@@ -49,7 +49,7 @@ interface DocumentsData {
   salaries: Salarie[];
   independants: Independant[];
   formateur: Formateur; // Pour rétrocompatibilité
-  formateurs?: Formateur[];
+  formateurs: Formateur[];
 }
 
 interface StepDocumentsProps {
@@ -111,8 +111,7 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
     });
   };
 
-  // Initialiser formateurs si non présent (migration depuis formateur unique)
-  const formateurs = data.formateurs || [{ id: "1", nomPrenom: data.formateur?.nomPrenom || "", fonction: data.formateur?.fonction || "" }];
+  const formateurs = data.formateurs;
 
   const addFormateur = () => {
     const newFormateur: Formateur = {

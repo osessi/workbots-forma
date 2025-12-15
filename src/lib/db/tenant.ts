@@ -17,13 +17,13 @@ export interface TenantContext {
 // ===========================================
 
 /**
- * Récupère le contexte multi-tenant à partir du Clerk userId
+ * Récupère le contexte multi-tenant à partir du Supabase userId
  */
 export async function getTenantContext(
-  clerkUserId: string
+  supabaseUserId: string
 ): Promise<TenantContext | null> {
   const user = await prisma.user.findUnique({
-    where: { clerkId: clerkUserId },
+    where: { supabaseId: supabaseUserId },
     include: { organization: true },
   });
 

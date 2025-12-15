@@ -1,0 +1,487 @@
+// Prisma Schema - Automate Forma
+// Multi-tenant SaaS pour organismes de formation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===========================================
+// ENUMS
+// ===========================================
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ORG_ADMIN
+  FORMATEUR
+  COLLABORATEUR
+}
+
+enum FormationStatus {
+  BROUILLON
+  EN_COURS
+  TERMINEE
+  ARCHIVEE
+}
+
+enum FileCategory {
+  FICHE_PEDAGOGIQUE
+  SLIDES
+  DOCUMENT
+  EVALUATION
+  SUPPORT_STAGIAIRE
+  IMAGE
+  AUTRE
+}
+
+enum DocumentType {
+  FICHE_PEDAGOGIQUE
+  CONVENTION
+  CONVOCATION
+  ATTESTATION_PRESENCE
+  ATTESTATION_FIN
+  EVALUATION_CHAUD
+  EVALUATION_FROID
+  REGLEMENT_INTERIEUR
+  CERTIFICAT
+  AUTRE
+}
+
+enum TemplateCategory {
+  DOCUMENT
+  EMAIL
+  PDF
+}
+
+// ===========================================
+// ORGANISATIONS (Multi-tenant root)
+// ===========================================
+
+model Organization {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  plan              Plan     @default(FREE)
+
+  // White-label
+  logo              String?
+  primaryColor      String   @default("#4277FF")
+  secondaryColor    String?
+  customDomain      String?  @unique
+
+  // Limites selon plan
+  maxFormateurs     Int      @default(1)
+  maxFormations     Int      @default(5)
+  maxStorageGb      Int      @default(1)
+
+  // Stripe
+  stripeCustomerId  String?  @unique
+  stripeSubscriptionId String?
+
+  // Metadata
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  users             User[]
+  formations        Formation[]
+  files             File[]
+  templates         Template[]
+  apiKeys           ApiKey[]
+  auditLogs         AuditLog[]
+
+  @@index([slug])
+  @@index([customDomain])
+}
+
+// ===========================================
+// UTILISATEURS
+// ===========================================
+
+model User {
+  id              String    @id @default(cuid())
+  supabaseId      String    @unique  // ID Supabase Auth (remplace clerkId)
+  email           String    @unique
+  firstName       String?
+  lastName        String?
+  avatar          String?
+  role            UserRole  @default(FORMATEUR)
+
+  // Multi-tenant
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Super Admin uniquement
+  isSuperAdmin    Boolean   @default(false)
+
+  // Metadata
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  formations      Formation[]
+  files           File[]
+  sessions        FormationSession[]
+  auditLogs       AuditLog[]
+
+  @@index([supabaseId])
+  @@index([organizationId])
+  @@index([email])
+}
+
+// ===========================================
+// FORMATIONS
+// ===========================================
+
+model Formation {
+  id              String          @id @default(cuid())
+  titre           String
+  description     String?         @db.Text
+  image           String?
+  status          FormationStatus @default(BROUILLON)
+
+  // Multi-tenant
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Créateur
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Fiche pédagogique (JSON)
+  fichePedagogique Json?
+
+  // Metadata
+  isArchived      Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  modules         Module[]
+  documents       Document[]
+  sessions        FormationSession[]
+  files           File[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Module {
+  id              String    @id @default(cuid())
+  titre           String
+  description     String?   @db.Text
+  ordre           Int       @default(0)
+  duree           Int?      // en minutes
+
+  // Parent
+  formationId     String
+  formation       Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Contenu (JSON pour flexibilité)
+  contenu         Json?
+
+  // Metadata
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([formationId])
+  @@index([ordre])
+}
+
+// ===========================================
+// DOCUMENTS GÉNÉRÉS
+// ===========================================
+
+model Document {
+  id              String        @id @default(cuid())
+  type            DocumentType
+  titre           String
+
+  // Contenu WYSIWYG (TipTap JSON)
+  content         Json?
+
+  // Fichier généré
+  fileUrl         String?
+  fileSize        Int?
+
+  // Parent
+  formationId     String
+  formation       Formation     @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Template utilisé
+  templateId      String?
+  template        Template?     @relation(fields: [templateId], references: [id])
+
+  // Metadata
+  version         Int           @default(1)
+  isGenerated     Boolean       @default(false)
+  generatedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([formationId])
+  @@index([type])
+}
+
+// ===========================================
+// TEMPLATES (Documents modèles)
+// ===========================================
+
+model Template {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  category        TemplateCategory
+  documentType    DocumentType?
+
+  // Contenu WYSIWYG (TipTap JSON)
+  content         Json
+
+  // Variables disponibles (ex: ["formation.titre", "formateur.nom"])
+  variables       String[]
+
+  // Multi-tenant (null = template système)
+  organizationId  String?
+  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Template système (disponible pour tous)
+  isSystem        Boolean          @default(false)
+
+  // Metadata
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  documents       Document[]
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([isSystem])
+}
+
+// ===========================================
+// FICHIERS (File Manager)
+// ===========================================
+
+model File {
+  id              String       @id @default(cuid())
+  name            String
+  originalName    String
+  mimeType        String
+  size            Int          // en bytes
+  category        FileCategory
+
+  // Stockage Supabase
+  storagePath     String
+  publicUrl       String?
+
+  // Multi-tenant
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Uploader
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Lien optionnel avec formation
+  formationId     String?
+  formation       Formation?   @relation(fields: [formationId], references: [id], onDelete: SetNull)
+
+  // Dossier virtuel
+  folderId        String?
+  folder          Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  // Metadata
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([category])
+  @@index([folderId])
+}
+
+model Folder {
+  id              String   @id @default(cuid())
+  name            String
+  color           String   @default("#4277FF")
+
+  // Parent folder (pour hiérarchie)
+  parentId        String?
+  parent          Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children        Folder[] @relation("FolderHierarchy")
+
+  // Multi-tenant
+  organizationId  String
+
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  files           File[]
+
+  @@index([organizationId])
+  @@index([parentId])
+}
+
+// ===========================================
+// SESSIONS DE FORMATION
+// ===========================================
+
+model FormationSession {
+  id              String    @id @default(cuid())
+
+  // Parent
+  formationId     String
+  formation       Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Formateur assigné
+  formateurId     String
+  formateur       User      @relation(fields: [formateurId], references: [id])
+
+  // Dates
+  dateDebut       DateTime
+  dateFin         DateTime
+
+  // Lieu
+  lieu            String?
+  isDistanciel    Boolean   @default(false)
+  lienVisio       String?
+
+  // Participants
+  maxParticipants Int       @default(10)
+
+  // Metadata
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  participants    Participant[]
+
+  @@index([formationId])
+  @@index([formateurId])
+  @@index([dateDebut])
+}
+
+model Participant {
+  id              String            @id @default(cuid())
+
+  // Session
+  sessionId       String
+  session         FormationSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Infos participant
+  email           String
+  firstName       String
+  lastName        String
+  company         String?
+
+  // Statut
+  hasConfirmed    Boolean           @default(false)
+  hasAttended     Boolean           @default(false)
+
+  // Metadata
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([sessionId])
+  @@index([email])
+}
+
+// ===========================================
+// API KEYS (Pour intégrations)
+// ===========================================
+
+model ApiKey {
+  id              String       @id @default(cuid())
+  name            String
+  key             String       @unique
+
+  // Multi-tenant
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Permissions (JSON array de scopes)
+  scopes          String[]
+
+  // Limites
+  rateLimit       Int          @default(1000) // requêtes par heure
+
+  // Metadata
+  lastUsedAt      DateTime?
+  expiresAt       DateTime?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  @@index([key])
+  @@index([organizationId])
+}
+
+// ===========================================
+// AUDIT LOG (Traçabilité)
+// ===========================================
+
+model AuditLog {
+  id              String       @id @default(cuid())
+
+  // Action
+  action          String       // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity          String       // Formation, Document, etc.
+  entityId        String?
+
+  // Détails (JSON)
+  details         Json?
+
+  // Qui
+  userId          String?
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Multi-tenant
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // IP & metadata
+  ipAddress       String?
+  userAgent       String?
+
+  // Timestamp
+  createdAt       DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+// ===========================================
+// CONFIG GLOBALE (Super Admin)
+// ===========================================
+
+model GlobalConfig {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           Json
+  description     String?
+
+  // Metadata
+  updatedAt       DateTime @updatedAt
+
+  @@index([key])
+}

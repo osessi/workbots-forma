@@ -1,9 +1,6 @@
 import { Outfit } from 'next/font/google';
 import './globals.css';
 
-// Clerk sera activé quand les clés seront configurées
-// import { ClerkProvider } from '@clerk/nextjs';
-// import { frFR } from '@clerk/localizations';
 import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import type { Metadata } from 'next';
@@ -25,19 +22,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // TODO: Activer ClerkProvider quand les clés sont configurées dans .env
-  // return (
-  //   <ClerkProvider localization={frFR}>
-  //     <html lang="fr">
-  //       <body className={`${outfit.className} dark:bg-gray-900`}>
-  //         <ThemeProvider>
-  //           <SidebarProvider>{children}</SidebarProvider>
-  //         </ThemeProvider>
-  //       </body>
-  //     </html>
-  //   </ClerkProvider>
-  // );
-
   return (
     <html lang="fr">
       <body className={`${outfit.className} dark:bg-gray-900`}>

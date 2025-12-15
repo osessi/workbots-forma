@@ -2,7 +2,7 @@
 // API ROUTE - Sign Out
 // ===========================================
 
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 

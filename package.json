@@ -37,7 +37,8 @@
     "react-dropzone": "^14.3.8",
     "svix": "^1.82.0",
     "swiper": "^11.2.10",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "lightningcss": "^1.29.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

@@ -239,7 +239,7 @@ export default function SettingsPage() {
 
   // Mock members data
   const mockMembers = [
-    { id: "1", name: user.prenom + " " + user.nom, email: user.email, role: user.role || "ORG_ADMIN", avatar: user.avatarUrl, status: "active" },
+    { id: "1", name: user.prenom + " " + user.nom, email: user.email, role: "ORG_ADMIN", avatar: user.avatarUrl, status: "active" },
   ];
 
   return (

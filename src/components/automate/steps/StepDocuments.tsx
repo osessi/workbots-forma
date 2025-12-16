@@ -1218,7 +1218,7 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="Écrivez ici..."
+                placeholder="Adresse du lieu / Visioconférence / ..."
                 value={infosPratiques.lieu}
                 onChange={(e) => updateInfosPratiquesField("lieu", e.target.value)}
                 className={inputClassName}

@@ -114,7 +114,7 @@ const initialDocumentsData = {
     telephone: "",
   },
   client: {
-    type: "entreprise" as const,
+    type: "entreprise" as "entreprise" | "independant",
     raisonSociale: "",
     nomDirigeant: "",
     adresse: "",

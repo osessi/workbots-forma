@@ -3,13 +3,15 @@
   "version": "2.2.1",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4000",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "next start -p 4000",
     "lint": "eslint .",
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@dicebear/collection": "^9.2.4",
+    "@dicebear/core": "^9.2.4",
     "@fullcalendar/core": "^6.1.19",
     "@fullcalendar/daygrid": "^6.1.19",
     "@fullcalendar/interaction": "^6.1.19",

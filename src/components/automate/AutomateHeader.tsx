@@ -2,7 +2,8 @@
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAutomate } from "@/context/AutomateContext";
-import Image from "next/image";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import UserAvatar from "@/components/ui/avatar/UserAvatar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect, useRef } from "react";
@@ -11,6 +12,7 @@ const AutomateHeader: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { user, formations, searchQuery, setSearchQuery } = useAutomate();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -72,6 +74,20 @@ const AutomateHeader: React.FC = () => {
     setLocalSearchQuery("");
     setIsSearchOpen(false);
     router.push(`/automate/create?id=${id}`);
+  };
+
+  const handleSignOut = async () => {
+    setIsLoggingOut(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.auth.signOut();
+      router.push("/signin");
+      router.refresh();
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -165,14 +181,13 @@ const AutomateHeader: React.FC = () => {
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all"
             >
-              <div className="relative w-10 h-10 overflow-hidden rounded-full ring-2 ring-transparent hover:ring-brand-100 dark:hover:ring-brand-500/20 transition-all">
-                <Image
-                  src="/images/user/photo costume carré.jpg"
-                  alt="User"
-                  fill
-                  className="object-cover"
-                />
-              </div>
+              <UserAvatar
+                src={user.avatarUrl}
+                seed={user.email}
+                alt={`${user.prenom} ${user.nom}`}
+                size="medium"
+                className="ring-2 ring-transparent hover:ring-brand-100 dark:hover:ring-brand-500/20 transition-all"
+              />
               <span className="hidden text-sm font-medium text-gray-700 dark:text-gray-200 lg:block">
                 {user.prenom}
               </span>
@@ -195,8 +210,12 @@ const AutomateHeader: React.FC = () => {
                   Facturation
                 </a>
                 <hr className="my-1.5 border-gray-100 dark:border-gray-700" />
-                <button className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors">
-                  Se déconnecter
+                <button
+                  onClick={handleSignOut}
+                  disabled={isLoggingOut}
+                  className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoggingOut ? "Déconnexion..." : "Se déconnecter"}
                 </button>
               </div>
             )}

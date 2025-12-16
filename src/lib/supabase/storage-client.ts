@@ -105,3 +105,48 @@ export async function uploadFilesClient(
   );
   return results;
 }
+
+// ===========================================
+// UPLOAD AVATAR (Simplifié)
+// ===========================================
+
+export interface AvatarUploadResult {
+  url: string | null;
+  error: string | null;
+}
+
+/**
+ * Upload un avatar utilisateur
+ * Stocké dans: avatars/{userEmail}/{timestamp}_{filename}
+ */
+export async function uploadAvatarClient(
+  file: File,
+  userEmail: string
+): Promise<AvatarUploadResult> {
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const timestamp = Date.now();
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const sanitizedEmail = userEmail.replace(/[^a-zA-Z0-9]/g, "_");
+    const path = `avatars/${sanitizedEmail}/${timestamp}.${ext}`;
+
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
+
+    if (error) {
+      return { url: null, error: error.message };
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+
+    return { url: publicUrl, error: null };
+  } catch (err) {
+    return { url: null, error: "Erreur lors de l'upload" };
+  }
+}

@@ -12,5 +12,6 @@ export {
   generateStoragePath,
   uploadFileClient,
   uploadFilesClient,
+  uploadAvatarClient,
 } from "./storage-client";
-export type { UploadResult, FileUploadOptions } from "./storage-client";
+export type { UploadResult, FileUploadOptions, AvatarUploadResult } from "./storage-client";

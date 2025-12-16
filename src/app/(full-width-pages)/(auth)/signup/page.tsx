@@ -1,12 +1,11 @@
-import SignUpForm from "@/components/auth/SignUpForm";
+import SignUpWizard from "@/components/auth/SignUpWizard";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Next.js SignUp Page | TailAdmin - Next.js Dashboard Template",
-  description: "This is Next.js SignUp Page TailAdmin Dashboard Template",
-  // other metadata
+  title: "Créer un compte | Automate Forma",
+  description: "Créez votre compte Automate Forma et simplifiez la création de vos formations",
 };
 
 export default function SignUp() {
-  return <SignUpForm />;
+  return <SignUpWizard />;
 }

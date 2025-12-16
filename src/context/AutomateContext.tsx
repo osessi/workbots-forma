@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 // Types
 export interface UserProfile {
@@ -13,6 +13,7 @@ export interface UserProfile {
   codePostal: string;
   ville: string;
   numeroFormateur: string;
+  avatarUrl?: string | null;
 }
 
 export interface Formation {
@@ -27,6 +28,8 @@ interface AutomateContextType {
   // User
   user: UserProfile;
   updateUser: (updates: Partial<UserProfile>) => void;
+  isLoadingUser: boolean;
+  refreshUser: () => Promise<void>;
 
   // Formations
   formations: Formation[];
@@ -41,17 +44,19 @@ interface AutomateContextType {
   filteredFormations: Formation[];
 }
 
+// Valeurs par défaut - vides pour les infos entreprise
 const defaultUser: UserProfile = {
-  prenom: "Fabien",
-  nom: "Durand",
-  email: "fabien.durand@email.com",
-  telephone: "06 12 34 56 78",
-  entreprise: "Formation Pro SARL",
-  siret: "123 456 789 00012",
-  adresse: "15 rue de la Formation",
-  codePostal: "75001",
-  ville: "Paris",
-  numeroFormateur: "11 75 12345 67",
+  prenom: "",
+  nom: "",
+  email: "",
+  telephone: "",
+  entreprise: "",
+  siret: "",
+  adresse: "",
+  codePostal: "",
+  ville: "",
+  numeroFormateur: "",
+  avatarUrl: null,
 };
 
 const defaultFormations: Formation[] = [
@@ -133,10 +138,51 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [user, setUser] = useState<UserProfile>(defaultUser);
   const [formations, setFormations] = useState<Formation[]>(defaultFormations);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  // Charger le profil utilisateur depuis l'API
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      setIsLoadingUser(true);
+      const response = await fetch("/api/user/profile");
+
+      if (response.ok) {
+        const data = await response.json();
+        const org = data.organization;
+        setUser({
+          prenom: data.firstName || "",
+          nom: data.lastName || "",
+          email: data.email || "",
+          telephone: data.phone || "",
+          avatarUrl: data.avatar || null,
+          // Infos entreprise depuis l'organisation
+          entreprise: org?.name || "",
+          siret: org?.siret || "",
+          numeroFormateur: org?.numeroFormateur || "",
+          adresse: org?.adresse || "",
+          codePostal: org?.codePostal || "",
+          ville: org?.ville || "",
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement du profil:", error);
+    } finally {
+      setIsLoadingUser(false);
+    }
+  }, []);
+
+  // Charger le profil au montage
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
 
   const updateUser = useCallback((updates: Partial<UserProfile>) => {
     setUser((prev) => ({ ...prev, ...updates }));
   }, []);
+
+  const refreshUser = useCallback(async () => {
+    await fetchUserProfile();
+  }, [fetchUserProfile]);
 
   const addFormation = useCallback((formation: Omit<Formation, "id">) => {
     const newId = (Math.max(...formations.map((f) => parseInt(f.id))) + 1).toString();
@@ -167,6 +213,8 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         user,
         updateUser,
+        isLoadingUser,
+        refreshUser,
         formations,
         addFormation,
         updateFormation,

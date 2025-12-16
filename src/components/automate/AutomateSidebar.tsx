@@ -1,10 +1,11 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { useTheme } from "@/context/ThemeContext";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
   LayoutDashboard,
   PlusCircle,
@@ -74,7 +75,23 @@ const bottomNavItems: NavItem[] = [
 const AutomateSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const router = useRouter();
   const { theme } = useTheme();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsLoggingOut(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.auth.signOut();
+      router.push("/signin");
+      router.refresh();
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const isActive = (path: string) => isActiveOrChild(path, pathname);
 
@@ -156,7 +173,9 @@ const AutomateSidebar: React.FC = () => {
             {bottomNavItems.map((nav) => renderNavItem(nav, false))}
             <li className="mt-2">
               <button
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border w-full transition-all duration-200 text-gray-600 border-gray-200 bg-gray-50/50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 dark:text-gray-300 dark:border-gray-700 dark:bg-gray-800/30 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 ${
+                onClick={handleSignOut}
+                disabled={isLoggingOut}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border w-full transition-all duration-200 text-gray-600 border-gray-200 bg-gray-50/50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 dark:text-gray-300 dark:border-gray-700 dark:bg-gray-800/30 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed ${
                   !isExpanded && !isHovered && !isMobileOpen ? "lg:justify-center lg:px-3" : ""
                 }`}
               >
@@ -164,7 +183,9 @@ const AutomateSidebar: React.FC = () => {
                   <LogOut size={20} strokeWidth={1.5} />
                 </span>
                 {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className="text-sm font-medium">Se déconnecter</span>
+                  <span className="text-sm font-medium">
+                    {isLoggingOut ? "Déconnexion..." : "Se déconnecter"}
+                  </span>
                 )}
               </button>
             </li>

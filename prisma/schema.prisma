@@ -74,6 +74,14 @@ model Organization {
   slug              String   @unique
   plan              Plan     @default(FREE)
 
+  // Infos entreprise
+  siret             String?
+  numeroFormateur   String?  // N° déclaration d'activité DREETS
+  adresse           String?
+  codePostal        String?
+  ville             String?
+  telephone         String?
+
   // White-label
   logo              String?
   primaryColor      String   @default("#4277FF")
@@ -116,6 +124,7 @@ model User {
   email           String    @unique
   firstName       String?
   lastName        String?
+  phone           String?
   avatar          String?
   role            UserRole  @default(FORMATEUR)
 

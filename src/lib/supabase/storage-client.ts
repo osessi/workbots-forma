@@ -1,7 +1,7 @@
 import { getSupabaseBrowserClient } from "./client";
 
 // Nom du bucket principal
-export const STORAGE_BUCKET = "automate-files";
+export const STORAGE_BUCKET = "worksbots-forma-stockage";
 
 // Types
 export interface UploadResult {

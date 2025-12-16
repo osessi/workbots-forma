@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import Link from "next/link";
 import { useAutomate } from "@/context/AutomateContext";
 
 // Icons
@@ -98,7 +99,7 @@ const FILE_CATEGORIES = {
   },
   slides: {
     icon: <PPTIcon />,
-    label: "Présentations",
+    label: "Slides",
     color: "text-orange-500",
     bgColor: "bg-orange-50 dark:bg-orange-500/10",
   },
@@ -183,8 +184,8 @@ export default function FileManagerPage() {
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
               Gestionnaire de fichiers
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Tous vos documents générés, organisés par formation
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+              Importez et centralisez tous vos documents de formation (supports, conventions, documents signés…). Classez-les par formation puis par apprenant pour constituer et retrouver facilement le dossier complet de chaque participant.
             </p>
           </div>
           <button className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:scale-[0.98] transition-all shadow-sm hover:shadow-md whitespace-nowrap">
@@ -196,23 +197,9 @@ export default function FileManagerPage() {
 
       {/* Stats Cards - All Media */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            Tous les médias
-          </h2>
-          <div className="relative max-w-xs">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <SearchIcon />
-            </span>
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
-            />
-          </div>
-        </div>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-6">
+          Vue d'ensemble
+        </h2>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {statsData.map((stat) => {
@@ -260,14 +247,14 @@ export default function FileManagerPage() {
         <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-              Dossiers par formation
+              Dossiers de formation
             </h2>
-            <button className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center gap-1">
+            <Link href="/automate/files/folders" className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center gap-1">
               Voir tout
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -387,7 +374,7 @@ export default function FileManagerPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-orange-500" />
-              <span className="text-xs text-gray-600 dark:text-gray-400">Présentations</span>
+              <span className="text-xs text-gray-600 dark:text-gray-400">Slides</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-green-500" />
@@ -412,12 +399,12 @@ export default function FileManagerPage() {
               </span>
             )}
           </h2>
-          <button className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center gap-1">
+          <Link href="/automate/files/all" className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 flex items-center gap-1">
             Voir tout
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-          </button>
+          </Link>
         </div>
 
         <div className="overflow-x-auto">

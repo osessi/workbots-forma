@@ -13,6 +13,7 @@ const AutomateHeader: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [localSearchQuery, setLocalSearchQuery] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isMac, setIsMac] = useState(false);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { user, formations, searchQuery, setSearchQuery } = useAutomate();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -34,6 +35,11 @@ const AutomateHeader: React.FC = () => {
       toggleMobileSidebar();
     }
   };
+
+  // Detect platform for keyboard shortcut display (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    setIsMac(navigator.platform?.includes("Mac") ?? false);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -130,7 +136,7 @@ const AutomateHeader: React.FC = () => {
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1 text-xs text-gray-400">
                 <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500 font-medium dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400">
-                  {typeof navigator !== "undefined" && navigator.platform?.includes("Mac") ? "⌘" : "Ctrl"}
+                  {isMac ? "⌘" : "Ctrl"}
                 </kbd>
                 <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-gray-500 font-medium dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400">
                   K

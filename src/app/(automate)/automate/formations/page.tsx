@@ -25,6 +25,20 @@ const CheckIcon = () => (
   </svg>
 );
 
+// Icon Edit (Stylo)
+const EditIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10.5 1.75L12.25 3.5M1.16667 12.8333L1.75 10.5L9.91667 2.33333L11.6667 4.08333L3.5 12.25L1.16667 12.8333Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Icon Close
+const CloseIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.5 3.5L10.5 10.5M3.5 10.5L10.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export default function MesFormationsPage() {
   const { formations, updateFormation } = useAutomate();
   const [searchQuery, setSearchQuery] = useState("");
@@ -147,15 +161,33 @@ export default function MesFormationsPage() {
                     >
                       <CheckIcon />
                     </button>
+                    <button
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditedTitle("");
+                      }}
+                      className="px-3 py-2 text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600 transition-colors"
+                      title="Annuler"
+                    >
+                      <CloseIcon />
+                    </button>
                   </div>
                 ) : (
-                  <input
-                    type="text"
-                    value={formation.titre}
-                    onFocus={() => handleStartEdit(formation.id, formation.titre)}
-                    readOnly
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-pointer hover:border-brand-300 hover:bg-white dark:hover:border-brand-500 dark:hover:bg-gray-700 transition-colors"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formation.titre}
+                      readOnly
+                      className="w-full px-3 py-2.5 pr-10 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white cursor-default"
+                    />
+                    <button
+                      onClick={() => handleStartEdit(formation.id, formation.titre)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-brand-500 hover:bg-brand-50 rounded-md transition-colors dark:hover:bg-brand-500/10"
+                      title="Modifier le titre"
+                    >
+                      <EditIcon />
+                    </button>
+                  </div>
                 )}
               </div>
               <Link

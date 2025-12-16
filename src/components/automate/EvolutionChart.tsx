@@ -16,8 +16,10 @@ const dataByPeriod = {
     series: [
       { name: "Formations", data: [2, 1, 3, 2, 4, 1, 2] },
       { name: "Fiches pédagogiques", data: [5, 3, 6, 4, 8, 2, 4] },
-      { name: "Présentations", data: [1, 2, 2, 1, 3, 1, 2] },
+      { name: "Slides", data: [4, 2, 5, 3, 6, 2, 3] },
+      { name: "Supports stagiaires", data: [3, 2, 4, 3, 5, 1, 3] },
       { name: "Évaluations", data: [1, 1, 2, 1, 2, 0, 1] },
+      { name: "Documents", data: [2, 1, 3, 2, 4, 1, 2] },
     ],
   },
   "30j": {
@@ -25,8 +27,10 @@ const dataByPeriod = {
     series: [
       { name: "Formations", data: [8, 12, 10, 15] },
       { name: "Fiches pédagogiques", data: [18, 24, 20, 28] },
-      { name: "Présentations", data: [6, 10, 8, 12] },
+      { name: "Slides", data: [14, 18, 16, 22] },
+      { name: "Supports stagiaires", data: [10, 14, 12, 18] },
       { name: "Évaluations", data: [4, 7, 5, 9] },
+      { name: "Documents", data: [8, 12, 10, 14] },
     ],
   },
   "90j": {
@@ -34,8 +38,10 @@ const dataByPeriod = {
     series: [
       { name: "Formations", data: [25, 32, 38] },
       { name: "Fiches pédagogiques", data: [52, 68, 78] },
-      { name: "Présentations", data: [20, 28, 35] },
+      { name: "Slides", data: [42, 55, 65] },
+      { name: "Supports stagiaires", data: [32, 42, 52] },
       { name: "Évaluations", data: [15, 22, 28] },
+      { name: "Documents", data: [28, 38, 48] },
     ],
   },
   "12m": {
@@ -43,8 +49,10 @@ const dataByPeriod = {
     series: [
       { name: "Formations", data: [4, 6, 8, 5, 10, 12, 8, 15, 18, 14, 20, 22] },
       { name: "Fiches pédagogiques", data: [8, 12, 15, 10, 18, 22, 16, 28, 32, 26, 35, 38] },
-      { name: "Présentations", data: [3, 5, 7, 4, 9, 11, 7, 14, 16, 12, 18, 20] },
+      { name: "Slides", data: [6, 9, 12, 8, 14, 18, 12, 22, 26, 20, 28, 32] },
+      { name: "Supports stagiaires", data: [5, 7, 10, 6, 12, 14, 10, 18, 22, 16, 24, 28] },
       { name: "Évaluations", data: [2, 4, 5, 3, 7, 8, 5, 10, 12, 9, 14, 16] },
+      { name: "Documents", data: [4, 6, 8, 5, 10, 12, 8, 14, 18, 12, 20, 24] },
     ],
   },
 };
@@ -76,7 +84,7 @@ export const EvolutionChart: React.FC = () => {
         horizontal: 12,
       },
     },
-    colors: ["#4277FF", "#F97316", "#22C55E", "#8B5CF6"],
+    colors: ["#4277FF", "#F97316", "#22C55E", "#8B5CF6", "#06B6D4", "#EC4899"],
     chart: {
       fontFamily: "inherit",
       height: 320,
@@ -190,7 +198,7 @@ export const EvolutionChart: React.FC = () => {
             Évolution des créations
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Suivez l'évolution de vos contenus générés
+            Visualisez le nombre de contenus générés sur la période sélectionnée.
           </p>
         </div>
         <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl dark:bg-gray-800">

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAutomate, UserProfile } from "@/context/AutomateContext";
 import UserAvatar from "@/components/ui/avatar/UserAvatar";
 import Image from "next/image";
+import Link from "next/link";
 
 // Icons
 const CameraIcon = () => (
@@ -48,7 +49,6 @@ export default function MonComptePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,7 +64,8 @@ export default function MonComptePage() {
   };
 
   const handleLogoClick = () => {
-    if (isEditing && logoInputRef.current) {
+    // Permet l'upload du logo sans mode édition
+    if (logoInputRef.current) {
       logoInputRef.current.click();
     }
   };
@@ -125,7 +126,8 @@ export default function MonComptePage() {
       const result = await uploadImage(file, "logo");
 
       if (result.url) {
-        setLogoUrl(result.url);
+        // Refresh pour synchroniser avec le serveur (logo sauvé dans l'organisation)
+        await refreshUser();
       } else {
         alert(result.error || "Erreur lors de l'upload");
       }
@@ -288,11 +290,11 @@ export default function MonComptePage() {
                 />
                 <div
                   onClick={handleLogoClick}
-                  className={`w-32 h-32 rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 transition-all ${isEditing ? "cursor-pointer hover:border-brand-300 hover:bg-brand-50/50 dark:hover:bg-brand-500/10" : ""}`}
+                  className="w-32 h-32 rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 transition-all cursor-pointer hover:border-brand-300 hover:bg-brand-50/50 dark:hover:bg-brand-500/10"
                 >
-                  {logoUrl ? (
+                  {user.logoUrl ? (
                     <Image
-                      src={logoUrl}
+                      src={user.logoUrl}
                       alt="Logo entreprise"
                       width={128}
                       height={128}
@@ -300,32 +302,35 @@ export default function MonComptePage() {
                     />
                   ) : (
                     <div className="text-center p-4">
-                      <BuildingIcon />
+                      <div className="flex justify-center text-gray-400">
+                        <BuildingIcon />
+                      </div>
                       <p className="text-xs text-gray-400 mt-2">
-                        {isEditing ? "Cliquez pour ajouter" : "Aucun logo"}
+                        Cliquez pour ajouter
                       </p>
                     </div>
                   )}
                 </div>
-                {isEditing && (
-                  <button
-                    onClick={handleLogoClick}
-                    disabled={isUploadingLogo}
-                    className="absolute -bottom-2 -right-2 p-2 bg-brand-500 text-white rounded-full hover:bg-brand-600 active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
-                  >
-                    {isUploadingLogo ? (
-                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : (
-                      <CameraIcon />
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={handleLogoClick}
+                  disabled={isUploadingLogo}
+                  className="absolute -bottom-2 -right-2 p-2 bg-brand-500 text-white rounded-full hover:bg-brand-600 active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
+                >
+                  {isUploadingLogo ? (
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <CameraIcon />
+                  )}
+                </button>
               </div>
               <p className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                {isEditing ? "Ce logo apparaîtra sur vos documents" : localProfile.entreprise || "Votre entreprise"}
+                {localProfile.entreprise || "Votre entreprise"}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-1">
+                Ce logo apparaîtra sur vos documents
               </p>
             </div>
           </div>
@@ -485,9 +490,12 @@ export default function MonComptePage() {
                   Dernière modification il y a 3 mois
                 </p>
               </div>
-              <button className="px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg active:scale-[0.98] transition-all dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20">
+              <Link
+                href="/reset-password"
+                className="px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg active:scale-[0.98] transition-all dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
+              >
                 Modifier le mot de passe
-              </button>
+              </Link>
             </div>
           </div>
         </div>

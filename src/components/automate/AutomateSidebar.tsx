@@ -12,6 +12,7 @@ import {
   FolderOpen,
   FileBox,
   User,
+  Settings,
   CreditCard,
   HelpCircle,
   LogOut,
@@ -61,9 +62,9 @@ const bottomNavItems: NavItem[] = [
     path: "/automate/account",
   },
   {
-    icon: <CreditCard size={20} strokeWidth={1.5} />,
-    name: "Facturation",
-    path: "/automate/billing",
+    icon: <Settings size={20} strokeWidth={1.5} />,
+    name: "Paramètres",
+    path: "/automate/settings",
   },
   {
     icon: <HelpCircle size={20} strokeWidth={1.5} />,

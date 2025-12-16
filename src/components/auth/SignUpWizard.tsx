@@ -33,6 +33,8 @@ interface WizardData {
   adresse: string;
   codePostal: string;
   ville: string;
+  logoFile: File | null;
+  logoPreview: string | null;
   // Step 3: Invitations
   teamMembers: TeamMember[];
 }
@@ -53,6 +55,7 @@ export default function SignUpWizard() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Form data
   const [data, setData] = useState<WizardData>({
@@ -70,6 +73,8 @@ export default function SignUpWizard() {
     adresse: "",
     codePostal: "",
     ville: "",
+    logoFile: null,
+    logoPreview: null,
     teamMembers: [{ email: "", role: "formateur" }],
   });
 
@@ -99,6 +104,32 @@ export default function SignUpWizard() {
       updateData({
         avatarFile: file,
         avatarPreview: reader.result as string,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle logo selection
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Veuillez sélectionner une image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("L'image ne doit pas dépasser 5MB");
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updateData({
+        logoFile: file,
+        logoPreview: reader.result as string,
       });
     };
     reader.readAsDataURL(file);
@@ -269,15 +300,16 @@ export default function SignUpWizard() {
             });
           }
 
-          // Créer le workspace (à implémenter côté API)
-          // await fetch("/api/workspace/create", {
-          //   method: "POST",
-          //   body: JSON.stringify({
-          //     name: data.workspaceName,
-          //     slug: data.workspaceSlug,
-          //     invitations: data.invitations.filter(Boolean),
-          //   }),
-          // });
+          // Upload logo si sélectionné
+          if (data.logoFile) {
+            const formData = new FormData();
+            formData.append("file", data.logoFile);
+            formData.append("type", "logo");
+            await fetch("/api/user/avatar", {
+              method: "POST",
+              body: formData,
+            });
+          }
 
           router.push("/automate");
           router.refresh();
@@ -696,6 +728,52 @@ export default function SignUpWizard() {
                   value={data.ville}
                   onChange={(e) => updateData({ ville: e.target.value })}
                 />
+              </div>
+            </div>
+
+            {/* Logo entreprise */}
+            <div>
+              <Label>Logo de l&apos;entreprise</Label>
+              <div className="flex items-center gap-4 mt-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="relative group"
+                >
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 transition-all group-hover:border-brand-300 group-hover:bg-brand-50/50 dark:group-hover:bg-brand-500/10">
+                    {data.logoPreview ? (
+                      <Image
+                        src={data.logoPreview}
+                        alt="Logo preview"
+                        width={80}
+                        height={80}
+                        className="object-contain w-full h-full p-1"
+                      />
+                    ) : (
+                      <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 p-1 bg-brand-500 text-white rounded-full">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                </button>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Ce logo apparaîtra sur vos documents de formation
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG jusqu&apos;à 5MB</p>
+                </div>
               </div>
             </div>
 

@@ -4,7 +4,7 @@ import Image from "next/image";
 
 // Icons
 const EditIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M13.5 2.25L15.75 4.5M1.5 16.5L2.25 13.5L12.75 3L15 5.25L4.5 15.75L1.5 16.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
@@ -37,6 +37,11 @@ interface FichePedagogiqueData {
   nombreParticipants: string;
   tarif: string;
   accessibilite: string;
+  prerequis: string;
+  publicVise: string;
+  suiviEvaluation: string;
+  ressourcesPedagogiques: string;
+  delaiAcces: string;
 }
 
 interface StepFichePedagogiqueProps {
@@ -45,6 +50,119 @@ interface StepFichePedagogiqueProps {
   onNext: () => void;
   onPrevious: () => void;
 }
+
+// Composant pour les blocs éditables avec stylo
+interface EditableBlockProps {
+  title: string;
+  value: string;
+  fieldName: keyof FichePedagogiqueData;
+  onChange: (field: keyof FichePedagogiqueData, value: string) => void;
+  isList?: boolean;
+}
+
+const EditableBlock: React.FC<EditableBlockProps> = ({ title, value, fieldName, onChange, isList = false }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedValue, setEditedValue] = useState(value);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      // Auto-resize
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    setEditedValue(value);
+  }, [value]);
+
+  const handleSave = () => {
+    onChange(fieldName, editedValue);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedValue(value);
+    setIsEditing(false);
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedValue(e.target.value);
+    // Auto-resize
+    e.target.style.height = "auto";
+    e.target.style.height = e.target.scrollHeight + "px";
+  };
+
+  const renderContent = () => {
+    if (isList && value) {
+      const items = value.split("\n").filter(item => item.trim());
+      return (
+        <ul className="space-y-2">
+          {items.map((item, index) => (
+            <li key={index} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-brand-500 mt-0.5 flex-shrink-0">•</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    return (
+      <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">
+        {value}
+      </p>
+    );
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {title}
+        </h4>
+        {!isEditing && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
+            title="Modifier"
+          >
+            <EditIcon />
+          </button>
+        )}
+      </div>
+      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+        {isEditing ? (
+          <div className="space-y-3">
+            <textarea
+              ref={textareaRef}
+              value={editedValue}
+              onChange={handleTextareaChange}
+              className="w-full px-3 py-2 text-sm border border-brand-300 rounded-lg bg-white text-gray-800 dark:bg-gray-900 dark:text-white dark:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none min-h-[100px]"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={handleCancel}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-3 py-1.5 text-sm text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        ) : (
+          renderContent()
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   data,
@@ -85,12 +203,16 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
     }
   };
 
+  const handleFieldChange = (field: keyof FichePedagogiqueData, value: string) => {
+    onChange({ ...data, [field]: value });
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Colonne gauche - Image et infos basiques */}
-          <div className="space-y-6">
+          {/* Colonne gauche - Image et infos basiques (sticky) */}
+          <div className="space-y-5 lg:sticky lg:top-6 lg:self-start">
             {/* Image de la formation */}
             <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
               <Image
@@ -101,10 +223,10 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               />
             </div>
 
-            {/* Type de formation */}
+            {/* Modalité de la formation */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Type de formation
+                Modalité de la formation
               </label>
               <input
                 type="text"
@@ -127,10 +249,10 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               />
             </div>
 
-            {/* Nombre de participants */}
+            {/* Nombre maximum de participants par session */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Nombre maximum de participants
+                Nombre maximum de participants par session
               </label>
               <input
                 type="text"
@@ -153,22 +275,17 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               />
             </div>
 
-            {/* Accessibilité */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Accessibilité
-              </label>
-              <input
-                type="text"
-                value={data.accessibilite}
-                onChange={(e) => onChange({ ...data, accessibilite: e.target.value })}
-                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
+            {/* Accessibilité - Bloc éditable */}
+            <EditableBlock
+              title="Accessibilité"
+              value={data.accessibilite}
+              fieldName="accessibilite"
+              onChange={handleFieldChange}
+            />
           </div>
 
           {/* Colonne droite - Détails de la fiche */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Titre avec actions */}
             <div className="flex items-start justify-between gap-4">
               {isEditingTitle ? (
@@ -239,13 +356,31 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                 <ul className="space-y-2">
                   {data.objectifs.map((objectif, index) => (
                     <li key={index} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <span className="text-brand-500 mt-1">•</span>
-                      {objectif}
+                      <span className="text-brand-500 mt-0.5 flex-shrink-0">•</span>
+                      <span>{objectif}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
+
+            {/* Prérequis - Bloc éditable */}
+            <EditableBlock
+              title="Prérequis"
+              value={data.prerequis}
+              fieldName="prerequis"
+              onChange={handleFieldChange}
+              isList
+            />
+
+            {/* Public visé - Bloc éditable */}
+            <EditableBlock
+              title="Public visé"
+              value={data.publicVise}
+              fieldName="publicVise"
+              onChange={handleFieldChange}
+              isList
+            />
 
             {/* Contenu de la formation */}
             <div>
@@ -258,6 +393,32 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Suivi de l'exécution et évaluation des résultats - Bloc éditable */}
+            <EditableBlock
+              title="Suivi de l'exécution et évaluation des résultats"
+              value={data.suiviEvaluation}
+              fieldName="suiviEvaluation"
+              onChange={handleFieldChange}
+              isList
+            />
+
+            {/* Ressources pédagogiques - Bloc éditable */}
+            <EditableBlock
+              title="Ressources pédagogiques"
+              value={data.ressourcesPedagogiques}
+              fieldName="ressourcesPedagogiques"
+              onChange={handleFieldChange}
+              isList
+            />
+
+            {/* Délai d'accès - Bloc éditable */}
+            <EditableBlock
+              title="Délai d'accès"
+              value={data.delaiAcces}
+              fieldName="delaiAcces"
+              onChange={handleFieldChange}
+            />
           </div>
         </div>
       </div>

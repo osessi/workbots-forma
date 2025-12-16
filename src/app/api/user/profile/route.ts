@@ -81,6 +81,7 @@ export async function GET() {
         ville: user.organization.ville,
         telephone: user.organization.telephone,
         logo: user.organization.logo,
+        primaryColor: user.organization.primaryColor,
       } : null,
     });
   } catch (error) {
@@ -90,6 +91,11 @@ export async function GET() {
       { status: 500 }
     );
   }
+}
+
+// PUT - Alias for PATCH (for settings page)
+export async function PUT(request: NextRequest) {
+  return PATCH(request);
 }
 
 // PATCH - Mettre à jour le profil (user + org)

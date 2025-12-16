@@ -9,11 +9,14 @@ import StepDocuments from "@/components/automate/steps/StepDocuments";
 
 // Données initiales pour l'étape Contexte
 const initialContexteData = {
+  typeSession: [] as string[],
+  modalite: "",
   dureeHeures: "",
   dureeJours: "",
-  modalite: "",
-  tarif: "",
   nombreParticipants: "",
+  tarifEntreprise: "",
+  tarifIndependant: "",
+  tarifParticulier: "",
   description: "",
 };
 
@@ -41,7 +44,23 @@ Module 2 – Données, algorithmes et apprentissage automatique
   duree: "14 heures (2 jours)",
   nombreParticipants: "12",
   tarif: "1200 € HT / participant",
-  accessibilite: "Oui",
+  accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
+  prerequis: `Aucune compétence technique en informatique ou en data n'est requise
+Être à l'aise avec l'utilisation courante d'un ordinateur (mail, navigation web, outils bureautiques)
+Manifester un intérêt pour les enjeux du numérique et de l'intelligence artificielle dans son activité professionnelle`,
+  publicVise: `Professionnels non spécialistes (salariés, managers, responsables de service, indépendants…) souhaitant comprendre les fondamentaux de l'IA
+Personnes impliquées dans des projets de transformation digitale ou d'optimisation de leurs processus de travail
+Toute personne souhaitant intégrer l'IA dans son quotidien professionnel`,
+  suiviEvaluation: `Feuilles d'émargement signées par demi-journée pour attester de la présence des participants
+Évaluation de fin de formation pour valider les acquis des participants
+Auto-évaluation des compétences en début et en fin de formation pour mesurer la progression
+Questionnaire de satisfaction à chaud remis à chaque participant
+Attestation de fin de formation délivrée aux participants ayant suivi l'intégralité de la session`,
+  ressourcesPedagogiques: `Formation réalisée en présentiel (en salle équipée, en intra-entreprise) ou à distance via un outil de visioconférence (en classe virtuelle synchrone)
+Accompagnement par le formateur : suivi individualisé et réponses aux questions tout au long de la formation
+Ateliers pratiques : mises en situation et exercices appliqués pour ancrer les compétences
+Supports de cours remis aux participants (version numérique et/ou papier)`,
+  delaiAcces: "Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.",
 };
 
 // Modules pour les étapes Slides et Évaluations
@@ -83,11 +102,27 @@ const initialModules = [
 
 // Données initiales pour les documents
 const initialDocumentsData = {
-  entreprise: {
+  organisme: {
     raisonSociale: "",
-    nomDirigeant: "",
+    representantLegal: "",
+    numeroDA: "",
     siret: "",
     adresse: "",
+    codePostal: "",
+    ville: "",
+    email: "",
+    telephone: "",
+  },
+  client: {
+    type: "entreprise" as const,
+    raisonSociale: "",
+    nomDirigeant: "",
+    adresse: "",
+    codePostal: "",
+    ville: "",
+    siret: "",
+    telephone: "",
+    email: "",
   },
   salaries: [
     {
@@ -96,15 +131,23 @@ const initialDocumentsData = {
       adresse: "",
       codePostal: "",
       ville: "",
+      telephone: "",
+      email: "",
+      dateNaissance: "",
+      villeNaissance: "",
     },
   ],
-  independants: [
+  particuliers: [
     {
       id: "1",
-      raisonSociale: "",
-      nomDirigeant: "",
-      siret: "",
+      nom: "",
+      prenom: "",
       adresse: "",
+      codePostal: "",
+      ville: "",
+      email: "",
+      telephone: "",
+      statut: "",
     },
   ],
   formateur: {
@@ -112,13 +155,20 @@ const initialDocumentsData = {
     nomPrenom: "",
     fonction: "",
   },
-  formateurs: [
-    {
-      id: "1",
-      nomPrenom: "",
-      fonction: "",
-    },
-  ],
+  infosPratiques: {
+    lieu: "",
+    adresse: "",
+    codePostal: "",
+    ville: "",
+    journees: [
+      {
+        id: "1",
+        date: "",
+        horaireMatin: "09:00 - 12:30",
+        horaireApresMidi: "14:00 - 17:30",
+      },
+    ],
+  },
 };
 
 export default function CreateFormationPage() {
@@ -172,6 +222,34 @@ export default function CreateFormationPage() {
 
   const handleGenerateContrat = () => {
     console.log("Générer contrat de formation");
+  };
+
+  const handleGenerateProgramme = () => {
+    console.log("Générer programme de formation");
+  };
+
+  const handleGenerateConvocation = () => {
+    console.log("Générer convocation");
+  };
+
+  const handleGenerateEmargement = () => {
+    console.log("Générer feuilles d'émargement");
+  };
+
+  const handleGenerateEvalChaud = () => {
+    console.log("Générer évaluation à chaud");
+  };
+
+  const handleGenerateEvalFroid = () => {
+    console.log("Générer évaluation à froid");
+  };
+
+  const handleGenerateEvalFormateur = () => {
+    console.log("Générer évaluation formateur");
+  };
+
+  const handleGenerateAttestation = () => {
+    console.log("Générer attestation de fin de formation");
   };
 
   return (
@@ -230,6 +308,13 @@ export default function CreateFormationPage() {
           onChange={setDocumentsData}
           onGenerateConvention={handleGenerateConvention}
           onGenerateContrat={handleGenerateContrat}
+          onGenerateProgramme={handleGenerateProgramme}
+          onGenerateConvocation={handleGenerateConvocation}
+          onGenerateEmargement={handleGenerateEmargement}
+          onGenerateEvalChaud={handleGenerateEvalChaud}
+          onGenerateEvalFroid={handleGenerateEvalFroid}
+          onGenerateEvalFormateur={handleGenerateEvalFormateur}
+          onGenerateAttestation={handleGenerateAttestation}
         />
       )}
     </div>

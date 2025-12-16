@@ -481,6 +481,43 @@ model AuditLog {
 }
 
 // ===========================================
+// INVITATIONS
+// ===========================================
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+model Invitation {
+  id              String           @id @default(cuid())
+  email           String
+  role            UserRole         @default(FORMATEUR)
+  status          InvitationStatus @default(PENDING)
+  token           String           @unique
+
+  // Multi-tenant
+  organizationId  String
+
+  // Qui a invité
+  invitedById     String
+
+  // Expiration (7 jours par défaut)
+  expiresAt       DateTime
+
+  // Metadata
+  createdAt       DateTime         @default(now())
+  acceptedAt      DateTime?
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([token])
+  @@index([status])
+}
+
+// ===========================================
 // CONFIG GLOBALE (Super Admin)
 // ===========================================
 

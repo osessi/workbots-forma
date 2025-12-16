@@ -1,6 +1,71 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
+// Helper pour convertir hex en HSL
+function hexToHSL(hex: string): { h: number; s: number; l: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return { h: 217, s: 100, l: 63 }; // Default brand color
+
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        h = ((b - r) / d + 2) / 6;
+        break;
+      case b:
+        h = ((r - g) / d + 4) / 6;
+        break;
+    }
+  }
+
+  return {
+    h: Math.round(h * 360),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100),
+  };
+}
+
+// Appliquer la couleur primaire aux CSS variables
+function applyPrimaryColor(hex: string) {
+  const hsl = hexToHSL(hex);
+  const root = document.documentElement;
+
+  // Couleur principale
+  root.style.setProperty("--color-brand-500", hex);
+  root.style.setProperty("--color-brand-hue", hsl.h.toString());
+  root.style.setProperty("--color-brand-saturation", `${hsl.s}%`);
+  root.style.setProperty("--color-brand-lightness", `${hsl.l}%`);
+
+  // Variantes plus claires
+  root.style.setProperty("--color-brand-25", `hsl(${hsl.h}, ${hsl.s}%, 98%)`);
+  root.style.setProperty("--color-brand-50", `hsl(${hsl.h}, ${hsl.s}%, 95%)`);
+  root.style.setProperty("--color-brand-100", `hsl(${hsl.h}, ${hsl.s}%, 90%)`);
+  root.style.setProperty("--color-brand-200", `hsl(${hsl.h}, ${hsl.s}%, 82%)`);
+  root.style.setProperty("--color-brand-300", `hsl(${hsl.h}, ${hsl.s}%, 72%)`);
+  root.style.setProperty("--color-brand-400", `hsl(${hsl.h}, ${hsl.s}%, ${Math.min(hsl.l + 8, 70)}%)`);
+
+  // Variantes plus foncées
+  root.style.setProperty("--color-brand-600", `hsl(${hsl.h}, ${hsl.s}%, ${Math.max(hsl.l - 8, 25)}%)`);
+  root.style.setProperty("--color-brand-700", `hsl(${hsl.h}, ${hsl.s}%, ${Math.max(hsl.l - 16, 20)}%)`);
+  root.style.setProperty("--color-brand-800", `hsl(${hsl.h}, ${hsl.s}%, ${Math.max(hsl.l - 24, 15)}%)`);
+  root.style.setProperty("--color-brand-900", `hsl(${hsl.h}, ${hsl.s}%, ${Math.max(hsl.l - 32, 10)}%)`);
+  root.style.setProperty("--color-brand-950", `hsl(${hsl.h}, ${hsl.s}%, ${Math.max(hsl.l - 40, 8)}%)`);
+}
+
 // Types
 export interface UserProfile {
   prenom: string;
@@ -14,6 +79,8 @@ export interface UserProfile {
   ville: string;
   numeroFormateur: string;
   avatarUrl?: string | null;
+  logoUrl?: string | null;
+  primaryColor?: string;
 }
 
 export interface Formation {
@@ -42,6 +109,10 @@ interface AutomateContextType {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   filteredFormations: Formation[];
+
+  // Branding
+  primaryColor: string;
+  setPrimaryColor: (color: string) => void;
 }
 
 // Valeurs par défaut - vides pour les infos entreprise
@@ -57,6 +128,7 @@ const defaultUser: UserProfile = {
   ville: "",
   numeroFormateur: "",
   avatarUrl: null,
+  logoUrl: null,
 };
 
 const defaultFormations: Formation[] = [
@@ -132,6 +204,9 @@ const defaultFormations: Formation[] = [
   },
 ];
 
+// Couleur par défaut
+const DEFAULT_PRIMARY_COLOR = "#4277FF";
+
 const AutomateContext = createContext<AutomateContextType | undefined>(undefined);
 
 export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -139,6 +214,7 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [formations, setFormations] = useState<Formation[]>(defaultFormations);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [primaryColor, setPrimaryColorState] = useState(DEFAULT_PRIMARY_COLOR);
 
   // Charger le profil utilisateur depuis l'API
   const fetchUserProfile = useCallback(async () => {
@@ -149,6 +225,10 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (response.ok) {
         const data = await response.json();
         const org = data.organization;
+
+        // Récupérer la couleur de l'organisation si disponible
+        const orgColor = org?.primaryColor || DEFAULT_PRIMARY_COLOR;
+
         setUser({
           prenom: data.firstName || "",
           nom: data.lastName || "",
@@ -162,7 +242,15 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           adresse: org?.adresse || "",
           codePostal: org?.codePostal || "",
           ville: org?.ville || "",
+          logoUrl: org?.logo || null,
+          primaryColor: orgColor,
         });
+
+        // Appliquer la couleur immédiatement
+        setPrimaryColorState(orgColor);
+        if (typeof window !== "undefined") {
+          applyPrimaryColor(orgColor);
+        }
       }
     } catch (error) {
       console.error("Erreur lors du chargement du profil:", error);
@@ -183,6 +271,40 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const refreshUser = useCallback(async () => {
     await fetchUserProfile();
   }, [fetchUserProfile]);
+
+  // Fonction pour changer la couleur primaire
+  const setPrimaryColor = useCallback(async (color: string) => {
+    // Appliquer immédiatement au DOM
+    if (typeof window !== "undefined") {
+      applyPrimaryColor(color);
+    }
+    setPrimaryColorState(color);
+
+    // Sauvegarder dans l'API
+    try {
+      const response = await fetch("/api/organization/branding", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ primaryColor: color }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        console.error("Erreur API branding:", data.error);
+      } else {
+        console.log("Couleur sauvegardée avec succès:", color);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde de la couleur:", error);
+    }
+  }, []);
+
+  // Appliquer la couleur au montage (côté client uniquement)
+  useEffect(() => {
+    if (typeof window !== "undefined" && primaryColor) {
+      applyPrimaryColor(primaryColor);
+    }
+  }, []);
 
   const addFormation = useCallback((formation: Omit<Formation, "id">) => {
     const newId = (Math.max(...formations.map((f) => parseInt(f.id))) + 1).toString();
@@ -223,6 +345,8 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         searchQuery,
         setSearchQuery,
         filteredFormations,
+        primaryColor,
+        setPrimaryColor,
       }}
     >
       {children}

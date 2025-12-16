@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Variables CSS pour les couleurs brand dynamiques */
+:root {
+  --color-brand-25: #f2f8ff;
+  --color-brand-50: #e8f1ff;
+  --color-brand-100: #d4e5ff;
+  --color-brand-200: #b3d0ff;
+  --color-brand-300: #85b3ff;
+  --color-brand-400: #5c95ff;
+  --color-brand-500: #4277ff;
+  --color-brand-600: #3461e6;
+  --color-brand-700: #294dcc;
+  --color-brand-800: #2240a6;
+  --color-brand-900: #1e3680;
+  --color-brand-950: #121f4d;
+  --color-brand-hue: 217;
+  --color-brand-saturation: 100%;
+  --color-brand-lightness: 63%;
+}
+
 @layer base {
   *,
   ::after,
@@ -25,7 +44,11 @@
   }
 
   .menu-item-active {
-    @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+    @apply bg-brand-50 text-brand-500 dark:text-brand-400;
+  }
+
+  .dark .menu-item-active {
+    background-color: color-mix(in srgb, var(--color-brand-500) 12%, transparent);
   }
 
   .menu-item-inactive {
@@ -61,7 +84,11 @@
   }
 
   .menu-dropdown-item-active {
-    @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+    @apply bg-brand-50 text-brand-500 dark:text-brand-400;
+  }
+
+  .dark .menu-dropdown-item-active {
+    background-color: color-mix(in srgb, var(--color-brand-500) 12%, transparent);
   }
 
   .menu-dropdown-item-inactive {
@@ -73,11 +100,24 @@
   }
 
   .menu-dropdown-badge-active {
-    @apply bg-brand-100 dark:bg-brand-500/20;
+    @apply bg-brand-100;
+  }
+
+  .dark .menu-dropdown-badge-active {
+    background-color: color-mix(in srgb, var(--color-brand-500) 20%, transparent);
   }
 
   .menu-dropdown-badge-inactive {
-    @apply bg-brand-50 group-hover:bg-brand-100 dark:bg-brand-500/[0.15] dark:group-hover:bg-brand-500/20;
+    @apply bg-brand-50 group-hover:bg-brand-100;
+  }
+
+  .dark .menu-dropdown-badge-inactive {
+    background-color: color-mix(in srgb, var(--color-brand-500) 15%, transparent);
+  }
+
+  .dark .menu-dropdown-badge-inactive:hover,
+  .dark .group:hover .menu-dropdown-badge-inactive {
+    background-color: color-mix(in srgb, var(--color-brand-500) 20%, transparent);
   }
 
   .card-hover-glow {
@@ -85,13 +125,14 @@
   }
 
   .card-hover-glow:hover {
-    @apply border-brand-200 dark:border-brand-500/30;
+    @apply border-brand-200;
     box-shadow: 0 0 0 1px rgba(66, 119, 255, 0.1),
                 0 4px 12px -2px rgba(66, 119, 255, 0.08),
                 0 2px 6px -1px rgba(66, 119, 255, 0.06);
   }
 
   .dark .card-hover-glow:hover {
+    border-color: color-mix(in srgb, var(--color-brand-500) 30%, transparent);
     box-shadow: 0 0 0 1px rgba(66, 119, 255, 0.2),
                 0 4px 16px -2px rgba(66, 119, 255, 0.15),
                 0 2px 8px -1px rgba(66, 119, 255, 0.1);

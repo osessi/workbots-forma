@@ -1,21 +1,37 @@
 // ===========================================
 // API ROUTE - Upload Avatar
 // ===========================================
-// Upload d'avatar utilisateur via le serveur (contourne les problèmes RLS)
+// Upload d'avatar utilisateur via le serveur (bypass RLS avec service role)
 
+import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
 
-const STORAGE_BUCKET = "automate-files";
+const STORAGE_BUCKET = "worksbots-forma-stockage";
+
+// Client admin avec service role (bypass RLS)
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Client pour vérifier l'auth de l'utilisateur
     const cookieStore = await cookies();
-    const supabase = createServerClient(
+    const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
@@ -34,8 +50,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Vérifier l'authentification
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
+    // Client admin pour le storage (bypass RLS)
+    const adminClient = getAdminClient();
+
+    // Vérifier l'authentification avec le client auth
+    const { data: { user: supabaseUser }, error: authError } = await authClient.auth.getUser();
 
     if (authError || !supabaseUser) {
       return NextResponse.json(
@@ -83,8 +102,13 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
 
-    // Upload vers Supabase Storage
-    const { data, error } = await supabase.storage
+    console.log("=== Upload Avatar ===");
+    console.log("User ID:", supabaseUser.id);
+    console.log("Path:", path);
+    console.log("File size:", buffer.length);
+
+    // Upload vers Supabase Storage avec le client admin (bypass RLS)
+    const { data, error } = await adminClient.storage
       .from(STORAGE_BUCKET)
       .upload(path, buffer, {
         contentType: file.type,
@@ -100,17 +124,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Récupérer l'URL publique
-    const { data: { publicUrl } } = supabase.storage
+    console.log("Upload success:", data.path);
+
+    // Récupérer l'URL publique avec le client admin
+    const { data: { publicUrl } } = adminClient.storage
       .from(STORAGE_BUCKET)
       .getPublicUrl(data.path);
 
-    // Mettre à jour l'utilisateur dans Prisma si c'est un avatar
+    // Mettre à jour dans Prisma selon le type
     if (type === "avatar") {
       await prisma.user.update({
         where: { supabaseId: supabaseUser.id },
         data: { avatar: publicUrl },
       });
+    } else if (type === "logo") {
+      // Récupérer l'utilisateur pour avoir son organizationId
+      const user = await prisma.user.findUnique({
+        where: { supabaseId: supabaseUser.id },
+        select: { organizationId: true, email: true },
+      });
+
+      if (user?.organizationId) {
+        // Mettre à jour l'organisation existante
+        await prisma.organization.update({
+          where: { id: user.organizationId },
+          data: { logo: publicUrl },
+        });
+      } else {
+        // Créer une organisation pour l'utilisateur s'il n'en a pas
+        const slug = user?.email?.split("@")[0]?.replace(/[^a-z0-9]/gi, "-").toLowerCase() || `org-${Date.now()}`;
+        const newOrg = await prisma.organization.create({
+          data: {
+            name: "Mon entreprise",
+            slug: slug,
+            logo: publicUrl,
+          },
+        });
+        // Associer l'organisation à l'utilisateur
+        await prisma.user.update({
+          where: { supabaseId: supabaseUser.id },
+          data: { organizationId: newOrg.id },
+        });
+        console.log("Created new organization for user:", newOrg.id);
+      }
     }
 
     return NextResponse.json({
@@ -120,8 +176,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Avatar upload error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return NextResponse.json(
-      { error: "Erreur lors de l'upload" },
+      { error: `Erreur lors de l'upload: ${errorMessage}` },
       { status: 500 }
     );
   }

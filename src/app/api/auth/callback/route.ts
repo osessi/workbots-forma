@@ -2,7 +2,8 @@
 // API ROUTE - OAuth Callback
 // ===========================================
 // Cette route gère le retour des providers OAuth (Google, Microsoft, LinkedIn)
-// et crée/met à jour l'utilisateur dans la base de données Prisma
+// et la confirmation d'email après inscription
+// Crée/met à jour l'utilisateur dans la base de données Prisma
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -45,28 +46,69 @@ export async function GET(request: NextRequest) {
       const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
       if (supabaseUser) {
+        const metadata = supabaseUser.user_metadata || {};
+
         // Vérifier si c'est le premier utilisateur (sera Super Admin)
         const userCount = await prisma.user.count();
         const isFirstUser = userCount === 0;
+
+        // Vérifier si l'utilisateur existe déjà
+        const existingUser = await prisma.user.findUnique({
+          where: { supabaseId: supabaseUser.id },
+          include: { organization: true },
+        });
+
+        let organizationId = existingUser?.organizationId;
+
+        // Créer l'organisation si workspace_name est fourni (depuis le wizard) et pas d'org existante
+        if (metadata.workspace_name && metadata.workspace_slug && !organizationId) {
+          // Vérifier si le slug n'existe pas déjà
+          const existingOrg = await prisma.organization.findUnique({
+            where: { slug: metadata.workspace_slug },
+          });
+
+          if (!existingOrg) {
+            const newOrg = await prisma.organization.create({
+              data: {
+                name: metadata.workspace_name,
+                slug: metadata.workspace_slug,
+                siret: metadata.siret || null,
+                numeroFormateur: metadata.numero_formateur || null,
+                adresse: metadata.adresse || null,
+                codePostal: metadata.code_postal || null,
+                ville: metadata.ville || null,
+                telephone: metadata.phone || null,
+              },
+            });
+            organizationId = newOrg.id;
+          } else {
+            organizationId = existingOrg.id;
+          }
+        }
 
         // Créer ou mettre à jour l'utilisateur dans Prisma
         await prisma.user.upsert({
           where: { supabaseId: supabaseUser.id },
           update: {
             email: supabaseUser.email!,
-            firstName: supabaseUser.user_metadata?.first_name || supabaseUser.user_metadata?.full_name?.split(' ')[0] || null,
-            lastName: supabaseUser.user_metadata?.last_name || supabaseUser.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
-            avatar: supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture || null,
+            firstName: metadata.first_name || metadata.full_name?.split(' ')[0] || null,
+            lastName: metadata.last_name || metadata.full_name?.split(' ').slice(1).join(' ') || null,
+            phone: metadata.phone || null,
+            // Garder l'avatar existant si déjà défini, sinon utiliser celui du provider OAuth
+            avatar: existingUser?.avatar || metadata.avatar_url || metadata.picture || null,
+            organizationId: organizationId || undefined,
             lastLoginAt: new Date(),
           },
           create: {
             supabaseId: supabaseUser.id,
             email: supabaseUser.email!,
-            firstName: supabaseUser.user_metadata?.first_name || supabaseUser.user_metadata?.full_name?.split(' ')[0] || null,
-            lastName: supabaseUser.user_metadata?.last_name || supabaseUser.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
-            avatar: supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture || null,
-            // Le premier utilisateur devient Super Admin
-            role: isFirstUser ? "SUPER_ADMIN" : "FORMATEUR",
+            firstName: metadata.first_name || metadata.full_name?.split(' ')[0] || null,
+            lastName: metadata.last_name || metadata.full_name?.split(' ').slice(1).join(' ') || null,
+            phone: metadata.phone || null,
+            avatar: metadata.avatar_url || metadata.picture || null,
+            organizationId: organizationId || null,
+            // Le premier utilisateur devient Super Admin, sinon ORG_ADMIN s'il crée une org
+            role: isFirstUser ? "SUPER_ADMIN" : (organizationId ? "ORG_ADMIN" : "FORMATEUR"),
             isSuperAdmin: isFirstUser,
             lastLoginAt: new Date(),
           },

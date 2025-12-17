@@ -264,8 +264,49 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     fetchUserProfile();
   }, [fetchUserProfile]);
 
-  const updateUser = useCallback((updates: Partial<UserProfile>) => {
+  // Mettre à jour le profil utilisateur (état local + API)
+  const updateUser = useCallback(async (updates: Partial<UserProfile>) => {
+    // Mettre à jour l'état local immédiatement
     setUser((prev) => ({ ...prev, ...updates }));
+
+    // Préparer les données pour l'API
+    const apiData: Record<string, unknown> = {};
+
+    // Mapper les champs du profil vers l'API
+    if (updates.prenom !== undefined) apiData.firstName = updates.prenom;
+    if (updates.nom !== undefined) apiData.lastName = updates.nom;
+    if (updates.telephone !== undefined) apiData.phone = updates.telephone;
+    if (updates.avatarUrl !== undefined) apiData.avatar = updates.avatarUrl;
+
+    // Champs organisation
+    if (updates.entreprise !== undefined) apiData.entreprise = updates.entreprise;
+    if (updates.siret !== undefined) apiData.siret = updates.siret;
+    if (updates.numeroFormateur !== undefined) apiData.numeroFormateur = updates.numeroFormateur;
+    if (updates.adresse !== undefined) apiData.adresse = updates.adresse;
+    if (updates.codePostal !== undefined) apiData.codePostal = updates.codePostal;
+    if (updates.ville !== undefined) apiData.ville = updates.ville;
+
+    // Si on a des données à envoyer, appeler l'API
+    if (Object.keys(apiData).length > 0) {
+      try {
+        const response = await fetch("/api/user/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(apiData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Erreur lors de la sauvegarde du profil:", errorData.error);
+          // En cas d'erreur, on pourrait annuler les changements locaux
+          // mais pour l'instant on garde l'optimistic update
+        } else {
+          console.log("Profil sauvegardé avec succès");
+        }
+      } catch (error) {
+        console.error("Erreur réseau lors de la sauvegarde du profil:", error);
+      }
+    }
   }, []);
 
   const refreshUser = useCallback(async () => {

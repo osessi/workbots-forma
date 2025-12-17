@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, description, documentType, category, content, variables, isSystem, isActive } = body;
+    const { name, description, documentType, category, content, headerContent, footerContent, variables, isSystem, isActive } = body;
 
     if (!name || !category) {
       return NextResponse.json(
@@ -94,6 +94,8 @@ export async function POST(request: NextRequest) {
         documentType: documentType || null,
         category: category as "DOCUMENT" | "EMAIL" | "PDF",
         content: content || {},
+        headerContent: headerContent || null,
+        footerContent: footerContent || null,
         variables: variables || [],
         isSystem: isSystem ?? false,
         isActive: isActive ?? true,

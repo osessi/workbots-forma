@@ -148,6 +148,8 @@ interface DocumentsData {
 interface StepDocumentsProps {
   data: DocumentsData;
   onChange: (data: DocumentsData) => void;
+  isGenerating?: boolean;
+  generatingType?: string | null;
   onGenerateConvention: () => void;
   onGenerateContrat: () => void;
   onGenerateProgramme?: () => void;
@@ -336,9 +338,18 @@ interface DocumentCardProps {
   description: string;
   buttonText: string;
   onGenerate: () => void;
+  isGenerating?: boolean;
+  isThisGenerating?: boolean;
 }
 
-const DocumentCard: React.FC<DocumentCardProps> = ({ title, description, buttonText, onGenerate }) => (
+const DocumentCard: React.FC<DocumentCardProps> = ({
+  title,
+  description,
+  buttonText,
+  onGenerate,
+  isGenerating = false,
+  isThisGenerating = false,
+}) => (
   <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
     <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
       {title}
@@ -348,9 +359,20 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ title, description, buttonT
     </p>
     <button
       onClick={onGenerate}
-      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
+      disabled={isGenerating}
+      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {buttonText}
+      {isThisGenerating ? (
+        <>
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Génération en cours...
+        </>
+      ) : (
+        buttonText
+      )}
     </button>
   </div>
 );
@@ -358,6 +380,8 @@ const DocumentCard: React.FC<DocumentCardProps> = ({ title, description, buttonT
 export const StepDocuments: React.FC<StepDocumentsProps> = ({
   data,
   onChange,
+  isGenerating = false,
+  generatingType = null,
   onGenerateConvention,
   onGenerateContrat,
   onGenerateProgramme,
@@ -588,54 +612,63 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
   // Documents à générer
   const documents = [
     {
+      type: "CONVENTION",
       title: "Convention de formation",
       description: "Document contractuel signé entre votre organisme de formation et l'entreprise cliente ou un indépendant, définissant les conditions de réalisation de l'action de formation.",
       buttonText: "Générer la convention de formation",
       onGenerate: onGenerateConvention,
     },
     {
+      type: "CONTRAT_FORMATION",
       title: "Contrat de formation",
       description: "Document contractuel signé entre votre organisme de formation et un particulier, définissant les conditions de réalisation de l'action de formation.",
       buttonText: "Générer le contrat de formation",
       onGenerate: onGenerateContrat,
     },
     {
+      type: "FICHE_PEDAGOGIQUE",
       title: "Programme de formation",
       description: "Document détaillant les objectifs, le contenu et l'organisation de la formation (modules, séquences, durées, modalités pédagogiques).",
       buttonText: "Générer le programme de formation",
       onGenerate: onGenerateProgramme || (() => console.log("Générer programme")),
     },
     {
+      type: "CONVOCATION",
       title: "Convocation",
       description: "Document adressé à chaque participant pour lui communiquer les informations pratiques de la formation (dates, horaires, lieu ou lien de connexion, consignes éventuelles).",
       buttonText: "Générer la convocation",
       onGenerate: onGenerateConvocation || (() => console.log("Générer convocation")),
     },
     {
+      type: "ATTESTATION_PRESENCE",
       title: "Feuilles d'émargement",
       description: "Documents de présence à faire signer par les participants (et, le cas échéant, par le formateur) à chaque demi-journée de formation.",
       buttonText: "Générer les feuilles d'émargement",
       onGenerate: onGenerateEmargement || (() => console.log("Générer émargement")),
     },
     {
+      type: "EVALUATION_CHAUD",
       title: "Évaluation à chaud",
       description: "Questionnaire remis aux participants en fin de formation afin de recueillir leur niveau de satisfaction et leurs retours immédiats sur le contenu, l'animation et les conditions de déroulement.",
       buttonText: "Générer l'évaluation à chaud",
       onGenerate: onGenerateEvalChaud || (() => console.log("Générer éval chaud")),
     },
     {
+      type: "EVALUATION_FROID",
       title: "Évaluation à froid",
       description: "Questionnaire envoyé aux participants plusieurs semaines après la formation afin d'évaluer la mise en pratique des acquis, l'évolution de leurs compétences et l'impact de la formation sur leur activité.",
       buttonText: "Générer l'évaluation à froid",
       onGenerate: onGenerateEvalFroid || (() => console.log("Générer éval froid")),
     },
     {
+      type: "EVALUATION_FORMATEUR",
       title: "Évaluation formateur",
       description: "Questionnaire destiné au formateur, lui permettant de faire un retour sur le déroulement de la formation (profil des participants, adéquation du programme, conditions matérielles, points forts, axes d'amélioration).",
       buttonText: "Générer l'évaluation formateur",
       onGenerate: onGenerateEvalFormateur || (() => console.log("Générer éval formateur")),
     },
     {
+      type: "ATTESTATION_FIN",
       title: "Attestation de fin de formation",
       description: "Document nominatif remis à chaque participant à l'issue de la formation, attestant de sa participation et de la réalisation de l'action de formation.",
       buttonText: "Générer l'attestation de fin de formation",
@@ -1346,13 +1379,15 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
           Documents à générer
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {documents.map((doc, index) => (
+          {documents.map((doc) => (
             <DocumentCard
-              key={index}
+              key={doc.type}
               title={doc.title}
               description={doc.description}
               buttonText={doc.buttonText}
               onGenerate={doc.onGenerate}
+              isGenerating={isGenerating}
+              isThisGenerating={generatingType === doc.type}
             />
           ))}
         </div>
@@ -1363,7 +1398,8 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
             onClick={() => {
               documents.forEach((doc) => doc.onGenerate());
             }}
-            className="inline-flex items-center gap-3 px-8 py-4 text-base font-semibold text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-all shadow-lg hover:shadow-xl hover:shadow-brand-500/25 active:scale-[0.98]"
+            disabled={isGenerating}
+            className="inline-flex items-center gap-3 px-8 py-4 text-base font-semibold text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-all shadow-lg hover:shadow-xl hover:shadow-brand-500/25 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M9 12H15M9 16H15M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H12.5858C12.851 3 13.1054 3.10536 13.2929 3.29289L18.7071 8.70711C18.8946 8.89464 19 9.149 19 9.41421V19C19 20.1046 18.1046 21 17 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

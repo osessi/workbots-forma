@@ -95,7 +95,7 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { name, description, documentType, category, isActive, isSystem, content, variables } = body;
+    const { name, description, documentType, category, isActive, isSystem, content, headerContent, footerContent, variables } = body;
 
     const updateData: Record<string, unknown> = {};
 
@@ -106,6 +106,8 @@ export async function PATCH(
     if (isActive !== undefined) updateData.isActive = isActive;
     if (isSystem !== undefined) updateData.isSystem = isSystem;
     if (content !== undefined) updateData.content = content;
+    if (headerContent !== undefined) updateData.headerContent = headerContent;
+    if (footerContent !== undefined) updateData.footerContent = footerContent;
     if (variables !== undefined) updateData.variables = variables;
 
     const template = await prisma.template.update({

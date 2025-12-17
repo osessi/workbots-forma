@@ -1,0 +1,472 @@
+/* ===========================================
+   STYLES POUR L'EDITEUR TIPTAP
+   =========================================== */
+
+/* Container principal */
+.document-editor {
+  position: relative;
+}
+
+/* Zone de contenu */
+.editor-content-wrapper {
+  max-height: calc(100vh - 300px);
+}
+
+/* Editeur TipTap */
+.ProseMirror {
+  outline: none;
+  min-height: 400px;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+.dark .ProseMirror p.is-editor-empty:first-child::before {
+  color: #6b7280;
+}
+
+/* Titres */
+.ProseMirror h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+}
+
+/* Paragraphes */
+.ProseMirror p {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  line-height: 1.6;
+}
+
+/* Listes */
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5em;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+.ProseMirror li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.ProseMirror li p {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/* Blockquote */
+.ProseMirror blockquote {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.dark .ProseMirror blockquote {
+  border-left-color: #374151;
+  color: #9ca3af;
+}
+
+/* Code inline */
+.ProseMirror code {
+  background-color: #f3f4f6;
+  padding: 0.125em 0.375em;
+  border-radius: 0.25em;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.dark .ProseMirror code {
+  background-color: #374151;
+}
+
+/* Code block */
+.ProseMirror pre {
+  background-color: #1f2937;
+  color: #f9fafb;
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  line-height: 1.5;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+/* Liens */
+.ProseMirror a {
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror a:hover {
+  color: #2563eb;
+}
+
+/* Images */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5em;
+  margin: 1em 0;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid #3b82f6;
+}
+
+/* Ligne horizontale */
+.ProseMirror hr {
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  margin: 2em 0;
+}
+
+.dark .ProseMirror hr {
+  border-top-color: #374151;
+}
+
+/* ===========================================
+   STYLES POUR LES TABLEAUX
+   =========================================== */
+
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.ProseMirror td,
+.ProseMirror th {
+  border: 1px solid #d1d5db;
+  padding: 0.5em 0.75em;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+  min-width: 50px;
+}
+
+.dark .ProseMirror td,
+.dark .ProseMirror th {
+  border-color: #4b5563;
+}
+
+.ProseMirror th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  text-align: left;
+}
+
+.dark .ProseMirror th {
+  background-color: #374151;
+}
+
+.ProseMirror .selectedCell {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.ProseMirror .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid #3b82f6;
+  pointer-events: none;
+}
+
+/* Resize handle pour les colonnes */
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #3b82f6;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ===========================================
+   STYLES POUR LES VARIABLES DE TEMPLATE
+   =========================================== */
+
+/* Variable inline */
+.template-variable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0.125em 0.5em;
+  margin: 0 0.125em;
+  border-radius: 0.375em;
+  font-size: 0.875em;
+  font-weight: 500;
+  vertical-align: baseline;
+  cursor: default;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+/* Couleurs par categorie */
+.template-variable[data-category="formation"] {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.dark .template-variable[data-category="formation"] {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.template-variable[data-category="modules"] {
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.dark .template-variable[data-category="modules"] {
+  background-color: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.template-variable[data-category="organisation"] {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.dark .template-variable[data-category="organisation"] {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.template-variable[data-category="entreprise"] {
+  background-color: rgba(249, 115, 22, 0.15);
+  color: #ea580c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.dark .template-variable[data-category="entreprise"] {
+  background-color: rgba(249, 115, 22, 0.2);
+  color: #fdba74;
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+.template-variable[data-category="participants"] {
+  background-color: rgba(236, 72, 153, 0.15);
+  color: #db2777;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.dark .template-variable[data-category="participants"] {
+  background-color: rgba(236, 72, 153, 0.2);
+  color: #f9a8d4;
+  border-color: rgba(236, 72, 153, 0.4);
+}
+
+.template-variable[data-category="formateur"] {
+  background-color: rgba(6, 182, 212, 0.15);
+  color: #0891b2;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.dark .template-variable[data-category="formateur"] {
+  background-color: rgba(6, 182, 212, 0.2);
+  color: #67e8f9;
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+.template-variable[data-category="dates"] {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.dark .template-variable[data-category="dates"] {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.template-variable[data-category="document"] {
+  background-color: rgba(107, 114, 128, 0.15);
+  color: #4b5563;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.dark .template-variable[data-category="document"] {
+  background-color: rgba(107, 114, 128, 0.2);
+  color: #d1d5db;
+  border-color: rgba(107, 114, 128, 0.4);
+}
+
+/* Variable selectionnee */
+.template-variable.ProseMirror-selectednode {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+/* Variable non resolue (en preview) */
+.template-variable-unresolved {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+  padding: 0.125em 0.5em;
+  border-radius: 0.375em;
+  border: 1px dashed rgba(239, 68, 68, 0.5);
+}
+
+.dark .template-variable-unresolved {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+/* Boucle vide */
+.template-loop-empty {
+  display: block;
+  padding: 0.5em;
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px dashed rgba(245, 158, 11, 0.5);
+  border-radius: 0.375em;
+  color: #d97706;
+  font-style: italic;
+  text-align: center;
+}
+
+.dark .template-loop-empty {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
+/* ===========================================
+   STYLES POUR LE MODE LECTURE SEULE
+   =========================================== */
+
+.ProseMirror[contenteditable="false"] {
+  cursor: default;
+}
+
+.ProseMirror[contenteditable="false"] .template-variable {
+  cursor: default;
+}
+
+/* ===========================================
+   ANIMATIONS
+   =========================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.template-variable {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ===========================================
+   RESPONSIVE
+   =========================================== */
+
+@media (max-width: 640px) {
+  .ProseMirror {
+    padding: 1rem;
+  }
+
+  .ProseMirror h1 {
+    font-size: 1.5em;
+  }
+
+  .ProseMirror h2 {
+    font-size: 1.25em;
+  }
+
+  .ProseMirror h3 {
+    font-size: 1.1em;
+  }
+
+  .template-variable {
+    font-size: 0.75em;
+    padding: 0.1em 0.375em;
+  }
+}
+
+/* ===========================================
+   IMPRESSION
+   =========================================== */
+
+@media print {
+  .template-variable {
+    background-color: transparent !important;
+    border: none !important;
+    color: inherit !important;
+    padding: 0 !important;
+  }
+
+  .template-variable::before {
+    content: "{{";
+  }
+
+  .template-variable::after {
+    content: "}}";
+  }
+}

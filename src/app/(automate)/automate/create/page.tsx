@@ -1,11 +1,12 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import FormationStepper, { StepId } from "@/components/automate/FormationStepper";
 import StepContexte from "@/components/automate/steps/StepContexte";
 import StepFichePedagogique from "@/components/automate/steps/StepFichePedagogique";
 import StepSlidesSupport from "@/components/automate/steps/StepSlidesSupport";
 import StepEvaluations from "@/components/automate/steps/StepEvaluations";
 import StepDocuments from "@/components/automate/steps/StepDocuments";
+import DocumentGenerationWrapper from "@/components/documents/DocumentGenerationWrapper";
 
 // Données initiales pour l'étape Contexte
 const initialContexteData = {
@@ -180,6 +181,10 @@ export default function CreateFormationPage() {
   const [ficheData, setFicheData] = useState(initialFicheData);
   const [documentsData, setDocumentsData] = useState(initialDocumentsData);
 
+  // État pour la formation créée (pour la génération de documents)
+  const [formationId, setFormationId] = useState<string | null>(null);
+  const [isSavingFormation, setIsSavingFormation] = useState(false);
+
   const handleStepClick = (stepId: StepId) => {
     setCurrentStep(stepId);
   };
@@ -194,6 +199,61 @@ export default function CreateFormationPage() {
   const goToPreviousStep = (previousStepId: StepId) => {
     setCurrentStep(previousStepId);
   };
+
+  // Fonction pour sauvegarder la formation avant génération de documents
+  const saveFormationForDocuments = useCallback(async (): Promise<string | null> => {
+    // Si déjà une formation, la retourner
+    if (formationId) return formationId;
+
+    setIsSavingFormation(true);
+    try {
+      const response = await fetch("/api/formations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titre: ficheData.titre,
+          description: ficheData.description,
+          fichePedagogique: {
+            objectifs: ficheData.objectifs,
+            contenu: ficheData.contenu,
+            typeFormation: ficheData.typeFormation,
+            duree: ficheData.duree,
+            dureeHeures: parseInt(contexteData.dureeHeures) || 14,
+            dureeJours: parseInt(contexteData.dureeJours) || 2,
+            nombreParticipants: ficheData.nombreParticipants,
+            tarif: ficheData.tarif,
+            accessibilite: ficheData.accessibilite,
+            prerequis: ficheData.prerequis,
+            publicVise: ficheData.publicVise,
+            suiviEvaluation: ficheData.suiviEvaluation,
+            ressourcesPedagogiques: ficheData.ressourcesPedagogiques,
+            delaiAcces: ficheData.delaiAcces,
+            modalites: contexteData.modalite,
+            prix: parseInt(contexteData.tarifEntreprise) || 0,
+          },
+          modules: initialModules.map((m, index) => ({
+            titre: m.titre,
+            ordre: index + 1,
+            contenu: { contenu: m.contenu },
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la sauvegarde de la formation");
+      }
+
+      const data = await response.json();
+      setFormationId(data.id);
+      return data.id;
+    } catch (error) {
+      console.error("Erreur sauvegarde formation:", error);
+      alert("Erreur lors de la sauvegarde de la formation. Veuillez réessayer.");
+      return null;
+    } finally {
+      setIsSavingFormation(false);
+    }
+  }, [formationId, ficheData, contexteData]);
 
   // Handlers pour les générations (à implémenter avec l'IA)
   const handleGeneratePowerPoint = (moduleId: string) => {
@@ -216,40 +276,17 @@ export default function CreateFormationPage() {
     console.log("Générer QCM pour module:", moduleId);
   };
 
-  const handleGenerateConvention = () => {
-    console.log("Générer convention de formation");
-  };
-
-  const handleGenerateContrat = () => {
-    console.log("Générer contrat de formation");
-  };
-
-  const handleGenerateProgramme = () => {
-    console.log("Générer programme de formation");
-  };
-
-  const handleGenerateConvocation = () => {
-    console.log("Générer convocation");
-  };
-
-  const handleGenerateEmargement = () => {
-    console.log("Générer feuilles d'émargement");
-  };
-
-  const handleGenerateEvalChaud = () => {
-    console.log("Générer évaluation à chaud");
-  };
-
-  const handleGenerateEvalFroid = () => {
-    console.log("Générer évaluation à froid");
-  };
-
-  const handleGenerateEvalFormateur = () => {
-    console.log("Générer évaluation formateur");
-  };
-
-  const handleGenerateAttestation = () => {
-    console.log("Générer attestation de fin de formation");
+  // Mapping des types de documents vers les types API
+  const documentTypeMapping: Record<string, string> = {
+    convention: "CONVENTION",
+    contrat: "CONTRAT_FORMATION",
+    programme: "FICHE_PEDAGOGIQUE",
+    convocation: "CONVOCATION",
+    emargement: "ATTESTATION_PRESENCE",
+    evalChaud: "EVALUATION_CHAUD",
+    evalFroid: "EVALUATION_FROID",
+    evalFormateur: "EVALUATION_FORMATEUR",
+    attestation: "ATTESTATION_FIN",
   };
 
   return (
@@ -303,19 +340,28 @@ export default function CreateFormationPage() {
       )}
 
       {currentStep === "documents" && (
-        <StepDocuments
-          data={documentsData}
-          onChange={setDocumentsData}
-          onGenerateConvention={handleGenerateConvention}
-          onGenerateContrat={handleGenerateContrat}
-          onGenerateProgramme={handleGenerateProgramme}
-          onGenerateConvocation={handleGenerateConvocation}
-          onGenerateEmargement={handleGenerateEmargement}
-          onGenerateEvalChaud={handleGenerateEvalChaud}
-          onGenerateEvalFroid={handleGenerateEvalFroid}
-          onGenerateEvalFormateur={handleGenerateEvalFormateur}
-          onGenerateAttestation={handleGenerateAttestation}
-        />
+        <DocumentGenerationWrapper
+          formationId={formationId || ""}
+          onSaveFormation={saveFormationForDocuments}
+        >
+          {({ generateDocument, isGenerating, generatingType }) => (
+            <StepDocuments
+              data={documentsData}
+              onChange={setDocumentsData}
+              isGenerating={isGenerating || isSavingFormation}
+              generatingType={generatingType}
+              onGenerateConvention={() => generateDocument(documentTypeMapping.convention)}
+              onGenerateContrat={() => generateDocument(documentTypeMapping.contrat)}
+              onGenerateProgramme={() => generateDocument(documentTypeMapping.programme)}
+              onGenerateConvocation={() => generateDocument(documentTypeMapping.convocation)}
+              onGenerateEmargement={() => generateDocument(documentTypeMapping.emargement)}
+              onGenerateEvalChaud={() => generateDocument(documentTypeMapping.evalChaud)}
+              onGenerateEvalFroid={() => generateDocument(documentTypeMapping.evalFroid)}
+              onGenerateEvalFormateur={() => generateDocument(documentTypeMapping.evalFormateur)}
+              onGenerateAttestation={() => generateDocument(documentTypeMapping.attestation)}
+            />
+          )}
+        </DocumentGenerationWrapper>
       )}
     </div>
   );

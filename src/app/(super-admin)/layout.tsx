@@ -35,7 +35,7 @@ export default async function SuperAdminLayout({
   const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
   if (!supabaseUser) {
-    redirect("/signin");
+    redirect("/admin-login");
   }
 
   // Vérifier si l'utilisateur est super admin

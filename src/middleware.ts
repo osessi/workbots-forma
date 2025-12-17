@@ -15,6 +15,7 @@ const publicRoutes = [
   "/signin",
   "/signup",
   "/reset-password",
+  "/admin-login",
   "/api/auth/callback",
   "/api/webhooks",
 ];
@@ -33,10 +34,15 @@ export async function middleware(request: NextRequest) {
   // Mettre à jour la session Supabase (refresh tokens)
   const { supabaseResponse, user } = await updateSession(request);
 
-  // Vérifier si c'est une route publique
+  // Vérifier si c'est une route publique (prioritaire)
   const isPublicRoute = publicRoutes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
+
+  // Si c'est une route publique, laisser passer
+  if (isPublicRoute) {
+    return supabaseResponse;
+  }
 
   // Vérifier si c'est une route protégée
   const isProtectedRoute = protectedRoutes.some((route) =>
@@ -50,7 +56,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Si l'utilisateur est connecté et essaie d'accéder aux pages auth, rediriger vers automate
+  // Si l'utilisateur est connecté et essaie d'accéder aux pages auth classiques, rediriger vers automate
+  // Note: /admin-login est exclu car il a sa propre logique de redirection
   if (user && (pathname === "/signin" || pathname === "/signup")) {
     return NextResponse.redirect(new URL("/automate", request.url));
   }

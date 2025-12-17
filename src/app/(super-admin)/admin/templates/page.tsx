@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface Template {
   id: string;
@@ -17,15 +18,19 @@ interface Template {
 
 // DocumentType enum values from Prisma schema
 const DOCUMENT_TYPES = {
-  FICHE_PEDAGOGIQUE: { label: "Fiche pédagogique", color: "bg-blue-500" },
-  CONVENTION: { label: "Convention", color: "bg-purple-500" },
+  FICHE_PEDAGOGIQUE: { label: "Programme de formation", color: "bg-blue-500" },
+  PROGRAMME_FORMATION: { label: "Programme de formation", color: "bg-blue-500" },
+  CONVENTION: { label: "Convention de formation", color: "bg-purple-500" },
+  CONTRAT_FORMATION: { label: "Contrat de formation", color: "bg-violet-500" },
   CONVOCATION: { label: "Convocation", color: "bg-green-500" },
-  ATTESTATION_PRESENCE: { label: "Attestation de présence", color: "bg-orange-500" },
+  ATTESTATION_PRESENCE: { label: "Feuille d'émargement", color: "bg-orange-500" },
   ATTESTATION_FIN: { label: "Attestation de fin", color: "bg-pink-500" },
   EVALUATION_CHAUD: { label: "Évaluation à chaud", color: "bg-yellow-500" },
   EVALUATION_FROID: { label: "Évaluation à froid", color: "bg-amber-500" },
   REGLEMENT_INTERIEUR: { label: "Règlement intérieur", color: "bg-indigo-500" },
   CERTIFICAT: { label: "Certificat", color: "bg-emerald-500" },
+  DEVIS: { label: "Devis", color: "bg-teal-500" },
+  FACTURE: { label: "Facture", color: "bg-cyan-500" },
   AUTRE: { label: "Autre", color: "bg-gray-500" },
 };
 
@@ -44,6 +49,7 @@ export default function TemplatesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -171,6 +177,36 @@ export default function TemplatesPage() {
     }
   };
 
+  const handleSeedTemplates = async (forceUpdate = false) => {
+    if (!confirm(forceUpdate
+      ? "Êtes-vous sûr de vouloir REMPLACER les templates existants par les versions par défaut ?"
+      : "Créer les templates par défaut manquants ?"
+    )) return;
+
+    setIsSeeding(true);
+    try {
+      const response = await fetch("/api/admin/templates/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ forceUpdate }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(result.message);
+        await fetchTemplates();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erreur lors du seed");
+      }
+    } catch (error) {
+      console.error("Erreur seed:", error);
+      alert("Erreur lors du seed des templates");
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const filteredTemplates = templates.filter((template) => {
     const matchesSearch =
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -189,15 +225,45 @@ export default function TemplatesPage() {
             G&eacute;rez les templates de documents globaux
           </p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 4.16667V15.8333M4.16667 10H15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Nouveau template
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => handleSeedTemplates(false)}
+            disabled={isSeeding}
+            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
+            title="Créer les templates par défaut manquants"
+          >
+            {isSeeding ? (
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v18M3 12h18" />
+              </svg>
+            )}
+            {isSeeding ? "Création..." : "Seed templates"}
+          </button>
+          <Link
+            href="/admin/templates/editor"
+            className="px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors flex items-center gap-2"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Editeur WYSIWYG
+          </Link>
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 4.16667V15.8333M4.16667 10H15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Nouveau template
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -305,12 +371,23 @@ export default function TemplatesPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Link
+                    href={`/admin/templates/editor?id=${template.id}`}
+                    className="p-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-lg transition-colors"
+                    title="Editer le contenu"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </Link>
                   <button
                     onClick={() => handleEdit(template)}
                     className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Modifier les infos"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M11.3333 2.00004C11.5084 1.82494 11.7163 1.68605 11.9451 1.59129C12.1739 1.49653 12.4191 1.44775 12.6667 1.44775C12.9143 1.44775 13.1594 1.49653 13.3882 1.59129C13.617 1.68605 13.8249 1.82494 14 2.00004C14.1751 2.17513 14.314 2.383 14.4088 2.61178C14.5035 2.84055 14.5523 3.08575 14.5523 3.33337C14.5523 3.58099 14.5035 3.82619 14.4088 4.05497C14.314 4.28374 14.1751 4.49161 14 4.66671L5 13.6667L1.33333 14.6667L2.33333 11L11.3333 2.00004Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M8 10V10.01M8 7V4M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C11.3137 2 14 4.68629 14 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </button>
                   <button

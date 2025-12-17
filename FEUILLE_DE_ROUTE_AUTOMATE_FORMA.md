@@ -2,7 +2,7 @@
 
 ## Vision du Projet
 
-**Automate Forma** est une plateforme SaaS multi-tenant destinée aux organismes de formation et formateurs indépendants. Elle automatise la création de contenus pédagogiques grâce à l'IA : fiches pédagogiques, présentations PowerPoint, évaluations et documents administratifs (conventions, contrats, attestations).
+**Workbots** est une plateforme SaaS multi-tenant destinée aux organismes de formation et formateurs indépendants. Elle automatise la création de contenus pédagogiques grâce à l'IA : fiches pédagogiques, présentations PowerPoint, évaluations et documents administratifs (conventions, contrats, attestations).
 
 ---
 

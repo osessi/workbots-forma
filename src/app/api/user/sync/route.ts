@@ -86,15 +86,18 @@ export async function POST() {
     }
 
     // Créer ou mettre à jour l'utilisateur dans Prisma
+    // IMPORTANT: Ne pas écraser les données existantes avec les métadonnées OAuth
     const user = await prisma.user.upsert({
       where: { supabaseId: supabaseUser.id },
       update: {
         email: supabaseUser.email!,
-        firstName: metadata.first_name || metadata.full_name?.split(' ')[0] || null,
-        lastName: metadata.last_name || metadata.full_name?.split(' ').slice(1).join(' ') || null,
-        phone: metadata.phone || null,
-        avatar: metadata.avatar_url || metadata.picture || null,
-        organizationId: organizationId || undefined,
+        // Garder les données existantes si déjà définies
+        firstName: existingUser?.firstName || metadata.first_name || metadata.full_name?.split(' ')[0] || null,
+        lastName: existingUser?.lastName || metadata.last_name || metadata.full_name?.split(' ').slice(1).join(' ') || null,
+        phone: existingUser?.phone || metadata.phone || null,
+        // IMPORTANT: Ne jamais écraser l'avatar personnalisé
+        avatar: existingUser?.avatar || metadata.avatar_url || metadata.picture || null,
+        organizationId: organizationId || existingUser?.organizationId || undefined,
         lastLoginAt: new Date(),
       },
       create: {

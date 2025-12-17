@@ -4,6 +4,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { AutomateProvider } from "@/context/AutomateContext";
 import AutomateHeader from "@/components/automate/AutomateHeader";
 import AutomateSidebar from "@/components/automate/AutomateSidebar";
+import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import Backdrop from "@/layout/Backdrop";
 import React from "react";
 
@@ -22,6 +23,8 @@ export default function AutomateLayout({
 
   return (
     <AutomateProvider>
+      {/* Bandeau d'impersonation (visible uniquement en mode impersonation) */}
+      <ImpersonationBanner />
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 xl:flex">
         <AutomateSidebar />
         <Backdrop />

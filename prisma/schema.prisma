@@ -108,6 +108,7 @@ model Organization {
   files             File[]
   templates         Template[]
   apiKeys           ApiKey[]
+  serviceApiKeys    ServiceApiKey[]
   auditLogs         AuditLog[]
 
   @@index([slug])
@@ -441,6 +442,43 @@ model ApiKey {
 
   @@index([key])
   @@index([organizationId])
+}
+
+// ===========================================
+// SERVICE API KEYS (Clés des services externes)
+// ===========================================
+
+model ServiceApiKey {
+  id              String        @id @default(cuid())
+  name            String        // Nom pour identification
+  provider        String        // ANTHROPIC, OPENAI, GAMMA, SUPABASE, RESEND
+  encryptedKey    String        // Clé chiffrée
+
+  // Global ou par organisation
+  isGlobal        Boolean       @default(false)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive        Boolean       @default(true)
+  lastUsedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([provider])
+  @@index([organizationId])
+  @@index([isGlobal])
+}
+
+// ===========================================
+// GLOBAL SETTINGS (Paramètres globaux)
+// ===========================================
+
+model GlobalSettings {
+  id        String   @id @default(cuid())
+  data      Json     // Stockage flexible des paramètres
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ===========================================

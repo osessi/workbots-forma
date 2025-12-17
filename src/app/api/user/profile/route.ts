@@ -2,49 +2,27 @@
 // API ROUTE - User Profile
 // ===========================================
 // Récupère et met à jour le profil utilisateur + organisation
+// Supporte l'impersonation pour les super admins
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
+import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 
 // GET - Récupérer le profil complet (user + org)
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const currentUser = await getCurrentUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!currentUser) {
       return NextResponse.json(
         { error: "Non authentifié" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur Prisma avec l'organisation complète
+    // Récupérer l'utilisateur complet avec l'organisation
     const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
+      where: { id: currentUser.id },
       include: {
         organization: true,
       },
@@ -66,8 +44,11 @@ export async function GET() {
       phone: user.phone,
       avatar: user.avatar,
       role: user.role,
-      isSuperAdmin: user.isSuperAdmin,
+      isSuperAdmin: currentUser.isSuperAdmin, // Important: utiliser la valeur de currentUser
       createdAt: user.createdAt,
+      // Informations d'impersonation
+      isImpersonating: currentUser.isImpersonating,
+      impersonatedBy: currentUser.impersonatedBy,
       // Organisation complète
       organization: user.organization ? {
         id: user.organization.id,
@@ -99,33 +80,13 @@ export async function PUT(request: NextRequest) {
 }
 
 // PATCH - Mettre à jour le profil (user + org)
+// Supporte l'impersonation: met à jour l'utilisateur impersonaté si applicable
 export async function PATCH(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    // Utiliser getCurrentUser pour supporter l'impersonation
+    const currentUser = await getCurrentUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!currentUser) {
       return NextResponse.json(
         { error: "Non authentifié" },
         { status: 401 }
@@ -150,22 +111,23 @@ export async function PATCH(request: NextRequest) {
       logo,
     } = body;
 
-    // Récupérer l'utilisateur actuel
-    const currentUser = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
+    // Récupérer l'utilisateur complet avec organisation
+    // Utiliser l'ID de currentUser (qui peut être l'utilisateur impersonaté)
+    const userWithOrg = await prisma.user.findUnique({
+      where: { id: currentUser.id },
       include: { organization: true },
     });
 
-    if (!currentUser) {
+    if (!userWithOrg) {
       return NextResponse.json(
         { error: "Utilisateur non trouvé" },
         { status: 404 }
       );
     }
 
-    // Mettre à jour l'utilisateur
+    // Mettre à jour l'utilisateur (par ID, pas supabaseId, pour supporter l'impersonation)
     const updatedUser = await prisma.user.update({
-      where: { supabaseId: supabaseUser.id },
+      where: { id: currentUser.id },
       data: {
         ...(firstName !== undefined && { firstName }),
         ...(lastName !== undefined && { lastName }),
@@ -175,10 +137,10 @@ export async function PATCH(request: NextRequest) {
     });
 
     // Mettre à jour l'organisation si elle existe
-    let updatedOrg = currentUser.organization;
-    if (currentUser.organizationId) {
+    let updatedOrg = userWithOrg.organization;
+    if (userWithOrg.organizationId) {
       updatedOrg = await prisma.organization.update({
-        where: { id: currentUser.organizationId },
+        where: { id: userWithOrg.organizationId },
         data: {
           ...(entreprise !== undefined && { name: entreprise }),
           ...(siret !== undefined && { siret }),

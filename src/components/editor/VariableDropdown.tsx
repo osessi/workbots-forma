@@ -3,18 +3,26 @@
 // DROPDOWN POUR INSERTION DE VARIABLES
 // ===========================================
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { DocumentType, TemplateVariable, VariableGroup } from "@/lib/templates/types";
-import { getVariablesForDocumentType, VARIABLE_GROUPS } from "@/lib/templates/variables";
+import {
+  getVariablesForDocumentType,
+  VARIABLE_GROUPS,
+  getVariableGroupsWithDynamicContext,
+  DynamicVariableContext,
+} from "@/lib/templates/variables";
 
 interface VariableDropdownProps {
   documentType?: DocumentType;
   onInsertVariable: (variableId: string) => void;
+  /** Contexte dynamique pour generer les variables numerotees */
+  dynamicContext?: DynamicVariableContext;
 }
 
 export default function VariableDropdown({
   documentType,
   onInsertVariable,
+  dynamicContext,
 }: VariableDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,10 +32,15 @@ export default function VariableDropdown({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Obtenir les groupes de variables selon le type de document
-  const variableGroups = documentType
-    ? getVariablesForDocumentType(documentType)
-    : VARIABLE_GROUPS;
+  // Obtenir les groupes de variables selon le type de document et le contexte dynamique
+  const variableGroups = useMemo(() => {
+    if (dynamicContext && (dynamicContext.nombreJournees || dynamicContext.nombreSalaries)) {
+      // Utiliser les variables dynamiques si un contexte est fourni
+      return getVariableGroupsWithDynamicContext(dynamicContext);
+    }
+    // Sinon utiliser les groupes statiques
+    return documentType ? getVariablesForDocumentType(documentType) : VARIABLE_GROUPS;
+  }, [documentType, dynamicContext]);
 
   // Filtrer les variables par recherche
   const filteredGroups = variableGroups

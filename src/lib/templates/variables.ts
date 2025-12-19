@@ -5,16 +5,17 @@
 import { TemplateVariable, VariableGroup, DocumentTypeConfig, DocumentType, VariableCategory } from "./types";
 
 // ===========================================
-// GENERATEURS DE VARIABLES NUMEROTEES
+// GENERATEURS DE VARIABLES DYNAMIQUES
 // ===========================================
 
 /**
- * Genere les variables numerotees pour les journees (jour1, jour2, etc.)
+ * Genere les variables numerotees pour les journees basees sur le nombre reel
+ * @param count - Nombre de journees (0 = pas de variables numerotees affichees)
  */
-function generateJourneeVariables(maxJours: number): TemplateVariable[] {
+export function generateJourneeVariables(count: number): TemplateVariable[] {
   const variables: TemplateVariable[] = [];
 
-  for (let i = 1; i <= maxJours; i++) {
+  for (let i = 1; i <= count; i++) {
     variables.push(
       {
         id: `journee${i}.date`,
@@ -51,12 +52,13 @@ function generateJourneeVariables(maxJours: number): TemplateVariable[] {
 }
 
 /**
- * Genere les variables numerotees pour les salaries/participants (salarie1, salarie2, etc.)
+ * Genere les variables numerotees pour les salaries basees sur le nombre reel
+ * @param count - Nombre de salaries (0 = pas de variables numerotees affichees)
  */
-function generateSalarieVariables(maxSalaries: number): TemplateVariable[] {
+export function generateSalarieVariables(count: number): TemplateVariable[] {
   const variables: TemplateVariable[] = [];
 
-  for (let i = 1; i <= maxSalaries; i++) {
+  for (let i = 1; i <= count; i++) {
     variables.push(
       {
         id: `salarie${i}.nom`,
@@ -139,6 +141,118 @@ function generateSalarieVariables(maxSalaries: number): TemplateVariable[] {
   }
 
   return variables;
+}
+
+/**
+ * Contexte dynamique pour la generation des variables
+ */
+export interface DynamicVariableContext {
+  nombreJournees?: number;
+  nombreSalaries?: number;
+}
+
+/**
+ * Obtenir toutes les variables avec les variables dynamiques basees sur le contexte
+ * @param context - Contexte avec le nombre d'elements (journees, salaries)
+ */
+export function getVariablesWithDynamicContext(context: DynamicVariableContext = {}): TemplateVariable[] {
+  const { nombreJournees = 0, nombreSalaries = 0 } = context;
+
+  // Variables de base (sans les variables numerotees)
+  const baseVariables = TEMPLATE_VARIABLES.filter(v => {
+    // Exclure les variables generees statiquement (on les regenere dynamiquement)
+    const isStaticJournee = v.id.match(/^journee\d+\./);
+    const isStaticSalarie = v.id.match(/^salarie\d+\./);
+    return !isStaticJournee && !isStaticSalarie;
+  });
+
+  // Ajouter les variables dynamiques
+  const dynamicJournees = generateJourneeVariables(nombreJournees);
+  const dynamicSalaries = generateSalarieVariables(nombreSalaries);
+
+  // Inserer les variables de journees apres journees.count
+  const journeesCountIndex = baseVariables.findIndex(v => v.id === "journees.count");
+  if (journeesCountIndex !== -1) {
+    baseVariables.splice(journeesCountIndex + 1, 0, ...dynamicJournees);
+  }
+
+  // Inserer les variables de salaries apres participants.count
+  const participantsCountIndex = baseVariables.findIndex(v => v.id === "participants.count");
+  if (participantsCountIndex !== -1) {
+    baseVariables.splice(participantsCountIndex + 1, 0, ...dynamicSalaries);
+  }
+
+  return baseVariables;
+}
+
+/**
+ * Obtenir les groupes de variables avec contexte dynamique
+ */
+export function getVariableGroupsWithDynamicContext(context: DynamicVariableContext = {}): VariableGroup[] {
+  const allVariables = getVariablesWithDynamicContext(context);
+
+  return [
+    {
+      category: "formation",
+      label: "Formation",
+      icon: "GraduationCap",
+      variables: allVariables.filter((v) => v.category === "formation"),
+    },
+    {
+      category: "journees",
+      label: "Journees",
+      icon: "CalendarDays",
+      variables: allVariables.filter((v) => v.category === "journees"),
+    },
+    {
+      category: "modules",
+      label: "Modules",
+      icon: "Layers",
+      variables: allVariables.filter((v) => v.category === "modules"),
+    },
+    {
+      category: "organisation",
+      label: "Organisme",
+      icon: "Building2",
+      variables: allVariables.filter((v) => v.category === "organisation"),
+    },
+    {
+      category: "entreprise",
+      label: "Entreprise",
+      icon: "Briefcase",
+      variables: allVariables.filter((v) => v.category === "entreprise"),
+    },
+    {
+      category: "particulier",
+      label: "Particulier",
+      icon: "User",
+      variables: allVariables.filter((v) => v.category === "particulier"),
+    },
+    {
+      category: "participants",
+      label: "Participants",
+      icon: "Users",
+      variables: allVariables.filter((v) => v.category === "participants"),
+    },
+    {
+      category: "formateur",
+      label: "Formateur",
+      icon: "UserCheck",
+      variables: allVariables.filter((v) => v.category === "formateur"),
+    },
+    {
+      category: "dates",
+      label: "Dates",
+      icon: "Calendar",
+      variables: allVariables.filter((v) => v.category === "dates"),
+    },
+    {
+      category: "document",
+      label: "Document",
+      icon: "FileText",
+      variables: allVariables.filter((v) => v.category === "document"),
+    },
+  ];
 }
 
 /**
@@ -339,8 +453,8 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     description: "Nombre total de journees programmees",
     example: "3",
   },
-  // Variables numerotees pour chaque journee (jour 1 a 10)
-  ...generateJourneeVariables(10),
+  // Note: Les variables journee1, journee2, etc. sont generees dynamiquement
+  // via getVariablesWithDynamicContext() selon le nombre reel de journees
 
   // ===== MODULES =====
   {
@@ -737,8 +851,8 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     description: "Nombre total de participants",
     example: "8",
   },
-  // Variables numerotees pour chaque salarie (salarie1 a salarie20)
-  ...generateSalarieVariables(20),
+  // Note: Les variables salarie1, salarie2, etc. sont generees dynamiquement
+  // via getVariablesWithDynamicContext() selon le nombre reel de salaries
 
   // ===== FORMATEUR =====
   {

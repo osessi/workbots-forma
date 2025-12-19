@@ -14,7 +14,14 @@ export {
   getVariableById,
   formatVariableForInsertion,
   extractVariablesFromText,
+  // Fonctions pour variables dynamiques
+  generateJourneeVariables,
+  generateSalarieVariables,
+  getVariablesWithDynamicContext,
+  getVariableGroupsWithDynamicContext,
 } from "./variables";
+
+export type { DynamicVariableContext } from "./variables";
 
 // Renderer
 export {

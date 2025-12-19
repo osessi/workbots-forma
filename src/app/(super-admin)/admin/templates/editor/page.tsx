@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { DocumentType } from "@/lib/templates/types";
-import { DOCUMENT_TYPES, generateTestContext, renderTemplate } from "@/lib/templates";
+import { DOCUMENT_TYPES, generateTestContext, renderTemplate, DynamicVariableContext } from "@/lib/templates";
 
 // Import dynamique de l'editeur (client-side only)
 const DocumentEditor = dynamic(
@@ -105,6 +105,12 @@ export default function TemplateEditorPage() {
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const contentMeasureRef = useRef<HTMLDivElement>(null);
   const testContext = useMemo(() => generateTestContext(), []);
+
+  // Contexte dynamique pour les variables numerotees (test avec 3 journees et 5 salaries)
+  const dynamicContext: DynamicVariableContext = useMemo(() => ({
+    nombreJournees: 3,
+    nombreSalaries: 5,
+  }), []);
 
   // Charger le template existant
   useEffect(() => {
@@ -668,6 +674,7 @@ export default function TemplateEditorPage() {
                     placeholder="En-tete du document..."
                     minHeight="100px"
                     showToolbar={true}
+                    dynamicContext={dynamicContext}
                   />
                 </div>
               )}
@@ -692,6 +699,7 @@ export default function TemplateEditorPage() {
                     placeholder="Redigez le contenu de votre template..."
                     minHeight="400px"
                     showToolbar={true}
+                    dynamicContext={dynamicContext}
                   />
                 </div>
               )}
@@ -717,6 +725,7 @@ export default function TemplateEditorPage() {
                     placeholder="Pied de page..."
                     minHeight="80px"
                     showToolbar={true}
+                    dynamicContext={dynamicContext}
                   />
                 </div>
               )}

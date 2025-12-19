@@ -26,6 +26,7 @@ import mammoth from "mammoth";
 import TemplateVariable from "./extensions/TemplateVariable";
 import EditorToolbar from "./EditorToolbar";
 import { DocumentType, TemplateContext } from "@/lib/templates/types";
+import { DynamicVariableContext } from "@/lib/templates/variables";
 
 // ===========================================
 // TYPES
@@ -54,6 +55,8 @@ interface DocumentEditorProps {
   previewContext?: TemplateContext;
   /** Afficher la toolbar */
   showToolbar?: boolean;
+  /** Contexte dynamique pour les variables numerotees */
+  dynamicContext?: DynamicVariableContext;
 }
 
 // ===========================================
@@ -72,6 +75,7 @@ export default function DocumentEditor({
   minHeight = "400px",
   previewContext,
   showToolbar = true,
+  dynamicContext,
 }: DocumentEditorProps) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -253,6 +257,7 @@ export default function DocumentEditor({
           documentType={documentType}
           onInsertVariable={handleInsertVariable}
           onImportWord={handleImportWord}
+          dynamicContext={dynamicContext}
         />
       )}
 

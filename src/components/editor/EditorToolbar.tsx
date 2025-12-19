@@ -7,12 +7,15 @@ import { Editor } from "@tiptap/react";
 import { useState, useCallback, useRef } from "react";
 import VariableDropdown from "./VariableDropdown";
 import { DocumentType } from "@/lib/templates/types";
+import { DynamicVariableContext } from "@/lib/templates/variables";
 
 interface EditorToolbarProps {
   editor: Editor | null;
   documentType?: DocumentType;
   onInsertVariable?: (variableId: string) => void;
   onImportWord?: (file: File) => void;
+  /** Contexte dynamique pour les variables numerotees (journees, salaries) */
+  dynamicContext?: DynamicVariableContext;
 }
 
 // Hook pour calculer la position d'un dropdown
@@ -82,7 +85,7 @@ function Divider() {
   return <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1" />;
 }
 
-export default function EditorToolbar({ editor, documentType, onInsertVariable, onImportWord }: EditorToolbarProps) {
+export default function EditorToolbar({ editor, documentType, onInsertVariable, onImportWord, dynamicContext }: EditorToolbarProps) {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [showImageInput, setShowImageInput] = useState(false);
@@ -493,6 +496,7 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
         <VariableDropdown
           documentType={documentType}
           onInsertVariable={handleInsertVariable}
+          dynamicContext={dynamicContext}
         />
       </div>
 

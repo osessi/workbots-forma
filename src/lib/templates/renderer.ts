@@ -6,9 +6,11 @@
 import {
   TemplateContext,
   FormationData,
+  JourneeData,
   ModuleData,
   OrganisationData,
   EntrepriseData,
+  ParticulierData,
   ParticipantData,
   FormateurData,
   DatesData,
@@ -218,8 +220,80 @@ function replaceConditions(
 
 /**
  * Obtenir une valeur depuis un chemin (ex: "formation.titre")
+ * Supporte les variables speciales calculees dynamiquement
  */
 function getValueFromPath(context: TemplateContext, path: string): unknown {
+  // Variables speciales calculees dynamiquement
+  if (path === "journees.premiere_date") {
+    const journees = context.journees;
+    if (journees && journees.length > 0) {
+      return journees[0].date;
+    }
+    return context.formation?.date_debut || undefined;
+  }
+
+  if (path === "journees.derniere_date") {
+    const journees = context.journees;
+    if (journees && journees.length > 0) {
+      return journees[journees.length - 1].date; // Derniere journee dynamique !
+    }
+    return context.formation?.date_fin || undefined;
+  }
+
+  if (path === "journees.count") {
+    const journees = context.journees;
+    if (journees) {
+      return journees.length;
+    }
+    return context.formation?.nombre_jours || 0;
+  }
+
+  if (path === "participants.count") {
+    const participants = context.participants;
+    if (participants) {
+      return participants.length;
+    }
+    return 0;
+  }
+
+  // Variables calculees pour le particulier
+  if (path === "particulier.nom_complet" && context.particulier) {
+    const p = context.particulier;
+    if (!p.nom_complet && p.prenom && p.nom) {
+      return `${p.prenom} ${p.nom}`;
+    }
+  }
+
+  if (path === "particulier.adresse_complete" && context.particulier) {
+    const p = context.particulier;
+    if (!p.adresse_complete && p.adresse) {
+      return `${p.adresse}, ${p.code_postal || ""} ${p.ville || ""}`.trim();
+    }
+  }
+
+  // Variables calculees pour le formateur
+  if (path === "formateur.nom_complet" && context.formateur) {
+    const f = context.formateur;
+    return `${f.prenom || ""} ${f.nom || ""}`.trim();
+  }
+
+  // Variables calculees pour l'organisation
+  if (path === "organisation.adresse_complete" && context.organisation) {
+    const o = context.organisation;
+    if (!o.adresse_complete && o.adresse) {
+      return `${o.adresse}, ${o.code_postal || ""} ${o.ville || ""}`.trim();
+    }
+  }
+
+  // Variables calculees pour l'entreprise
+  if (path === "entreprise.adresse_complete" && context.entreprise) {
+    const e = context.entreprise;
+    if (!e.adresse_complete && e.adresse) {
+      return `${e.adresse}, ${e.code_postal || ""} ${e.ville || ""}`.trim();
+    }
+  }
+
+  // Chemin standard
   const parts = path.split(".");
   let current: unknown = context;
 
@@ -270,6 +344,7 @@ function getSingularName(pluralName: string): string {
   const singulars: Record<string, string> = {
     modules: "module",
     participants: "participant",
+    journees: "journee",
     objectifs: "objectif",
     prerequis: "prerequis",
     contenus: "contenu",
@@ -486,8 +561,11 @@ export function generateTestContext(): TemplateContext {
       description: "Cette formation permet de maitriser les fondamentaux du management agile et de developper ses competences de leader.",
       duree: "14 heures (2 jours)",
       duree_heures: 14,
+      nombre_jours: 2,
       prix: 1500,
       prix_format: "1 500,00 EUR HT",
+      prix_ttc: "1 800,00 EUR TTC",
+      tva: "300,00",
       objectifs: [
         "Comprendre les principes du management agile",
         "Developper ses competences de leader",
@@ -501,10 +579,36 @@ export function generateTestContext(): TemplateContext {
       public_cible: "Managers, chefs de projet, responsables d'equipe",
       modalites: "Presentiel",
       lieu: "Paris - Centre de formation",
+      adresse: "15 rue de la Formation",
+      code_postal: "75001",
+      ville: "Paris",
       date_debut: "15/01/2025",
       date_fin: "16/01/2025",
+      horaires_matin: "09:00 - 12:30",
+      horaires_apres_midi: "14:00 - 17:30",
       reference: "FORM-2025-001",
+      methodes_pedagogiques: "Apports theoriques, exercices pratiques, mises en situation, etudes de cas",
+      moyens_techniques: "Salle equipee, videoprojecteur, supports de cours remis aux participants",
+      modalites_evaluation: "QCM d'evaluation des acquis, mise en situation pratique, evaluation continue",
+      accessibilite: "Formation accessible aux personnes en situation de handicap. Contactez-nous pour etudier les adaptations possibles.",
+      delai_acces: "14 jours ouvrables avant le debut de la formation",
     },
+    journees: [
+      {
+        numero: 1,
+        date: "15 janvier 2025",
+        date_courte: "15/01/2025",
+        horaires_matin: "09:00 - 12:30",
+        horaires_apres_midi: "14:00 - 17:30",
+      },
+      {
+        numero: 2,
+        date: "16 janvier 2025",
+        date_courte: "16/01/2025",
+        horaires_matin: "09:00 - 12:30",
+        horaires_apres_midi: "14:00 - 17:30",
+      },
+    ],
     modules: [
       {
         id: "MOD-001",
@@ -565,12 +669,18 @@ export function generateTestContext(): TemplateContext {
       adresse: "15 rue de la Formation",
       code_postal: "75001",
       ville: "Paris",
+      adresse_complete: "15 rue de la Formation, 75001 Paris",
       telephone: "01 23 45 67 89",
       email: "contact@automate-formation.fr",
       site_web: "www.automate-formation.fr",
       numero_da: "11 75 12345 67",
+      logo: "https://example.com/logo.png",
       representant: "Jean DUPONT",
       fonction_representant: "Directeur General",
+      tva_intra: "FR12345678901",
+      capital: "10 000 EUR",
+      forme_juridique: "SAS",
+      rcs: "Paris B 123 456 789",
     },
     entreprise: {
       id: "ENT-001",
@@ -579,10 +689,26 @@ export function generateTestContext(): TemplateContext {
       adresse: "100 avenue des Champs-Elysees",
       code_postal: "75008",
       ville: "Paris",
+      adresse_complete: "100 avenue des Champs-Elysees, 75008 Paris",
       telephone: "01 98 76 54 32",
       email: "contact@acme.fr",
       representant: "Marie MARTIN",
       fonction_representant: "Directrice des Ressources Humaines",
+    },
+    particulier: {
+      civilite: "M.",
+      nom: "DURAND",
+      prenom: "Pierre",
+      nom_complet: "Pierre DURAND",
+      adresse: "25 rue de la Paix",
+      code_postal: "75002",
+      ville: "Paris",
+      adresse_complete: "25 rue de la Paix, 75002 Paris",
+      email: "pierre.durand@email.com",
+      telephone: "06 12 34 56 78",
+      date_naissance: "15/03/1985",
+      lieu_naissance: "Paris",
+      statut: "Demandeur d'emploi",
     },
     participants: [
       {

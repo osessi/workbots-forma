@@ -7,9 +7,11 @@
  */
 export type VariableCategory =
   | "formation"
+  | "journees"
   | "modules"
   | "organisation"
   | "entreprise"
+  | "particulier"
   | "participants"
   | "formateur"
   | "dates"
@@ -88,9 +90,11 @@ export interface DocumentTypeConfig {
  */
 export interface TemplateContext {
   formation?: FormationData;
+  journees?: JourneeData[];
   modules?: ModuleData[];
   organisation?: OrganisationData;
   entreprise?: EntrepriseData;
+  particulier?: ParticulierData;
   participants?: ParticipantData[];
   formateur?: FormateurData;
   dates?: DatesData;
@@ -106,16 +110,59 @@ export interface FormationData {
   description?: string;
   duree: string;
   duree_heures: number;
-  prix?: number;
+  nombre_jours?: number;
+  prix?: number | string;
   prix_format?: string;
+  prix_ttc?: number | string;
+  tva?: number | string;
   objectifs?: string[];
   prerequis?: string[];
   public_cible?: string;
   modalites?: string;
   lieu?: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
   date_debut?: string;
   date_fin?: string;
+  horaires_matin?: string;
+  horaires_apres_midi?: string;
   reference?: string;
+  methodes_pedagogiques?: string;
+  moyens_techniques?: string;
+  modalites_evaluation?: string;
+  accessibilite?: string;
+  delai_acces?: string;
+}
+
+/**
+ * Donnees d'une journee de formation
+ */
+export interface JourneeData {
+  numero: number;
+  date: string;
+  date_courte: string;
+  horaires_matin?: string;
+  horaires_apres_midi?: string;
+}
+
+/**
+ * Donnees d'un particulier (stagiaire individuel)
+ */
+export interface ParticulierData {
+  civilite?: string;
+  nom: string;
+  prenom: string;
+  nom_complet?: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  adresse_complete?: string;
+  email?: string;
+  telephone?: string;
+  date_naissance?: string;
+  lieu_naissance?: string;
+  statut?: string; // demandeur d'emploi, salarie, independant, etc.
 }
 
 /**
@@ -142,13 +189,19 @@ export interface OrganisationData {
   adresse: string;
   code_postal: string;
   ville: string;
+  adresse_complete?: string;
   telephone?: string;
   email?: string;
   site_web?: string;
   numero_da: string; // Numero de declaration d'activite
-  logo_url?: string;
+  logo?: string; // URL du logo
+  logo_url?: string; // Alias pour compatibilite
   representant?: string;
   fonction_representant?: string;
+  tva_intra?: string; // Numero TVA intracommunautaire
+  capital?: string; // Capital social
+  forme_juridique?: string; // SAS, SARL, etc.
+  rcs?: string; // RCS
 }
 
 /**

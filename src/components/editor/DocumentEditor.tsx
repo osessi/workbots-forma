@@ -235,7 +235,7 @@ export default function DocumentEditor({
 
   return (
     <div
-      className={`document-editor relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden ${className}`}
+      className={`document-editor relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 ${className}`}
     >
       {/* Indicateur d'import */}
       {isImporting && (

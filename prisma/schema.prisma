@@ -114,6 +114,8 @@ model Organization {
   apiKeys           ApiKey[]
   serviceApiKeys    ServiceApiKey[]
   auditLogs         AuditLog[]
+  aiPrompts         AIPrompt[]
+  aiGenerationLogs  AIGenerationLog[]
 
   @@index([slug])
   @@index([customDomain])
@@ -151,6 +153,7 @@ model User {
   files           File[]
   sessions        FormationSession[]
   auditLogs       AuditLog[]
+  aiGenerationLogs AIGenerationLog[]
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -577,4 +580,125 @@ model GlobalConfig {
   updatedAt       DateTime @updatedAt
 
   @@index([key])
+}
+
+// ===========================================
+// AI PROMPTS (Prompts IA configurables)
+// ===========================================
+
+enum AIPromptType {
+  FICHE_PEDAGOGIQUE
+  PROGRAMME_FORMATION
+  CONVENTION
+  CONTRAT_FORMATION
+  CONVOCATION
+  ATTESTATION_PRESENCE
+  ATTESTATION_FIN
+  EVALUATION_CHAUD
+  EVALUATION_FROID
+  REGLEMENT_INTERIEUR
+  CERTIFICAT
+  QCM
+  POSITIONNEMENT
+  EVALUATION_FINALE
+  REFORMULATION
+  CUSTOM
+}
+
+model AIPrompt {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+  type            AIPromptType
+
+  // Prompt system (instructions pour l'IA)
+  systemPrompt    String       @db.Text
+
+  // Prompt utilisateur (template avec variables)
+  userPromptTemplate String    @db.Text
+
+  // Variables requises pour ce prompt (ex: ["formation.titre", "modules"])
+  requiredVariables String[]
+
+  // Variables optionnelles
+  optionalVariables String[]
+
+  // Configuration IA
+  model           String       @default("claude-sonnet-4-20250514")
+  temperature     Float        @default(0.7)
+  maxTokens       Int          @default(4096)
+
+  // Schema de sortie attendu (JSON Schema pour validation)
+  outputSchema    Json?
+
+  // Template TipTap pour formater la sortie (optionnel)
+  outputTemplate  Json?
+
+  // Prompt systeme (global uniquement)
+  isSystem        Boolean      @default(false)
+
+  // Multi-tenant (null = global)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relation avec les logs
+  generationLogs  AIGenerationLog[]
+
+  // Metadata
+  isActive        Boolean      @default(true)
+  version         Int          @default(1)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([type, organizationId])
+  @@index([type])
+  @@index([organizationId])
+  @@index([isSystem])
+}
+
+// ===========================================
+// AI GENERATION LOGS (Suivi des generations)
+// ===========================================
+
+model AIGenerationLog {
+  id              String       @id @default(cuid())
+
+  // Quel prompt a ete utilise
+  promptId        String?
+  prompt          AIPrompt?    @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  promptType      AIPromptType
+
+  // Qui a genere
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // Input/Output
+  inputContext    Json         // Contexte envoye a l'IA
+  outputContent   Json?        // Contenu genere
+  outputRaw       String?      @db.Text // Reponse brute de l'IA
+
+  // Metriques
+  tokensPrompt    Int          @default(0)
+  tokensCompletion Int         @default(0)
+  tokensTotal     Int          @default(0)
+  durationMs      Int          @default(0)
+
+  // Statut
+  status          String       @default("pending") // pending, success, error
+  errorMessage    String?
+
+  // Provider utilise
+  provider        String?      // anthropic, openai
+  model           String?
+
+  // Metadata
+  createdAt       DateTime     @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([promptType])
+  @@index([status])
+  @@index([createdAt])
 }

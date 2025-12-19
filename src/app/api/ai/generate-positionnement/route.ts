@@ -8,11 +8,17 @@ import { generatePositionnement, isAIConfigured } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 
 // Schema de validation de la requete
+const ModuleSchema = z.object({
+  titre: z.string(),
+  contenu: z.array(z.string()).optional(),
+});
+
 const RequestSchema = z.object({
   formationTitre: z.string().min(1, "Le titre de la formation est requis"),
-  objectifs: z.array(z.string()).min(1, "Au moins un objectif est requis"),
-  prerequis: z.array(z.string()),
-  publicCible: z.string().min(1, "Le public cible est requis"),
+  objectifs: z.array(z.string()).default([]),
+  prerequis: z.array(z.string()).default([]),
+  publicCible: z.string().default("Professionnels"),
+  modules: z.array(ModuleSchema).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -45,8 +51,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const data = validationResult.data;
+
+    // Extraire les objectifs des modules si non fournis
+    let objectifs = data.objectifs;
+    if (objectifs.length === 0 && data.modules) {
+      objectifs = data.modules.map(m => `Maitriser ${m.titre}`);
+    }
+
+    // Extraire les prerequis des modules si non fournis
+    let prerequis = data.prerequis;
+    if (prerequis.length === 0 && data.modules) {
+      prerequis = ["Connaissances de base dans le domaine"];
+    }
+
     // Generer le test de positionnement
-    const result = await generatePositionnement(validationResult.data);
+    const result = await generatePositionnement({
+      formationTitre: data.formationTitre,
+      objectifs,
+      prerequis,
+      publicCible: data.publicCible,
+    });
 
     if (!result.success) {
       console.error("Erreur generation positionnement:", result.error);

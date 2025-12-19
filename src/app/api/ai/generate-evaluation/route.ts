@@ -9,13 +9,15 @@ import { getCurrentUser } from "@/lib/auth/getCurrentUser";
 
 // Schema de validation de la requete
 const ModuleSchema = z.object({
-  titre: z.string().min(1),
-  objectifs: z.array(z.string()).min(1),
+  titre: z.string(),
+  contenu: z.array(z.string()).optional(),
+  objectifs: z.array(z.string()).optional(),
 });
 
 const RequestSchema = z.object({
   formationTitre: z.string().min(1, "Le titre de la formation est requis"),
-  modules: z.array(ModuleSchema).min(1, "Au moins un module est requis"),
+  modules: z.array(ModuleSchema).default([]),
+  objectifs: z.array(z.string()).default([]),
   dureeEvaluation: z.string().optional(),
 });
 
@@ -49,8 +51,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const data = validationResult.data;
+
+    // Transformer les modules pour inclure des objectifs si non fournis
+    const modulesWithObjectifs = data.modules.map(m => ({
+      titre: m.titre,
+      objectifs: m.objectifs?.length ? m.objectifs : (m.contenu?.length ? m.contenu.slice(0, 3) : [`Maitriser ${m.titre}`]),
+    }));
+
     // Generer l'evaluation
-    const result = await generateEvaluation(validationResult.data);
+    const result = await generateEvaluation({
+      formationTitre: data.formationTitre,
+      modules: modulesWithObjectifs,
+      dureeEvaluation: data.dureeEvaluation,
+    });
 
     if (!result.success) {
       console.error("Erreur generation evaluation:", result.error);

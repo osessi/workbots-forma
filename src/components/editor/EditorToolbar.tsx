@@ -6,6 +6,7 @@
 import { Editor } from "@tiptap/react";
 import { useState, useCallback, useRef } from "react";
 import VariableDropdown from "./VariableDropdown";
+import AIGenerateButton from "./AIGenerateButton";
 import { DocumentType } from "@/lib/templates/types";
 import { DynamicVariableContext } from "@/lib/templates/variables";
 
@@ -496,6 +497,15 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
         <VariableDropdown
           documentType={documentType}
           onInsertVariable={handleInsertVariable}
+          dynamicContext={dynamicContext}
+        />
+
+        <Divider />
+
+        {/* Generation IA */}
+        <AIGenerateButton
+          editor={editor}
+          documentType={documentType}
           dynamicContext={dynamicContext}
         />
       </div>

@@ -21,85 +21,31 @@ const initialContexteData = {
   description: "",
 };
 
-// Données initiales pour la fiche pédagogique (exemple)
+// Données initiales vides pour la fiche pédagogique (sera rempli par l'IA)
 const initialFicheData = {
-  titre: "Les bases de l'intelligence artificielle",
-  description:
-    "Cette formation de deux jours a pour objectif de rendre accessibles les notions essentielles de l'intelligence artificielle (IA) à des professionnels non spécialistes. Elle permet de comprendre ce qu'est réellement l'IA, comment elle fonctionne, quelles sont ses principales applications concrètes en entreprise et comment l'utiliser de manière responsable.",
-  objectifs: [
-    "Comprendre ce qu'est (et ce que n'est pas) l'intelligence artificielle",
-    "Identifier les principales familles d'IA (IA symbolique, machine learning, IA générative)",
-    "Comprendre le rôle des données et des algorithmes dans le fonctionnement de l'IA",
-    "Utiliser quelques outils d'IA simples (dont l'IA générative) pour gagner du temps au quotidien",
-  ],
-  contenu: `Module 1 – Introduction à l'intelligence artificielle
-• Définir l'intelligence artificielle : histoire, mythes et réalités
-• Panorama des grands types d'IA
-• Quelques exemples d'IA dans le quotidien (recommandations, GPS, assistants vocaux...)
-
-Module 2 – Données, algorithmes et apprentissage automatique
-• Qu'est-ce qu'une donnée ? Données structurées / non structurées
-• Principes de base du machine learning (apprentissage supervisé / non supervisé, entraînement d'un modèle)
-• Notion de surapprentissage et de qualité des données`,
-  typeFormation: "Présentiel",
-  duree: "14 heures (2 jours)",
-  nombreParticipants: "12",
-  tarif: "1200 € HT / participant",
-  accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
-  prerequis: `Aucune compétence technique en informatique ou en data n'est requise
-Être à l'aise avec l'utilisation courante d'un ordinateur (mail, navigation web, outils bureautiques)
-Manifester un intérêt pour les enjeux du numérique et de l'intelligence artificielle dans son activité professionnelle`,
-  publicVise: `Professionnels non spécialistes (salariés, managers, responsables de service, indépendants…) souhaitant comprendre les fondamentaux de l'IA
-Personnes impliquées dans des projets de transformation digitale ou d'optimisation de leurs processus de travail
-Toute personne souhaitant intégrer l'IA dans son quotidien professionnel`,
-  suiviEvaluation: `Feuilles d'émargement signées par demi-journée pour attester de la présence des participants
-Évaluation de fin de formation pour valider les acquis des participants
-Auto-évaluation des compétences en début et en fin de formation pour mesurer la progression
-Questionnaire de satisfaction à chaud remis à chaque participant
-Attestation de fin de formation délivrée aux participants ayant suivi l'intégralité de la session`,
-  ressourcesPedagogiques: `Formation réalisée en présentiel (en salle équipée, en intra-entreprise) ou à distance via un outil de visioconférence (en classe virtuelle synchrone)
-Accompagnement par le formateur : suivi individualisé et réponses aux questions tout au long de la formation
-Ateliers pratiques : mises en situation et exercices appliqués pour ancrer les compétences
-Supports de cours remis aux participants (version numérique et/ou papier)`,
-  delaiAcces: "Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.",
+  titre: "",
+  description: "",
+  objectifs: [] as string[],
+  contenu: "",
+  typeFormation: "",
+  duree: "",
+  nombreParticipants: "",
+  tarif: "",
+  accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles a tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les amenagements necessaires.",
+  prerequis: "",
+  publicVise: "",
+  suiviEvaluation: "",
+  ressourcesPedagogiques: "",
+  delaiAcces: "Le delai d'acces a la formation est de 4 semaines a compter de la validation de la demande de formation.",
+  imageUrl: "",
 };
 
-// Modules pour les étapes Slides et Évaluations
-const initialModules = [
-  {
-    id: "1",
-    titre: "Module 1 – Introduction à l'intelligence artificielle",
-    contenu: [
-      "Définir l'intelligence artificielle : histoire, mythes et réalités",
-      "Panorama des grands types d'IA",
-      "Quelques exemples d'IA dans le quotidien (recommandations, GPS, assistants vocaux...)",
-    ],
-  },
-  {
-    id: "2",
-    titre: "Module 2 – Données, algorithmes et apprentissage automatique",
-    contenu: [
-      "Qu'est-ce qu'une donnée ? Données structurées / non structurées",
-      "Principes de base du machine learning (apprentissage supervisé / non supervisé, entraînement d'un modèle)",
-      "Notion de surapprentissage et de qualité des données",
-    ],
-  },
-  {
-    id: "3",
-    titre: "Module 3 – Découvrir l'IA générative",
-    contenu: [
-      "Principe de l'IA générative (texte, image, son, vidéo).",
-      "Fonctionnement général des modèles de langage (type ChatGPT).",
-      "Démonstrations : génération de texte, reformulation, synthèse, idées de contenu.",
-      "Notions de prompt et de bonnes pratiques de questionnement.",
-    ],
-  },
-  {
-    id: "4",
-    titre: "Module 4 – Cas d'usage de l'IA en entreprise",
-    contenu: [],
-  },
-];
+// Modules vides initialement (sera rempli dynamiquement par l'IA)
+const initialModules: Array<{
+  id: string;
+  titre: string;
+  contenu: string[];
+}> = [];
 
 // Données initiales pour les documents
 const initialDocumentsData = {
@@ -172,18 +118,44 @@ const initialDocumentsData = {
   },
 };
 
+// Types pour la generation
+interface FichePedagogiqueGeneree {
+  titre?: string;
+  objectifGeneral?: string;
+  objectifsSpecifiques?: string[];
+  publicCible?: string;
+  prerequis?: string[];
+  dureeTotal?: string;
+  modules?: Array<{
+    titre: string;
+    duree?: string;
+    objectifs?: string[];
+    contenu?: string[];
+    methodePedagogique?: string;
+  }>;
+  moyensPedagogiques?: string[];
+  modalitesEvaluation?: string[];
+  sanctionFormation?: string;
+  accessibilite?: string;
+}
+
 export default function CreateFormationPage() {
   const [currentStep, setCurrentStep] = useState<StepId>("contexte");
   const [completedSteps, setCompletedSteps] = useState<StepId[]>([]);
 
-  // États des données
+  // Etats des donnees
   const [contexteData, setContexteData] = useState(initialContexteData);
   const [ficheData, setFicheData] = useState(initialFicheData);
   const [documentsData, setDocumentsData] = useState(initialDocumentsData);
+  const [modules, setModules] = useState(initialModules);
 
-  // État pour la formation créée (pour la génération de documents)
+  // Etat pour la formation creee (pour la generation de documents)
   const [formationId, setFormationId] = useState<string | null>(null);
   const [isSavingFormation, setIsSavingFormation] = useState(false);
+
+  // Etats pour la generation IA
+  const [isGeneratingFiche, setIsGeneratingFiche] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   const handleStepClick = (stepId: StepId) => {
     setCurrentStep(stepId);
@@ -200,7 +172,130 @@ export default function CreateFormationPage() {
     setCurrentStep(previousStepId);
   };
 
-  // Fonction pour sauvegarder la formation avant génération de documents
+  // Fonction pour generer la fiche pedagogique avec l'IA
+  const handleGenerateFiche = useCallback(async (contexte: typeof contexteData) => {
+    setIsGeneratingFiche(true);
+    setGenerationError(null);
+
+    // Labels pour les modalites
+    const modaliteLabel: Record<string, string> = {
+      presentiel: "Presentiel",
+      distanciel: "Distanciel / Classe virtuelle",
+      elearning: "E-learning",
+      mixte: "Formation mixte",
+    };
+
+    try {
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          promptType: "FICHE_PEDAGOGIQUE",
+          context: {
+            formation: {
+              description: contexte.description,
+              duree: contexte.dureeHeures
+                ? `${contexte.dureeHeures} heures (${contexte.dureeJours || Math.ceil(parseInt(contexte.dureeHeures) / 7)} jours)`
+                : undefined,
+              modalites: contexte.modalite ? modaliteLabel[contexte.modalite] || contexte.modalite : undefined,
+            },
+            metadata: {
+              typeSession: contexte.typeSession.join(", "),
+              nombreParticipants: contexte.nombreParticipants,
+              tarifEntreprise: contexte.tarifEntreprise,
+              tarifIndependant: contexte.tarifIndependant,
+              tarifParticulier: contexte.tarifParticulier,
+            },
+          },
+          outputFormat: "json",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la generation");
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Erreur lors de la generation");
+      }
+
+      // Parser le contenu JSON genere
+      const genere = data.contentJson as FichePedagogiqueGeneree | null;
+
+      if (genere) {
+        // Calculer la duree formatee
+        const dureeFormatee = contexte.dureeHeures
+          ? `${contexte.dureeHeures} heures (${contexte.dureeJours || Math.ceil(parseInt(contexte.dureeHeures) / 7)} jours)`
+          : genere.dureeTotal || "";
+
+        // Calculer le tarif
+        const tarifFormate = contexte.tarifEntreprise
+          ? `${contexte.tarifEntreprise} € HT / participant`
+          : "";
+
+        // Construire le contenu des modules
+        const contenuModules = genere.modules
+          ? genere.modules
+              .map(
+                (m, i) =>
+                  `Module ${i + 1} - ${m.titre}\n${(m.contenu || []).map((c) => `• ${c}`).join("\n")}`
+              )
+              .join("\n\n")
+          : "";
+
+        // Mettre a jour les donnees de la fiche avec les valeurs generees (pas de fallback vers prev)
+        setFicheData({
+          titre: genere.titre || "Formation sans titre",
+          description: genere.objectifGeneral || contexte.description,
+          objectifs: genere.objectifsSpecifiques || [],
+          prerequis: (genere.prerequis || []).join("\n"),
+          publicVise: genere.publicCible || "",
+          typeFormation: modaliteLabel[contexte.modalite] || contexte.modalite || "",
+          duree: dureeFormatee,
+          nombreParticipants: contexte.nombreParticipants || "",
+          tarif: tarifFormate,
+          accessibilite: genere.accessibilite || "Nous faisons notre possible pour rendre nos formations accessibles a tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les amenagements necessaires.",
+          suiviEvaluation: (genere.modalitesEvaluation || []).join("\n"),
+          ressourcesPedagogiques: (genere.moyensPedagogiques || []).join("\n"),
+          contenu: contenuModules,
+          delaiAcces: "Le delai d'acces a la formation est de 4 semaines a compter de la validation de la demande de formation.",
+          imageUrl: "", // Sera defini par l'utilisateur dans l'etape suivante
+        });
+
+        // Mettre a jour les modules - l'IA determine le nombre de modules necessaires
+        if (genere.modules && genere.modules.length > 0) {
+          setModules(
+            genere.modules.map((m, i) => ({
+              id: String(i + 1),
+              titre: `Module ${i + 1} - ${m.titre}`,
+              contenu: m.contenu || [],
+            }))
+          );
+        }
+      }
+
+      // Passer a l'etape suivante
+      goToNextStep("contexte", "fiche");
+    } catch (error) {
+      console.error("Erreur generation fiche:", error);
+      setGenerationError(
+        error instanceof Error ? error.message : "Erreur lors de la generation de la fiche"
+      );
+      // Afficher une alerte mais permettre de continuer
+      alert(
+        `Erreur lors de la generation: ${error instanceof Error ? error.message : "Erreur inconnue"}. Vous pouvez remplir manuellement les informations.`
+      );
+      // Passer quand meme a l'etape suivante pour permettre la saisie manuelle
+      goToNextStep("contexte", "fiche");
+    } finally {
+      setIsGeneratingFiche(false);
+    }
+  }, [goToNextStep]);
+
+  // Fonction pour sauvegarder la formation avant generation de documents
   const saveFormationForDocuments = useCallback(async (): Promise<string | null> => {
     // Si déjà une formation, la retourner
     if (formationId) return formationId;
@@ -231,7 +326,7 @@ export default function CreateFormationPage() {
             modalites: contexteData.modalite,
             prix: parseInt(contexteData.tarifEntreprise) || 0,
           },
-          modules: initialModules.map((m, index) => ({
+          modules: modules.map((m, index) => ({
             titre: m.titre,
             ordre: index + 1,
             contenu: { contenu: m.contenu },
@@ -253,27 +348,17 @@ export default function CreateFormationPage() {
     } finally {
       setIsSavingFormation(false);
     }
-  }, [formationId, ficheData, contexteData]);
+  }, [formationId, ficheData, contexteData, modules]);
 
-  // Handlers pour les générations (à implémenter avec l'IA)
+  // Handlers pour les generations de slides (a implementer avec Gamma)
   const handleGeneratePowerPoint = (moduleId: string) => {
-    console.log("Générer PowerPoint pour module:", moduleId);
+    console.log("Generer PowerPoint pour module:", moduleId);
+    // TODO: Integrer Gamma API pour generation de slides
   };
 
   const handleGenerateSupport = (moduleId: string) => {
-    console.log("Générer support pour module:", moduleId);
-  };
-
-  const handleGeneratePositionnement = () => {
-    console.log("Générer test de positionnement");
-  };
-
-  const handleGenerateEvaluationFinale = () => {
-    console.log("Générer évaluation finale");
-  };
-
-  const handleGenerateQCM = (moduleId: string) => {
-    console.log("Générer QCM pour module:", moduleId);
+    console.log("Generer support pour module:", moduleId);
+    // TODO: Integrer Gamma API pour generation de support apprenant
   };
 
   // Mapping des types de documents vers les types API
@@ -300,12 +385,14 @@ export default function CreateFormationPage() {
         />
       </div>
 
-      {/* Contenu de l'étape */}
+      {/* Contenu de l'etape */}
       {currentStep === "contexte" && (
         <StepContexte
           data={contexteData}
           onChange={setContexteData}
           onNext={() => goToNextStep("contexte", "fiche")}
+          onGenerateFiche={handleGenerateFiche}
+          isGenerating={isGeneratingFiche}
         />
       )}
 
@@ -320,7 +407,7 @@ export default function CreateFormationPage() {
 
       {currentStep === "slides" && (
         <StepSlidesSupport
-          modules={initialModules}
+          modules={modules}
           onNext={() => goToNextStep("slides", "evaluations")}
           onPrevious={() => goToPreviousStep("fiche")}
           onGeneratePowerPoint={handleGeneratePowerPoint}
@@ -330,12 +417,11 @@ export default function CreateFormationPage() {
 
       {currentStep === "evaluations" && (
         <StepEvaluations
-          modules={initialModules}
+          modules={modules}
+          formationTitre={ficheData.titre}
+          formationObjectifs={ficheData.objectifs}
           onNext={() => goToNextStep("evaluations", "documents")}
           onPrevious={() => goToPreviousStep("slides")}
-          onGeneratePositionnement={handleGeneratePositionnement}
-          onGenerateEvaluationFinale={handleGenerateEvaluationFinale}
-          onGenerateQCM={handleGenerateQCM}
         />
       )}
 

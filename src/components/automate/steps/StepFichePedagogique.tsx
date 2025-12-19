@@ -9,6 +9,22 @@ const EditIcon = () => (
   </svg>
 );
 
+const ImageIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2.25" y="2.25" width="13.5" height="13.5" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+    <circle cx="6.375" cy="6.375" r="1.125" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M2.25 12.75L5.625 9.375C6.03921 8.96079 6.71079 8.96079 7.125 9.375L11.25 13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M10.125 12.375L11.625 10.875C12.0392 10.4608 12.7108 10.4608 13.125 10.875L15.75 13.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const SearchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8.25" cy="8.25" r="5.25" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M12.375 12.375L15.75 15.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
 const CheckIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M3.75 9L7.5 12.75L14.25 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -42,6 +58,17 @@ interface FichePedagogiqueData {
   suiviEvaluation: string;
   ressourcesPedagogiques: string;
   delaiAcces: string;
+  imageUrl?: string;
+}
+
+interface ImageResult {
+  id: string;
+  url: string;
+  thumbnail: string;
+  alt: string;
+  credit: string;
+  creditUrl: string;
+  source: "unsplash" | "picsum";
 }
 
 interface StepFichePedagogiqueProps {
@@ -172,7 +199,238 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(data.titre);
+  const [isDownloading, setIsDownloading] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Etats pour la recherche d'image
+  const [showImageSearch, setShowImageSearch] = useState(false);
+  const [imageQuery, setImageQuery] = useState("");
+  const [imageResults, setImageResults] = useState<ImageResult[]>([]);
+  const [isSearchingImages, setIsSearchingImages] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(data.imageUrl || null);
+
+  // Rechercher des images
+  const handleSearchImages = async () => {
+    if (!imageQuery.trim()) return;
+
+    setIsSearchingImages(true);
+    try {
+      const response = await fetch("/api/ai/search-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: imageQuery, count: 6 }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la recherche d'images");
+      }
+
+      const result = await response.json();
+      if (result.success && result.data?.images) {
+        setImageResults(result.data.images);
+      }
+    } catch (error) {
+      console.error("Erreur recherche images:", error);
+    } finally {
+      setIsSearchingImages(false);
+    }
+  };
+
+  // Selectionner une image
+  const handleSelectImage = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    onChange({ ...data, imageUrl });
+    setShowImageSearch(false);
+  };
+
+  // Rechercher automatiquement des images basees sur le titre
+  const handleAutoSearchImages = async () => {
+    if (!data.titre) return;
+
+    // Extraire les mots cles du titre pour la recherche
+    const searchQuery = data.titre
+      .replace(/Module \d+ –/gi, "")
+      .replace(/Formation/gi, "")
+      .trim()
+      .slice(0, 50);
+
+    setImageQuery(searchQuery);
+    setShowImageSearch(true);
+
+    setIsSearchingImages(true);
+    try {
+      const response = await fetch("/api/ai/search-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchQuery, count: 6 }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la recherche d'images");
+      }
+
+      const result = await response.json();
+      if (result.success && result.data?.images) {
+        setImageResults(result.data.images);
+      }
+    } catch (error) {
+      console.error("Erreur recherche images:", error);
+    } finally {
+      setIsSearchingImages(false);
+    }
+  };
+
+  // Fonction de telechargement PDF via API print
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+
+    // Creer une fenetre d'impression stylisee
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${data.titre} - Fiche Pedagogique</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+          }
+          h1 { color: #1a1a2e; font-size: 28px; margin-bottom: 20px; border-bottom: 3px solid #6366f1; padding-bottom: 10px; }
+          h2 { color: #4338ca; font-size: 18px; margin-top: 30px; margin-bottom: 10px; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+          .info-item { background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #6366f1; }
+          .info-label { font-weight: 600; color: #64748b; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; }
+          .info-value { color: #1e293b; }
+          ul { padding-left: 20px; }
+          li { margin-bottom: 8px; }
+          .section { margin-bottom: 25px; padding: 20px; background: #fafafa; border-radius: 8px; }
+          .section-title { font-weight: 600; color: #4338ca; margin-bottom: 10px; }
+          @media print {
+            body { padding: 20px; }
+            .section { break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>${data.titre}</h1>
+
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Modalite</div>
+            <div class="info-value">${data.typeFormation || 'Non defini'}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Duree</div>
+            <div class="info-value">${data.duree || 'Non defini'}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Participants max</div>
+            <div class="info-value">${data.nombreParticipants || 'Non defini'}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Tarif</div>
+            <div class="info-value">${data.tarif || 'Non defini'}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Description</div>
+          <p>${data.description || 'Aucune description'}</p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Objectifs pedagogiques</div>
+          <ul>
+            ${data.objectifs.map(obj => `<li>${obj}</li>`).join('')}
+          </ul>
+        </div>
+
+        ${data.prerequis ? `
+        <div class="section">
+          <div class="section-title">Prerequis</div>
+          <ul>
+            ${data.prerequis.split('\n').filter(p => p.trim()).map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        ${data.publicVise ? `
+        <div class="section">
+          <div class="section-title">Public vise</div>
+          <ul>
+            ${data.publicVise.split('\n').filter(p => p.trim()).map(p => `<li>${p}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        <div class="section">
+          <div class="section-title">Contenu de la formation</div>
+          <div style="white-space: pre-line;">${data.contenu || 'Aucun contenu'}</div>
+        </div>
+
+        ${data.suiviEvaluation ? `
+        <div class="section">
+          <div class="section-title">Suivi et evaluation</div>
+          <ul>
+            ${data.suiviEvaluation.split('\n').filter(s => s.trim()).map(s => `<li>${s}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        ${data.ressourcesPedagogiques ? `
+        <div class="section">
+          <div class="section-title">Ressources pedagogiques</div>
+          <ul>
+            ${data.ressourcesPedagogiques.split('\n').filter(r => r.trim()).map(r => `<li>${r}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+
+        ${data.accessibilite ? `
+        <div class="section">
+          <div class="section-title">Accessibilite</div>
+          <p>${data.accessibilite}</p>
+        </div>
+        ` : ''}
+
+        ${data.delaiAcces ? `
+        <div class="section">
+          <div class="section-title">Delai d'acces</div>
+          <p>${data.delaiAcces}</p>
+        </div>
+        ` : ''}
+      </body>
+      </html>
+    `;
+
+    // Ouvrir une nouvelle fenetre avec le contenu
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+
+      // Attendre que le contenu soit charge puis lancer l'impression
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          setIsDownloading(false);
+        }, 250);
+      };
+
+      // Fallback si onload ne se declenche pas
+      setTimeout(() => {
+        setIsDownloading(false);
+      }, 2000);
+    } else {
+      alert("Veuillez autoriser les popups pour telecharger le PDF");
+      setIsDownloading(false);
+    }
+  };
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -214,14 +472,104 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           {/* Colonne gauche - Image et infos basiques (sticky) */}
           <div className="space-y-5 lg:sticky lg:top-6 lg:self-start">
             {/* Image de la formation */}
-            <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-              <Image
-                src="/images/cards/card-01.png"
-                alt="Formation"
-                fill
-                className="object-cover"
-              />
+            <div className="relative">
+              <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                {selectedImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedImage}
+                    alt={data.titre || "Formation"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-brand-100 to-purple-100 dark:from-brand-900/30 dark:to-purple-900/30 flex items-center justify-center">
+                    <div className="text-center text-gray-400 dark:text-gray-500">
+                      <ImageIcon />
+                      <p className="text-sm mt-2">Aucune image selectionnee</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleAutoSearchImages}
+                className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-black/50 backdrop-blur-sm rounded-lg hover:bg-black/70 transition-colors"
+              >
+                <ImageIcon />
+                <span>Changer l&apos;image</span>
+              </button>
             </div>
+
+            {/* Modal de recherche d'image */}
+            {showImageSearch && (
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Rechercher une image
+                  </h4>
+                  <button
+                    onClick={() => setShowImageSearch(false)}
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={imageQuery}
+                    onChange={(e) => setImageQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearchImages()}
+                    placeholder="Ex: ecriture, formation, bureau..."
+                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-600 dark:text-white"
+                  />
+                  <button
+                    onClick={handleSearchImages}
+                    disabled={isSearchingImages || !imageQuery.trim()}
+                    className="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSearchingImages ? (
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                    ) : (
+                      <SearchIcon />
+                    )}
+                  </button>
+                </div>
+
+                {imageResults.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {imageResults.map((img) => (
+                      <button
+                        key={img.id}
+                        onClick={() => handleSelectImage(img.url)}
+                        className="relative aspect-video overflow-hidden rounded-lg border-2 border-transparent hover:border-brand-500 transition-colors"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img.thumbnail}
+                          alt={img.alt}
+                          className="w-full h-full object-cover"
+                        />
+                        {selectedImage === img.url && (
+                          <div className="absolute inset-0 bg-brand-500/30 flex items-center justify-center">
+                            <CheckIcon />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {imageResults.length > 0 && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+                    Images libres de droits
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Modalité de la formation */}
             <div>
@@ -328,9 +676,20 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                     <EditIcon />
                   </button>
                 )}
-                <button className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:text-brand-400">
-                  <DownloadIcon />
-                  Télécharger en PDF
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={isDownloading}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:text-brand-400 disabled:opacity-50"
+                >
+                  {isDownloading ? (
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                  ) : (
+                    <DownloadIcon />
+                  )}
+                  {isDownloading ? 'Preparation...' : 'Telecharger en PDF'}
                 </button>
               </div>
             </div>

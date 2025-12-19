@@ -44,6 +44,14 @@ const SettingsIcon = () => (
   </svg>
 );
 
+const AIIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 2.5L11.1918 6.55818C11.3372 7.07098 11.7290 7.46282 12.2418 7.60818L16.25 8.75L12.2418 9.89182C11.7290 10.0372 11.3372 10.429 11.1918 10.9418L10 15L8.80818 10.9418C8.66282 10.429 8.27098 10.0372 7.75818 9.89182L3.75 8.75L7.75818 7.60818C8.27098 7.46282 8.66282 7.07098 8.80818 6.55818L10 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M15.8333 1.66667L16.25 3.33333L17.9167 3.75L16.25 4.16667L15.8333 5.83333L15.4167 4.16667L13.75 3.75L15.4167 3.33333L15.8333 1.66667Z" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M4.16667 14.1667L4.58333 15.8333L6.25 16.25L4.58333 16.6667L4.16667 18.3333L3.75 16.6667L2.08333 16.25L3.75 15.8333L4.16667 14.1667Z" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const MenuIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -68,6 +76,7 @@ const navItems: NavItem[] = [
   { id: "organizations", label: "Organisations", href: "/admin/organizations", icon: <OrganizationIcon /> },
   { id: "users", label: "Utilisateurs", href: "/admin/users", icon: <UsersIcon /> },
   { id: "templates", label: "Templates", href: "/admin/templates", icon: <TemplateIcon /> },
+  { id: "ai-prompts", label: "Prompts IA", href: "/admin/ai-prompts", icon: <AIIcon /> },
   { id: "api-keys", label: "Cles API", href: "/admin/api-keys", icon: <KeyIcon /> },
   { id: "settings", label: "Configuration", href: "/admin/settings", icon: <SettingsIcon /> },
 ];

@@ -73,13 +73,28 @@ export default function VariableDropdown({
       if (inputRef.current) {
         inputRef.current.focus();
       }
-      // Calculer la position du dropdown
+      // Calculer la position du dropdown avec gestion du debordement
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
-        setDropdownPosition({
-          top: rect.bottom + 4,
-          left: rect.left,
-        });
+        const dropdownHeight = 450; // hauteur max estimee du dropdown
+        const dropdownWidth = 320; // largeur du dropdown
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+
+        // Verifier si le dropdown depasse en bas
+        let top = rect.bottom + 4;
+        if (top + dropdownHeight > viewportHeight) {
+          // Afficher au-dessus du bouton si pas assez de place en bas
+          top = Math.max(8, rect.top - dropdownHeight - 4);
+        }
+
+        // Verifier si le dropdown depasse a droite
+        let left = rect.left;
+        if (left + dropdownWidth > viewportWidth) {
+          left = Math.max(8, viewportWidth - dropdownWidth - 8);
+        }
+
+        setDropdownPosition({ top, left });
       }
     }
   }, [isOpen]);

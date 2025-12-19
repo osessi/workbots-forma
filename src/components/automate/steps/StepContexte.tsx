@@ -1,6 +1,7 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 
+// Types
 interface FormationData {
   typeSession: string[];
   modalite: string;
@@ -17,7 +18,30 @@ interface StepContexteProps {
   data: FormationData;
   onChange: (data: FormationData) => void;
   onNext: () => void;
+  onGenerateFiche?: (contexte: FormationData) => Promise<void>;
+  isGenerating?: boolean;
 }
+
+// Icon pour enrichir
+const WandIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M15 4V2M15 16V14M8 9H10M20 9H22M17.8 11.8L19 13M17.8 6.2L19 5M3 21L12 12M12.2 6.2L11 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Icon composant pour le spinner
+const SpinnerIcon = () => (
+  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+  </svg>
+);
+
+const SparklesIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 3L13.4302 8.31181C13.6047 8.92648 14.0735 9.39526 14.6882 9.56983L20 11L14.6882 12.4302C14.0735 12.6047 13.6047 13.0735 13.4302 13.6882L12 19L10.5698 13.6882C10.3953 13.0735 9.92648 12.6047 9.31181 12.4302L4 11L9.31181 9.56983C9.92648 9.39526 10.3953 8.92648 10.5698 8.31181L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
 const modaliteOptions = [
   { value: "presentiel", label: "Présentiel" },
@@ -31,10 +55,68 @@ const sessionOptions = [
   { value: "inter", label: "Inter-entreprises" },
 ];
 
-export const StepContexte: React.FC<StepContexteProps> = ({ data, onChange, onNext }) => {
+export const StepContexte: React.FC<StepContexteProps> = ({
+  data,
+  onChange,
+  onNext,
+  onGenerateFiche,
+  isGenerating = false,
+}) => {
+  const [isEnriching, setIsEnriching] = useState(false);
+
   const handleChange = (field: keyof FormationData, value: string | string[]) => {
     onChange({ ...data, [field]: value });
   };
+
+  const handleGenerateClick = async () => {
+    if (onGenerateFiche) {
+      await onGenerateFiche(data);
+    } else {
+      onNext();
+    }
+  };
+
+  // Enrichir la description avec l'IA
+  const handleEnrichDescription = async () => {
+    if (!data.description.trim() || data.description.trim().length < 10) {
+      alert("Veuillez d'abord saisir une description de base (au moins 10 caracteres).");
+      return;
+    }
+
+    setIsEnriching(true);
+    try {
+      const response = await fetch("/api/ai/enrich-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: data.description,
+          modalite: data.modalite,
+          dureeHeures: data.dureeHeures,
+          dureeJours: data.dureeJours,
+          nombreParticipants: data.nombreParticipants,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de l'enrichissement");
+      }
+
+      const result = await response.json();
+      if (result.success && result.data?.enrichedDescription) {
+        onChange({ ...data, description: result.data.enrichedDescription });
+      }
+    } catch (error) {
+      console.error("Erreur enrichissement:", error);
+      alert(error instanceof Error ? error.message : "Erreur lors de l'enrichissement de la description");
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
+  // Verifier si le formulaire est valide pour la generation
+  const canGenerate = data.description.trim().length >= 20;
+  const canEnrich = data.description.trim().length >= 10;
 
   const handleSessionToggle = (value: string) => {
     const currentSessions = data.typeSession || [];
@@ -171,12 +253,35 @@ export const StepContexte: React.FC<StepContexteProps> = ({ data, onChange, onNe
           </h3>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Contenu de la formation
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Contenu de la formation
+              </label>
+              <button
+                type="button"
+                onClick={handleEnrichDescription}
+                disabled={!canEnrich || isEnriching || isGenerating}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/30"
+              >
+                {isEnriching ? (
+                  <>
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    <span>Enrichissement...</span>
+                  </>
+                ) : (
+                  <>
+                    <WandIcon />
+                    <span>Enrichir</span>
+                  </>
+                )}
+              </button>
+            </div>
             <div className="relative">
               <textarea
-                placeholder="Décrivez le plus clairement possible la formation que vous avez en tête : de quoi il s'agit, ce que vous souhaitez y aborder, à qui elle s'adresse et dans quel but vous la mettez en place. Plus vous donnez d'éléments, plus la fiche pédagogique générée correspondra à votre projet."
+                placeholder="Decrivez le plus clairement possible la formation que vous avez en tete : de quoi il s'agit, ce que vous souhaitez y aborder, a qui elle s'adresse et dans quel but vous la mettez en place. Plus vous donnez d'elements, plus la fiche pedagogique generee correspondra a votre projet."
                 value={data.description}
                 onChange={(e) => handleChange("description", e.target.value)}
                 maxLength={3000}
@@ -194,12 +299,30 @@ export const StepContexte: React.FC<StepContexteProps> = ({ data, onChange, onNe
       {/* Bouton suivant */}
       <div className="flex justify-end">
         <button
-          onClick={onNext}
-          className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors shadow-sm"
+          onClick={handleGenerateClick}
+          disabled={!canGenerate || isGenerating}
+          className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-lg hover:from-brand-600 hover:to-purple-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Générer la fiche pédagogique
+          {isGenerating ? (
+            <>
+              <SpinnerIcon />
+              <span>Generation en cours...</span>
+            </>
+          ) : (
+            <>
+              <SparklesIcon />
+              <span>Generer la fiche pedagogique</span>
+            </>
+          )}
         </button>
       </div>
+
+      {/* Message d'aide */}
+      {!canGenerate && (
+        <p className="text-sm text-amber-600 dark:text-amber-400 text-right">
+          Veuillez decrire la formation en au moins 20 caracteres pour generer la fiche.
+        </p>
+      )}
     </div>
   );
 };

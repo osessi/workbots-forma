@@ -214,6 +214,7 @@ export interface EntrepriseData {
   adresse: string;
   code_postal: string;
   ville: string;
+  adresse_complete?: string;
   telephone?: string;
   email?: string;
   representant: string;

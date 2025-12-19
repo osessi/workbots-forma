@@ -233,11 +233,14 @@ export interface ParticipantData {
   telephone?: string;
   fonction?: string;
   type: "salarie" | "independant" | "particulier";
-  // Pour independants
+  // Pour independants et salaries
   siret?: string;
   adresse?: string;
   code_postal?: string;
   ville?: string;
+  // Informations personnelles
+  date_naissance?: string;
+  lieu_naissance?: string;
 }
 
 /**

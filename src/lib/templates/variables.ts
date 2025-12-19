@@ -4,6 +4,143 @@
 
 import { TemplateVariable, VariableGroup, DocumentTypeConfig, DocumentType, VariableCategory } from "./types";
 
+// ===========================================
+// GENERATEURS DE VARIABLES NUMEROTEES
+// ===========================================
+
+/**
+ * Genere les variables numerotees pour les journees (jour1, jour2, etc.)
+ */
+function generateJourneeVariables(maxJours: number): TemplateVariable[] {
+  const variables: TemplateVariable[] = [];
+
+  for (let i = 1; i <= maxJours; i++) {
+    variables.push(
+      {
+        id: `journee${i}.date`,
+        label: `Jour ${i} - Date`,
+        category: "journees",
+        description: `Date de la journee ${i}`,
+        example: "15 janvier 2025",
+      },
+      {
+        id: `journee${i}.date_courte`,
+        label: `Jour ${i} - Date courte`,
+        category: "journees",
+        description: `Date courte de la journee ${i}`,
+        example: "15/01/2025",
+      },
+      {
+        id: `journee${i}.horaires_matin`,
+        label: `Jour ${i} - Horaires matin`,
+        category: "journees",
+        description: `Horaires du matin pour le jour ${i}`,
+        example: "09:00 - 12:30",
+      },
+      {
+        id: `journee${i}.horaires_apres_midi`,
+        label: `Jour ${i} - Horaires apres-midi`,
+        category: "journees",
+        description: `Horaires de l'apres-midi pour le jour ${i}`,
+        example: "14:00 - 17:30",
+      }
+    );
+  }
+
+  return variables;
+}
+
+/**
+ * Genere les variables numerotees pour les salaries/participants (salarie1, salarie2, etc.)
+ */
+function generateSalarieVariables(maxSalaries: number): TemplateVariable[] {
+  const variables: TemplateVariable[] = [];
+
+  for (let i = 1; i <= maxSalaries; i++) {
+    variables.push(
+      {
+        id: `salarie${i}.nom`,
+        label: `Salarie ${i} - Nom`,
+        category: "participants",
+        description: `Nom du salarie ${i}`,
+        example: "DUPONT",
+      },
+      {
+        id: `salarie${i}.prenom`,
+        label: `Salarie ${i} - Prenom`,
+        category: "participants",
+        description: `Prenom du salarie ${i}`,
+        example: "Jean",
+      },
+      {
+        id: `salarie${i}.nom_complet`,
+        label: `Salarie ${i} - Nom complet`,
+        category: "participants",
+        description: `Nom complet du salarie ${i}`,
+        example: "Jean DUPONT",
+      },
+      {
+        id: `salarie${i}.adresse`,
+        label: `Salarie ${i} - Adresse`,
+        category: "participants",
+        description: `Adresse du salarie ${i}`,
+        example: "12 rue de la Paix",
+      },
+      {
+        id: `salarie${i}.code_postal`,
+        label: `Salarie ${i} - Code postal`,
+        category: "participants",
+        description: `Code postal du salarie ${i}`,
+        example: "75001",
+      },
+      {
+        id: `salarie${i}.ville`,
+        label: `Salarie ${i} - Ville`,
+        category: "participants",
+        description: `Ville du salarie ${i}`,
+        example: "Paris",
+      },
+      {
+        id: `salarie${i}.adresse_complete`,
+        label: `Salarie ${i} - Adresse complete`,
+        category: "participants",
+        description: `Adresse complete du salarie ${i}`,
+        example: "12 rue de la Paix, 75001 Paris",
+      },
+      {
+        id: `salarie${i}.telephone`,
+        label: `Salarie ${i} - Telephone`,
+        category: "participants",
+        description: `Telephone du salarie ${i}`,
+        example: "06 12 34 56 78",
+      },
+      {
+        id: `salarie${i}.email`,
+        label: `Salarie ${i} - Email`,
+        category: "participants",
+        description: `Email du salarie ${i}`,
+        example: "jean.dupont@email.com",
+      },
+      {
+        id: `salarie${i}.date_naissance`,
+        label: `Salarie ${i} - Date naissance`,
+        category: "participants",
+        description: `Date de naissance du salarie ${i}`,
+        example: "15/03/1985",
+      },
+      {
+        id: `salarie${i}.lieu_naissance`,
+        label: `Salarie ${i} - Lieu naissance`,
+        category: "participants",
+        description: `Lieu de naissance du salarie ${i}`,
+        example: "Paris",
+      }
+    );
+  }
+
+  return variables;
+}
+
 /**
  * Toutes les variables disponibles dans le systeme
  */
@@ -182,51 +319,6 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
 
   // ===== JOURNEES DE FORMATION =====
   {
-    id: "journees",
-    label: "Liste des journees",
-    category: "journees",
-    description: "Boucle sur toutes les journees de formation",
-    example: "",
-    isLoop: true,
-    children: [
-      {
-        id: "journee.numero",
-        label: "Numero de la journee",
-        category: "journees",
-        description: "Numero d'ordre de la journee (1, 2, 3...)",
-        example: "1",
-      },
-      {
-        id: "journee.date",
-        label: "Date de la journee",
-        category: "journees",
-        description: "Date complete de la journee",
-        example: "15 janvier 2025",
-      },
-      {
-        id: "journee.date_courte",
-        label: "Date courte",
-        category: "journees",
-        description: "Date au format court",
-        example: "15/01/2025",
-      },
-      {
-        id: "journee.horaires_matin",
-        label: "Horaires matin",
-        category: "journees",
-        description: "Horaires du matin pour cette journee",
-        example: "09:00 - 12:30",
-      },
-      {
-        id: "journee.horaires_apres_midi",
-        label: "Horaires apres-midi",
-        category: "journees",
-        description: "Horaires de l'apres-midi pour cette journee",
-        example: "14:00 - 17:30",
-      },
-    ],
-  },
-  {
     id: "journees.premiere_date",
     label: "Premiere journee (date debut)",
     category: "journees",
@@ -247,6 +339,8 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     description: "Nombre total de journees programmees",
     example: "3",
   },
+  // Variables numerotees pour chaque journee (jour 1 a 10)
+  ...generateJourneeVariables(10),
 
   // ===== MODULES =====
   {
@@ -643,6 +737,8 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     description: "Nombre total de participants",
     example: "8",
   },
+  // Variables numerotees pour chaque salarie (salarie1 a salarie20)
+  ...generateSalarieVariables(20),
 
   // ===== FORMATEUR =====
   {

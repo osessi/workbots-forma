@@ -293,6 +293,73 @@ function getValueFromPath(context: TemplateContext, path: string): unknown {
     }
   }
 
+  // Variables numerotees pour les journees (journee1.date, journee2.horaires_matin, etc.)
+  const journeeMatch = path.match(/^journee(\d+)\.(.+)$/);
+  if (journeeMatch) {
+    const index = parseInt(journeeMatch[1], 10) - 1; // Index 0-based
+    const field = journeeMatch[2];
+    const journees = context.journees;
+    if (journees && journees[index]) {
+      const journee = journees[index];
+      switch (field) {
+        case "date":
+          return journee.date;
+        case "date_courte":
+          return journee.date_courte;
+        case "horaires_matin":
+          return journee.horaires_matin;
+        case "horaires_apres_midi":
+          return journee.horaires_apres_midi;
+        case "numero":
+          return journee.numero;
+        default:
+          return undefined;
+      }
+    }
+    return undefined;
+  }
+
+  // Variables numerotees pour les salaries (salarie1.nom, salarie2.email, etc.)
+  const salarieMatch = path.match(/^salarie(\d+)\.(.+)$/);
+  if (salarieMatch) {
+    const index = parseInt(salarieMatch[1], 10) - 1; // Index 0-based
+    const field = salarieMatch[2];
+    const participants = context.participants;
+    if (participants && participants[index]) {
+      const participant = participants[index];
+      switch (field) {
+        case "nom":
+          return participant.nom;
+        case "prenom":
+          return participant.prenom;
+        case "nom_complet":
+          return `${participant.prenom || ""} ${participant.nom || ""}`.trim();
+        case "email":
+          return participant.email;
+        case "telephone":
+          return participant.telephone;
+        case "adresse":
+          return participant.adresse;
+        case "code_postal":
+          return participant.code_postal;
+        case "ville":
+          return participant.ville;
+        case "adresse_complete":
+          if (participant.adresse) {
+            return `${participant.adresse}, ${participant.code_postal || ""} ${participant.ville || ""}`.trim();
+          }
+          return undefined;
+        case "date_naissance":
+          return participant.date_naissance;
+        case "lieu_naissance":
+          return participant.lieu_naissance;
+        default:
+          return undefined;
+      }
+    }
+    return undefined;
+  }
+
   // Chemin standard
   const parts = path.split(".");
   let current: unknown = context;

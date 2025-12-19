@@ -40,7 +40,7 @@ export default function VariableDropdown({
     }
     // Sinon utiliser les groupes statiques
     return documentType ? getVariablesForDocumentType(documentType) : VARIABLE_GROUPS;
-  }, [documentType, dynamicContext]);
+  }, [documentType, dynamicContext?.nombreJournees, dynamicContext?.nombreSalaries]);
 
   // Filtrer les variables par recherche
   const filteredGroups = variableGroups

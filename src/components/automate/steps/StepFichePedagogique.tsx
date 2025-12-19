@@ -58,7 +58,7 @@ interface FichePedagogiqueData {
   suiviEvaluation: string;
   ressourcesPedagogiques: string;
   delaiAcces: string;
-  imageUrl?: string;
+  imageUrl: string;
 }
 
 interface ImageResult {

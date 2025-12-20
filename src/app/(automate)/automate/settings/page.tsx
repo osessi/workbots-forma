@@ -1,10 +1,17 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAutomate } from "@/context/AutomateContext";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 
 // Icons
+const BuildingIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.33333 17.5V4.16667C3.33333 3.24619 4.07953 2.5 5 2.5H15C15.9205 2.5 16.6667 3.24619 16.6667 4.16667V17.5M3.33333 17.5H16.6667M3.33333 17.5H1.66667M16.6667 17.5H18.3333M6.66667 5.83333H8.33333M6.66667 9.16667H8.33333M11.6667 5.83333H13.3333M11.6667 9.16667H13.3333M8.33333 17.5V13.3333C8.33333 12.8731 8.70643 12.5 9.16667 12.5H10.8333C11.2936 12.5 11.6667 12.8731 11.6667 13.3333V17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const UsersIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M14.1667 17.5V15.8333C14.1667 14.9493 13.8155 14.1014 13.1904 13.4763C12.5652 12.8512 11.7174 12.5 10.8333 12.5H4.16667C3.28261 12.5 2.43476 12.8512 1.80964 13.4763C1.18452 14.1014 0.833333 14.9493 0.833333 15.8333V17.5M19.1667 17.5V15.8333C19.1662 15.0948 18.9203 14.3773 18.4678 13.7936C18.0153 13.2099 17.3818 12.793 16.6667 12.6083M13.3333 2.60833C14.0503 2.79192 14.6859 3.20892 15.1397 3.79359C15.5935 4.37827 15.8399 5.09736 15.8399 5.8375C15.8399 6.57764 15.5935 7.29673 15.1397 7.88141C14.6859 8.46608 14.0503 8.88308 13.3333 9.06667M10.8333 5.83333C10.8333 7.67428 9.34095 9.16667 7.5 9.16667C5.65905 9.16667 4.16667 7.67428 4.16667 5.83333C4.16667 3.99238 5.65905 2.5 7.5 2.5C9.34095 2.5 10.8333 3.99238 10.8333 5.83333Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -40,14 +47,29 @@ const CheckIcon = () => (
   </svg>
 );
 
-// Tabs - L'onglet Organisation a été retiré car ces infos sont dans Mon compte
-type TabType = "members" | "branding" | "billing";
+// Tabs
+type TabType = "organisme" | "members" | "branding" | "billing";
 
 const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+  { id: "organisme", label: "Organisme de formation", icon: <BuildingIcon /> },
   { id: "members", label: "Membres", icon: <UsersIcon /> },
   { id: "branding", label: "Marque blanche", icon: <PaletteIcon /> },
   { id: "billing", label: "Facturation", icon: <CreditCardIcon /> },
 ];
+
+// Interface pour les données de l'organisme
+interface OrganismeData {
+  name: string;
+  representantLegal: string;
+  numeroFormateur: string;
+  prefectureRegion: string;
+  siret: string;
+  adresse: string;
+  codePostal: string;
+  ville: string;
+  email: string;
+  telephone: string;
+}
 
 // Preset colors for branding
 const presetColors = [
@@ -72,8 +94,95 @@ const PLAN_LIMITS = {
 };
 
 export default function SettingsPage() {
-  const { user, primaryColor, setPrimaryColor } = useAutomate();
-  const [activeTab, setActiveTab] = useState<TabType>("members");
+  const { user, primaryColor, setPrimaryColor, refreshUser } = useAutomate();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<TabType>("organisme");
+
+  // Lire le tab depuis l'URL au chargement
+  useEffect(() => {
+    const tabFromUrl = searchParams.get("tab") as TabType | null;
+    if (tabFromUrl && tabs.some(t => t.id === tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
+  // Organisme state
+  const [organisme, setOrganisme] = useState<OrganismeData>({
+    name: "",
+    representantLegal: "",
+    numeroFormateur: "",
+    prefectureRegion: "",
+    siret: "",
+    adresse: "",
+    codePostal: "",
+    ville: "",
+    email: "",
+    telephone: "",
+  });
+  const [isLoadingOrganisme, setIsLoadingOrganisme] = useState(true);
+  const [isSavingOrganisme, setIsSavingOrganisme] = useState(false);
+  const [organismeMessage, setOrganismeMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Charger les données de l'organisme
+  useEffect(() => {
+    const loadOrganisme = async () => {
+      try {
+        const response = await fetch("/api/user/organization");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.organization) {
+            setOrganisme({
+              name: data.organization.name || "",
+              representantLegal: data.organization.representantLegal || "",
+              numeroFormateur: data.organization.numeroFormateur || "",
+              prefectureRegion: data.organization.prefectureRegion || "",
+              siret: data.organization.siret || "",
+              adresse: data.organization.adresse || "",
+              codePostal: data.organization.codePostal || "",
+              ville: data.organization.ville || "",
+              email: data.organization.email || "",
+              telephone: data.organization.telephone || "",
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Erreur chargement organisme:", error);
+      } finally {
+        setIsLoadingOrganisme(false);
+      }
+    };
+    loadOrganisme();
+  }, []);
+
+  const handleOrganismeChange = (field: keyof OrganismeData, value: string) => {
+    setOrganisme(prev => ({ ...prev, [field]: value }));
+    setOrganismeMessage(null);
+  };
+
+  const handleSaveOrganisme = async () => {
+    setIsSavingOrganisme(true);
+    setOrganismeMessage(null);
+    try {
+      const response = await fetch("/api/user/organization", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(organisme),
+      });
+
+      if (response.ok) {
+        setOrganismeMessage({ type: "success", text: "Informations enregistrees avec succes" });
+        await refreshUser();
+      } else {
+        const data = await response.json();
+        setOrganismeMessage({ type: "error", text: data.error || "Erreur lors de l'enregistrement" });
+      }
+    } catch (error) {
+      console.error("Erreur sauvegarde organisme:", error);
+      setOrganismeMessage({ type: "error", text: "Erreur lors de l'enregistrement" });
+    } finally {
+      setIsSavingOrganisme(false);
+    }
+  };
 
   // Members state
   const [inviteEmail, setInviteEmail] = useState("");
@@ -134,6 +243,205 @@ export default function SettingsPage() {
         </div>
 
         <div className="p-6">
+          {/* Organisme Tab */}
+          {activeTab === "organisme" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Organisme de formation
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Renseignez les informations de votre organisme de formation. Elles sont indispensables pour generer correctement vos documents officiels.
+                </p>
+              </div>
+
+              {/* Message de succes/erreur */}
+              {organismeMessage && (
+                <div className={`p-4 rounded-lg ${
+                  organismeMessage.type === "success"
+                    ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                    : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                }`}>
+                  {organismeMessage.text}
+                </div>
+              )}
+
+              {isLoadingOrganisme ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Informations legales */}
+                  <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Informations legales
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Raison sociale de l&apos;organisme *
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.name}
+                          onChange={(e) => handleOrganismeChange("name", e.target.value)}
+                          placeholder="Nom de votre organisme de formation"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Nom et prenom du representant legal
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.representantLegal}
+                          onChange={(e) => handleOrganismeChange("representantLegal", e.target.value)}
+                          placeholder="Jean Dupont"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Numero de declaration d&apos;activite (NDA)
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.numeroFormateur}
+                          onChange={(e) => handleOrganismeChange("numeroFormateur", e.target.value)}
+                          placeholder="11 75 XXXXX 75"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Delivre par la DREETS (ex-DIRECCTE)
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Region d&apos;enregistrement
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.prefectureRegion}
+                          onChange={(e) => handleOrganismeChange("prefectureRegion", e.target.value)}
+                          placeholder="Ile-de-France"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Numero SIRET
+                      </label>
+                      <input
+                        type="text"
+                        value={organisme.siret}
+                        onChange={(e) => handleOrganismeChange("siret", e.target.value)}
+                        placeholder="123 456 789 00012"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Coordonnees */}
+                  <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Coordonnees du siege / lieu d&apos;exercice
+                    </h3>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Adresse
+                      </label>
+                      <input
+                        type="text"
+                        value={organisme.adresse}
+                        onChange={(e) => handleOrganismeChange("adresse", e.target.value)}
+                        placeholder="123 rue de la Formation"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Code postal
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.codePostal}
+                          onChange={(e) => handleOrganismeChange("codePostal", e.target.value)}
+                          placeholder="75001"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Ville
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.ville}
+                          onChange={(e) => handleOrganismeChange("ville", e.target.value)}
+                          placeholder="Paris"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Email de contact
+                        </label>
+                        <input
+                          type="email"
+                          value={organisme.email}
+                          onChange={(e) => handleOrganismeChange("email", e.target.value)}
+                          placeholder="contact@organisme.fr"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Telephone
+                        </label>
+                        <input
+                          type="tel"
+                          value={organisme.telephone}
+                          onChange={(e) => handleOrganismeChange("telephone", e.target.value)}
+                          placeholder="01 23 45 67 89"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bouton de sauvegarde */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveOrganisme}
+                      disabled={isSavingOrganisme}
+                      className="px-6 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors"
+                    >
+                      {isSavingOrganisme ? "Enregistrement..." : "Enregistrer les modifications"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Members Tab */}
           {activeTab === "members" && (
             <div className="space-y-6">

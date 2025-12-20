@@ -204,6 +204,7 @@ export interface OrganisationData {
   capital?: string; // Capital social
   forme_juridique?: string; // SAS, SARL, etc.
   rcs?: string; // RCS
+  prefecture_region?: string; // Region d'acquisition du numero de declaration d'activite
 }
 
 /**

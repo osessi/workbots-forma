@@ -1,5 +1,19 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+
+// Interface pour les données de l'organisme depuis les paramètres
+interface OrganisationSettings {
+  name: string;
+  representantLegal: string;
+  numeroFormateur: string;
+  siret: string;
+  adresse: string;
+  codePostal: string;
+  ville: string;
+  email: string;
+  telephone: string;
+}
 
 // Icon Plus
 const PlusIcon = () => (
@@ -128,8 +142,11 @@ interface JourneeFormation {
   horaireApresMidi: string;
 }
 
+type TypeLieu = "presentiel" | "visioconference" | "mixte" | "intra";
+
 interface InfosPratiques {
-  lieu: string;
+  typeLieu: TypeLieu;
+  lieu: string; // Adresse exacte ou lien de connexion
   adresse: string;
   codePostal: string;
   ville: string;
@@ -195,6 +212,7 @@ interface DatePickerProps {
 const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = "Sélectionner une date" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showYearSelector, setShowYearSelector] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -234,11 +252,21 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
   const handleDateSelect = (day: number) => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const selectedDate = new Date(year, month, day);
-    const formattedDate = selectedDate.toISOString().split("T")[0];
+    // Formater la date manuellement pour éviter le décalage UTC
+    const formattedDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     onChange(formattedDate);
     setIsOpen(false);
+    setShowYearSelector(false);
   };
+
+  const handleYearSelect = (year: number) => {
+    setCurrentMonth(new Date(year, currentMonth.getMonth(), 1));
+    setShowYearSelector(false);
+  };
+
+  // Générer les années (10 ans avant et après l'année actuelle)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
 
   const isSelectedDate = (day: number) => {
     if (!value) return false;
@@ -276,56 +304,98 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
 
       {isOpen && (
         <div className="absolute z-50 mt-1 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 15L7 10L12 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-            </span>
-            <button
-              onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8 5L13 10L8 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {dayNames.map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-1">
-                {day}
+          {/* Sélecteur d'année */}
+          {showYearSelector ? (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">Sélectionner une année</span>
+                <button
+                  onClick={() => setShowYearSelector(false)}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
               </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {getDaysInMonth(currentMonth).map((day, index) => (
-              <div key={index} className="aspect-square">
-                {day !== null && (
+              <div className="grid grid-cols-4 gap-1 max-h-48 overflow-y-auto">
+                {years.map((year) => (
                   <button
-                    onClick={() => handleDateSelect(day)}
-                    className={`w-full h-full flex items-center justify-center text-sm rounded-lg transition-colors ${
-                      isSelectedDate(day)
+                    key={year}
+                    onClick={() => handleYearSelect(year)}
+                    className={`py-2 text-sm rounded-lg transition-colors ${
+                      year === currentMonth.getFullYear()
                         ? "bg-brand-500 text-white"
-                        : isToday(day)
+                        : year === currentYear
                         ? "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
                         : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                     }`}
                   >
-                    {day}
+                    {year}
                   </button>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15L7 10L12 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowYearSelector(true)}
+                  className="text-sm font-medium text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded-lg transition-colors"
+                >
+                  {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                  <svg className="inline-block ml-1 -mt-0.5" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 5L13 10L8 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {dayNames.map((day) => (
+                  <div key={day} className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-1">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {getDaysInMonth(currentMonth).map((day, index) => (
+                  <div key={index} className="aspect-square">
+                    {day !== null && (
+                      <button
+                        onClick={() => handleDateSelect(day)}
+                        className={`w-full h-full flex items-center justify-center text-sm rounded-lg transition-colors ${
+                          isSelectedDate(day)
+                            ? "bg-brand-500 text-white"
+                            : isToday(day)
+                            ? "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -392,19 +462,59 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
   onGenerateEvalFormateur,
   onGenerateAttestation,
 }) => {
-  // Initialiser les données si vides
-  const organisme = data.organisme || {
-    raisonSociale: "",
-    representantLegal: "",
-    numeroDA: "",
-    siret: "",
-    adresse: "",
-    codePostal: "",
-    ville: "",
-    email: "",
-    telephone: "",
-  };
+  // État pour les données de l'organisme depuis les paramètres
+  const [organismeSettings, setOrganismeSettings] = useState<OrganisationSettings | null>(null);
+  const [isLoadingOrganisme, setIsLoadingOrganisme] = useState(true);
 
+  // Charger les données de l'organisme depuis les paramètres
+  useEffect(() => {
+    const fetchOrganisme = async () => {
+      try {
+        const response = await fetch("/api/user/organization");
+        if (response.ok) {
+          const responseData = await response.json();
+          if (responseData.organization) {
+            const org = responseData.organization;
+            setOrganismeSettings({
+              name: org.name || "",
+              representantLegal: org.representantLegal || "",
+              numeroFormateur: org.numeroFormateur || "",
+              siret: org.siret || "",
+              adresse: org.adresse || "",
+              codePostal: org.codePostal || "",
+              ville: org.ville || "",
+              email: org.email || "",
+              telephone: org.telephone || "",
+            });
+            // Mettre à jour les données du document avec les infos de l'organisme
+            onChange({
+              ...data,
+              organisme: {
+                raisonSociale: org.name || "",
+                representantLegal: org.representantLegal || "",
+                numeroDA: org.numeroFormateur || "",
+                siret: org.siret || "",
+                adresse: org.adresse || "",
+                codePostal: org.codePostal || "",
+                ville: org.ville || "",
+                email: org.email || "",
+                telephone: org.telephone || "",
+              },
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement de l'organisme:", error);
+      } finally {
+        setIsLoadingOrganisme(false);
+      }
+    };
+
+    fetchOrganisme();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initialiser les données client si vides
   const client = data.client || {
     type: "entreprise" as const,
     raisonSociale: "",
@@ -448,6 +558,7 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
   };
 
   const infosPratiques = data.infosPratiques || {
+    typeLieu: "presentiel" as TypeLieu,
     lieu: "",
     adresse: "",
     codePostal: "",
@@ -469,13 +580,6 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
   }];
 
   // Fonctions de mise à jour
-  const updateOrganisme = (field: keyof OrganismeFormation, value: string) => {
-    onChange({
-      ...data,
-      organisme: { ...organisme, [field]: value },
-    });
-  };
-
   const updateClient = (field: keyof ClientInfo, value: string) => {
     onChange({
       ...data,
@@ -560,7 +664,7 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
     });
   };
 
-  const updateInfosPratiquesField = (field: "lieu" | "adresse" | "codePostal" | "ville", value: string) => {
+  const updateInfosPratiquesField = (field: "typeLieu" | "lieu" | "adresse" | "codePostal" | "ville", value: string) => {
     onChange({
       ...data,
       infosPratiques: { ...infosPratiques, [field]: value },
@@ -680,126 +784,102 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
     <div className="space-y-6">
       {/* Grille principale */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {/* Bloc 1 - Organisme de formation */}
+        {/* Bloc 1 - Organisme de formation (lecture seule depuis les paramètres) */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
           <SectionHeader
             icon={<OrganismeIcon />}
             title="Organisme de formation"
-            description="Renseignez ici les informations de votre organisme de formation. Elles sont indispensables pour générer correctement vos documents officiels."
+            description="Ces informations proviennent de vos paramètres. Modifiez-les dans Paramètres > Organisme de formation."
             color="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
           />
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Raison sociale de l'organisme
-              </label>
-              <input
-                type="text"
-                placeholder="Écrivez ici..."
-                value={organisme.raisonSociale}
-                onChange={(e) => updateOrganisme("raisonSociale", e.target.value)}
-                className={inputClassName}
-              />
+
+          {isLoadingOrganisme ? (
+            <div className="flex items-center justify-center py-8">
+              <svg className="animate-spin h-6 w-6 text-brand-500" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Nom et prénom du représentant légal
-              </label>
-              <input
-                type="text"
-                placeholder="Écrivez ici..."
-                value={organisme.representantLegal}
-                onChange={(e) => updateOrganisme("representantLegal", e.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Numéro de déclaration d'activité
-              </label>
-              <input
-                type="text"
-                placeholder="Écrivez ici..."
-                value={organisme.numeroDA}
-                onChange={(e) => updateOrganisme("numeroDA", e.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Numéro SIRET
-              </label>
-              <input
-                type="text"
-                placeholder="Écrivez ici..."
-                value={organisme.siret}
-                onChange={(e) => updateOrganisme("siret", e.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Adresse
-              </label>
-              <input
-                type="text"
-                placeholder="Écrivez ici..."
-                value={organisme.adresse}
-                onChange={(e) => updateOrganisme("adresse", e.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Code postal
-                </label>
-                <input
-                  type="text"
-                  placeholder="Écrivez ici..."
-                  value={organisme.codePostal}
-                  onChange={(e) => updateOrganisme("codePostal", e.target.value)}
-                  className={inputClassName}
-                />
+          ) : organismeSettings && (organismeSettings.name || organismeSettings.siret) ? (
+            <div className="space-y-3">
+              {/* Affichage des informations en lecture seule */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-2">
+                {organismeSettings.name && (
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Raison sociale</span>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{organismeSettings.name}</p>
+                  </div>
+                )}
+                {organismeSettings.representantLegal && (
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Représentant légal</span>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{organismeSettings.representantLegal}</p>
+                  </div>
+                )}
+                {organismeSettings.numeroFormateur && (
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">N° déclaration d'activité</span>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{organismeSettings.numeroFormateur}</p>
+                  </div>
+                )}
+                {organismeSettings.siret && (
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">SIRET</span>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{organismeSettings.siret}</p>
+                  </div>
+                )}
+                {(organismeSettings.adresse || organismeSettings.codePostal || organismeSettings.ville) && (
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Adresse</span>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {[organismeSettings.adresse, organismeSettings.codePostal, organismeSettings.ville].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+                )}
+                {organismeSettings.email && (
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Email</span>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{organismeSettings.email}</p>
+                  </div>
+                )}
+                {organismeSettings.telephone && (
+                  <div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Téléphone</span>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{organismeSettings.telephone}</p>
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Ville
-                </label>
-                <input
-                  type="text"
-                  placeholder="Écrivez ici..."
-                  value={organisme.ville}
-                  onChange={(e) => updateOrganisme("ville", e.target.value)}
-                  className={inputClassName}
-                />
+
+              {/* Lien vers les paramètres */}
+              <Link
+                href="/automate/settings?tab=organisme"
+                className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 10V8M8 6H8.005M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C11.3137 2 14 4.68629 14 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Modifier dans les paramètres
+              </Link>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                <OrganismeIcon />
               </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                Aucune information d'organisme configurée
+              </p>
+              <Link
+                href="/automate/settings?tab=organisme"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 3.33333V12.6667M3.33333 8H12.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Configurer mon organisme
+              </Link>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Email de contact
-              </label>
-              <input
-                type="email"
-                placeholder="Écrivez ici..."
-                value={organisme.email}
-                onChange={(e) => updateOrganisme("email", e.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Téléphone
-              </label>
-              <input
-                type="tel"
-                placeholder="Écrivez ici..."
-                value={organisme.telephone}
-                onChange={(e) => updateOrganisme("telephone", e.target.value)}
-                className={inputClassName}
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Bloc 2 - Entreprise ou indépendant (Client) */}
@@ -1247,54 +1327,91 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Lieu de la formation
+                Type de lieu
+              </label>
+              <div className="relative">
+                <select
+                  value={infosPratiques.typeLieu || "presentiel"}
+                  onChange={(e) => updateInfosPratiquesField("typeLieu", e.target.value)}
+                  className={selectClassName}
+                >
+                  <option value="presentiel">Presentiel (dans vos locaux)</option>
+                  <option value="visioconference">Visioconference</option>
+                  <option value="mixte">Mixte (presentiel + distanciel)</option>
+                  <option value="intra">Intra-entreprise (chez le client)</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {infosPratiques.typeLieu === "visioconference"
+                  ? "Lien de connexion"
+                  : infosPratiques.typeLieu === "intra"
+                    ? "Adresse du client"
+                    : "Adresse du lieu de formation"}
               </label>
               <input
                 type="text"
-                placeholder="Adresse du lieu / Visioconférence / ..."
+                placeholder={
+                  infosPratiques.typeLieu === "visioconference"
+                    ? "https://meet.google.com/... ou https://zoom.us/..."
+                    : infosPratiques.typeLieu === "intra"
+                      ? "Adresse de l'entreprise cliente"
+                      : "Adresse complete du lieu"
+                }
                 value={infosPratiques.lieu}
                 onChange={(e) => updateInfosPratiquesField("lieu", e.target.value)}
                 className={inputClassName}
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Adresse
-              </label>
-              <input
-                type="text"
-                placeholder="Écrivez ici..."
-                value={infosPratiques.adresse}
-                onChange={(e) => updateInfosPratiquesField("adresse", e.target.value)}
-                className={inputClassName}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Code postal
-                </label>
-                <input
-                  type="text"
-                  placeholder="Écrivez ici..."
-                  value={infosPratiques.codePostal}
-                  onChange={(e) => updateInfosPratiquesField("codePostal", e.target.value)}
-                  className={inputClassName}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Ville
-                </label>
-                <input
-                  type="text"
-                  placeholder="Écrivez ici..."
-                  value={infosPratiques.ville}
-                  onChange={(e) => updateInfosPratiquesField("ville", e.target.value)}
-                  className={inputClassName}
-                />
-              </div>
-            </div>
+            {/* Afficher les champs adresse/CP/ville seulement pour presentiel et mixte */}
+            {(infosPratiques.typeLieu === "presentiel" || infosPratiques.typeLieu === "mixte" || !infosPratiques.typeLieu) && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Adresse (complement)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Batiment, etage, etc."
+                    value={infosPratiques.adresse}
+                    onChange={(e) => updateInfosPratiquesField("adresse", e.target.value)}
+                    className={inputClassName}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Code postal
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ecrivez ici..."
+                      value={infosPratiques.codePostal}
+                      onChange={(e) => updateInfosPratiquesField("codePostal", e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Ville
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ecrivez ici..."
+                      value={infosPratiques.ville}
+                      onChange={(e) => updateInfosPratiquesField("ville", e.target.value)}
+                      className={inputClassName}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Journées de formation */}
             <div className="pt-3 border-t border-gray-200 dark:border-gray-700">

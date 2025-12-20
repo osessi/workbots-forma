@@ -25,16 +25,22 @@ interface WizardData {
   telephone: string;
   avatarFile: File | null;
   avatarPreview: string | null;
-  // Step 2: Workspace / Entreprise
+  // Step 2: Organisme de formation
   workspaceName: string;
   workspaceSlug: string;
+  representantLegal: string;
   siret: string;
   numeroFormateur: string;
+  prefectureRegion: string;
   adresse: string;
   codePostal: string;
   ville: string;
+  emailOrganisme: string;
+  telephoneOrganisme: string;
   logoFile: File | null;
   logoPreview: string | null;
+  // Copier infos entreprise
+  copyFromAccount: boolean;
   // Step 3: Invitations
   teamMembers: TeamMember[];
 }
@@ -42,8 +48,8 @@ interface WizardData {
 // Steps indicator
 const steps = [
   { id: 1, name: "Compte", description: "Vos informations" },
-  { id: 2, name: "Entreprise", description: "Votre organisation" },
-  { id: 3, name: "Équipe", description: "Inviter des membres" },
+  { id: 2, name: "Organisme", description: "Votre organisme de formation" },
+  { id: 3, name: "Equipe", description: "Inviter des membres" },
 ];
 
 export default function SignUpWizard() {
@@ -68,13 +74,18 @@ export default function SignUpWizard() {
     avatarPreview: null,
     workspaceName: "",
     workspaceSlug: "",
+    representantLegal: "",
     siret: "",
     numeroFormateur: "",
+    prefectureRegion: "",
     adresse: "",
     codePostal: "",
     ville: "",
+    emailOrganisme: "",
+    telephoneOrganisme: "",
     logoFile: null,
     logoPreview: null,
+    copyFromAccount: false,
     teamMembers: [{ email: "", role: "formateur" }],
   });
 
@@ -257,14 +268,18 @@ export default function SignUpWizard() {
             last_name: data.lastName,
             full_name: `${data.firstName} ${data.lastName}`,
             phone: data.telephone,
-            // Infos entreprise/workspace
+            // Infos organisme de formation
             workspace_name: data.workspaceName,
             workspace_slug: data.workspaceSlug,
+            representant_legal: data.representantLegal,
             siret: data.siret,
             numero_formateur: data.numeroFormateur,
+            prefecture_region: data.prefectureRegion,
             adresse: data.adresse,
             code_postal: data.codePostal,
             ville: data.ville,
+            email_organisme: data.emailOrganisme,
+            telephone_organisme: data.telephoneOrganisme,
           },
         },
       });
@@ -631,21 +646,21 @@ export default function SignUpWizard() {
           </div>
         )}
 
-        {/* Step 2: Entreprise */}
+        {/* Step 2: Organisme de formation */}
         {currentStep === 2 && (
           <div className="space-y-5">
             <div className="mb-4">
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-                Votre entreprise
+                Votre organisme de formation
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ces informations apparaîtront sur vos documents de formation
+                Ces informations sont indispensables pour generer vos documents officiels
               </p>
             </div>
 
-            {/* Nom de l'entreprise et identifiant */}
+            {/* Raison sociale */}
             <div>
-              <Label>Nom de l&apos;entreprise<span className="text-error-500">*</span></Label>
+              <Label>Raison sociale de l&apos;organisme<span className="text-error-500">*</span></Label>
               <Input
                 type="text"
                 placeholder="Ma Formation Pro SARL"
@@ -659,7 +674,7 @@ export default function SignUpWizard() {
               <Label>Identifiant du workspace<span className="text-error-500">*</span></Label>
               <div className="flex items-center">
                 <span className="px-3 py-2.5 text-sm text-gray-500 bg-gray-100 border border-r-0 border-gray-200 rounded-l-lg dark:bg-gray-800 dark:border-gray-700">
-                  workbots.io/
+                  automateforma.fr/
                 </span>
                 <Input
                   type="text"
@@ -670,15 +685,23 @@ export default function SignUpWizard() {
                   required
                 />
               </div>
-              <p className="mt-1 text-xs text-gray-400">
-                Cet identifiant sera utilisé dans l&apos;URL de votre workspace
-              </p>
+            </div>
+
+            {/* Representant legal */}
+            <div>
+              <Label>Nom et prenom du representant legal</Label>
+              <Input
+                type="text"
+                placeholder="Jean Dupont"
+                value={data.representantLegal}
+                onChange={(e) => updateData({ representantLegal: e.target.value })}
+              />
             </div>
 
             {/* SIRET et Numéro formateur */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Numéro SIRET</Label>
+                <Label>Numero SIRET</Label>
                 <Input
                   type="text"
                   placeholder="123 456 789 00012"
@@ -687,20 +710,31 @@ export default function SignUpWizard() {
                 />
               </div>
               <div>
-                <Label>N° déclaration d&apos;activité</Label>
+                <Label>N° declaration d&apos;activite (NDA)</Label>
                 <Input
                   type="text"
                   placeholder="11 75 12345 67"
                   value={data.numeroFormateur}
                   onChange={(e) => updateData({ numeroFormateur: e.target.value })}
                 />
-                <p className="mt-1 text-xs text-gray-400">N° DREETS</p>
+                <p className="mt-1 text-xs text-gray-400">Delivre par la DREETS</p>
               </div>
+            </div>
+
+            {/* Region */}
+            <div>
+              <Label>Region d&apos;enregistrement</Label>
+              <Input
+                type="text"
+                placeholder="Ile-de-France"
+                value={data.prefectureRegion}
+                onChange={(e) => updateData({ prefectureRegion: e.target.value })}
+              />
             </div>
 
             {/* Adresse */}
             <div>
-              <Label>Adresse</Label>
+              <Label>Adresse du siege</Label>
               <Input
                 type="text"
                 placeholder="15 rue de la Formation"
@@ -731,9 +765,31 @@ export default function SignUpWizard() {
               </div>
             </div>
 
+            {/* Email et telephone organisme */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Email de contact</Label>
+                <Input
+                  type="email"
+                  placeholder="contact@organisme.fr"
+                  value={data.emailOrganisme}
+                  onChange={(e) => updateData({ emailOrganisme: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Telephone</Label>
+                <Input
+                  type="tel"
+                  placeholder="01 23 45 67 89"
+                  value={data.telephoneOrganisme}
+                  onChange={(e) => updateData({ telephoneOrganisme: e.target.value })}
+                />
+              </div>
+            </div>
+
             {/* Logo entreprise */}
             <div>
-              <Label>Logo de l&apos;entreprise</Label>
+              <Label>Logo de l&apos;organisme</Label>
               <div className="flex items-center gap-4 mt-2">
                 <input
                   ref={logoInputRef}
@@ -770,17 +826,17 @@ export default function SignUpWizard() {
                 </button>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Ce logo apparaîtra sur vos documents de formation
+                    Ce logo apparaitra sur vos documents de formation
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">PNG, JPG jusqu&apos;à 5MB</p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG jusqu&apos;a 5MB</p>
                 </div>
               </div>
             </div>
 
             {/* Info box */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                <span className="font-medium text-gray-700 dark:text-gray-300">Bon à savoir :</span> Vous pourrez modifier ces informations à tout moment dans les paramètres de votre compte.
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                <span className="font-medium">Bon a savoir :</span> Vous pourrez modifier ces informations a tout moment dans Parametres &gt; Organisme de formation.
               </p>
             </div>
           </div>

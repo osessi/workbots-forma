@@ -36,7 +36,7 @@ export const AI_CONFIGS = {
   qcm: {
     provider: "anthropic" as AIProvider,
     model: "claude-sonnet-4-20250514",
-    maxTokens: 4096,
+    maxTokens: 6144,
     temperature: 0.5,
   },
   // Test de positionnement

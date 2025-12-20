@@ -506,15 +506,15 @@ export default function MonComptePage() {
             </div>
           </div>
 
-          {/* Infos professionnelles */}
+          {/* Infos entreprise */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] card-hover-glow">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-              Informations professionnelles
+              Informations de l&apos;entreprise
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Nom de l&apos;entreprise
+                  Raison sociale
                 </label>
                 <input
                   type="text"

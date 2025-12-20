@@ -51,7 +51,9 @@ interface FichePedagogiqueData {
   typeFormation: string;
   duree: string;
   nombreParticipants: string;
-  tarif: string;
+  tarifEntreprise: string;
+  tarifIndependant: string;
+  tarifParticulier: string;
   accessibilite: string;
   prerequis: string;
   publicVise: string;
@@ -302,7 +304,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           }
           h1 { color: #1a1a2e; font-size: 28px; margin-bottom: 20px; border-bottom: 3px solid #6366f1; padding-bottom: 10px; }
           h2 { color: #4338ca; font-size: 18px; margin-top: 30px; margin-bottom: 10px; }
-          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0; }
           .info-item { background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #6366f1; }
           .info-label { font-weight: 600; color: #64748b; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; }
           .info-value { color: #1e293b; }
@@ -333,8 +335,16 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             <div class="info-value">${data.nombreParticipants || 'Non defini'}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">Tarif</div>
-            <div class="info-value">${data.tarif || 'Non defini'}</div>
+            <div class="info-label">Tarif Entreprise (HT)</div>
+            <div class="info-value">${data.tarifEntreprise || 'Non defini'}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Tarif Independant (HT)</div>
+            <div class="info-value">${data.tarifIndependant || 'Non defini'}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Tarif Particulier (TTC)</div>
+            <div class="info-value">${data.tarifParticulier || 'Non defini'}</div>
           </div>
         </div>
 
@@ -610,17 +620,49 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               />
             </div>
 
-            {/* Tarif */}
+            {/* Tarifs */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Tarif
+                Tarifs
               </label>
-              <input
-                type="text"
-                value={data.tarif}
-                onChange={(e) => onChange({ ...data, tarif: e.target.value })}
-                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    Entreprise (HT)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Montant facturé à une entreprise"
+                    value={data.tarifEntreprise}
+                    onChange={(e) => onChange({ ...data, tarifEntreprise: e.target.value })}
+                    className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    Indépendant (HT)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Montant facturé à un indépendant"
+                    value={data.tarifIndependant}
+                    onChange={(e) => onChange({ ...data, tarifIndependant: e.target.value })}
+                    className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    Particulier (TTC)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Montant facturé à un particulier"
+                    value={data.tarifParticulier}
+                    onChange={(e) => onChange({ ...data, tarifParticulier: e.target.value })}
+                    className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Accessibilité - Bloc éditable */}

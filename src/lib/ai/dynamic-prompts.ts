@@ -327,7 +327,11 @@ Règles importantes:
 - Structure le contenu de manière logique et progressive
 - Le nombre de modules doit être adapté à la durée et au contenu de la formation (entre 2 et 6 modules généralement)
 
-IMPORTANT - Format de sortie JSON obligatoire:
+⚠️ INTERDICTION ABSOLUE - SECTIONS FIXES (NE JAMAIS GENERER) ⚠️
+Les champs "moyensPedagogiques" et "modalitesEvaluation" sont gérés automatiquement par le système.
+Tu NE DOIS PAS générer ces champs dans ta réponse. Ils seront remplis avec des valeurs standards Qualiopi.
+
+Format de sortie JSON obligatoire:
 Tu dois UNIQUEMENT retourner un objet JSON valide avec cette structure exacte:
 {
   "titre": "Titre accrocheur de la formation",
@@ -344,11 +348,13 @@ Tu dois UNIQUEMENT retourner un objet JSON valide avec cette structure exacte:
       "contenu": ["Point 1", "Point 2", "Point 3"],
       "methodePedagogique": "Méthode utilisée"
     }
-  ],
-  "moyensPedagogiques": ["Moyen 1", "Moyen 2"],
-  "modalitesEvaluation": ["Modalité 1", "Modalité 2"],
-  "accessibilite": "Information sur l'accessibilité"
+  ]
 }
+
+⛔ NE PAS INCLURE dans ta réponse:
+- moyensPedagogiques (géré par le système)
+- modalitesEvaluation (géré par le système)
+- accessibilite (géré par le système)
 
 Ne retourne RIEN d'autre que le JSON. Pas de texte avant ou après.`,
     userPromptTemplate: `A partir de la description suivante, génère une fiche pédagogique complète au format JSON.

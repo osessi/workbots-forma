@@ -86,6 +86,8 @@ model Organization {
   codePostal        String?
   ville             String?
   telephone         String?
+  email             String?  // Email de contact de l'organisme
+  representantLegal String?  // Nom et prénom du représentant légal
 
   // White-label
   logo              String?

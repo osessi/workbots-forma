@@ -190,6 +190,14 @@ const QCMQuestionItem: React.FC<QCMQuestionItemProps> = ({
   );
 };
 
+// Icon pour les réponses
+const AnswersIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 11L12 14L22 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M21 12V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 // Composant apercu miniature d'evaluation
 interface EvaluationPreviewProps {
   title: string;
@@ -199,6 +207,7 @@ interface EvaluationPreviewProps {
   onRegenerate: () => void;
   onViewAll: () => void;
   onDownload: () => void;
+  onDownloadAnswers?: () => void;
 }
 
 const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
@@ -209,6 +218,7 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
   onRegenerate,
   onViewAll,
   onDownload,
+  onDownloadAnswers,
 }) => {
   if (isGenerating) {
     return (
@@ -269,10 +279,19 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(); }}
             className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-green-600 dark:text-green-400"
-            title="Telecharger"
+            title="Telecharger le test"
           >
             <DownloadIcon />
           </button>
+          {onDownloadAnswers && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDownloadAnswers(); }}
+              className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-purple-600 dark:text-purple-400"
+              title="Telecharger les reponses"
+            >
+              <AnswersIcon />
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
             className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
@@ -520,6 +539,89 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     }
   }, []);
 
+  // Fonction pour telecharger les reponses d'une evaluation (meme format que le test)
+  const handleDownloadAnswers = useCallback((evaluation: EvaluationData) => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${evaluation.titre} - Corrige</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+          }
+          h1 { color: #1a1a2e; font-size: 24px; margin-bottom: 10px; border-bottom: 3px solid #22c55e; padding-bottom: 10px; }
+          .badge { display: inline-block; background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-left: 10px; }
+          .description { color: #64748b; margin-bottom: 30px; font-size: 14px; }
+          .question-block { margin-bottom: 25px; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #22c55e; }
+          .question-number { display: inline-block; width: 28px; height: 28px; background: #22c55e; color: white; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; font-size: 14px; }
+          .question-text { font-weight: 600; color: #1e293b; display: inline; }
+          .answer-section { margin-top: 15px; padding: 12px; background: #dcfce7; border-radius: 8px; border: 1px solid #86efac; }
+          .answer-label { font-weight: 600; color: #166534; font-size: 12px; margin-bottom: 5px; }
+          .answer-text { color: #15803d; font-size: 14px; }
+          .options { margin-top: 15px; padding-left: 40px; }
+          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; }
+          .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
+          .correct { background: #dcfce7; border: 1px solid #86efac; }
+          .correct .option-letter { background: #22c55e; color: white; }
+          @media print {
+            body { padding: 20px; }
+            .question-block { break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>${evaluation.titre}<span class="badge">CORRIGE</span></h1>
+        <p class="description">${evaluation.description}</p>
+
+        ${evaluation.questions.map((q, i) => `
+          <div class="question-block">
+            <span class="question-number">${i + 1}</span>
+            <span class="question-text">${q.question}</span>
+            ${q.options ? `
+              <div class="options">
+                ${q.options.map((opt, idx) => `
+                  <div class="option ${q.correctAnswer === idx ? 'correct' : ''}">
+                    <span class="option-letter">${String.fromCharCode(65 + idx)}</span>
+                    ${opt}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            <div class="answer-section">
+              <div class="answer-label">BONNE REPONSE :</div>
+              <div class="answer-text">
+                ${q.options && typeof q.correctAnswer === 'number'
+                  ? `${String.fromCharCode(65 + q.correctAnswer)} - ${q.options[q.correctAnswer]}`
+                  : q.correctAnswer || 'Non specifie'
+                }
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+    } else {
+      alert("Veuillez autoriser les popups pour telecharger le PDF");
+    }
+  }, []);
+
   // Toggle une question QCM
   const toggleQuestion = useCallback((moduleId: string, questionIndex: number) => {
     setExpandedQuestions(prev => {
@@ -536,18 +638,28 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   const handleGeneratePositionnement = useCallback(async () => {
     setGeneratingPositionnement(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
       const response = await fetch("/api/ai/generate-positionnement", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
         body: JSON.stringify({
           formationTitre,
           objectifs: formationObjectifs,
           modules: modules.map(m => ({ titre: m.titre, contenu: m.contenu })),
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error("Erreur lors de la generation");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erreur HTTP ${response.status}`);
       }
 
       const data = await response.json();
@@ -557,10 +669,17 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           description: `Evaluation pre-formation pour ${formationTitre}`,
           questions: data.data.questions || [],
         });
+      } else if (data.error) {
+        throw new Error(data.error);
       }
     } catch (error) {
       console.error("Erreur generation positionnement:", error);
-      alert("Erreur lors de la generation du test de positionnement");
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      if (errorMessage.includes("abort")) {
+        alert("Timeout: La generation a pris trop de temps. Reessayez.");
+      } else {
+        alert(`Erreur lors de la generation: ${errorMessage}`);
+      }
     } finally {
       setGeneratingPositionnement(false);
     }
@@ -570,18 +689,28 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   const handleGenerateEvaluation = useCallback(async () => {
     setGeneratingEvaluation(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
       const response = await fetch("/api/ai/generate-evaluation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
         body: JSON.stringify({
           formationTitre,
           objectifs: formationObjectifs,
           modules: modules.map(m => ({ titre: m.titre, contenu: m.contenu })),
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error("Erreur lors de la generation");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erreur HTTP ${response.status}`);
       }
 
       const data = await response.json();
@@ -591,10 +720,17 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           description: `Evaluation des acquis pour ${formationTitre}`,
           questions: data.data.questions || [],
         });
+      } else if (data.error) {
+        throw new Error(data.error);
       }
     } catch (error) {
       console.error("Erreur generation evaluation:", error);
-      alert("Erreur lors de la generation de l'evaluation finale");
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      if (errorMessage.includes("abort")) {
+        alert("Timeout: La generation a pris trop de temps. Reessayez.");
+      } else {
+        alert(`Erreur lors de la generation: ${errorMessage}`);
+      }
     } finally {
       setGeneratingEvaluation(false);
     }
@@ -607,19 +743,30 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
     setGeneratingQCM(prev => ({ ...prev, [moduleId]: true }));
     try {
+      // Utiliser AbortController pour timeout (Safari peut avoir des problemes de timeout)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+
       const response = await fetch("/api/ai/generate-qcm", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache", // Eviter le cache Safari
+        },
         body: JSON.stringify({
           moduleTitre: module.titre,
           moduleContenu: module.contenu,
           objectifs: formationObjectifs,
           nombreQuestions: 8, // ~8 questions par module
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error("Erreur lors de la generation");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erreur HTTP ${response.status}`);
       }
 
       const data = await response.json();
@@ -631,10 +778,17 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             questions: data.data.questions || [],
           },
         }));
+      } else if (data.error) {
+        throw new Error(data.error);
       }
     } catch (error) {
       console.error("Erreur generation QCM:", error);
-      alert(`Erreur lors de la generation du QCM pour ${module.titre}`);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      if (errorMessage.includes("abort")) {
+        alert(`Timeout: La generation du QCM a pris trop de temps. Reessayez.`);
+      } else {
+        alert(`Erreur lors de la generation du QCM: ${errorMessage}`);
+      }
     } finally {
       setGeneratingQCM(prev => ({ ...prev, [moduleId]: false }));
     }
@@ -873,6 +1027,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             onRegenerate={handleGeneratePositionnement}
             onViewAll={() => setViewingPositionnement(true)}
             onDownload={() => positionnement && handleDownloadEvaluation(positionnement)}
+            onDownloadAnswers={() => positionnement && handleDownloadAnswers(positionnement)}
           />
         </div>
 
@@ -892,6 +1047,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             onRegenerate={handleGenerateEvaluation}
             onViewAll={() => setViewingEvaluation(true)}
             onDownload={() => evaluationFinale && handleDownloadEvaluation(evaluationFinale)}
+            onDownloadAnswers={() => evaluationFinale && handleDownloadAnswers(evaluationFinale)}
           />
         </div>
       </div>

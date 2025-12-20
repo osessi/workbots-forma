@@ -166,8 +166,10 @@ export async function POST(request: NextRequest) {
         code_postal: formation.organization.codePostal || "",
         ville: formation.organization.ville || "",
         telephone: formation.organization.telephone || "",
-        email: "",
+        email: formation.organization.email || "",
         logo: formation.organization.logo || "",
+        representant: formation.organization.representantLegal || "",
+        prefecture_region: formation.organization.prefectureRegion || "",
       },
       formateur: {
         nom: formation.user.lastName || "",

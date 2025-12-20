@@ -30,13 +30,15 @@ const initialFicheData = {
   typeFormation: "",
   duree: "",
   nombreParticipants: "",
-  tarif: "",
-  accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles a tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les amenagements necessaires.",
+  tarifEntreprise: "",
+  tarifIndependant: "",
+  tarifParticulier: "",
+  accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
   prerequis: "",
   publicVise: "",
   suiviEvaluation: "",
   ressourcesPedagogiques: "",
-  delaiAcces: "Le delai d'acces a la formation est de 4 semaines a compter de la validation de la demande de formation.",
+  delaiAcces: "Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.",
   imageUrl: "",
 };
 
@@ -231,9 +233,15 @@ export default function CreateFormationPage() {
           ? `${contexte.dureeHeures} heures (${contexte.dureeJours || Math.ceil(parseInt(contexte.dureeHeures) / 7)} jours)`
           : genere.dureeTotal || "";
 
-        // Calculer le tarif
-        const tarifFormate = contexte.tarifEntreprise
-          ? `${contexte.tarifEntreprise} € HT / participant`
+        // Formater les tarifs
+        const tarifEntrepriseFormate = contexte.tarifEntreprise
+          ? `${contexte.tarifEntreprise} € HT`
+          : "";
+        const tarifIndependantFormate = contexte.tarifIndependant
+          ? `${contexte.tarifIndependant} € HT`
+          : "";
+        const tarifParticulierFormate = contexte.tarifParticulier
+          ? `${contexte.tarifParticulier} € TTC`
           : "";
 
         // Construire le contenu des modules
@@ -256,12 +264,14 @@ export default function CreateFormationPage() {
           typeFormation: modaliteLabel[contexte.modalite] || contexte.modalite || "",
           duree: dureeFormatee,
           nombreParticipants: contexte.nombreParticipants || "",
-          tarif: tarifFormate,
-          accessibilite: genere.accessibilite || "Nous faisons notre possible pour rendre nos formations accessibles a tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les amenagements necessaires.",
-          suiviEvaluation: (genere.modalitesEvaluation || []).join("\n"),
-          ressourcesPedagogiques: (genere.moyensPedagogiques || []).join("\n"),
+          tarifEntreprise: tarifEntrepriseFormate,
+          tarifIndependant: tarifIndependantFormate,
+          tarifParticulier: tarifParticulierFormate,
+          accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
+          suiviEvaluation: "Feuilles de presence\nFormulaires d'evaluation de la formation\nQuiz de validation des acquis en fin de module\nAttestation de fin de formation",
+          ressourcesPedagogiques: "Support de formation projete\nMise a disposition en ligne des supports\nExercices pratiques et mises en situation\nEtudes de cas",
           contenu: contenuModules,
-          delaiAcces: "Le delai d'acces a la formation est de 4 semaines a compter de la validation de la demande de formation.",
+          delaiAcces: "Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.",
           imageUrl: "", // Sera defini par l'utilisateur dans l'etape suivante
         });
 
@@ -316,7 +326,9 @@ export default function CreateFormationPage() {
             dureeHeures: parseInt(contexteData.dureeHeures) || 14,
             dureeJours: parseInt(contexteData.dureeJours) || 2,
             nombreParticipants: ficheData.nombreParticipants,
-            tarif: ficheData.tarif,
+            tarifEntreprise: ficheData.tarifEntreprise,
+            tarifIndependant: ficheData.tarifIndependant,
+            tarifParticulier: ficheData.tarifParticulier,
             accessibilite: ficheData.accessibilite,
             prerequis: ficheData.prerequis,
             publicVise: ficheData.publicVise,

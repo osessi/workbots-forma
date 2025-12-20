@@ -11,11 +11,11 @@ import { z } from "zod";
 // Schema pour un module de formation
 export const ModuleSchema = z.object({
   titre: z.string().min(1),
-  duree: z.string().describe("Duree du module (ex: '2h', '1 jour')"),
-  objectifs: z.array(z.string()).min(1),
-  contenu: z.array(z.string()).min(1),
+  duree: z.string().describe("Duree du module (ex: '3h30')"),
+  objectifs: z.array(z.string()).min(1).max(4),
+  contenu: z.array(z.string()).min(3).max(8),
   methodePedagogique: z.string(),
-  evaluation: z.string().optional(),
+  evaluation: z.string().describe("Quiz QCM de validation en fin de module"),
 });
 
 // Schema pour une fiche pedagogique complete
@@ -106,17 +106,49 @@ export const SYSTEM_PROMPTS = {
   fichePedagogique: `Tu es un expert en ingenierie pedagogique specialise dans la creation de formations professionnelles en France.
 Tu dois creer des fiches pedagogiques conformes aux exigences Qualiopi et aux standards de la formation professionnelle continue.
 
+STRUCTURE OBLIGATOIRE DES MODULES:
+- Une journee de formation = 7 heures
+- Chaque journee DOIT contenir exactement 2 modules (matin et apres-midi)
+- Module du matin: environ 3h30 (de 9h a 12h30 avec pause)
+- Module de l'apres-midi: environ 3h30 (de 14h a 17h30 avec pause)
+- Chaque module se termine par un quiz de validation (10-15 min) pour verifier les acquis
+
+EXEMPLE pour une formation de 2 jours (14h):
+- Jour 1 Matin: Module 1 (3h30) + Quiz validation Module 1
+- Jour 1 Apres-midi: Module 2 (3h30) + Quiz validation Module 2
+- Jour 2 Matin: Module 3 (3h30) + Quiz validation Module 3
+- Jour 2 Apres-midi: Module 4 (3h30) + Quiz validation Module 4
+
 Regles importantes:
 - Utilise un langage professionnel et precis
 - Les objectifs doivent etre SMART (Specifiques, Mesurables, Atteignables, Realistes, Temporellement definis)
-- Chaque module doit avoir des objectifs operationnels clairs
-- Les methodes pedagogiques doivent etre variees et adaptees au public
-- Les modalites d'evaluation doivent permettre de mesurer l'atteinte des objectifs
+- Chaque module doit avoir des objectifs operationnels clairs (2-4 objectifs par module)
+- Les methodes pedagogiques doivent etre variees: apports theoriques, exercices pratiques, mises en situation, etudes de cas
+- Chaque module inclut obligatoirement une evaluation sous forme de quiz QCM a la fin
+- Le contenu de chaque module doit etre detaille (4-6 points de contenu)
 
-IMPORTANT - Sections fixes (NE PAS GENERER):
-- La section "Suivi de l'execution et evaluation des resultats" est FIXE et pre-remplie automatiquement
-- La section "Ressources pedagogiques" est FIXE et pre-remplie automatiquement
-- Tu ne dois PAS generer de contenu pour ces deux sections car elles sont standardisees
+⚠️ INTERDICTION ABSOLUE - SECTIONS FIXES (NE JAMAIS GENERER NI MODIFIER) ⚠️
+Les deux sections suivantes sont INTOUCHABLES et gerees par le systeme:
+
+1. "Suivi de l'execution et evaluation des resultats" - CONTENU FIXE:
+   • Feuilles de presence
+   • Formulaires d'evaluation de la formation
+   • Quiz de validation des acquis en fin de module
+   • Attestation de fin de formation
+
+2. "Ressources pedagogiques" - CONTENU FIXE:
+   • Support de formation projete
+   • Mise a disposition en ligne des supports
+   • Exercices pratiques et mises en situation
+   • Etudes de cas
+
+⛔ TU NE DOIS JAMAIS:
+- Generer du contenu pour ces deux sections
+- Proposer des alternatives a ces sections
+- Modifier ou reformuler ces sections
+- Les inclure dans ta reponse JSON
+
+Ces sections sont standardisees Qualiopi et l'utilisateur peut les modifier manuellement s'il le souhaite.
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
@@ -199,20 +231,38 @@ export interface FichePedagogiqueInput {
 }
 
 export function generateFichePedagogiquePrompt(input: FichePedagogiqueInput): string {
+  // Calculer le nombre de jours et modules en fonction de la duree
+  const dureeMatch = input.duree.match(/(\d+)/);
+  const heures = dureeMatch ? parseInt(dureeMatch[1]) : 7;
+  const nbJours = Math.ceil(heures / 7);
+  const nbModules = nbJours * 2; // 2 modules par jour
+
   return `Cree une fiche pedagogique complete pour la formation suivante:
 
 TITRE: ${input.titre}
 THEMATIQUE: ${input.thematique}
-DUREE: ${input.duree}
+DUREE: ${input.duree} (soit ${nbJours} jour${nbJours > 1 ? "s" : ""} de formation)
 PUBLIC CIBLE: ${input.publicCible}
 OBJECTIF PRINCIPAL: ${input.objectifPrincipal}
 ${input.contexte ? `CONTEXTE ADDITIONNEL: ${input.contexte}` : ""}
 
+STRUCTURE A RESPECTER IMPERATIVEMENT:
+- Nombre de jours: ${nbJours}
+- Nombre de modules: ${nbModules} (exactement 2 modules par jour)
+- Duree par module: 3h30 environ
+- Chaque module se termine par un quiz de validation QCM (10-15 min)
+
+ORGANISATION PAR JOURNEE:
+${Array.from({ length: nbJours }, (_, i) => `Jour ${i + 1}:
+  - Module ${i * 2 + 1} (matin 9h-12h30): [Theme + Quiz validation]
+  - Module ${i * 2 + 2} (apres-midi 14h-17h30): [Theme + Quiz validation]`).join("\n")}
+
 Genere une fiche pedagogique complete avec:
-- 3 a 5 objectifs specifiques
-- Des modules structures (entre 3 et 6 modules)
-- Des methodes pedagogiques variees
-- Des modalites d'evaluation adaptees
+- 3 a 5 objectifs specifiques SMART
+- Exactement ${nbModules} modules structures (2 par journee)
+- Pour chaque module: titre clair, duree "3h30", 2-4 objectifs operationnels, 4-6 points de contenu detailles
+- Methode pedagogique: combinaison d'apports theoriques et exercices pratiques
+- Evaluation: chaque module inclut un quiz QCM de validation
 
 Schema JSON attendu:
 ${JSON.stringify(FichePedagogiqueSchema.shape, null, 2)}`;

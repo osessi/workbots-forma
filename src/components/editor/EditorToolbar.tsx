@@ -149,6 +149,11 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
     }
   }, [editor]);
 
+  // Inserer un saut de page
+  const insertPageBreak = useCallback(() => {
+    editor?.chain().focus().setHardBreak().insertContent('<div class="page-break" style="page-break-after: always; break-after: page; height: 0; margin: 24px 0; border-top: 2px dashed #d1d5db;"></div><p></p>').run();
+  }, [editor]);
+
   const undo = useCallback(() => editor?.chain().focus().undo().run(), [editor]);
   const redo = useCallback(() => editor?.chain().focus().redo().run(), [editor]);
 
@@ -317,6 +322,16 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
           title="Liste numerotee"
         >
           <OrderedListIcon />
+        </ToolbarButton>
+
+        <Divider />
+
+        {/* Saut de page */}
+        <ToolbarButton
+          onClick={insertPageBreak}
+          title="Inserer un saut de page"
+        >
+          <PageBreakIcon />
         </ToolbarButton>
 
         <Divider />
@@ -767,5 +782,15 @@ const WordIcon = () => (
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
     <path d="M9 15l2 2 4-4" />
+  </svg>
+);
+
+const PageBreakIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 5v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5" />
+    <path d="M4 19v-4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4" />
+    <line x1="2" y1="12" x2="6" y2="12" />
+    <line x1="10" y1="12" x2="14" y2="12" />
+    <line x1="18" y1="12" x2="22" y2="12" />
   </svg>
 );

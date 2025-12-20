@@ -614,7 +614,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           moduleTitre: module.titre,
           moduleContenu: module.contenu,
           objectifs: formationObjectifs,
-          nombreQuestions: 5,
+          nombreQuestions: 8, // ~8 questions par module
         }),
       });
 

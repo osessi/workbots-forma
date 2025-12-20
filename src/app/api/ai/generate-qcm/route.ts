@@ -12,7 +12,7 @@ const RequestSchema = z.object({
   moduleTitre: z.string().min(1, "Le titre du module est requis"),
   moduleContenu: z.array(z.string()).min(1, "Le contenu du module est requis"),
   objectifs: z.array(z.string()).min(1, "Au moins un objectif est requis"),
-  nombreQuestions: z.number().min(3).max(10).optional(),
+  nombreQuestions: z.number().min(6).max(12).optional(), // 6-12 questions par module (defaut 8)
 });
 
 export async function POST(request: NextRequest) {

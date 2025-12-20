@@ -15,7 +15,8 @@ export type VariableCategory =
   | "participants"
   | "formateur"
   | "dates"
-  | "document";
+  | "document"
+  | "signature";
 
 /**
  * Definition d'une variable de template
@@ -99,6 +100,7 @@ export interface TemplateContext {
   formateur?: FormateurData;
   dates?: DatesData;
   document?: DocumentData;
+  signature?: SignatureData;
 }
 
 /**
@@ -280,6 +282,13 @@ export interface DocumentData {
   version?: string;
   numero_page?: number;
   total_pages?: number;
+}
+
+/**
+ * Donnees de signature
+ */
+export interface SignatureData {
+  responsable_organisme?: string; // URL de l'image de signature
 }
 
 /**

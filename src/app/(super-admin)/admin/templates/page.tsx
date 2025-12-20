@@ -50,6 +50,8 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -177,11 +179,92 @@ export default function TemplatesPage() {
     }
   };
 
+  // Importer des templates depuis un fichier JSON backup
+  const handleImportTemplates = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+
+      // Demander le mode d'import
+      const mode = confirm(
+        "Comment voulez-vous importer ?\n\n" +
+        "OK = Fusionner (mettre à jour les templates existants)\n" +
+        "Annuler = Remplacer TOUT (supprimer les templates existants)"
+      ) ? "merge" : "replace";
+
+      if (mode === "replace" && !confirm("⚠️ ATTENTION: Tous vos templates actuels seront SUPPRIMÉS et remplacés par ceux du fichier. Continuer ?")) {
+        setIsImporting(false);
+        return;
+      }
+
+      const response = await fetch("/api/admin/templates/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backup, mode }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(result.message);
+        await fetchTemplates();
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erreur lors de l'import");
+      }
+    } catch (error) {
+      console.error("Erreur import:", error);
+      alert("Erreur lors de l'import. Vérifiez que le fichier est un JSON valide.");
+    } finally {
+      setIsImporting(false);
+      // Reset l'input file pour permettre de re-sélectionner le même fichier
+      event.target.value = "";
+    }
+  };
+
+  // Exporter tous les templates en JSON (backup)
+  const handleExportTemplates = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch("/api/admin/templates/export");
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `templates-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erreur lors de l'export");
+      }
+    } catch (error) {
+      console.error("Erreur export:", error);
+      alert("Erreur lors de l'export des templates");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleSeedTemplates = async (forceUpdate = false) => {
     if (!confirm(forceUpdate
       ? "Êtes-vous sûr de vouloir REMPLACER les templates existants par les versions par défaut ?"
       : "Créer les templates par défaut manquants ?"
     )) return;
+
+    // Faire un backup automatique avant le seed
+    if (templates.length > 0) {
+      const doBackup = confirm("Voulez-vous télécharger un backup de vos templates actuels avant de continuer ?");
+      if (doBackup) {
+        await handleExportTemplates();
+      }
+    }
 
     setIsSeeding(true);
     try {
@@ -226,6 +309,53 @@ export default function TemplatesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Bouton Import */}
+          <label
+            className={`px-4 py-2.5 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2 cursor-pointer ${isImporting ? "opacity-50 pointer-events-none" : ""}`}
+            title="Importer des templates depuis un backup JSON"
+          >
+            {isImporting ? (
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            )}
+            {isImporting ? "Import..." : "Import"}
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImportTemplates}
+              className="hidden"
+              disabled={isImporting}
+            />
+          </label>
+          {/* Bouton Export/Backup */}
+          <button
+            onClick={handleExportTemplates}
+            disabled={isExporting || templates.length === 0}
+            className="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
+            title="Exporter tous les templates (backup)"
+          >
+            {isExporting ? (
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            )}
+            {isExporting ? "Export..." : "Backup"}
+          </button>
           <button
             onClick={() => handleSeedTemplates(false)}
             disabled={isSeeding}

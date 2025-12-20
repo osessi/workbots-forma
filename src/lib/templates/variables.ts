@@ -252,6 +252,12 @@ export function getVariableGroupsWithDynamicContext(context: DynamicVariableCont
       icon: "FileText",
       variables: allVariables.filter((v) => v.category === "document"),
     },
+    {
+      category: "signature",
+      label: "Signature",
+      icon: "PenTool",
+      variables: allVariables.filter((v) => v.category === "signature"),
+    },
   ];
 }
 
@@ -508,7 +514,7 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
   // ===== ORGANISATION =====
   {
     id: "organisation.nom",
-    label: "Nom de l'organisme",
+    label: "Raison sociale",
     category: "organisation",
     description: "Raison sociale de l'organisme de formation",
     example: "Automate Formation SAS",
@@ -624,6 +630,38 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     category: "organisation",
     description: "Numero RCS",
     example: "Paris B 123 456 789",
+  },
+  {
+    id: "organisation.prefecture_region",
+    label: "Region prefecture",
+    category: "organisation",
+    description: "Region d'acquisition du numero de declaration d'activite",
+    example: "Ile-de-France",
+  },
+
+  // ===== FORMATION - SECTIONS FIXES =====
+  {
+    id: "formation.execution_resultats",
+    label: "Suivi execution et resultats",
+    category: "formation",
+    description: "Section fixe: Suivi de l'execution et evaluation des resultats (texte standard Qualiopi)",
+    example: "Feuilles d'emargement, evaluation de fin de formation, auto-evaluation, questionnaire satisfaction, attestation",
+  },
+  {
+    id: "formation.ressources_pedagogiques",
+    label: "Ressources pedagogiques",
+    category: "formation",
+    description: "Section fixe: Ressources et moyens pedagogiques (texte standard Qualiopi)",
+    example: "Formation presentiel/distanciel, accompagnement formateur, ateliers pratiques, supports de cours",
+  },
+
+  // ===== SIGNATURE =====
+  {
+    id: "signature.responsable_organisme",
+    label: "Signature responsable OF",
+    category: "signature",
+    description: "Image de signature du responsable de l'organisme de formation",
+    example: "https://example.com/signature.png",
   },
 
   // ===== ENTREPRISE =====
@@ -1037,6 +1075,12 @@ export const VARIABLE_GROUPS: VariableGroup[] = [
     icon: "FileText",
     variables: TEMPLATE_VARIABLES.filter((v) => v.category === "document"),
   },
+  {
+    category: "signature",
+    label: "Signature",
+    icon: "PenTool",
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "signature"),
+  },
 ];
 
 /**
@@ -1045,7 +1089,7 @@ export const VARIABLE_GROUPS: VariableGroup[] = [
 // Toutes les categories disponibles pour harmonisation
 const ALL_CATEGORIES: VariableCategory[] = [
   "formation", "journees", "modules", "organisation", "entreprise",
-  "particulier", "participants", "formateur", "dates", "document"
+  "particulier", "participants", "formateur", "dates", "document", "signature"
 ];
 
 export const DOCUMENT_TYPES: DocumentTypeConfig[] = [

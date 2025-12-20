@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const sanitizedId = supabaseUser.id.replace(/[^a-zA-Z0-9]/g, "_");
-    const folder = type === "logo" ? "logos" : "avatars";
+    const folder = type === "logo" ? "logos" : type === "signature" ? "signatures" : "avatars";
     const path = `${folder}/${sanitizedId}/${timestamp}.${ext}`;
 
     // Convertir File en ArrayBuffer
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         where: { supabaseId: supabaseUser.id },
         data: { avatar: publicUrl },
       });
-    } else if (type === "logo") {
+    } else if (type === "logo" || type === "signature") {
       // Récupérer l'utilisateur pour avoir son organizationId
       const user = await prisma.user.findUnique({
         where: { supabaseId: supabaseUser.id },
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
         // Mettre à jour l'organisation existante
         await prisma.organization.update({
           where: { id: user.organizationId },
-          data: { logo: publicUrl },
+          data: type === "logo" ? { logo: publicUrl } : { signature: publicUrl },
         });
       } else {
         // Créer une organisation pour l'utilisateur s'il n'en a pas
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           data: {
             name: "Mon entreprise",
             slug: slug,
-            logo: publicUrl,
+            ...(type === "logo" ? { logo: publicUrl } : { signature: publicUrl }),
           },
         });
         // Associer l'organisation à l'utilisateur

@@ -19,8 +19,15 @@ const BuildingIcon = () => (
   </svg>
 );
 
+const PenIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 17.5H17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M13.75 2.91669C14.0815 2.58517 14.5312 2.39844 15 2.39844C15.2321 2.39844 15.462 2.44414 15.6765 2.53296C15.891 2.62177 16.0858 2.75196 16.25 2.91669C16.4147 3.08143 16.5449 3.27621 16.6337 3.49068C16.7226 3.70516 16.7683 3.93509 16.7683 4.16669C16.7683 4.3983 16.7226 4.62823 16.6337 4.84271C16.5449 5.05718 16.4147 5.25196 16.25 5.41669L5.83333 15.8334L2.5 16.6667L3.33333 13.3334L13.75 2.91669Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 // Helper pour upload via API
-async function uploadImage(file: File, type: "avatar" | "logo"): Promise<{ url: string | null; error: string | null }> {
+async function uploadImage(file: File, type: "avatar" | "logo" | "signature"): Promise<{ url: string | null; error: string | null }> {
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -49,8 +56,10 @@ export default function MonComptePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
 
   // Synchronize local state when user changes
   useEffect(() => {
@@ -67,6 +76,13 @@ export default function MonComptePage() {
     // Permet l'upload du logo sans mode édition
     if (logoInputRef.current) {
       logoInputRef.current.click();
+    }
+  };
+
+  const handleSignatureClick = () => {
+    // Permet l'upload de la signature sans mode édition
+    if (signatureInputRef.current) {
+      signatureInputRef.current.click();
     }
   };
 
@@ -138,6 +154,41 @@ export default function MonComptePage() {
       setIsUploadingLogo(false);
       if (logoInputRef.current) {
         logoInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleSignatureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Veuillez sélectionner une image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("L'image ne doit pas dépasser 5MB");
+      return;
+    }
+
+    setIsUploadingSignature(true);
+    try {
+      const result = await uploadImage(file, "signature");
+
+      if (result.url) {
+        // Refresh pour synchroniser avec le serveur (signature sauvée dans l'organisation)
+        await refreshUser();
+      } else {
+        alert(result.error || "Erreur lors de l'upload");
+      }
+    } catch (error) {
+      console.error("Erreur upload:", error);
+      alert("Erreur lors de l'upload de la signature");
+    } finally {
+      setIsUploadingSignature(false);
+      if (signatureInputRef.current) {
+        signatureInputRef.current.value = "";
       }
     }
   };
@@ -331,6 +382,67 @@ export default function MonComptePage() {
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-1">
                 Ce logo apparaîtra sur vos documents
+              </p>
+            </div>
+          </div>
+
+          {/* Signature responsable */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] card-hover-glow">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+              Signature responsable
+            </h2>
+            <div className="flex flex-col items-center">
+              <div className="relative">
+                <input
+                  ref={signatureInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSignatureChange}
+                  className="hidden"
+                />
+                <div
+                  onClick={handleSignatureClick}
+                  className="w-48 h-24 rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 transition-all cursor-pointer hover:border-brand-300 hover:bg-brand-50/50 dark:hover:bg-brand-500/10"
+                >
+                  {user.signatureUrl ? (
+                    <Image
+                      src={user.signatureUrl}
+                      alt="Signature responsable"
+                      width={192}
+                      height={96}
+                      className="object-contain w-full h-full p-2"
+                    />
+                  ) : (
+                    <div className="text-center p-4">
+                      <div className="flex justify-center text-gray-400">
+                        <PenIcon />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Cliquez pour ajouter
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={handleSignatureClick}
+                  disabled={isUploadingSignature}
+                  className="absolute -bottom-2 -right-2 p-2 bg-brand-500 text-white rounded-full hover:bg-brand-600 active:scale-[0.95] transition-all shadow-lg disabled:opacity-50"
+                >
+                  {isUploadingSignature ? (
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <CameraIcon />
+                  )}
+                </button>
+              </div>
+              <p className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                Signature du responsable
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-1">
+                Cette signature apparaîtra sur vos documents
               </p>
             </div>
           </div>

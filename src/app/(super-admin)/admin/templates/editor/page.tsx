@@ -71,8 +71,11 @@ const MARGIN_RIGHT_MM = 25;
 const HEADER_HEIGHT_MM = 30;
 const FOOTER_HEIGHT_MM = 25;
 
-// Hauteur de contenu disponible par page
-const CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_TOP_MM + MARGIN_BOTTOM_MM + HEADER_HEIGHT_MM + FOOTER_HEIGHT_MM) * MM_TO_PX;
+// Hauteur de contenu disponible par page (en px)
+// Page 1 a moins d'espace car elle contient le header
+const FIRST_PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_TOP_MM + MARGIN_BOTTOM_MM + HEADER_HEIGHT_MM + FOOTER_HEIGHT_MM) * MM_TO_PX;
+// Pages suivantes ont plus d'espace (pas de header)
+const OTHER_PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_TOP_MM + MARGIN_BOTTOM_MM + FOOTER_HEIGHT_MM) * MM_TO_PX;
 
 export default function TemplateEditorPage() {
   const searchParams = useSearchParams();
@@ -98,9 +101,9 @@ export default function TemplateEditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!!templateId);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [isExporting, setIsExporting] = useState(false);
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const contentMeasureRef = useRef<HTMLDivElement>(null);
@@ -183,31 +186,6 @@ export default function TemplateEditorPage() {
     setCurrentFooter(newContent);
   }, []);
 
-  // Calculer le nombre de pages basé sur la hauteur du contenu
-  useEffect(() => {
-    // Calculer meme si pas en preview pour avoir le bon nombre de pages
-    const calculatePages = () => {
-      if (contentMeasureRef.current) {
-        const contentHeight = contentMeasureRef.current.scrollHeight;
-        const pages = Math.max(1, Math.ceil(contentHeight / CONTENT_HEIGHT_PX));
-        setTotalPages(pages);
-      }
-    };
-
-    // Petit delai pour laisser le DOM se mettre a jour
-    const timer = setTimeout(calculatePages, 100);
-    return () => clearTimeout(timer);
-  }, [currentContent, currentHeader, currentFooter]);
-
-  // Recalculer quand on entre en mode preview
-  useEffect(() => {
-    if (isPreviewMode && contentMeasureRef.current) {
-      const contentHeight = contentMeasureRef.current.scrollHeight;
-      const pages = Math.max(1, Math.ceil(contentHeight / CONTENT_HEIGHT_PX));
-      setTotalPages(pages);
-    }
-  }, [isPreviewMode]);
-
   // Sauvegarder le template
   const handleSaveTemplate = async () => {
     setIsSaving(true);
@@ -287,15 +265,6 @@ export default function TemplateEditorPage() {
     }
   };
 
-  // Scroll handler pour pagination
-  const handlePreviewScroll = useCallback(() => {
-    if (previewContainerRef.current) {
-      const scrollTop = previewContainerRef.current.scrollTop;
-      const pageHeight = A4_HEIGHT_PX + 32;
-      const currentPageNum = Math.max(1, Math.min(totalPages, Math.floor(scrollTop / pageHeight) + 1));
-      setCurrentPage(currentPageNum);
-    }
-  }, [totalPages]);
 
   // Render HTML pour preview
   const renderPreviewHtml = useCallback((contentStr: string) => {
@@ -311,6 +280,62 @@ export default function TemplateEditorPage() {
   const previewHeaderHtml = useMemo(() => renderPreviewHtml(currentHeader), [currentHeader, renderPreviewHtml]);
   const previewContentHtml = useMemo(() => renderPreviewHtml(currentContent), [currentContent, renderPreviewHtml]);
   const previewFooterHtml = useMemo(() => renderPreviewHtml(currentFooter), [currentFooter, renderPreviewHtml]);
+
+  // Calculer le nombre de pages basé sur la hauteur du contenu
+  useEffect(() => {
+    if (!isPreviewMode) return;
+
+    const calculatePages = () => {
+      if (contentMeasureRef.current) {
+        // Force le navigateur à recalculer le layout
+        contentMeasureRef.current.offsetHeight;
+        const contentHeight = contentMeasureRef.current.scrollHeight;
+
+        // Debug: afficher la hauteur mesurée dans la console
+        console.log('Content height measured:', contentHeight, 'FIRST_PAGE:', FIRST_PAGE_CONTENT_HEIGHT_PX, 'OTHER_PAGE:', OTHER_PAGE_CONTENT_HEIGHT_PX);
+
+        // Page 1 a moins d'espace (avec header), pages suivantes ont plus d'espace
+        let pages = 1;
+        if (contentHeight > FIRST_PAGE_CONTENT_HEIGHT_PX) {
+          const remainingContent = contentHeight - FIRST_PAGE_CONTENT_HEIGHT_PX;
+          pages = 1 + Math.ceil(remainingContent / OTHER_PAGE_CONTENT_HEIGHT_PX);
+        }
+        console.log('Total pages calculated:', pages);
+        setTotalPages(Math.max(1, pages));
+      }
+    };
+
+    // Utiliser plusieurs délais pour s'assurer que le DOM est prêt
+    const timer1 = setTimeout(calculatePages, 50);
+    const timer2 = setTimeout(calculatePages, 200);
+    const timer3 = setTimeout(calculatePages, 500);
+
+    // Observer les changements de taille
+    let resizeObserver: ResizeObserver | null = null;
+    if (contentMeasureRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        calculatePages();
+      });
+      resizeObserver.observe(contentMeasureRef.current);
+    }
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      resizeObserver?.disconnect();
+    };
+  }, [isPreviewMode, previewContentHtml, previewHeaderHtml, previewFooterHtml]);
+
+  // Scroll handler pour mettre à jour la page courante
+  const handlePreviewScroll = useCallback(() => {
+    if (previewContainerRef.current && totalPages > 1) {
+      const scrollTop = previewContainerRef.current.scrollTop;
+      const pageHeight = A4_HEIGHT_PX + 32; // hauteur de page + gap
+      const currentPageNum = Math.max(1, Math.min(totalPages, Math.floor(scrollTop / pageHeight) + 1));
+      setCurrentPage(currentPageNum);
+    }
+  }, [totalPages]);
 
   // Export PDF (utilise l'API print du navigateur)
   const handleExportPDF = useCallback(() => {
@@ -566,81 +591,205 @@ export default function TemplateEditorPage() {
             isPreviewMode ? "opacity-100 z-10" : "opacity-0 pointer-events-none z-0"
           }`}
         >
-          {/* Element cache pour mesurer la hauteur du contenu */}
-          <div ref={contentMeasureRef} className="absolute opacity-0 pointer-events-none" style={{ width: `${A4_WIDTH_PX - (MARGIN_LEFT_MM + MARGIN_RIGHT_MM) * MM_TO_PX}px` }}>
+          {/* Element cache pour mesurer la hauteur du contenu - DOIT avoir les mêmes styles que le contenu réel */}
+          <div
+            ref={contentMeasureRef}
+            className="absolute opacity-0 pointer-events-none document-preview-content"
+            style={{
+              width: `${A4_WIDTH_PX - (MARGIN_LEFT_MM + MARGIN_RIGHT_MM) * MM_TO_PX}px`,
+              fontFamily: "'Georgia', 'Times New Roman', serif",
+              fontSize: '11pt',
+              lineHeight: 1.6,
+            }}
+          >
             <div dangerouslySetInnerHTML={{ __html: previewContentHtml }} />
           </div>
 
+          {/* Styles personnalises pour le preview document */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            .document-preview-content {
+              font-family: 'Georgia', 'Times New Roman', serif;
+              font-size: 11pt;
+              line-height: 1.6;
+              color: #1a1a1a;
+            }
+            .document-preview-content h1 {
+              font-size: 18pt;
+              font-weight: 700;
+              color: #111;
+              margin: 0 0 16px 0;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .document-preview-content h2 {
+              font-size: 13pt;
+              font-weight: 700;
+              color: #222;
+              margin: 24px 0 12px 0;
+              border-bottom: 1px solid #e5e5e5;
+              padding-bottom: 6px;
+            }
+            .document-preview-content h3, .document-preview-content h4 {
+              font-size: 11pt;
+              font-weight: 700;
+              color: #333;
+              margin: 16px 0 8px 0;
+            }
+            .document-preview-content p {
+              margin: 0 0 10px 0;
+              text-align: justify;
+            }
+            .document-preview-content p[style*="text-align: center"] {
+              text-align: center !important;
+            }
+            .document-preview-content hr {
+              border: none;
+              border-top: 2px solid #333;
+              margin: 20px 0;
+            }
+            .document-preview-content ul, .document-preview-content ol {
+              margin: 10px 0;
+              padding-left: 24px;
+            }
+            .document-preview-content li {
+              margin: 4px 0;
+            }
+            .document-preview-content ul li::marker {
+              color: #4277FF;
+            }
+            .document-preview-content strong {
+              font-weight: 700;
+            }
+            .document-preview-content em {
+              font-style: italic;
+            }
+            .document-preview-content .template-list {
+              list-style: disc;
+              margin: 8px 0;
+              padding-left: 24px;
+            }
+            .document-preview-content .module-section {
+              background: #f9f9f9;
+              border-left: 3px solid #4277FF;
+              padding: 12px 16px;
+              margin: 12px 0;
+              border-radius: 0 4px 4px 0;
+            }
+            .document-preview-content .module-section h4 {
+              margin-top: 0;
+              color: #4277FF;
+            }
+            .document-preview-content table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 16px 0;
+            }
+            .document-preview-content td, .document-preview-content th {
+              border: 1px solid #ddd;
+              padding: 8px 12px;
+              text-align: left;
+            }
+            .document-preview-content th {
+              background: #f5f5f5;
+              font-weight: 700;
+            }
+            .document-preview-content img {
+              max-width: 100%;
+              height: auto;
+            }
+            .document-header-content {
+              font-family: 'Georgia', 'Times New Roman', serif;
+              font-size: 10pt;
+              color: #444;
+            }
+            .document-header-content img {
+              max-height: 60px;
+              width: auto;
+              max-width: 180px;
+            }
+            .document-footer-content {
+              font-family: 'Georgia', 'Times New Roman', serif;
+              font-size: 9pt;
+              color: #666;
+            }
+            .page-footer {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              border-top: 1px solid #ddd;
+              padding-top: 12px;
+              margin-top: auto;
+              font-size: 9pt;
+              color: #666;
+            }
+          ` }} />
+
+          {/* Pages A4 avec pagination */}
           <div className="flex flex-col items-center gap-8 pb-8">
-            {/* Pages A4 */}
             {Array.from({ length: totalPages }, (_, pageIndex) => (
               <div
                 key={pageIndex}
-                className="bg-white shadow-2xl relative print:shadow-none"
+                className="bg-white shadow-2xl document-preview-content"
                 style={{
                   width: `${A4_WIDTH_PX}px`,
                   height: `${A4_HEIGHT_PX}px`,
                   padding: `${MARGIN_TOP_MM * MM_TO_PX}px ${MARGIN_RIGHT_MM * MM_TO_PX}px ${MARGIN_BOTTOM_MM * MM_TO_PX}px ${MARGIN_LEFT_MM * MM_TO_PX}px`,
+                  display: "flex",
+                  flexDirection: "column",
                   overflow: "hidden",
+                  position: "relative",
                 }}
               >
-                {/* Header - sur chaque page */}
-                {currentHeader && (
+                {/* Header - seulement sur la première page */}
+                {pageIndex === 0 && currentHeader && (
                   <div
-                    className="border-b border-gray-200 pb-3 mb-4"
+                    className="border-b-2 border-gray-300 pb-3 mb-4 flex-shrink-0"
                     style={{ minHeight: `${HEADER_HEIGHT_MM * MM_TO_PX}px` }}
                   >
                     <div
-                      className="prose prose-sm max-w-none [&_img]:max-w-full [&_img]:h-auto"
+                      className="document-header-content"
                       dangerouslySetInnerHTML={{ __html: previewHeaderHtml }}
                     />
                   </div>
                 )}
 
-                {/* Contenu - decalage par page pour simuler la pagination */}
+                {/* Contenu principal avec décalage pour chaque page */}
                 <div
-                  className="prose prose-sm max-w-none [&_img]:max-w-full [&_img]:h-auto overflow-hidden"
-                  style={{
-                    height: `${CONTENT_HEIGHT_PX}px`,
-                  }}
+                  className="flex-1 overflow-hidden"
+                  style={{ position: "relative" }}
                 >
                   <div
                     style={{
-                      transform: `translateY(-${pageIndex * CONTENT_HEIGHT_PX}px)`,
+                      position: "absolute",
+                      // Page 0: pas de décalage
+                      // Page 1+: décalage = hauteur page 1 + (pageIndex-1) * hauteur pages suivantes
+                      top: pageIndex === 0
+                        ? 0
+                        : `-${FIRST_PAGE_CONTENT_HEIGHT_PX + (pageIndex - 1) * OTHER_PAGE_CONTENT_HEIGHT_PX}px`,
+                      left: 0,
+                      right: 0,
                     }}
                     dangerouslySetInnerHTML={{ __html: previewContentHtml }}
                   />
                 </div>
 
-                {/* Footer - sur chaque page */}
-                <div
-                  className="absolute bottom-0 left-0 right-0 border-t border-gray-200 pt-2 bg-white"
-                  style={{
-                    padding: `8px ${MARGIN_RIGHT_MM * MM_TO_PX}px ${MARGIN_BOTTOM_MM * MM_TO_PX / 2}px ${MARGIN_LEFT_MM * MM_TO_PX}px`,
-                    minHeight: `${FOOTER_HEIGHT_MM * MM_TO_PX}px`,
-                  }}
-                >
-                  <div className="flex items-end justify-between text-sm text-gray-500">
-                    {currentFooter ? (
-                      <div
-                        className="prose prose-sm max-w-none [&_img]:max-w-full [&_img]:h-auto flex-1"
-                        dangerouslySetInnerHTML={{ __html: previewFooterHtml }}
-                      />
-                    ) : (
-                      <div />
-                    )}
-                    <span className="text-gray-400 ml-4 whitespace-nowrap">
-                      Page {pageIndex + 1} / {totalPages}
-                    </span>
+                {/* Footer avec numéro de page */}
+                <div className="page-footer flex-shrink-0">
+                  <div
+                    className="document-footer-content"
+                    dangerouslySetInnerHTML={{ __html: previewFooterHtml }}
+                  />
+                  <div className="text-right font-medium text-gray-500">
+                    Page {pageIndex + 1} / {totalPages}
                   </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Indicateur de page flottant */}
+          {/* Indicateur de page fixe */}
           {isPreviewMode && (
-            <div className="fixed bottom-6 right-6 bg-white dark:bg-gray-800 rounded-full shadow-lg px-4 py-2 flex items-center gap-2 text-sm z-50">
+            <div className="fixed bottom-6 right-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg px-4 py-2 text-sm z-50 border border-gray-200 dark:border-gray-700 flex items-center gap-3">
               <span className="text-gray-500">Page</span>
               <span className="font-semibold text-gray-900 dark:text-white">{currentPage}</span>
               <span className="text-gray-400">/</span>

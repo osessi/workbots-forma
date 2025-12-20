@@ -1,16 +1,10 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { useAutomate } from "@/context/AutomateContext";
 import Image from "next/image";
 import Link from "next/link";
 
 // Icons
-const BuildingIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3.33333 17.5V4.16667C3.33333 3.24619 4.07953 2.5 5 2.5H15C15.9205 2.5 16.6667 3.24619 16.6667 4.16667V17.5M3.33333 17.5H16.6667M3.33333 17.5H1.66667M16.6667 17.5H18.3333M6.66667 5.83333H8.33333M6.66667 9.16667H8.33333M11.6667 5.83333H13.3333M11.6667 9.16667H13.3333M8.33333 17.5V13.3333C8.33333 12.8731 8.70643 12.5 9.16667 12.5H10.8333C11.2936 12.5 11.6667 12.8731 11.6667 13.3333V17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
 const UsersIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M14.1667 17.5V15.8333C14.1667 14.9493 13.8155 14.1014 13.1904 13.4763C12.5652 12.8512 11.7174 12.5 10.8333 12.5H4.16667C3.28261 12.5 2.43476 12.8512 1.80964 13.4763C1.18452 14.1014 0.833333 14.9493 0.833333 15.8333V17.5M19.1667 17.5V15.8333C19.1662 15.0948 18.9203 14.3773 18.4678 13.7936C18.0153 13.2099 17.3818 12.793 16.6667 12.6083M13.3333 2.60833C14.0503 2.79192 14.6859 3.20892 15.1397 3.79359C15.5935 4.37827 15.8399 5.09736 15.8399 5.8375C15.8399 6.57764 15.5935 7.29673 15.1397 7.88141C14.6859 8.46608 14.0503 8.88308 13.3333 9.06667M10.8333 5.83333C10.8333 7.67428 9.34095 9.16667 7.5 9.16667C5.65905 9.16667 4.16667 7.67428 4.16667 5.83333C4.16667 3.99238 5.65905 2.5 7.5 2.5C9.34095 2.5 10.8333 3.99238 10.8333 5.83333Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -46,11 +40,10 @@ const CheckIcon = () => (
   </svg>
 );
 
-// Tabs
-type TabType = "organization" | "members" | "branding" | "billing";
+// Tabs - L'onglet Organisation a été retiré car ces infos sont dans Mon compte
+type TabType = "members" | "branding" | "billing";
 
 const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
-  { id: "organization", label: "Organisation", icon: <BuildingIcon /> },
   { id: "members", label: "Membres", icon: <UsersIcon /> },
   { id: "branding", label: "Marque blanche", icon: <PaletteIcon /> },
   { id: "billing", label: "Facturation", icon: <CreditCardIcon /> },
@@ -78,143 +71,14 @@ const PLAN_LIMITS = {
   ENTERPRISE: { maxFormateurs: -1, maxFormations: -1, maxStorageGb: 100 }, // -1 = illimité
 };
 
-// Helper pour upload via API
-async function uploadImage(file: File, type: "avatar" | "logo"): Promise<{ url: string | null; error: string | null }> {
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", type);
-
-    const response = await fetch("/api/user/avatar", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { url: null, error: data.error || "Erreur lors de l'upload" };
-    }
-
-    return { url: data.url, error: null };
-  } catch (error) {
-    return { url: null, error: "Erreur de connexion" };
-  }
-}
-
 export default function SettingsPage() {
-  const { user, refreshUser, primaryColor, setPrimaryColor } = useAutomate();
-  const [activeTab, setActiveTab] = useState<TabType>("organization");
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-
-  // Organization form data
-  const [orgData, setOrgData] = useState({
-    name: "",
-    slug: "",
-    siret: "",
-    numeroFormateur: "",
-    adresse: "",
-    codePostal: "",
-    ville: "",
-    telephone: "",
-    customDomain: "",
-  });
+  const { user, primaryColor, setPrimaryColor } = useAutomate();
+  const [activeTab, setActiveTab] = useState<TabType>("members");
 
   // Members state
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"FORMATEUR" | "ORG_ADMIN">("FORMATEUR");
   const [isInviting, setIsInviting] = useState(false);
-
-  // Load organization data
-  useEffect(() => {
-    if (user) {
-      setOrgData({
-        name: user.entreprise || "",
-        slug: "", // Will be fetched from API
-        siret: user.siret || "",
-        numeroFormateur: user.numeroFormateur || "",
-        adresse: user.adresse || "",
-        codePostal: user.codePostal || "",
-        ville: user.ville || "",
-        telephone: user.telephone || "",
-        customDomain: "",
-      });
-    }
-  }, [user]);
-
-  const handleLogoClick = () => {
-    if (logoInputRef.current) {
-      logoInputRef.current.click();
-    }
-  };
-
-  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("Veuillez sélectionner une image");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert("L'image ne doit pas dépasser 5MB");
-      return;
-    }
-
-    setIsUploadingLogo(true);
-    try {
-      const result = await uploadImage(file, "logo");
-      if (result.url) {
-        await refreshUser();
-      } else {
-        alert(result.error || "Erreur lors de l'upload");
-      }
-    } catch (error) {
-      console.error("Erreur upload:", error);
-      alert("Erreur lors de l'upload du logo");
-    } finally {
-      setIsUploadingLogo(false);
-      if (logoInputRef.current) {
-        logoInputRef.current.value = "";
-      }
-    }
-  };
-
-  const handleSaveOrganization = async () => {
-    setIsSaving(true);
-    try {
-      const response = await fetch("/api/user/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          entreprise: orgData.name,
-          siret: orgData.siret,
-          numeroFormateur: orgData.numeroFormateur,
-          adresse: orgData.adresse,
-          codePostal: orgData.codePostal,
-          ville: orgData.ville,
-          telephone: orgData.telephone,
-        }),
-      });
-
-      if (response.ok) {
-        await refreshUser();
-        setIsEditing(false);
-      } else {
-        const data = await response.json();
-        alert(data.error || "Erreur lors de la sauvegarde");
-      }
-    } catch (error) {
-      console.error("Erreur:", error);
-      alert("Erreur lors de la sauvegarde");
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleInviteMember = async () => {
     if (!inviteEmail) return;
@@ -230,12 +94,6 @@ export default function SettingsPage() {
       setIsInviting(false);
     }
   };
-
-  const inputClassName = `w-full px-4 py-3 text-sm border border-gray-200 rounded-lg ${
-    isEditing
-      ? "bg-white dark:bg-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
-      : "bg-gray-50 dark:bg-gray-800"
-  } text-gray-800 dark:border-gray-700 dark:text-white`;
 
   // Mock members data
   const mockMembers = [
@@ -276,197 +134,6 @@ export default function SettingsPage() {
         </div>
 
         <div className="p-6">
-          {/* Organization Tab */}
-          {activeTab === "organization" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Informations de l&apos;organisation
-                  </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Ces informations apparaîtront sur vos documents
-                  </p>
-                </div>
-                {isEditing ? (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      onClick={handleSaveOrganization}
-                      disabled={isSaving}
-                      className="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50"
-                    >
-                      {isSaving ? "Enregistrement..." : "Enregistrer"}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600"
-                  >
-                    Modifier
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Logo */}
-                <div className="flex flex-col items-center p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoChange}
-                    className="hidden"
-                  />
-                  <div
-                    onClick={handleLogoClick}
-                    className="w-32 h-32 rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center bg-white dark:bg-gray-900 transition-all cursor-pointer hover:border-brand-300"
-                  >
-                    {user.logoUrl ? (
-                      <Image
-                        src={user.logoUrl}
-                        alt="Logo"
-                        width={128}
-                        height={128}
-                        className="object-contain w-full h-full p-2"
-                      />
-                    ) : (
-                      <div className="text-center p-4">
-                        <div className="flex justify-center text-gray-400">
-                          <BuildingIcon />
-                        </div>
-                        <p className="text-xs text-gray-400 mt-2">
-                          Ajouter un logo
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={handleLogoClick}
-                    disabled={isUploadingLogo}
-                    className="mt-4 flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-400 disabled:opacity-50"
-                  >
-                    {isUploadingLogo ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Upload...
-                      </>
-                    ) : (
-                      <>
-                        <CameraIcon />
-                        Changer le logo
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Form fields */}
-                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Nom de l&apos;organisation
-                    </label>
-                    <input
-                      type="text"
-                      value={orgData.name}
-                      onChange={(e) => setOrgData({ ...orgData, name: e.target.value })}
-                      readOnly={!isEditing}
-                      className={inputClassName}
-                      placeholder="Mon Organisme de Formation"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      SIRET
-                    </label>
-                    <input
-                      type="text"
-                      value={orgData.siret}
-                      onChange={(e) => setOrgData({ ...orgData, siret: e.target.value })}
-                      readOnly={!isEditing}
-                      className={inputClassName}
-                      placeholder="123 456 789 00012"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      N° Déclaration DREETS
-                    </label>
-                    <input
-                      type="text"
-                      value={orgData.numeroFormateur}
-                      onChange={(e) => setOrgData({ ...orgData, numeroFormateur: e.target.value })}
-                      readOnly={!isEditing}
-                      className={inputClassName}
-                      placeholder="11 75 12345 75"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Adresse
-                    </label>
-                    <input
-                      type="text"
-                      value={orgData.adresse}
-                      onChange={(e) => setOrgData({ ...orgData, adresse: e.target.value })}
-                      readOnly={!isEditing}
-                      className={inputClassName}
-                      placeholder="123 rue de la Formation"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Code postal
-                    </label>
-                    <input
-                      type="text"
-                      value={orgData.codePostal}
-                      onChange={(e) => setOrgData({ ...orgData, codePostal: e.target.value })}
-                      readOnly={!isEditing}
-                      className={inputClassName}
-                      placeholder="75001"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Ville
-                    </label>
-                    <input
-                      type="text"
-                      value={orgData.ville}
-                      onChange={(e) => setOrgData({ ...orgData, ville: e.target.value })}
-                      readOnly={!isEditing}
-                      className={inputClassName}
-                      placeholder="Paris"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Téléphone
-                    </label>
-                    <input
-                      type="tel"
-                      value={orgData.telephone}
-                      onChange={(e) => setOrgData({ ...orgData, telephone: e.target.value })}
-                      readOnly={!isEditing}
-                      className={inputClassName}
-                      placeholder="01 23 45 67 89"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Members Tab */}
           {activeTab === "members" && (
             <div className="space-y-6">
@@ -690,11 +357,11 @@ export default function SettingsPage() {
                 <div className="mt-4">
                   <input
                     type="text"
-                    value={orgData.customDomain}
-                    onChange={(e) => setOrgData({ ...orgData, customDomain: e.target.value })}
+                    value=""
                     placeholder="formation.votre-domaine.com"
                     disabled
                     className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-100 dark:bg-gray-900 dark:border-gray-700 text-gray-400 cursor-not-allowed"
+                    readOnly
                   />
                 </div>
               </div>
@@ -719,13 +386,13 @@ export default function SettingsPage() {
                       style={{ backgroundColor: primaryColor + "20" }}
                     >
                       <span style={{ color: primaryColor }} className="text-lg font-bold">
-                        {orgData.name?.charAt(0) || "A"}
+                        {user.entreprise?.charAt(0) || "A"}
                       </span>
                     </div>
                   )}
                   <div>
                     <p className="font-semibold text-gray-900 dark:text-white">
-                      {orgData.name || "Votre Organisation"}
+                      {user.entreprise || "Votre Organisation"}
                     </p>
                     <p className="text-sm text-gray-500">
                       Organisme de formation

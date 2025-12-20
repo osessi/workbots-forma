@@ -81,6 +81,7 @@ model Organization {
   // Infos entreprise
   siret             String?
   numeroFormateur   String?  // N° déclaration d'activité DREETS
+  prefectureRegion  String?  // Région d'acquisition du numéro de déclaration
   adresse           String?
   codePostal        String?
   ville             String?
@@ -88,6 +89,7 @@ model Organization {
 
   // White-label
   logo              String?
+  signature         String?  // URL de l'image de signature du responsable
   primaryColor      String   @default("#4277FF")
   secondaryColor    String?
   customDomain      String?  @unique

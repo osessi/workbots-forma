@@ -204,6 +204,9 @@ export async function POST(request: NextRequest) {
         representant: "",
       },
       participants: [],
+      signature: {
+        responsable_organisme: formation.organization.signature || "",
+      },
     };
 
     // Rendre le template avec les données

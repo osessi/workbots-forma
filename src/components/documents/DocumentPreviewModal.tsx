@@ -34,7 +34,13 @@ const MM_TO_PX = 96 / 25.4;
 const A4_WIDTH_PX = Math.round(A4_WIDTH_MM * MM_TO_PX);
 const A4_HEIGHT_PX = Math.round(A4_HEIGHT_MM * MM_TO_PX);
 const MARGIN_MM = 20;
-const CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_MM * 2 * MM_TO_PX); // Hauteur utilisable pour le contenu
+const HEADER_HEIGHT_MM = 30;
+const FOOTER_HEIGHT_MM = 25;
+// Hauteur disponible pour le contenu
+// Page 1 a moins d'espace car elle contient le header
+const FIRST_PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_MM * 2 + HEADER_HEIGHT_MM + FOOTER_HEIGHT_MM) * MM_TO_PX;
+// Pages suivantes ont plus d'espace (pas de header)
+const OTHER_PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_MM * 2 + FOOTER_HEIGHT_MM) * MM_TO_PX;
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -137,10 +143,10 @@ export default function DocumentPreviewModal({
   // Calculer le nombre de pages basé sur la hauteur du contenu
   useEffect(() => {
     if (!isEditMode) {
-      // Attendre que le contenu soit rendu
-      const timer = setTimeout(() => {
-        // Créer un élément temporaire pour mesurer le contenu
+      const calculatePages = () => {
+        // Créer un élément temporaire pour mesurer le contenu avec les mêmes styles que le rendu
         const tempDiv = window.document.createElement("div");
+        tempDiv.className = "document-preview";
         tempDiv.style.cssText = `
           position: absolute;
           visibility: hidden;
@@ -148,19 +154,63 @@ export default function DocumentPreviewModal({
           font-family: 'Georgia', 'Times New Roman', serif;
           font-size: 11pt;
           line-height: 1.6;
+          color: #1a1a1a;
         `;
-        tempDiv.innerHTML = previewContent || document?.renderedContent || "";
+
+        // Ajouter les mêmes styles CSS que le document preview
+        const styleElement = window.document.createElement("style");
+        styleElement.textContent = `
+          .document-preview h1 { font-size: 18pt; font-weight: 700; margin: 0 0 16px 0; }
+          .document-preview h2 { font-size: 13pt; font-weight: 700; margin: 24px 0 12px 0; border-bottom: 1px solid #e5e5e5; padding-bottom: 6px; }
+          .document-preview h3, .document-preview h4 { font-size: 11pt; font-weight: 700; margin: 16px 0 8px 0; }
+          .document-preview p { margin: 0 0 10px 0; text-align: justify; }
+          .document-preview ul, .document-preview ol { margin: 10px 0; padding-left: 24px; }
+          .document-preview li { margin: 4px 0; }
+          .document-preview table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+          .document-preview td, .document-preview th { border: 1px solid #ddd; padding: 8px 12px; }
+          .document-preview th { background: #f5f5f5; font-weight: 700; }
+          .document-preview .module-section { background: #f9f9f9; border-left: 3px solid #4277FF; padding: 12px 16px; margin: 12px 0; }
+        `;
+
+        tempDiv.appendChild(styleElement);
+
+        const contentDiv = window.document.createElement("div");
+        contentDiv.innerHTML = previewContent || document?.renderedContent || "";
+        tempDiv.appendChild(contentDiv);
+
         window.document.body.appendChild(tempDiv);
 
+        // Force reflow pour s'assurer que le contenu est rendu
+        tempDiv.offsetHeight;
+
         const contentHeight = tempDiv.scrollHeight;
-        // Hauteur disponible pour le contenu (page - marges - header - footer)
-        const availableHeight = A4_HEIGHT_PX - (MARGIN_MM * 2 * MM_TO_PX) - 100; // 100px pour header/footer
-        const pages = Math.max(1, Math.ceil(contentHeight / availableHeight));
+
+        // Debug log
+        console.log("DocumentPreviewModal - Content height:", contentHeight, "FIRST_PAGE:", FIRST_PAGE_CONTENT_HEIGHT_PX, "OTHER_PAGE:", OTHER_PAGE_CONTENT_HEIGHT_PX);
+
+        // Page 1 a moins d'espace (avec header), pages suivantes ont plus d'espace
+        let pages = 1;
+        if (contentHeight > FIRST_PAGE_CONTENT_HEIGHT_PX) {
+          const remainingContent = contentHeight - FIRST_PAGE_CONTENT_HEIGHT_PX;
+          pages = 1 + Math.ceil(remainingContent / OTHER_PAGE_CONTENT_HEIGHT_PX);
+        }
+
+        console.log("DocumentPreviewModal - Total pages calculated:", pages);
 
         window.document.body.removeChild(tempDiv);
-        setTotalPages(pages);
-      }, 100);
-      return () => clearTimeout(timer);
+        setTotalPages(Math.max(1, pages));
+      };
+
+      // Utiliser plusieurs délais pour s'assurer que le DOM est complètement rendu
+      const timer1 = setTimeout(calculatePages, 50);
+      const timer2 = setTimeout(calculatePages, 200);
+      const timer3 = setTimeout(calculatePages, 500);
+
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+      };
     }
   }, [previewContent, editedHeader, editedFooter, isEditMode, document?.renderedContent]);
 
@@ -760,7 +810,11 @@ export default function DocumentPreviewModal({
                         <div
                           style={{
                             position: "absolute",
-                            top: pageIndex === 0 ? 0 : `-${pageIndex * (A4_HEIGHT_PX - (MARGIN_MM * 2 * MM_TO_PX) - 100)}px`,
+                            // Page 0: pas de décalage
+                            // Page 1+: décalage = hauteur page 1 + (pageIndex-1) * hauteur pages suivantes
+                            top: pageIndex === 0
+                              ? 0
+                              : `-${FIRST_PAGE_CONTENT_HEIGHT_PX + (pageIndex - 1) * OTHER_PAGE_CONTENT_HEIGHT_PX}px`,
                             left: 0,
                             right: 0,
                           }}

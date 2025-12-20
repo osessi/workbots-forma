@@ -80,6 +80,7 @@ export interface UserProfile {
   numeroFormateur: string;
   avatarUrl?: string | null;
   logoUrl?: string | null;
+  signatureUrl?: string | null;
   primaryColor?: string;
 }
 
@@ -129,6 +130,7 @@ const defaultUser: UserProfile = {
   numeroFormateur: "",
   avatarUrl: null,
   logoUrl: null,
+  signatureUrl: null,
 };
 
 const defaultFormations: Formation[] = [
@@ -243,6 +245,7 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           codePostal: org?.codePostal || "",
           ville: org?.ville || "",
           logoUrl: org?.logo || null,
+          signatureUrl: org?.signature || null,
           primaryColor: orgColor,
         });
 

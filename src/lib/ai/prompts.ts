@@ -42,27 +42,32 @@ export const QuestionQCMSchema = z.object({
   difficulte: z.enum(["facile", "moyen", "difficile"]),
 });
 
-// Schema pour un QCM complet
+// Schema pour un QCM complet (par module - environ 8 questions)
 export const QCMSchema = z.object({
   titre: z.string(),
   moduleReference: z.string().optional(),
-  questions: z.array(QuestionQCMSchema).min(5).max(10),
+  questions: z.array(QuestionQCMSchema).min(6).max(12),
   tempsEstime: z.string(),
   seuilReussite: z.number().min(50).max(100),
 });
 
-// Schema pour test de positionnement
+// Schema pour une question QCM de test (avec 4 options et 1 seule bonne réponse)
+export const QuestionTestSchema = z.object({
+  question: z.string().min(1),
+  options: z.array(z.string()).length(4),
+  reponseCorrecte: z.number().min(0).max(3),
+  explication: z.string().optional(),
+  difficulte: z.enum(["facile", "moyen", "difficile"]),
+  competenceEvaluee: z.string(),
+});
+
+// Schema pour test de positionnement (QCM uniquement - 20 questions, niveau plus difficile)
 export const TestPositionnementSchema = z.object({
   titre: z.string(),
   introduction: z.string(),
-  questions: z.array(
-    z.object({
-      question: z.string(),
-      type: z.enum(["qcm", "echelle", "ouvert"]),
-      options: z.array(z.string()).optional(),
-      objectifEvalue: z.string(),
-    })
-  ).min(5),
+  questions: z.array(QuestionTestSchema).min(18).max(22),
+  tempsEstime: z.string(),
+  seuilReussite: z.number().min(50).max(100),
   grilleLecture: z.object({
     niveauDebutant: z.string(),
     niveauIntermediaire: z.string(),
@@ -70,17 +75,13 @@ export const TestPositionnementSchema = z.object({
   }),
 });
 
-// Schema pour evaluation finale
+// Schema pour evaluation finale (QCM uniquement - 20 questions, niveau plus facile que positionnement)
 export const EvaluationFinaleSchema = z.object({
   titre: z.string(),
+  introduction: z.string(),
   objectifsEvalues: z.array(z.string()),
-  sections: z.array(
-    z.object({
-      titre: z.string(),
-      questions: z.array(QuestionQCMSchema),
-      pointsTotal: z.number(),
-    })
-  ),
+  questions: z.array(QuestionTestSchema).min(18).max(22),
+  tempsEstime: z.string(),
   bareme: z.object({
     noteMinimum: z.number(),
     noteMaximum: z.number(),
@@ -112,6 +113,11 @@ Regles importantes:
 - Les methodes pedagogiques doivent etre variees et adaptees au public
 - Les modalites d'evaluation doivent permettre de mesurer l'atteinte des objectifs
 
+IMPORTANT - Sections fixes (NE PAS GENERER):
+- La section "Suivi de l'execution et evaluation des resultats" est FIXE et pre-remplie automatiquement
+- La section "Ressources pedagogiques" est FIXE et pre-remplie automatiquement
+- Tu ne dois PAS generer de contenu pour ces deux sections car elles sont standardisees
+
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
   qcm: `Tu es un expert en evaluation pedagogique.
@@ -129,26 +135,40 @@ Regles pour les QCM:
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
   positionnement: `Tu es un expert en evaluation des competences professionnelles.
-Tu dois creer un test de positionnement pour evaluer le niveau initial des apprenants avant une formation.
+Tu dois creer un test de positionnement de 20 questions QCM pour evaluer le niveau initial des apprenants AVANT une formation.
+
+IMPORTANT - Format QCM uniquement:
+- Exactement 20 questions QCM (pas de questions ouvertes, pas d'echelles)
+- Chaque question a 4 options avec UNE SEULE bonne reponse (reponseCorrecte: 0, 1, 2 ou 3)
+- Le test de positionnement doit etre PLUS DIFFICILE que l'evaluation finale
+- Inclure des questions piege pour identifier les lacunes
+- Varie les niveaux: 30% facile, 40% moyen, 30% difficile
+- Les distracteurs doivent etre plausibles et tester des erreurs courantes
 
 Regles pour le test de positionnement:
 - Les questions doivent couvrir tous les objectifs de la formation
-- Inclure des questions de differents niveaux
-- Permettre d'identifier les forces et lacunes
-- Les questions ouvertes permettent d'evaluer la reflexion
-- La grille de lecture doit etre claire pour l'interpretation
+- Permettre d'identifier clairement les forces et lacunes
+- La grille de lecture doit definir les seuils (debutant < 40%, intermediaire 40-70%, avance > 70%)
+- Temps estime: environ 30-40 minutes
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
   evaluation: `Tu es un expert en evaluation sommative des formations professionnelles.
-Tu dois creer une evaluation finale complete pour certifier les competences acquises.
+Tu dois creer une evaluation finale de 20 questions QCM pour certifier les competences acquises APRES une formation.
+
+IMPORTANT - Format QCM uniquement:
+- Exactement 20 questions QCM (pas de questions ouvertes, pas de mises en situation complexes)
+- Chaque question a 4 options avec UNE SEULE bonne reponse (reponseCorrecte: 0, 1, 2 ou 3)
+- L'evaluation finale doit etre PLUS FACILE que le test de positionnement
+- Les questions doivent etre claires et directes (pas de pieges)
+- Varie les niveaux: 40% facile, 45% moyen, 15% difficile
+- Les bonnes reponses doivent etre evidentes pour quelqu'un qui a suivi la formation
 
 Regles pour l'evaluation finale:
 - Couvrir tous les objectifs pedagogiques de la formation
-- Le bareme doit etre clair et juste
-- Les questions doivent permettre de verifier les competences operationnelles
-- Inclure des mises en situation quand c'est pertinent
-- Le seuil de reussite doit etre raisonnable (generalement 70-80%)
+- Verifier l'acquisition des competences enseignees
+- Le seuil de reussite est de 70% (14/20 bonnes reponses)
+- Temps estime: environ 20-30 minutes
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
@@ -206,7 +226,7 @@ export interface QCMInput {
 }
 
 export function generateQCMPrompt(input: QCMInput): string {
-  const nbQuestions = input.nombreQuestions || 5;
+  const nbQuestions = input.nombreQuestions || 8;
   return `Cree un QCM de ${nbQuestions} questions pour evaluer ce module:
 
 MODULE: ${input.moduleTitre}
@@ -217,11 +237,29 @@ ${input.moduleContenu.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 OBJECTIFS A EVALUER:
 ${input.objectifs.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 
-Genere exactement ${nbQuestions} questions avec 4 options chacune.
-Varie les niveaux de difficulte.
+IMPORTANT:
+- Genere exactement ${nbQuestions} questions QCM
+- Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
+- Varie les niveaux de difficulte: 30% facile, 50% moyen, 20% difficile
+- Les questions doivent couvrir l'ensemble du contenu du module
+- Les distracteurs doivent etre plausibles
 
 Schema JSON attendu:
-${JSON.stringify(QCMSchema.shape, null, 2)}`;
+{
+  "titre": "string",
+  "moduleReference": "string",
+  "questions": [
+    {
+      "question": "string",
+      "options": ["option1", "option2", "option3", "option4"],
+      "reponseCorrecte": 0-3,
+      "explication": "string (optionnel)",
+      "difficulte": "facile|moyen|difficile"
+    }
+  ],
+  "tempsEstime": "10-15 minutes",
+  "seuilReussite": 70
+}`;
 }
 
 export interface PositionnementInput {
@@ -232,7 +270,7 @@ export interface PositionnementInput {
 }
 
 export function generatePositionnementPrompt(input: PositionnementInput): string {
-  return `Cree un test de positionnement pour cette formation:
+  return `Cree un test de positionnement QCM de 20 questions pour cette formation:
 
 FORMATION: ${input.formationTitre}
 PUBLIC CIBLE: ${input.publicCible}
@@ -243,11 +281,38 @@ ${input.objectifs.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 PREREQUIS ATTENDUS:
 ${input.prerequis.map((p, i) => `${i + 1}. ${p}`).join("\n")}
 
+IMPORTANT:
+- Genere exactement 20 questions QCM
+- Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
+- Le test doit etre assez DIFFICILE pour identifier les lacunes AVANT la formation
+- Inclure des questions qui testent les prerequis et les connaissances prealables
+- Difficulte: 30% facile, 40% moyen, 30% difficile
+
 Le test doit permettre d'evaluer le niveau initial de chaque apprenant
 et d'identifier leurs besoins specifiques.
 
 Schema JSON attendu:
-${JSON.stringify(TestPositionnementSchema.shape, null, 2)}`;
+{
+  "titre": "string",
+  "introduction": "string",
+  "questions": [
+    {
+      "question": "string",
+      "options": ["option1", "option2", "option3", "option4"],
+      "reponseCorrecte": 0-3,
+      "explication": "string (optionnel)",
+      "difficulte": "facile|moyen|difficile",
+      "competenceEvaluee": "string"
+    }
+  ],
+  "tempsEstime": "30-40 minutes",
+  "seuilReussite": 60,
+  "grilleLecture": {
+    "niveauDebutant": "Moins de 40% de bonnes reponses",
+    "niveauIntermediaire": "Entre 40% et 70% de bonnes reponses",
+    "niveauAvance": "Plus de 70% de bonnes reponses"
+  }
+}`;
 }
 
 export interface EvaluationInput {
@@ -257,10 +322,10 @@ export interface EvaluationInput {
 }
 
 export function generateEvaluationPrompt(input: EvaluationInput): string {
-  return `Cree une evaluation finale pour cette formation:
+  return `Cree une evaluation finale QCM de 20 questions pour cette formation:
 
 FORMATION: ${input.formationTitre}
-DUREE EVALUATION: ${input.dureeEvaluation || "30 minutes"}
+DUREE EVALUATION: ${input.dureeEvaluation || "20-30 minutes"}
 
 MODULES ET OBJECTIFS:
 ${input.modules
@@ -271,11 +336,41 @@ Objectifs: ${m.objectifs.join(", ")}`
   )
   .join("\n")}
 
+IMPORTANT:
+- Genere exactement 20 questions QCM
+- Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
+- L'evaluation doit etre PLUS FACILE que le test de positionnement
+- Les questions doivent verifier les acquis de la formation (pas de pieges)
+- Difficulte: 40% facile, 45% moyen, 15% difficile
+- Repartir les questions equitablement sur tous les modules
+
 L'evaluation doit couvrir tous les modules et permettre de certifier
-l'acquisition des competences.
+l'acquisition des competences. Un apprenant ayant bien suivi la formation
+devrait facilement obtenir plus de 70%.
 
 Schema JSON attendu:
-${JSON.stringify(EvaluationFinaleSchema.shape, null, 2)}`;
+{
+  "titre": "string",
+  "introduction": "string",
+  "objectifsEvalues": ["objectif1", "objectif2"],
+  "questions": [
+    {
+      "question": "string",
+      "options": ["option1", "option2", "option3", "option4"],
+      "reponseCorrecte": 0-3,
+      "explication": "string (optionnel)",
+      "difficulte": "facile|moyen|difficile",
+      "competenceEvaluee": "string"
+    }
+  ],
+  "tempsEstime": "20-30 minutes",
+  "bareme": {
+    "noteMinimum": 0,
+    "noteMaximum": 20,
+    "seuilReussite": 70
+  },
+  "consignes": "string"
+}`;
 }
 
 export interface ReformulationInput {
@@ -315,6 +410,7 @@ ${JSON.stringify(ReformulationSchema.shape, null, 2)}`;
 export type FichePedagogique = z.infer<typeof FichePedagogiqueSchema>;
 export type QCM = z.infer<typeof QCMSchema>;
 export type QuestionQCM = z.infer<typeof QuestionQCMSchema>;
+export type QuestionTest = z.infer<typeof QuestionTestSchema>;
 export type TestPositionnement = z.infer<typeof TestPositionnementSchema>;
 export type EvaluationFinale = z.infer<typeof EvaluationFinaleSchema>;
 export type Reformulation = z.infer<typeof ReformulationSchema>;

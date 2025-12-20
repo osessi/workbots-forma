@@ -187,20 +187,22 @@ export const FICHE_PEDAGOGIQUE_TEMPLATE: DefaultTemplate = {
     textWithVariable([{ var: "modules" }]),
     spacer(),
 
-    heading(2, "MOYENS PÉDAGOGIQUES"),
+    heading(2, "SUIVI DE L'EXÉCUTION ET ÉVALUATION DES RÉSULTATS"),
     bulletList([
-      "Supports de formation projetés et remis aux participants",
-      "Études de cas pratiques et mises en situation",
-      "Quiz et évaluations formatives",
-      "Ressources documentaires mises à disposition",
+      "Feuilles d'émargement signées par demi-journée pour attester de la présence des participants",
+      "Évaluation de fin de formation pour valider les acquis des participants",
+      "Auto-évaluation des compétences en début et en fin de formation pour mesurer la progression",
+      "Questionnaire de satisfaction à chaud remis à chaque participant",
+      "Attestation de fin de formation délivrée aux participants ayant suivi l'intégralité de la session",
     ]),
     spacer(),
 
-    heading(2, "ÉVALUATION"),
+    heading(2, "RESSOURCES PÉDAGOGIQUES"),
     bulletList([
-      "Évaluation des acquis en cours de formation (quiz, exercices)",
-      "Évaluation à chaud en fin de formation",
-      "Attestation de fin de formation remise au participant",
+      "Formation réalisée en présentiel (en salle équipée, en intra-entreprise) ou à distance via un outil de visioconférence (en classe virtuelle synchrone)",
+      "Accompagnement par le formateur : suivi individualisé et réponses aux questions tout au long de la formation",
+      "Ateliers pratiques : mises en situation et exercices appliqués pour ancrer les compétences",
+      "Supports de cours remis aux participants (version numérique et/ou papier)",
     ]),
     spacer(),
 

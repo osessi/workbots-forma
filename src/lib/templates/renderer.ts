@@ -91,6 +91,13 @@ function replaceSimpleVariables(
         // Tableau de strings - faire une liste à puces
         return `<ul class="template-list">${value.map(item => `<li>${escapeHtml(String(item))}</li>`).join("")}</ul>`;
       }
+
+      // Si c'est une variable de type logo/image (URL), afficher une balise img
+      if (isImageVariable(trimmedPath) && typeof value === "string" && isValidImageUrl(value)) {
+        // Ajouter onerror pour cacher l'image si elle ne charge pas
+        return `<img src="${escapeHtml(value)}" alt="Logo" style="max-height: 80px; max-width: 200px; height: auto; width: auto;" onerror="this.style.display='none'" />`;
+      }
+
       return String(value);
     }
 
@@ -102,6 +109,32 @@ function replaceSimpleVariables(
     // Variable non trouvee - retourner vide ou la variable
     return "";
   });
+}
+
+/**
+ * Verifier si une variable est de type image/logo
+ */
+function isImageVariable(path: string): boolean {
+  const imageVariables = [
+    "organisation.logo",
+    "entreprise.logo",
+    "formateur.photo",
+    "participant.photo",
+    "signature.responsable_organisme",
+  ];
+  return imageVariables.includes(path) || path.endsWith(".logo") || path.endsWith(".image") || path.endsWith(".photo") || path.startsWith("signature.");
+}
+
+/**
+ * Verifier si une URL est une URL d'image valide
+ */
+function isValidImageUrl(url: string): boolean {
+  if (!url || typeof url !== "string") return false;
+  // Verifier que c'est une URL
+  if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("data:image/")) {
+    return false;
+  }
+  return true;
 }
 
 // ===========================================
@@ -826,6 +859,9 @@ export function generateTestContext(): TemplateContext {
       reference: "DOC-2025-001",
       date_creation: `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`,
       version: "1.0",
+    },
+    signature: {
+      responsable_organisme: "https://example.com/signature.png",
     },
   };
 }

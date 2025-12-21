@@ -1,7 +1,57 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useAutomate } from "@/context/AutomateContext";
+import FilePreviewModal from "@/components/files/FilePreviewModal";
+
+// Types pour les dossiers
+interface Folder {
+  id: string;
+  name: string;
+  color: string;
+  folderType: string;
+  parentId: string | null;
+  formationId: string | null;
+  entrepriseId: string | null;
+  apprenantId: string | null;
+  formation?: {
+    id: string;
+    titre: string;
+    status: string;
+  };
+  entreprise?: {
+    id: string;
+    raisonSociale: string;
+  };
+  apprenant?: {
+    id: string;
+    nom: string;
+    prenom: string;
+  };
+  _count: {
+    files: number;
+    children: number;
+  };
+  createdAt: string;
+}
+
+// Type pour les fichiers
+interface FileItem {
+  id: string;
+  name: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  category: string;
+  storagePath: string;
+  publicUrl: string | null;
+  formationId: string | null;
+  folderId: string | null;
+  createdAt: string;
+  formation?: {
+    id: string;
+    titre: string;
+  };
+}
 
 // Icons
 const SearchIcon = () => (
@@ -129,51 +179,139 @@ const FILE_CATEGORIES = {
   },
 };
 
-// Mock data for files
-const mockFiles = [
-  { id: "1", name: "Fiche_IA_Bases.pdf", category: "fiches", size: "1.2 MB", date: "10 déc. 2025", formation: "Les bases de l'IA" },
-  { id: "2", name: "Slides_Module1.pptx", category: "slides", size: "8.5 MB", date: "9 déc. 2025", formation: "Les bases de l'IA" },
-  { id: "3", name: "Convention_Entreprise_ABC.pdf", category: "documents", size: "245 KB", date: "8 déc. 2025", formation: "Les bases de l'IA" },
-  { id: "4", name: "QCM_Module2.pdf", category: "evaluations", size: "156 KB", date: "7 déc. 2025", formation: "Les bases de l'IA" },
-  { id: "5", name: "Support_Stagiaire_Module1.pdf", category: "supports", size: "3.2 MB", date: "6 déc. 2025", formation: "Les bases de l'IA" },
-  { id: "6", name: "Fiche_Excel_Avance.pdf", category: "fiches", size: "980 KB", date: "5 déc. 2025", formation: "Excel Avancé" },
-  { id: "7", name: "Attestation_Formation.pdf", category: "documents", size: "125 KB", date: "4 déc. 2025", formation: "Excel Avancé" },
-  { id: "8", name: "Image_Couverture.png", category: "images", size: "2.1 MB", date: "3 déc. 2025", formation: "Excel Avancé" },
-];
+// Icon Loader
+const LoaderIcon = () => (
+  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+);
 
-// Mock folders based on formations
-const mockFolders = [
-  { id: "1", name: "Les bases de l'IA", filesCount: 12, size: "45.2 MB" },
-  { id: "2", name: "Excel Avancé", filesCount: 8, size: "23.1 MB" },
-  { id: "3", name: "Management d'équipe", filesCount: 5, size: "12.8 MB" },
-  { id: "4", name: "Communication efficace", filesCount: 3, size: "8.4 MB" },
-];
+// Helper pour formater la taille des fichiers
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+};
 
-// Stats data
-const statsData = [
-  { category: "fiches", count: 78, size: "156 MB", percentage: 35 },
-  { category: "slides", count: 45, size: "380 MB", percentage: 25 },
-  { category: "documents", count: 124, size: "89 MB", percentage: 20 },
-  { category: "evaluations", count: 32, size: "24 MB", percentage: 10 },
-  { category: "supports", count: 45, size: "245 MB", percentage: 8 },
-  { category: "images", count: 28, size: "112 MB", percentage: 2 },
+// Helper pour formater la date
+const formatDate = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+// Stats data (calculé dynamiquement plus tard)
+const defaultStatsData = [
+  { category: "fiches", count: 0, size: "0 MB", percentage: 0 },
+  { category: "slides", count: 0, size: "0 MB", percentage: 0 },
+  { category: "documents", count: 0, size: "0 MB", percentage: 0 },
+  { category: "evaluations", count: 0, size: "0 MB", percentage: 0 },
+  { category: "supports", count: 0, size: "0 MB", percentage: 0 },
+  { category: "images", count: 0, size: "0 MB", percentage: 0 },
 ];
 
 export default function FileManagerPage() {
-  const { formations } = useAutomate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [isLoadingFolders, setIsLoadingFolders] = useState(true);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(true);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [breadcrumb, setBreadcrumb] = useState<{ id: string | null; name: string }[]>([
+    { id: null, name: "Mes fichiers" }
+  ]);
+  const [statsData, setStatsData] = useState(defaultStatsData);
 
-  const filteredFiles = mockFiles.filter((file) => {
+  // Modal preview
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
+  // Charger les dossiers depuis l'API
+  const fetchFolders = useCallback(async (parentId: string | null = null) => {
+    setIsLoadingFolders(true);
+    try {
+      const params = new URLSearchParams();
+      if (parentId) {
+        params.append("parentId", parentId);
+      } else {
+        params.append("parentId", "root");
+      }
+      params.append("type", "formation"); // D'abord les dossiers de formation
+
+      const response = await fetch(`/api/folders?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFolders(data);
+      }
+    } catch (error) {
+      console.error("Erreur chargement dossiers:", error);
+    } finally {
+      setIsLoadingFolders(false);
+    }
+  }, []);
+
+  // Charger les fichiers depuis l'API
+  const fetchFiles = useCallback(async (folderId: string | null = null) => {
+    setIsLoadingFiles(true);
+    try {
+      const params = new URLSearchParams();
+      if (folderId) {
+        params.append("folderId", folderId);
+      }
+      if (selectedCategory) {
+        params.append("category", selectedCategory);
+      }
+
+      const response = await fetch(`/api/files?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFiles(data);
+      }
+    } catch (error) {
+      console.error("Erreur chargement fichiers:", error);
+      setFiles([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  }, [selectedCategory]);
+
+  // Charger au montage
+  useEffect(() => {
+    fetchFolders(currentFolderId);
+    fetchFiles(currentFolderId);
+  }, [fetchFolders, fetchFiles, currentFolderId]);
+
+  // Naviguer dans un dossier
+  const navigateToFolder = (folder: Folder) => {
+    setCurrentFolderId(folder.id);
+    setBreadcrumb(prev => [...prev, { id: folder.id, name: folder.name }]);
+  };
+
+  // Naviguer vers un élément du breadcrumb
+  const navigateToBreadcrumb = (index: number) => {
+    const newBreadcrumb = breadcrumb.slice(0, index + 1);
+    setBreadcrumb(newBreadcrumb);
+    setCurrentFolderId(newBreadcrumb[newBreadcrumb.length - 1].id);
+  };
+
+  // Filtrer les fichiers par recherche
+  const filteredFiles = files.filter((file) => {
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      file.formation.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = !selectedCategory || file.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+      file.originalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (file.formation?.titre || "").toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
   });
 
-  const totalStorage = 1024; // 1 GB total
-  const usedStorage = 512; // 512 MB used
-  const freeStorage = totalStorage - usedStorage;
+  const totalStorage = 1024; // 1 GB total (à récupérer de l'organisation)
+  const usedStorage = files.reduce((acc, f) => acc + f.size, 0) / (1024 * 1024); // En MB
+  const freeStorage = Math.max(0, totalStorage - usedStorage);
 
   return (
     <div className="space-y-6">
@@ -257,32 +395,85 @@ export default function FileManagerPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {mockFolders.map((folder) => (
-              <div
-                key={folder.id}
-                className="p-4 rounded-xl border border-gray-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800/50 dark:hover:border-brand-500 group"
-              >
-                <div className="flex items-start justify-between">
-                  <FolderIcon />
-                  <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <DotsIcon />
+          {/* Breadcrumb */}
+          {breadcrumb.length > 1 && (
+            <div className="flex items-center gap-2 mb-4 text-sm">
+              {breadcrumb.map((item, index) => (
+                <React.Fragment key={item.id || "root"}>
+                  {index > 0 && <span className="text-gray-400">/</span>}
+                  <button
+                    onClick={() => navigateToBreadcrumb(index)}
+                    className={`hover:text-brand-500 transition-colors ${
+                      index === breadcrumb.length - 1
+                        ? "text-gray-900 dark:text-white font-medium"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {item.name}
                   </button>
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+
+          {/* État de chargement */}
+          {isLoadingFolders ? (
+            <div className="flex items-center justify-center py-8">
+              <LoaderIcon />
+              <span className="ml-2 text-sm text-gray-500">Chargement...</span>
+            </div>
+          ) : folders.length === 0 ? (
+            <div className="text-center py-8">
+              <FolderIcon />
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                {currentFolderId ? "Ce dossier est vide" : "Aucun dossier de formation"}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                Les dossiers sont créés automatiquement quand vous créez une formation
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {folders.map((folder) => (
+                <div
+                  key={folder.id}
+                  onClick={() => navigateToFolder(folder)}
+                  className="p-4 rounded-xl border border-gray-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all cursor-pointer dark:border-gray-700 dark:bg-gray-800/50 dark:hover:border-brand-500 group"
+                >
+                  <div className="flex items-start justify-between">
+                    <FolderIcon />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); }}
+                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <DotsIcon />
+                    </button>
+                  </div>
+                  <h3 className="mt-3 text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {folder.name}
+                  </h3>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {folder._count.files} fichier{folder._count.files !== 1 ? "s" : ""}
+                      {folder._count.children > 0 && `, ${folder._count.children} sous-dossier${folder._count.children !== 1 ? "s" : ""}`}
+                    </span>
+                    {folder.formation?.status && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        folder.formation.status === "TERMINEE"
+                          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                          : folder.formation.status === "EN_COURS"
+                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400"
+                      }`}>
+                        {folder.formation.status === "TERMINEE" ? "Terminée" :
+                         folder.formation.status === "EN_COURS" ? "En cours" : "Brouillon"}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <h3 className="mt-3 text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {folder.name}
-                </h3>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {folder.filesCount} fichiers
-                  </span>
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                    {folder.size}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Storage Details */}
@@ -432,65 +623,96 @@ export default function FileManagerPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              {filteredFiles.map((file) => {
-                const category = FILE_CATEGORIES[file.category as keyof typeof FILE_CATEGORIES];
-                return (
-                  <tr key={file.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg ${category.bgColor} flex items-center justify-center`}>
-                          {category.icon}
+              {isLoadingFiles ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center">
+                    <div className="flex items-center justify-center">
+                      <LoaderIcon />
+                      <span className="ml-2 text-sm text-gray-500">Chargement des fichiers...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredFiles.length === 0 ? null : (
+                filteredFiles.map((file) => {
+                  // Mapper les catégories Prisma vers les catégories UI
+                  const categoryMap: Record<string, string> = {
+                    "FICHE_PEDAGOGIQUE": "fiches",
+                    "SLIDES": "slides",
+                    "DOCUMENT": "documents",
+                    "EVALUATION": "evaluations",
+                    "SUPPORT_STAGIAIRE": "supports",
+                    "IMAGE": "images",
+                    "AUTRE": "documents",
+                  };
+                  const categoryKey = categoryMap[file.category] || "documents";
+                  const category = FILE_CATEGORIES[categoryKey as keyof typeof FILE_CATEGORIES];
+
+                  return (
+                    <tr key={file.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-lg ${category?.bgColor || "bg-gray-100"} flex items-center justify-center`}>
+                            {category?.icon || <DOCIcon />}
+                          </div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">
+                            {file.originalName || file.name}
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {file.name}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {file.formation?.titre || "-"}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {file.formation}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${category.bgColor} ${category.color}`}>
-                        {category.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {file.size}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {file.date}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
-                          title="Télécharger"
-                        >
-                          <DownloadIcon />
-                        </button>
-                        <button
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors dark:hover:text-blue-400 dark:hover:bg-blue-500/10"
-                          title="Visualiser"
-                        >
-                          <EyeIcon />
-                        </button>
-                        <button
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors dark:hover:text-red-400 dark:hover:bg-red-500/10"
-                          title="Supprimer"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${category?.bgColor || "bg-gray-100"} ${category?.color || "text-gray-600"}`}>
+                          {category?.label || "Document"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {formatFileSize(file.size)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {formatDate(file.createdAt)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          {file.publicUrl && (
+                            <a
+                              href={file.publicUrl}
+                              download={file.originalName}
+                              className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
+                              title="Télécharger"
+                            >
+                              <DownloadIcon />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => {
+                              setPreviewFile(file);
+                              setShowPreviewModal(true);
+                            }}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors dark:hover:text-blue-400 dark:hover:bg-blue-500/10"
+                            title="Visualiser"
+                          >
+                            <EyeIcon />
+                          </button>
+                          <button
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors dark:hover:text-red-400 dark:hover:bg-red-500/10"
+                            title="Supprimer"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -505,6 +727,28 @@ export default function FileManagerPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de preview/edit */}
+      {previewFile && (
+        <FilePreviewModal
+          file={previewFile}
+          isOpen={showPreviewModal}
+          onClose={() => {
+            setShowPreviewModal(false);
+            setPreviewFile(null);
+          }}
+          onSave={async (fileId, content) => {
+            const response = await fetch(`/api/files/${fileId}/content`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content }),
+            });
+            if (!response.ok) {
+              throw new Error("Erreur lors de la sauvegarde");
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

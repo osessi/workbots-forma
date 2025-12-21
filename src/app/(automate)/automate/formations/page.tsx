@@ -1,8 +1,17 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAutomate } from "@/context/AutomateContext";
+import KanbanBoard from "@/components/formations/KanbanBoard";
+
+// Icon Loader
+const LoaderIcon = () => (
+  <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24" fill="none">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+);
 
 // Icon Plus
 const PlusIcon = () => (
@@ -39,20 +48,50 @@ const CloseIcon = () => (
   </svg>
 );
 
+// Icon Grid
+const GridIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="11" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="2" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="11" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+);
+
+// Icon Kanban
+const KanbanIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="2" width="4" height="14" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="7" y="2" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="12" y="2" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+);
+
+type ViewMode = "grid" | "kanban";
+
 export default function MesFormationsPage() {
-  const { formations, updateFormation } = useAutomate();
+  const { formations, updateFormation, isLoadingFormations, refreshFormations } = useAutomate();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  // Rafraîchir les formations au montage
+  useEffect(() => {
+    refreshFormations();
+  }, [refreshFormations]);
 
   const handleStartEdit = (id: string, currentTitle: string) => {
     setEditingId(id);
     setEditedTitle(currentTitle);
   };
 
-  const handleSaveTitle = (id: string) => {
+  const handleSaveTitle = async (id: string) => {
     if (editedTitle.trim()) {
-      updateFormation(id, { titre: editedTitle.trim() });
+      setIsSaving(true);
+      await updateFormation(id, { titre: editedTitle.trim() });
+      setIsSaving(false);
     }
     setEditingId(null);
     setEditedTitle("");
@@ -93,9 +132,9 @@ export default function MesFormationsPage() {
           </Link>
         </div>
 
-        {/* Barre de recherche */}
-        <div className="mt-6">
-          <div className="relative max-w-md">
+        {/* Barre de recherche + Toggle vue */}
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <div className="relative max-w-md flex-1">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
               <SearchIcon />
             </span>
@@ -107,10 +146,55 @@ export default function MesFormationsPage() {
               className="w-full pl-12 pr-4 py-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 transition-all"
             />
           </div>
+
+          {/* Toggle Vue Grille / Kanban */}
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                viewMode === "grid"
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <GridIcon />
+              <span className="hidden sm:inline">Grille</span>
+            </button>
+            <button
+              onClick={() => setViewMode("kanban")}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                viewMode === "kanban"
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <KanbanIcon />
+              <span className="hidden sm:inline">Pipeline</span>
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* État de chargement */}
+      {isLoadingFormations && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-3">
+            <LoaderIcon />
+            <span className="text-gray-500 dark:text-gray-400 text-sm">Chargement des formations...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Vue Kanban */}
+      {!isLoadingFormations && viewMode === "kanban" && filteredFormations.length > 0 && (
+        <KanbanBoard
+          formations={filteredFormations}
+          onEditTitle={handleStartEdit}
+        />
+      )}
+
       {/* Grille des formations - 3 colonnes max */}
+      {!isLoadingFormations && viewMode === "grid" && filteredFormations.length > 0 && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredFormations.map((formation) => (
           <div
@@ -200,13 +284,39 @@ export default function MesFormationsPage() {
           </div>
         ))}
       </div>
+      )}
 
       {/* Message si aucune formation */}
-      {filteredFormations.length === 0 && (
+      {!isLoadingFormations && filteredFormations.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">
-            Aucune formation trouvée pour "{searchQuery}"
-          </p>
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-white/[0.03] max-w-md mx-auto">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-50 dark:bg-brand-500/10 flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-brand-500">
+                <path d="M12 6V12M12 12V18M12 12H18M12 12H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+            {searchQuery ? (
+              <p className="text-gray-500 dark:text-gray-400">
+                Aucune formation trouvée pour &quot;{searchQuery}&quot;
+              </p>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Aucune formation
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                  Créez votre première formation pour commencer
+                </p>
+                <Link
+                  href="/automate/create"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-all"
+                >
+                  <PlusIcon />
+                  Créer une formation
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

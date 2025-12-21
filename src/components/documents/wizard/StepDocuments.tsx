@@ -23,8 +23,9 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  FileDown,
   Edit3,
+  Save,
+  FolderOpen,
 } from "lucide-react";
 import {
   SessionClient,
@@ -65,6 +66,8 @@ interface GeneratedDocument {
   apprenantName?: string;
   renderedContent: string;
   jsonContent?: string; // Contenu JSON TipTap pour l'édition
+  savedToDrive?: boolean; // Si le document a été sauvegardé dans le Drive
+  entrepriseId?: string; // ID de l'entreprise pour l'organisation des dossiers
 }
 
 interface StepDocumentsProps {
@@ -354,6 +357,10 @@ export default function StepDocuments({
 
   // Section dépliée
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  // Sauvegarde dans le Drive
+  const [isSavingToDrive, setIsSavingToDrive] = useState(false);
+  const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0 });
 
   // Calculs pour le récap
   const totalApprenants = clients.reduce((acc, c) => acc + c.apprenants.length, 0);
@@ -661,45 +668,131 @@ export default function StepDocuments({
     printWindow.document.close();
   };
 
-  // Télécharger tous les documents en ZIP
-  const downloadAllAsZip = async () => {
+  // État pour le téléchargement en masse
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+
+  // Télécharger tous les documents en PDF (un par un en chaîne)
+  const downloadAllAsPDF = async () => {
     if (generatedDocs.length === 0) return;
 
-    try {
-      const JSZip = (await import("jszip")).default;
-      const zip = new JSZip();
+    setIsDownloadingAll(true);
+    setDownloadProgress({ current: 0, total: generatedDocs.length });
 
-      generatedDocs.forEach((doc, index) => {
-        const fileName = `${String(index + 1).padStart(2, "0")}_${doc.titre.replace(/[^a-zA-Z0-9àâäéèêëïîôùûüÿç\s-]/g, "").replace(/\s+/g, "_")}.html`;
-        const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${doc.titre}</title>
-  <style>${getDocumentStyles()}</style>
-</head>
-<body>
-  ${doc.renderedContent}
-</body>
-</html>`;
-        zip.file(fileName, htmlContent);
-      });
+    for (let i = 0; i < generatedDocs.length; i++) {
+      const doc = generatedDocs[i];
+      setDownloadProgress({ current: i + 1, total: generatedDocs.length });
 
-      const content = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(content);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `documents_${formation.titre.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().split("T")[0]}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Erreur création ZIP:", error);
-      alert("Erreur lors de la création du ZIP");
+      // Créer une iframe cachée pour l'impression
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentWindow?.document;
+      if (iframeDoc) {
+        iframeDoc.open();
+        iframeDoc.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${doc.titre}</title>
+            <style>${getDocumentStyles()}</style>
+          </head>
+          <body>
+            ${doc.renderedContent}
+          </body>
+          </html>
+        `);
+        iframeDoc.close();
+
+        // Attendre que le contenu soit chargé puis imprimer
+        await new Promise<void>((resolve) => {
+          iframe.onload = () => {
+            setTimeout(() => {
+              iframe.contentWindow?.print();
+              // Attendre un peu pour que la boîte de dialogue s'ouvre
+              setTimeout(() => {
+                document.body.removeChild(iframe);
+                resolve();
+              }, 1000);
+            }, 500);
+          };
+          // Déclencher onload manuellement si déjà chargé
+          if (iframeDoc.readyState === "complete") {
+            iframe.onload?.(new Event("load"));
+          }
+        });
+
+        // Délai entre chaque document pour éviter les conflits
+        if (i < generatedDocs.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
     }
+
+    setIsDownloadingAll(false);
+    setDownloadProgress({ current: 0, total: 0 });
   };
+
+  // Sauvegarder tous les documents dans le Drive
+  const saveAllToDrive = async () => {
+    if (generatedDocs.length === 0 || !formation.id) return;
+
+    const unsavedDocs = generatedDocs.filter(d => !d.savedToDrive);
+    if (unsavedDocs.length === 0) return;
+
+    setIsSavingToDrive(true);
+    setSaveProgress({ current: 0, total: unsavedDocs.length });
+
+    for (let i = 0; i < unsavedDocs.length; i++) {
+      const doc = unsavedDocs[i];
+      setSaveProgress({ current: i + 1, total: unsavedDocs.length });
+
+      try {
+        // Trouver l'entrepriseId si le document est pour un client entreprise
+        let entrepriseId: string | undefined;
+        if (doc.clientId) {
+          const client = clients.find(c => c.id === doc.clientId);
+          if (client?.type === "ENTREPRISE" && client.entrepriseId) {
+            entrepriseId = client.entrepriseId;
+          }
+        }
+
+        const response = await fetch("/api/documents/save-to-drive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            formationId: formation.id,
+            documentType: doc.type,
+            titre: doc.titre,
+            content: doc.renderedContent,
+            entrepriseId,
+            apprenantId: doc.apprenantId,
+          }),
+        });
+
+        if (response.ok) {
+          // Marquer le document comme sauvegardé
+          setGeneratedDocs(prev =>
+            prev.map(d => d.id === doc.id ? { ...d, savedToDrive: true } : d)
+          );
+        }
+      } catch (err) {
+        console.error(`Erreur sauvegarde ${doc.titre}:`, err);
+      }
+    }
+
+    setIsSavingToDrive(false);
+    setSaveProgress({ current: 0, total: 0 });
+  };
+
+  // Compter les documents non sauvegardés
+  const unsavedDocsCount = generatedDocs.filter(d => !d.savedToDrive).length;
 
   // Vérifier si un document a été généré pour un destinataire
   const isDocGenerated = (docType: DocumentType, targetId: string) => {
@@ -935,19 +1028,10 @@ export default function StepDocuments({
       {/* Documents générés */}
       {generatedDocs.length > 0 && (
         <div className="rounded-xl border border-green-200 bg-green-50 p-5 dark:border-green-500/30 dark:bg-green-500/10">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
-              <CheckCircle2 size={16} />
-              {generatedDocs.length} document{generatedDocs.length > 1 ? "s" : ""} généré{generatedDocs.length > 1 ? "s" : ""}
-            </h3>
-            <button
-              onClick={downloadAllAsZip}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <FileDown size={16} />
-              Télécharger tout (.zip)
-            </button>
-          </div>
+          <h3 className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-2 mb-4">
+            <CheckCircle2 size={16} />
+            {generatedDocs.length} document{generatedDocs.length > 1 ? "s" : ""} généré{generatedDocs.length > 1 ? "s" : ""}
+          </h3>
 
           <div className="flex flex-wrap gap-2">
             {generatedDocs.map((doc) => (
@@ -1000,13 +1084,55 @@ export default function StepDocuments({
         </button>
 
         {generatedDocs.length > 0 && (
-          <button
-            onClick={downloadAllAsZip}
-            className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-colors"
-          >
-            <Download size={18} />
-            Télécharger tous les documents
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Bouton Sauvegarder dans le Drive */}
+            {formation.id && unsavedDocsCount > 0 && (
+              <button
+                onClick={saveAllToDrive}
+                disabled={isSavingToDrive}
+                className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-green-500 rounded-xl hover:bg-green-600 transition-colors disabled:opacity-50"
+              >
+                {isSavingToDrive ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Sauvegarde {saveProgress.current}/{saveProgress.total}...
+                  </>
+                ) : (
+                  <>
+                    <FolderOpen size={18} />
+                    Sauvegarder dans le Drive ({unsavedDocsCount})
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Indicateur si tous sauvegardés */}
+            {formation.id && unsavedDocsCount === 0 && generatedDocs.length > 0 && (
+              <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-xl dark:bg-green-500/20 dark:text-green-400">
+                <Save size={16} />
+                Tous sauvegardés
+              </span>
+            )}
+
+            {/* Bouton Télécharger PDF */}
+            <button
+              onClick={downloadAllAsPDF}
+              disabled={isDownloadingAll}
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-colors disabled:opacity-50"
+            >
+              {isDownloadingAll ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Téléchargement {downloadProgress.current}/{downloadProgress.total}...
+                </>
+              ) : (
+                <>
+                  <Download size={18} />
+                  Télécharger tous les PDF
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
 

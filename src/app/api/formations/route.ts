@@ -58,28 +58,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Le titre est requis" }, { status: 400 });
     }
 
-    // Créer la formation avec ses modules
-    const formation = await prisma.formation.create({
-      data: {
-        titre,
-        description: description || null,
-        fichePedagogique: fichePedagogique || {},
-        userId: user.id,
-        organizationId: user.organizationId,
-        modules: modules && modules.length > 0 ? {
-          create: modules.map((m: { titre: string; ordre: number; contenu?: object; duree?: number }) => ({
-            titre: m.titre,
-            ordre: m.ordre,
-            contenu: m.contenu || {},
-            duree: m.duree || null,
-          })),
-        } : undefined,
-      },
-      include: {
-        modules: {
-          orderBy: { ordre: "asc" },
+    // Créer la formation avec ses modules dans une transaction
+    const formation = await prisma.$transaction(async (tx) => {
+      // 1. Créer la formation
+      const newFormation = await tx.formation.create({
+        data: {
+          titre,
+          description: description || null,
+          fichePedagogique: fichePedagogique || {},
+          userId: user.id,
+          organizationId: user.organizationId,
+          modules: modules && modules.length > 0 ? {
+            create: modules.map((m: { titre: string; ordre: number; contenu?: object; duree?: number }) => ({
+              titre: m.titre,
+              ordre: m.ordre,
+              contenu: m.contenu || {},
+              duree: m.duree || null,
+            })),
+          } : undefined,
         },
-      },
+        include: {
+          modules: {
+            orderBy: { ordre: "asc" },
+          },
+        },
+      });
+
+      // 2. Créer automatiquement un dossier Drive pour cette formation
+      await tx.folder.create({
+        data: {
+          name: titre,
+          color: "#4277FF", // Couleur par défaut
+          organizationId: user.organizationId,
+          formationId: newFormation.id, // Lier le dossier à la formation
+          folderType: "formation",
+        },
+      });
+
+      return newFormation;
     });
 
     return NextResponse.json(formation, { status: 201 });

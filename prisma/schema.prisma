@@ -242,6 +242,7 @@ model Formation {
   sessions          FormationSession[]
   files             File[]
   documentSessions  DocumentSession[]
+  folder            Folder?          @relation("FormationFolder")
 
   @@index([organizationId])
   @@index([userId])
@@ -378,6 +379,9 @@ model File {
   folderId        String?
   folder          Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
+  // Contenu du fichier (pour les documents HTML éditables)
+  fileContent     FileContent?
+
   // Metadata
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -386,6 +390,16 @@ model File {
   @@index([userId])
   @@index([category])
   @@index([folderId])
+}
+
+// Contenu des fichiers HTML éditables
+model FileContent {
+  id        String   @id @default(cuid())
+  fileId    String   @unique
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  content   String   @db.Text // Contenu HTML
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Folder {
@@ -397,6 +411,21 @@ model Folder {
   parentId        String?
   parent          Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children        Folder[] @relation("FolderHierarchy")
+
+  // Lien avec formation (dossier racine de la formation)
+  formationId     String?  @unique
+  formation       Formation? @relation("FormationFolder", fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Lien avec entreprise (sous-dossier entreprise dans une formation)
+  entrepriseId    String?
+  entreprise      Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+
+  // Lien avec apprenant (sous-dossier apprenant)
+  apprenantId     String?
+  apprenant       Apprenant? @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+
+  // Type de dossier pour faciliter le filtrage
+  folderType      String   @default("general") // formation, entreprise, apprenant, general
 
   // Multi-tenant
   organizationId  String
@@ -410,6 +439,10 @@ model Folder {
 
   @@index([organizationId])
   @@index([parentId])
+  @@index([formationId])
+  @@index([entrepriseId])
+  @@index([apprenantId])
+  @@index([folderType])
 }
 
 // ===========================================
@@ -903,6 +936,7 @@ model Entreprise {
   // Relations
   apprenants        Apprenant[]
   sessionClients    SessionClient[]
+  folders           Folder[]
 
   @@index([organizationId])
   @@index([raisonSociale])
@@ -945,6 +979,7 @@ model Apprenant {
 
   // Relations
   sessionParticipants SessionParticipant[]
+  folders           Folder[]
 
   @@index([organizationId])
   @@index([entrepriseId])

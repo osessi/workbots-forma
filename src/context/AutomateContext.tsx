@@ -90,6 +90,17 @@ export interface Formation {
   image: string;
   dateCreation: string;
   status: "complete" | "en_cours" | "brouillon";
+  // Champs additionnels de la BDD
+  description?: string;
+  fichePedagogique?: Record<string, unknown>;
+  modules?: Array<{
+    id: string;
+    titre: string;
+    ordre: number;
+    contenu?: Record<string, unknown>;
+    duree?: number;
+  }>;
+  documentsCount?: number;
 }
 
 interface AutomateContextType {
@@ -101,10 +112,12 @@ interface AutomateContextType {
 
   // Formations
   formations: Formation[];
-  addFormation: (formation: Omit<Formation, "id">) => void;
-  updateFormation: (id: string, updates: Partial<Formation>) => void;
-  deleteFormation: (id: string) => void;
+  isLoadingFormations: boolean;
+  addFormation: (formation: Omit<Formation, "id">) => Promise<Formation | null>;
+  updateFormation: (id: string, updates: Partial<Formation>) => Promise<void>;
+  deleteFormation: (id: string) => Promise<void>;
   getFormationById: (id: string) => Formation | undefined;
+  refreshFormations: () => Promise<void>;
 
   // Search
   searchQuery: string;
@@ -133,78 +146,53 @@ const defaultUser: UserProfile = {
   signatureUrl: null,
 };
 
-const defaultFormations: Formation[] = [
-  {
-    id: "1",
-    titre: "Les bases de l'intelligence artificielle",
-    image: "/images/cards/card-01.png",
-    dateCreation: "03/12/2025",
-    status: "complete",
-  },
-  {
-    id: "2",
-    titre: "Initiation à Excel pour les débutants",
-    image: "/images/cards/card-02.png",
-    dateCreation: "18/10/2025",
-    status: "complete",
-  },
-  {
-    id: "3",
-    titre: "Vendre avec la Communication Non Violente (CNV)",
-    image: "/images/cards/card-03.png",
-    dateCreation: "09/10/2025",
-    status: "en_cours",
-  },
-  {
-    id: "4",
-    titre: "Construire un script d'appel de vente efficace",
-    image: "/images/cards/card-01.png",
-    dateCreation: "11/09/2025",
-    status: "complete",
-  },
-  {
-    id: "5",
-    titre: "Prendre la parole en public avec confiance",
-    image: "/images/cards/card-02.png",
-    dateCreation: "15/07/2025",
-    status: "brouillon",
-  },
-  {
-    id: "6",
-    titre: "Gestion du stress et des émotions au travail",
-    image: "/images/cards/card-03.png",
-    dateCreation: "17/05/2025",
-    status: "complete",
-  },
-  {
-    id: "7",
-    titre: "Fidéliser ses clients grâce à la relation commerciale",
-    image: "/images/cards/card-01.png",
-    dateCreation: "22/04/2025",
-    status: "complete",
-  },
-  {
-    id: "8",
-    titre: "Conduire des réunions de formation efficaces et dynamiques",
-    image: "/images/cards/card-02.png",
-    dateCreation: "08/03/2025",
-    status: "complete",
-  },
-  {
-    id: "9",
-    titre: "Construire un script d'appel de vente performant",
-    image: "/images/cards/card-03.png",
-    dateCreation: "12/02/2025",
-    status: "complete",
-  },
-  {
-    id: "10",
-    titre: 'Gérer les objections et transformer les "non" en opportunités',
-    image: "/images/cards/card-01.png",
-    dateCreation: "24/01/2025",
-    status: "complete",
-  },
+// Images par défaut pour les formations
+const DEFAULT_FORMATION_IMAGES = [
+  "/images/cards/card-01.png",
+  "/images/cards/card-02.png",
+  "/images/cards/card-03.png",
 ];
+
+// Helper pour obtenir une image aléatoire
+const getRandomFormationImage = () => {
+  return DEFAULT_FORMATION_IMAGES[Math.floor(Math.random() * DEFAULT_FORMATION_IMAGES.length)];
+};
+
+// Helper pour convertir le statut Prisma vers le format frontend
+const mapPrismaStatusToFrontend = (status: string): "complete" | "en_cours" | "brouillon" => {
+  switch (status) {
+    case "TERMINEE":
+      return "complete";
+    case "EN_COURS":
+      return "en_cours";
+    case "BROUILLON":
+    default:
+      return "brouillon";
+  }
+};
+
+// Helper pour convertir le statut frontend vers Prisma
+const mapFrontendStatusToPrisma = (status: string): string => {
+  switch (status) {
+    case "complete":
+      return "TERMINEE";
+    case "en_cours":
+      return "EN_COURS";
+    case "brouillon":
+    default:
+      return "BROUILLON";
+  }
+};
+
+// Helper pour formater la date
+const formatDate = (date: string | Date): string => {
+  const d = new Date(date);
+  return d.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
 
 // Couleur par défaut
 const DEFAULT_PRIMARY_COLOR = "#4277FF";
@@ -213,9 +201,10 @@ const AutomateContext = createContext<AutomateContextType | undefined>(undefined
 
 export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile>(defaultUser);
-  const [formations, setFormations] = useState<Formation[]>(defaultFormations);
+  const [formations, setFormations] = useState<Formation[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [isLoadingFormations, setIsLoadingFormations] = useState(true);
   const [primaryColor, setPrimaryColorState] = useState(DEFAULT_PRIMARY_COLOR);
 
   // Charger le profil utilisateur depuis l'API
@@ -316,6 +305,62 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await fetchUserProfile();
   }, [fetchUserProfile]);
 
+  // Charger les formations depuis l'API
+  const fetchFormations = useCallback(async () => {
+    try {
+      setIsLoadingFormations(true);
+      const response = await fetch("/api/formations");
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Convertir les formations de l'API vers le format frontend
+        const formattedFormations: Formation[] = data.map((f: {
+          id: string;
+          titre: string;
+          image?: string;
+          status: string;
+          description?: string;
+          fichePedagogique?: Record<string, unknown>;
+          modules?: Array<{
+            id: string;
+            titre: string;
+            ordre: number;
+            contenu?: Record<string, unknown>;
+            duree?: number;
+          }>;
+          createdAt: string;
+          _count?: { documents: number };
+        }) => ({
+          id: f.id,
+          titre: f.titre,
+          image: f.image || getRandomFormationImage(),
+          dateCreation: formatDate(f.createdAt),
+          status: mapPrismaStatusToFrontend(f.status),
+          description: f.description,
+          fichePedagogique: f.fichePedagogique,
+          modules: f.modules,
+          documentsCount: f._count?.documents || 0,
+        }));
+
+        setFormations(formattedFormations);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des formations:", error);
+    } finally {
+      setIsLoadingFormations(false);
+    }
+  }, []);
+
+  // Charger les formations au montage
+  useEffect(() => {
+    fetchFormations();
+  }, [fetchFormations]);
+
+  const refreshFormations = useCallback(async () => {
+    await fetchFormations();
+  }, [fetchFormations]);
+
   // Fonction pour changer la couleur primaire
   const setPrimaryColor = useCallback(async (color: string) => {
     // Appliquer immédiatement au DOM
@@ -350,20 +395,107 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  const addFormation = useCallback((formation: Omit<Formation, "id">) => {
-    const newId = (Math.max(...formations.map((f) => parseInt(f.id))) + 1).toString();
-    setFormations((prev) => [{ ...formation, id: newId }, ...prev]);
-  }, [formations]);
+  // Ajouter une formation (persiste en BDD)
+  const addFormation = useCallback(async (formation: Omit<Formation, "id">): Promise<Formation | null> => {
+    try {
+      const response = await fetch("/api/formations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titre: formation.titre,
+          description: formation.description,
+          fichePedagogique: formation.fichePedagogique,
+          modules: formation.modules,
+        }),
+      });
 
-  const updateFormation = useCallback((id: string, updates: Partial<Formation>) => {
+      if (response.ok) {
+        const newFormation = await response.json();
+
+        // Convertir vers le format frontend
+        const formattedFormation: Formation = {
+          id: newFormation.id,
+          titre: newFormation.titre,
+          image: formation.image || getRandomFormationImage(),
+          dateCreation: formatDate(newFormation.createdAt),
+          status: mapPrismaStatusToFrontend(newFormation.status),
+          description: newFormation.description,
+          fichePedagogique: newFormation.fichePedagogique,
+          modules: newFormation.modules,
+          documentsCount: 0,
+        };
+
+        // Ajouter au state local
+        setFormations((prev) => [formattedFormation, ...prev]);
+        return formattedFormation;
+      } else {
+        const error = await response.json();
+        console.error("Erreur lors de la création:", error);
+        return null;
+      }
+    } catch (error) {
+      console.error("Erreur réseau lors de la création:", error);
+      return null;
+    }
+  }, []);
+
+  // Mettre à jour une formation (persiste en BDD)
+  const updateFormation = useCallback(async (id: string, updates: Partial<Formation>): Promise<void> => {
+    // Optimistic update
     setFormations((prev) =>
       prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
     );
-  }, []);
 
-  const deleteFormation = useCallback((id: string) => {
+    try {
+      const apiUpdates: Record<string, unknown> = {};
+      if (updates.titre !== undefined) apiUpdates.titre = updates.titre;
+      if (updates.description !== undefined) apiUpdates.description = updates.description;
+      if (updates.status !== undefined) apiUpdates.status = mapFrontendStatusToPrisma(updates.status);
+      if (updates.fichePedagogique !== undefined) apiUpdates.fichePedagogique = updates.fichePedagogique;
+      if (updates.image !== undefined) apiUpdates.image = updates.image;
+
+      if (Object.keys(apiUpdates).length > 0) {
+        const response = await fetch(`/api/formations/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(apiUpdates),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          console.error("Erreur lors de la mise à jour:", error);
+          // Rollback en cas d'erreur
+          await fetchFormations();
+        }
+      }
+    } catch (error) {
+      console.error("Erreur réseau lors de la mise à jour:", error);
+      await fetchFormations();
+    }
+  }, [fetchFormations]);
+
+  // Supprimer une formation (persiste en BDD)
+  const deleteFormation = useCallback(async (id: string): Promise<void> => {
+    // Optimistic update
+    const previousFormations = formations;
     setFormations((prev) => prev.filter((f) => f.id !== id));
-  }, []);
+
+    try {
+      const response = await fetch(`/api/formations/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Erreur lors de la suppression:", error);
+        // Rollback
+        setFormations(previousFormations);
+      }
+    } catch (error) {
+      console.error("Erreur réseau lors de la suppression:", error);
+      setFormations(previousFormations);
+    }
+  }, [formations]);
 
   const getFormationById = useCallback(
     (id: string) => formations.find((f) => f.id === id),
@@ -382,10 +514,12 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isLoadingUser,
         refreshUser,
         formations,
+        isLoadingFormations,
         addFormation,
         updateFormation,
         deleteFormation,
         getFormationById,
+        refreshFormations,
         searchQuery,
         setSearchQuery,
         filteredFormations,

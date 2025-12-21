@@ -140,24 +140,50 @@ export default function DocumentPreviewModal({
     setIsEditMode(false);
   }, [editedContent, editedHeaderJson, editedFooterJson]);
 
-  // Calculer le nombre de pages basé sur la hauteur du contenu
+  // État pour les pages mesurées (combinaison sauts manuels + pagination auto)
+  const [measuredPages, setMeasuredPages] = useState<string[]>([""]);
+
+  // Diviser le contenu en sections basées sur les sauts de page manuels
+  const manualSections = useMemo(() => {
+    const content = previewContent || document?.renderedContent || "";
+    if (!content) return [""];
+
+    // Utiliser un marqueur temporaire pour diviser
+    const separator = "<!--PAGE_BREAK_SEPARATOR-->";
+    const htmlWithSeparator = content
+      .replace(/<div[^>]*class="[^"]*page-break[^"]*"[^>]*><\/div>/gi, separator)
+      .replace(/<div[^>]*class="[^"]*page-break[^"]*"[^>]*>[^<]*<\/div>/gi, separator)
+      .replace(/<div[^>]*data-type="page-break"[^>]*><\/div>/gi, separator)
+      .replace(/<div[^>]*data-type="page-break"[^>]*>[^<]*<\/div>/gi, separator);
+
+    const sections = htmlWithSeparator.split(separator).filter(section => section.trim() !== "");
+    return sections.length > 0 ? sections : [""];
+  }, [previewContent, document?.renderedContent]);
+
+  // Mesurer et paginer le contenu automatiquement (combiné avec sauts manuels)
   useEffect(() => {
-    if (!isEditMode) {
-      const calculatePages = () => {
-        // Créer un élément temporaire pour mesurer le contenu avec les mêmes styles que le rendu
-        const tempDiv = window.document.createElement("div");
-        tempDiv.className = "document-preview";
-        tempDiv.style.cssText = `
+    if (isEditMode) return;
+
+    const paginateContent = async () => {
+      const allPages: string[] = [];
+      const hasHeader = !!(editedHeader || document?.renderedHeader);
+
+      for (let sectionIndex = 0; sectionIndex < manualSections.length; sectionIndex++) {
+        const sectionHtml = manualSections[sectionIndex];
+
+        // Créer un conteneur temporaire pour mesurer
+        const tempContainer = window.document.createElement("div");
+        tempContainer.className = "document-preview";
+        tempContainer.style.cssText = `
           position: absolute;
           visibility: hidden;
           width: ${A4_WIDTH_PX - (MARGIN_MM * 2 * MM_TO_PX)}px;
           font-family: 'Georgia', 'Times New Roman', serif;
           font-size: 11pt;
           line-height: 1.6;
-          color: #1a1a1a;
         `;
 
-        // Ajouter les mêmes styles CSS que le document preview
+        // Ajouter les styles
         const styleElement = window.document.createElement("style");
         styleElement.textContent = `
           .document-preview h1 { font-size: 18pt; font-weight: 700; margin: 0 0 16px 0; }
@@ -171,48 +197,59 @@ export default function DocumentPreviewModal({
           .document-preview th { background: #f5f5f5; font-weight: 700; }
           .document-preview .module-section { background: #f9f9f9; border-left: 3px solid #4277FF; padding: 12px 16px; margin: 12px 0; }
         `;
+        tempContainer.appendChild(styleElement);
+        tempContainer.innerHTML += sectionHtml;
+        window.document.body.appendChild(tempContainer);
 
-        tempDiv.appendChild(styleElement);
+        // Force reflow
+        tempContainer.offsetHeight;
 
-        const contentDiv = window.document.createElement("div");
-        contentDiv.innerHTML = previewContent || document?.renderedContent || "";
-        tempDiv.appendChild(contentDiv);
+        const totalHeight = tempContainer.scrollHeight;
+        // La première page de la première section a le header
+        const isFirstPage = allPages.length === 0;
+        const contentHeightPx = isFirstPage && hasHeader ? FIRST_PAGE_CONTENT_HEIGHT_PX : OTHER_PAGE_CONTENT_HEIGHT_PX;
 
-        window.document.body.appendChild(tempDiv);
+        if (totalHeight <= contentHeightPx) {
+          // La section tient sur une page
+          allPages.push(sectionHtml);
+        } else {
+          // La section doit être divisée en plusieurs pages
+          const children = Array.from(tempContainer.children).filter(el => el.tagName !== "STYLE");
+          let currentPageHtml = "";
+          let currentHeight = 0;
+          let isFirstPageOfSection = isFirstPage;
 
-        // Force reflow pour s'assurer que le contenu est rendu
-        tempDiv.offsetHeight;
+          for (const child of children) {
+            const childHeight = (child as HTMLElement).offsetHeight || 0;
+            const maxHeight = isFirstPageOfSection && hasHeader ? FIRST_PAGE_CONTENT_HEIGHT_PX : OTHER_PAGE_CONTENT_HEIGHT_PX;
 
-        const contentHeight = tempDiv.scrollHeight;
+            if (currentHeight + childHeight > maxHeight && currentPageHtml) {
+              allPages.push(currentPageHtml);
+              currentPageHtml = (child as HTMLElement).outerHTML;
+              currentHeight = childHeight;
+              isFirstPageOfSection = false;
+            } else {
+              currentPageHtml += (child as HTMLElement).outerHTML;
+              currentHeight += childHeight;
+            }
+          }
 
-        // Debug log
-        console.log("DocumentPreviewModal - Content height:", contentHeight, "FIRST_PAGE:", FIRST_PAGE_CONTENT_HEIGHT_PX, "OTHER_PAGE:", OTHER_PAGE_CONTENT_HEIGHT_PX);
-
-        // Page 1 a moins d'espace (avec header), pages suivantes ont plus d'espace
-        let pages = 1;
-        if (contentHeight > FIRST_PAGE_CONTENT_HEIGHT_PX) {
-          const remainingContent = contentHeight - FIRST_PAGE_CONTENT_HEIGHT_PX;
-          pages = 1 + Math.ceil(remainingContent / OTHER_PAGE_CONTENT_HEIGHT_PX);
+          if (currentPageHtml) {
+            allPages.push(currentPageHtml);
+          }
         }
 
-        console.log("DocumentPreviewModal - Total pages calculated:", pages);
+        window.document.body.removeChild(tempContainer);
+      }
 
-        window.document.body.removeChild(tempDiv);
-        setTotalPages(Math.max(1, pages));
-      };
+      setMeasuredPages(allPages.length > 0 ? allPages : [""]);
+      setTotalPages(Math.max(1, allPages.length));
+    };
 
-      // Utiliser plusieurs délais pour s'assurer que le DOM est complètement rendu
-      const timer1 = setTimeout(calculatePages, 50);
-      const timer2 = setTimeout(calculatePages, 200);
-      const timer3 = setTimeout(calculatePages, 500);
-
-      return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-        clearTimeout(timer3);
-      };
-    }
-  }, [previewContent, editedHeader, editedFooter, isEditMode, document?.renderedContent]);
+    // Petit délai pour s'assurer que le DOM est prêt
+    const timer = setTimeout(paginateContent, 100);
+    return () => clearTimeout(timer);
+  }, [manualSections, editedHeader, document?.renderedHeader, isEditMode]);
 
   // Fermer avec Escape
   useEffect(() => {
@@ -316,6 +353,23 @@ export default function DocumentPreviewModal({
             border-left: 3px solid #4277FF;
             padding: 12px 16px;
             margin: 12px 0;
+          }
+          /* Saut de page pour l'impression */
+          .page-break {
+            display: block;
+            page-break-after: always;
+            break-after: page;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            border: none;
+            visibility: hidden;
+          }
+          @media print {
+            .page-break {
+              page-break-after: always !important;
+              break-after: page !important;
+            }
           }
         </style>
       </head>
@@ -776,18 +830,18 @@ export default function DocumentPreviewModal({
                     }
                   ` }} />
 
-                  {/* Génération des pages A4 séparées */}
-                  {Array.from({ length: totalPages }, (_, pageIndex) => (
+                  {/* Génération des pages A4 séparées - utilise measuredPages */}
+                  {measuredPages.map((pageContent, pageIndex) => (
                     <div
                       key={pageIndex}
                       className="document-page document-preview"
                       style={{
                         width: `${A4_WIDTH_PX}px`,
-                        height: `${A4_HEIGHT_PX}px`,
+                        minHeight: `${A4_HEIGHT_PX}px`,
                         padding: `${MARGIN_MM * MM_TO_PX}px`,
                         display: "flex",
                         flexDirection: "column",
-                        marginBottom: pageIndex < totalPages - 1 ? "32px" : "0",
+                        marginBottom: pageIndex < measuredPages.length - 1 ? "32px" : "0",
                         overflow: "hidden",
                         position: "relative",
                       }}
@@ -800,27 +854,11 @@ export default function DocumentPreviewModal({
                         />
                       )}
 
-                      {/* Contenu principal avec décalage pour chaque page */}
+                      {/* Contenu de cette page spécifique */}
                       <div
                         className="document-content flex-1 overflow-hidden"
-                        style={{
-                          position: "relative",
-                        }}
-                      >
-                        <div
-                          style={{
-                            position: "absolute",
-                            // Page 0: pas de décalage
-                            // Page 1+: décalage = hauteur page 1 + (pageIndex-1) * hauteur pages suivantes
-                            top: pageIndex === 0
-                              ? 0
-                              : `-${FIRST_PAGE_CONTENT_HEIGHT_PX + (pageIndex - 1) * OTHER_PAGE_CONTENT_HEIGHT_PX}px`,
-                            left: 0,
-                            right: 0,
-                          }}
-                          dangerouslySetInnerHTML={{ __html: previewContent || document.renderedContent }}
-                        />
-                      </div>
+                        dangerouslySetInnerHTML={{ __html: pageContent }}
+                      />
 
                       {/* Footer avec numéro de page */}
                       <div className="page-footer flex-shrink-0">

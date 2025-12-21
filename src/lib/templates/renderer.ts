@@ -547,6 +547,8 @@ function tiptapJsonToHtml(json: unknown): string {
       return "<hr />";
     case "hardBreak":
       return "<br />";
+    case "pageBreak":
+      return '<div data-type="page-break" class="page-break"></div>';
     case "table":
       return `<table>${childrenHtml}</table>`;
     case "tableRow":

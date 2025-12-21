@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import mammoth from "mammoth";
 
 import TemplateVariable from "./extensions/TemplateVariable";
+import PageBreak from "./extensions/PageBreak";
 import EditorToolbar from "./EditorToolbar";
 import { DocumentType, TemplateContext } from "@/lib/templates/types";
 import { DynamicVariableContext } from "@/lib/templates/variables";
@@ -131,6 +132,7 @@ export default function DocumentEditor({
       }),
       Typography,
       TemplateVariable,
+      PageBreak,
     ],
     content: parseContent(initialContent),
     editable: !readOnly,

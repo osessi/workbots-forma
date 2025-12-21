@@ -142,9 +142,9 @@ interface JourneeFormation {
   horaireApresMidi: string;
 }
 
-type TypeLieu = "presentiel" | "visioconference" | "mixte" | "intra";
+export type TypeLieu = "presentiel" | "visioconference" | "mixte" | "intra";
 
-interface InfosPratiques {
+export interface InfosPratiques {
   typeLieu: TypeLieu;
   lieu: string; // Adresse exacte ou lien de connexion
   adresse: string;
@@ -153,7 +153,7 @@ interface InfosPratiques {
   journees: JourneeFormation[];
 }
 
-interface DocumentsData {
+export interface DocumentsData {
   organisme: OrganismeFormation;
   client: ClientInfo;
   salaries: Salarie[];
@@ -1339,6 +1339,7 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
                   <option value="visioconference">Visioconference</option>
                   <option value="mixte">Mixte (presentiel + distanciel)</option>
                   <option value="intra">Intra-entreprise (chez le client)</option>
+                  <option value="autres">Autres</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">

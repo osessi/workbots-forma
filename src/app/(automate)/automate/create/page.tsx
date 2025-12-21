@@ -5,7 +5,7 @@ import StepContexte from "@/components/automate/steps/StepContexte";
 import StepFichePedagogique from "@/components/automate/steps/StepFichePedagogique";
 import StepSlidesSupport from "@/components/automate/steps/StepSlidesSupport";
 import StepEvaluations from "@/components/automate/steps/StepEvaluations";
-import StepDocuments from "@/components/automate/steps/StepDocuments";
+import StepDocuments, { DocumentsData } from "@/components/automate/steps/StepDocuments";
 import DocumentGenerationWrapper from "@/components/documents/DocumentGenerationWrapper";
 
 // Données initiales pour l'étape Contexte
@@ -50,7 +50,7 @@ const initialModules: Array<{
 }> = [];
 
 // Données initiales pour les documents
-const initialDocumentsData = {
+const initialDocumentsData: DocumentsData = {
   organisme: {
     raisonSociale: "",
     representantLegal: "",
@@ -105,6 +105,7 @@ const initialDocumentsData = {
     fonction: "",
   },
   infosPratiques: {
+    typeLieu: "presentiel" as const,
     lieu: "",
     adresse: "",
     codePostal: "",

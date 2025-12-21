@@ -151,7 +151,7 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
 
   // Inserer un saut de page
   const insertPageBreak = useCallback(() => {
-    editor?.chain().focus().setHardBreak().insertContent('<div class="page-break" style="page-break-after: always; break-after: page; height: 0; margin: 24px 0; border-top: 2px dashed #d1d5db;"></div><p></p>').run();
+    editor?.chain().focus().setPageBreak().run();
   }, [editor]);
 
   const undo = useCallback(() => editor?.chain().focus().undo().run(), [editor]);

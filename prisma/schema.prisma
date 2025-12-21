@@ -35,6 +35,38 @@ enum FormationStatus {
   ARCHIVEE
 }
 
+enum ApprenantStatus {
+  SALARIE
+  INDEPENDANT
+  PARTICULIER
+}
+
+enum FinanceurType {
+  OPCO
+  AGEFIPH
+  CAISSE_DEPOTS
+  ETAT
+  FOND_ASSURANCE
+  FRANCE_TRAVAIL
+  INSTANCES_EUROPEENNES
+  OPACIF
+  OPCA
+  REGION
+  ORGANISME_PUBLIC
+  AUTRE
+}
+
+enum SessionModalite {
+  PRESENTIEL
+  DISTANCIEL
+  MIXTE
+}
+
+enum TypeLieu {
+  PRESENTIEL
+  VISIOCONFERENCE
+}
+
 enum FileCategory {
   FICHE_PEDAGOGIQUE
   SLIDES
@@ -123,6 +155,16 @@ model Organization {
   reusableBlocks    ReusableBlock[]
   customVariables   CustomVariable[]
 
+  // BDD - Mes données
+  entreprises       Entreprise[]
+  apprenants        Apprenant[]
+  intervenants      Intervenant[]
+  lieuxFormation    LieuFormation[]
+  financeurs        Financeur[]
+
+  // Sessions documentaires
+  documentSessions  DocumentSession[]
+
   @@index([slug])
   @@index([customDomain])
 }
@@ -195,10 +237,11 @@ model Formation {
   updatedAt       DateTime        @updatedAt
 
   // Relations
-  modules         Module[]
-  documents       Document[]
-  sessions        FormationSession[]
-  files           File[]
+  modules           Module[]
+  documents         Document[]
+  sessions          FormationSession[]
+  files             File[]
+  documentSessions  DocumentSession[]
 
   @@index([organizationId])
   @@index([userId])
@@ -818,4 +861,420 @@ model AIGenerationLog {
   @@index([promptType])
   @@index([status])
   @@index([createdAt])
+}
+
+// ===========================================
+// BASE DE DONNEES - MES DONNEES
+// ===========================================
+
+// Entreprises clientes de l'OF
+model Entreprise {
+  id                String       @id @default(cuid())
+
+  // Infos principales
+  raisonSociale     String
+  siret             String?
+  tvaIntracom       String?
+
+  // Contact référent
+  contactNom        String?
+  contactPrenom     String?
+  contactEmail      String?
+  contactTelephone  String?
+
+  // Adresse
+  adresse           String?
+  codePostal        String?
+  ville             String?
+  pays              String       @default("France")
+
+  // Notes internes
+  notes             String?      @db.Text
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  apprenants        Apprenant[]
+  sessionClients    SessionClient[]
+
+  @@index([organizationId])
+  @@index([raisonSociale])
+  @@index([siret])
+}
+
+// Apprenants / Participants
+model Apprenant {
+  id                String          @id @default(cuid())
+
+  // Infos personnelles
+  nom               String
+  prenom            String
+  email             String
+  telephone         String?
+
+  // Adresse (optionnel)
+  adresse           String?
+  codePostal        String?
+  ville             String?
+
+  // Statut
+  statut            ApprenantStatus @default(PARTICULIER)
+
+  // Si salarié, entreprise rattachée
+  entrepriseId      String?
+  entreprise        Entreprise?     @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+
+  // Notes internes
+  notes             String?         @db.Text
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  sessionParticipants SessionParticipant[]
+
+  @@index([organizationId])
+  @@index([entrepriseId])
+  @@index([statut])
+  @@index([email])
+}
+
+// Intervenants / Formateurs
+model Intervenant {
+  id                String       @id @default(cuid())
+
+  // Infos personnelles
+  nom               String
+  prenom            String
+  email             String?
+  telephone         String?
+
+  // Fonction / spécialité
+  fonction          String?
+  specialites       String[]
+
+  // Structure (si externe)
+  structure         String?
+  structureSiret    String?
+
+  // Notes internes
+  notes             String?      @db.Text
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  sessionsFormateur    DocumentSession[]  @relation("SessionFormateur")
+  sessionsCoFormateur  SessionCoFormateur[]
+
+  @@index([organizationId])
+  @@index([nom])
+}
+
+// Lieux de formation
+model LieuFormation {
+  id                String       @id @default(cuid())
+
+  // Type de lieu
+  typeLieu          TypeLieu     @default(PRESENTIEL)
+
+  // Infos lieu
+  nom               String       // Nom du lieu de formation
+  lieuFormation     String       // Adresse OU lien de visio selon typeLieu
+  codePostal        String?
+  ville             String?
+
+  // Infos pratiques
+  infosPratiques    String?      @db.Text  // Code porte, étage, etc.
+
+  // Capacité (seulement pour présentiel)
+  capacite          Int?
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  sessions          DocumentSession[]
+
+  @@index([organizationId])
+  @@index([nom])
+}
+
+// Financeurs (OPCO et autres)
+model Financeur {
+  id                String        @id @default(cuid())
+
+  // Infos
+  nom               String
+  type              FinanceurType @default(OPCO)
+
+  // Contact (facultatif)
+  email             String?
+  telephone         String?
+  adresse           String?
+  codePostal        String?
+  ville             String?
+  siteWeb           String?
+
+  // Notes
+  notes             String?       @db.Text
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  clientFinancements SessionClientFinancement[]
+
+  @@index([organizationId])
+  @@index([nom])
+  @@index([type])
+}
+
+// ===========================================
+// WIZARD DOCUMENTS - SESSION DOCUMENTAIRE
+// ===========================================
+
+// Session documentaire liée à une formation
+model DocumentSession {
+  id                String          @id @default(cuid())
+
+  // Formation parent
+  formationId       String
+  formation         Formation       @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Étape 3 - Modalité et lieu
+  modalite          SessionModalite @default(PRESENTIEL)
+
+  // Si présentiel
+  lieuId            String?
+  lieu              LieuFormation?  @relation(fields: [lieuId], references: [id], onDelete: SetNull)
+  lieuTexteLibre    String?         // Si lieu non enregistré
+
+  // Si distanciel
+  lienConnexion     String?
+  plateformeVisio   String?         // Zoom, Google Meet, Teams, etc.
+
+  // Étape 4 - Formateur principal
+  formateurId       String?
+  formateur         Intervenant?    @relation("SessionFormateur", fields: [formateurId], references: [id], onDelete: SetNull)
+
+  // Notes internes
+  notes             String?         @db.Text
+
+  // Statut
+  status            String          @default("brouillon")  // brouillon, en_cours, termine
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  clients           SessionClient[]
+  journees          SessionJournee[]
+  coFormateurs      SessionCoFormateur[]
+  documentsGeneres  SessionDocument[]
+
+  @@index([formationId])
+  @@index([organizationId])
+  @@index([status])
+}
+
+// Journées de formation (Étape 3)
+model SessionJournee {
+  id                String          @id @default(cuid())
+
+  // Session parent
+  sessionId         String
+  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Ordre
+  ordre             Int             @default(1)
+
+  // Date
+  date              DateTime
+
+  // Horaires
+  heureDebutMatin   String?         // "09:00"
+  heureFinMatin     String?         // "12:30"
+  heureDebutAprem   String?         // "14:00"
+  heureFinAprem     String?         // "17:30"
+
+  // Metadata
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([sessionId])
+  @@index([date])
+}
+
+// Co-formateurs (Étape 4)
+model SessionCoFormateur {
+  id                String          @id @default(cuid())
+
+  // Session parent
+  sessionId         String
+  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Intervenant
+  intervenantId     String
+  intervenant       Intervenant     @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt         DateTime        @default(now())
+
+  @@unique([sessionId, intervenantId])
+  @@index([sessionId])
+}
+
+// Clients de la session (Étape 1)
+model SessionClient {
+  id                String          @id @default(cuid())
+
+  // Session parent
+  sessionId         String
+  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Type de client
+  typeClient        ApprenantStatus // ENTREPRISE (mapped to SALARIE), INDEPENDANT, PARTICULIER
+
+  // Si entreprise
+  entrepriseId      String?
+  entreprise        Entreprise?     @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+
+  // Étape 2 - Tarifs
+  tarifHT           Float?          // Tarif appliqué
+  tarifTTC          Float?
+
+  // Metadata
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  participants      SessionParticipant[]
+  financements      SessionClientFinancement[]
+
+  @@index([sessionId])
+  @@index([entrepriseId])
+}
+
+// Financement d'un client (Étape 2)
+model SessionClientFinancement {
+  id                String        @id @default(cuid())
+
+  // Client parent
+  clientId          String
+  client            SessionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Financeur
+  financeurId       String
+  financeur         Financeur     @relation(fields: [financeurId], references: [id], onDelete: Cascade)
+
+  // Montants
+  montantFinanceHT  Float         @default(0)
+  montantFinanceTTC Float?
+
+  // Notes
+  notes             String?
+
+  // Metadata
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([clientId, financeurId])
+  @@index([clientId])
+  @@index([financeurId])
+}
+
+// Participants à la session (liés à un client)
+model SessionParticipant {
+  id                String        @id @default(cuid())
+
+  // Client parent
+  clientId          String
+  client            SessionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Apprenant
+  apprenantId       String
+  apprenant         Apprenant     @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Statut de participation
+  estConfirme       Boolean       @default(false)
+  aAssiste          Boolean       @default(false)
+
+  // Metadata
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([clientId, apprenantId])
+  @@index([clientId])
+  @@index([apprenantId])
+}
+
+// Documents générés pour la session (Étape 5)
+model SessionDocument {
+  id                String          @id @default(cuid())
+
+  // Session parent
+  sessionId         String
+  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Type de document
+  type              DocumentType
+
+  // Pour qui (optionnel)
+  clientId          String?         // Si document par client (convention)
+  apprenantId       String?         // Si document par apprenant (convocation, attestation)
+
+  // Contenu généré
+  content           Json?
+  fileUrl           String?
+  fileName          String?
+
+  // Statut
+  status            String          @default("pending")  // pending, generated, sent
+
+  // Metadata
+  generatedAt       DateTime?
+  sentAt            DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([sessionId])
+  @@index([type])
+  @@index([status])
 }

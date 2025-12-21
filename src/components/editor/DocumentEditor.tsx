@@ -25,6 +25,7 @@ import mammoth from "mammoth";
 
 import TemplateVariable from "./extensions/TemplateVariable";
 import PageBreak from "./extensions/PageBreak";
+import ConditionalBlock from "./extensions/ConditionalBlock";
 import EditorToolbar from "./EditorToolbar";
 import { DocumentType, TemplateContext } from "@/lib/templates/types";
 import { DynamicVariableContext } from "@/lib/templates/variables";
@@ -133,6 +134,7 @@ export default function DocumentEditor({
       Typography,
       TemplateVariable,
       PageBreak,
+      ConditionalBlock,
     ],
     content: parseContent(initialContent),
     editable: !readOnly,
@@ -187,7 +189,15 @@ export default function DocumentEditor({
   const handleInsertVariable = useCallback(
     (variableId: string) => {
       if (editor) {
-        editor.chain().focus().insertVariable(variableId).run();
+        // Verifier si c'est une variable conditionnelle (commence par #if)
+        if (variableId.startsWith("#if ")) {
+          // Inserer un bloc conditionnel complet avec {{#if ...}}contenu{{/if}}
+          const condition = variableId.substring(4); // Enlever "#if "
+          editor.chain().focus().setConditionalBlock(condition).run();
+        } else {
+          // Variable normale
+          editor.chain().focus().insertVariable(variableId).run();
+        }
       }
     },
     [editor]

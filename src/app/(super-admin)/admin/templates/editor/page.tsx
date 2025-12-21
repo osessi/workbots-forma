@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { DocumentType } from "@/lib/templates/types";
+import { DocumentType, ClientType } from "@/lib/templates/types";
 import { DOCUMENT_TYPES, generateTestContext, renderTemplate, DynamicVariableContext } from "@/lib/templates";
 
 // Import dynamique de l'editeur (client-side only)
@@ -77,6 +77,7 @@ export default function TemplateEditorPage() {
   // Etat du template
   const [templateName, setTemplateName] = useState("Nouveau template");
   const [documentType, setDocumentType] = useState<DocumentType>("convention_formation");
+  const [clientType, setClientType] = useState<ClientType>("entreprise");
 
   // Contenus actuels - utiliser useState pour declencher les re-renders du preview
   const [currentContent, setCurrentContent] = useState("");
@@ -99,7 +100,44 @@ export default function TemplateEditorPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
-  const testContext = useMemo(() => generateTestContext(), []);
+
+  // Contexte de test avec le type de client selectionne
+  const testContext = useMemo(() => {
+    const baseContext = generateTestContext();
+    return {
+      ...baseContext,
+      client: { type: clientType },
+      // Ajouter les donnees d'independant si le type est independant
+      independant: clientType === "independant" ? {
+        civilite: "M.",
+        nom: "DURAND",
+        prenom: "Jean",
+        nom_complet: "Jean DURAND",
+        siret: "123 456 789 00012",
+        adresse: "10 rue du Commerce",
+        code_postal: "75011",
+        ville: "Paris",
+        adresse_complete: "10 rue du Commerce, 75011 Paris",
+        email: "jean.durand@email.com",
+        telephone: "06 98 76 54 32",
+        activite: "Consultant informatique",
+      } : undefined,
+      // Ajouter les donnees de financeur si le type est financeur
+      financeur: clientType === "financeur" ? {
+        nom: "OPCO Atlas",
+        siret: "852 963 741 00025",
+        adresse: "30 rue de la Solidarite",
+        code_postal: "75015",
+        ville: "Paris",
+        adresse_complete: "30 rue de la Solidarite, 75015 Paris",
+        telephone: "01 45 67 89 00",
+        email: "contact@opco-atlas.fr",
+        representant: "Marie FINANCE",
+        fonction_representant: "Charge de mission",
+        numero_dossier: "DOSSIER-2025-001234",
+      } : undefined,
+    };
+  }, [clientType]);
 
   // Contexte dynamique pour les variables numerotees (test avec 3 journees et 5 salaries)
   const dynamicContext: DynamicVariableContext = useMemo(() => ({
@@ -556,6 +594,28 @@ export default function TemplateEditorPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Selecteur de type de client pour le preview */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span className="text-xs font-medium text-purple-600 dark:text-purple-400">Type client:</span>
+            <select
+              value={clientType}
+              onChange={(e) => setClientType(e.target.value as ClientType)}
+              className="px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-600 rounded text-purple-700 dark:text-purple-300 focus:outline-none focus:border-purple-500"
+            >
+              <option value="entreprise">Entreprise</option>
+              <option value="particulier">Particulier</option>
+              <option value="independant">Independant</option>
+              <option value="salarie">Salarie</option>
+              <option value="financeur">Financeur (OPCO)</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-2">

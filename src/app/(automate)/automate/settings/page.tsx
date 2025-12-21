@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useAutomate } from "@/context/AutomateContext";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -93,18 +93,23 @@ const PLAN_LIMITS = {
   ENTERPRISE: { maxFormateurs: -1, maxFormations: -1, maxStorageGb: 100 }, // -1 = illimité
 };
 
-export default function SettingsPage() {
-  const { user, primaryColor, setPrimaryColor, refreshUser } = useAutomate();
+// Composant qui utilise useSearchParams (doit être dans Suspense)
+function SettingsTabHandler({ onTabChange }: { onTabChange: (tab: TabType) => void }) {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabType>("organisme");
 
-  // Lire le tab depuis l'URL au chargement
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab") as TabType | null;
     if (tabFromUrl && tabs.some(t => t.id === tabFromUrl)) {
-      setActiveTab(tabFromUrl);
+      onTabChange(tabFromUrl);
     }
-  }, [searchParams]);
+  }, [searchParams, onTabChange]);
+
+  return null;
+}
+
+export default function SettingsPage() {
+  const { user, primaryColor, setPrimaryColor, refreshUser } = useAutomate();
+  const [activeTab, setActiveTab] = useState<TabType>("organisme");
 
   // Organisme state
   const [organisme, setOrganisme] = useState<OrganismeData>({
@@ -211,6 +216,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Handler pour lire le tab depuis l'URL */}
+      <Suspense fallback={null}>
+        <SettingsTabHandler onTabChange={setActiveTab} />
+      </Suspense>
+
       {/* En-tête */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-white">

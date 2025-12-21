@@ -219,6 +219,11 @@ function replaceLoops(
 
 /**
  * Remplacer les conditions {{#if condition}}...{{/if}}
+ * Supporte:
+ * - {{#if variable}} - verifie si la variable existe et est truthy
+ * - {{#if variable === "valeur"}} - comparaison d'egalite
+ * - {{#if variable !== "valeur"}} - comparaison de difference
+ * - {{#if client.type === "entreprise"}} - comparaison avec chemin de variable
  */
 function replaceConditions(
   content: string,
@@ -226,25 +231,100 @@ function replaceConditions(
   previewMode: boolean
 ): string {
   // Pattern pour {{#if condition}}...{{else}}...{{/if}}
+  // On gere aussi {{#elseif condition}} pour les conditions multiples
   const conditionPattern = /\{\{#if\s+([^}]+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g;
 
   return content.replace(conditionPattern, (match, condition, ifContent, elseContent = "") => {
     const trimmedCondition = condition.trim();
-    const value = getValueFromPath(context, trimmedCondition);
 
-    // Evaluer la condition
-    const isTruthy = evaluateCondition(value);
+    // Evaluer la condition (simple ou avec comparaison)
+    const isTruthy = evaluateAdvancedCondition(trimmedCondition, context);
 
     if (isTruthy) {
-      // Rendre le contenu du if
-      return replaceSimpleVariables(ifContent, context, previewMode);
+      // Rendre le contenu du if (recursif pour les conditions imbriquees)
+      let result = replaceConditions(ifContent, context, previewMode);
+      result = replaceSimpleVariables(result, context, previewMode);
+      return result;
     } else if (elseContent) {
-      // Rendre le contenu du else
-      return replaceSimpleVariables(elseContent, context, previewMode);
+      // Rendre le contenu du else (recursif pour les conditions imbriquees)
+      let result = replaceConditions(elseContent, context, previewMode);
+      result = replaceSimpleVariables(result, context, previewMode);
+      return result;
     }
 
     return "";
   });
+}
+
+/**
+ * Evaluer une condition avancee avec support des comparaisons
+ * Exemples:
+ * - "client.type" -> verifie si la variable existe
+ * - "client.type === 'entreprise'" -> comparaison egalite
+ * - "client.type !== 'particulier'" -> comparaison difference
+ * - "formation.prix > 1000" -> comparaison numerique
+ */
+function evaluateAdvancedCondition(condition: string, context: TemplateContext): boolean {
+  // Pattern pour detecter les comparaisons
+  // Supporte: ===, !==, ==, !=, >, <, >=, <=
+  const comparisonPattern = /^(.+?)\s*(===|!==|==|!=|>=|<=|>|<)\s*(.+)$/;
+  const match = condition.match(comparisonPattern);
+
+  if (match) {
+    const [, leftPath, operator, rightValue] = match;
+    const leftTrimmed = leftPath.trim();
+    let rightTrimmed = rightValue.trim();
+
+    // Obtenir la valeur de gauche depuis le contexte
+    const leftValue = getValueFromPath(context, leftTrimmed);
+
+    // Determiner la valeur de droite
+    let rightParsed: unknown;
+
+    // Verifier si c'est une string entre quotes (simples ou doubles)
+    if ((rightTrimmed.startsWith('"') && rightTrimmed.endsWith('"')) ||
+        (rightTrimmed.startsWith("'") && rightTrimmed.endsWith("'"))) {
+      rightParsed = rightTrimmed.slice(1, -1);
+    }
+    // Verifier si c'est un nombre
+    else if (!isNaN(Number(rightTrimmed))) {
+      rightParsed = Number(rightTrimmed);
+    }
+    // Verifier si c'est un booleen
+    else if (rightTrimmed === "true") {
+      rightParsed = true;
+    } else if (rightTrimmed === "false") {
+      rightParsed = false;
+    }
+    // Sinon c'est peut-etre une autre variable
+    else {
+      rightParsed = getValueFromPath(context, rightTrimmed);
+    }
+
+    // Effectuer la comparaison
+    switch (operator) {
+      case "===":
+      case "==":
+        return leftValue === rightParsed;
+      case "!==":
+      case "!=":
+        return leftValue !== rightParsed;
+      case ">":
+        return Number(leftValue) > Number(rightParsed);
+      case "<":
+        return Number(leftValue) < Number(rightParsed);
+      case ">=":
+        return Number(leftValue) >= Number(rightParsed);
+      case "<=":
+        return Number(leftValue) <= Number(rightParsed);
+      default:
+        return false;
+    }
+  }
+
+  // Pas de comparaison, evaluer comme condition simple (verifie existence/truthiness)
+  const value = getValueFromPath(context, condition);
+  return evaluateCondition(value);
 }
 
 // ===========================================
@@ -549,6 +629,10 @@ function tiptapJsonToHtml(json: unknown): string {
       return "<br />";
     case "pageBreak":
       return '<div data-type="page-break" class="page-break"></div>';
+    case "conditionalBlock":
+      const condition = attrs?.condition as string || "";
+      // Generer le contenu du bloc conditionnel avec les balises handlebars
+      return `{{#if ${condition}}}${childrenHtml}{{/if}}`;
     case "table":
       return `<table>${childrenHtml}</table>`;
     case "tableRow":

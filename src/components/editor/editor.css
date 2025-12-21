@@ -510,6 +510,217 @@
 }
 
 /* ===========================================
+   BLOCS CONDITIONNELS
+   =========================================== */
+
+/* Container du bloc conditionnel */
+.ProseMirror .conditional-block {
+  position: relative;
+  margin: 1em 0;
+  padding: 1em;
+  padding-top: 2.5em;
+  border: 2px dashed #a78bfa;
+  border-radius: 0.5em;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.05) 0%, rgba(139, 92, 246, 0.08) 100%);
+}
+
+.dark .ProseMirror .conditional-block {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.1) 0%, rgba(139, 92, 246, 0.15) 100%);
+  border-color: #8b5cf6;
+}
+
+/* Label de condition */
+.ProseMirror .conditional-block::before {
+  content: attr(data-condition-label);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.35em 0.75em;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 0.25em 0.25em 0 0;
+}
+
+/* Fallback si pas de label */
+.ProseMirror .conditional-block:not([data-condition-label])::before,
+.ProseMirror .conditional-block[data-condition-label=""]::before {
+  content: "Bloc Conditionnel";
+}
+
+/* Indicateur visuel du type de condition */
+.ProseMirror .conditional-block[data-condition*="entreprise"] {
+  border-color: #f97316;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.05) 0%, rgba(234, 88, 12, 0.08) 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="entreprise"]::before {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="particulier"] {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(37, 99, 235, 0.08) 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="particulier"]::before {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="independant"] {
+  border-color: #22c55e;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(22, 163, 74, 0.08) 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="independant"]::before {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="salarie"] {
+  border-color: #ec4899;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.05) 0%, rgba(219, 39, 119, 0.08) 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="salarie"]::before {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="financeur"] {
+  border-color: #06b6d4;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(8, 145, 178, 0.08) 100%);
+}
+
+.ProseMirror .conditional-block[data-condition*="financeur"]::before {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+}
+
+/* Bloc selectionne */
+.ProseMirror .conditional-block.ProseMirror-selectednode {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Dark mode adjustments */
+.dark .ProseMirror .conditional-block[data-condition*="entreprise"] {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(234, 88, 12, 0.15) 100%);
+}
+
+.dark .ProseMirror .conditional-block[data-condition*="particulier"] {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.15) 100%);
+}
+
+.dark .ProseMirror .conditional-block[data-condition*="independant"] {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(22, 163, 74, 0.15) 100%);
+}
+
+.dark .ProseMirror .conditional-block[data-condition*="salarie"] {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.15) 100%);
+}
+
+.dark .ProseMirror .conditional-block[data-condition*="financeur"] {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(8, 145, 178, 0.15) 100%);
+}
+
+/* ===========================================
+   STYLES VARIABLES SUPPLEMENTAIRES
+   =========================================== */
+
+/* Client */
+.template-variable[data-category="client"] {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #9333ea;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.dark .template-variable[data-category="client"] {
+  background-color: rgba(168, 85, 247, 0.2);
+  color: #d8b4fe;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+/* Independant */
+.template-variable[data-category="independant"] {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.dark .template-variable[data-category="independant"] {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+/* Financeur */
+.template-variable[data-category="financeur"] {
+  background-color: rgba(6, 182, 212, 0.15);
+  color: #0891b2;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.dark .template-variable[data-category="financeur"] {
+  background-color: rgba(6, 182, 212, 0.2);
+  color: #67e8f9;
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+/* Conditions */
+.template-variable[data-category="conditions"] {
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.dark .template-variable[data-category="conditions"] {
+  background-color: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+/* Particulier */
+.template-variable[data-category="particulier"] {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.dark .template-variable[data-category="particulier"] {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Journees */
+.template-variable[data-category="journees"] {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.dark .template-variable[data-category="journees"] {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+/* Signature */
+.template-variable[data-category="signature"] {
+  background-color: rgba(107, 114, 128, 0.15);
+  color: #4b5563;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.dark .template-variable[data-category="signature"] {
+  background-color: rgba(107, 114, 128, 0.2);
+  color: #d1d5db;
+  border-color: rgba(107, 114, 128, 0.4);
+}
+
+/* ===========================================
    RESPONSIVE
    =========================================== */
 

@@ -12,11 +12,15 @@ export type VariableCategory =
   | "organisation"
   | "entreprise"
   | "particulier"
+  | "independant"
+  | "financeur"
+  | "client"
   | "participants"
   | "formateur"
   | "dates"
   | "document"
-  | "signature";
+  | "signature"
+  | "conditions";
 
 /**
  * Definition d'une variable de template
@@ -87,6 +91,55 @@ export interface DocumentTypeConfig {
 }
 
 /**
+ * Types de clients disponibles pour les conditions
+ */
+export type ClientType = "entreprise" | "particulier" | "independant" | "salarie" | "financeur";
+
+/**
+ * Donnees du client (pour les conditions)
+ */
+export interface ClientData {
+  type: ClientType;
+}
+
+/**
+ * Donnees du financeur (OPCO, Pole Emploi, etc.)
+ */
+export interface FinanceurData {
+  nom: string;
+  siret?: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  adresse_complete?: string;
+  telephone?: string;
+  email?: string;
+  representant?: string;
+  fonction_representant?: string;
+  numero_dossier?: string;
+}
+
+/**
+ * Donnees de l'independant
+ */
+export interface IndependantData {
+  civilite?: string;
+  nom: string;
+  prenom: string;
+  nom_complet?: string;
+  siret: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  adresse_complete?: string;
+  email?: string;
+  telephone?: string;
+  activite?: string; // Activite professionnelle
+  date_naissance?: string;
+  lieu_naissance?: string;
+}
+
+/**
  * Contexte de donnees pour le rendu d'un template
  */
 export interface TemplateContext {
@@ -96,6 +149,9 @@ export interface TemplateContext {
   organisation?: OrganisationData;
   entreprise?: EntrepriseData;
   particulier?: ParticulierData;
+  independant?: IndependantData;
+  financeur?: FinanceurData;
+  client?: ClientData;
   participants?: ParticipantData[];
   formateur?: FormateurData;
   dates?: DatesData;

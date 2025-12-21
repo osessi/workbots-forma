@@ -633,6 +633,10 @@ function tiptapJsonToHtml(json: unknown): string {
       const condition = attrs?.condition as string || "";
       // Generer le contenu du bloc conditionnel avec les balises handlebars
       return `{{#if ${condition}}}${childrenHtml}{{/if}}`;
+    case "loopBlock":
+      const collection = attrs?.collection as string || "items";
+      // Generer le contenu du bloc de boucle avec les balises handlebars
+      return `{{#each ${collection}}}${childrenHtml}{{/each}}`;
     case "table":
       return `<table>${childrenHtml}</table>`;
     case "tableRow":

@@ -120,6 +120,8 @@ model Organization {
   auditLogs         AuditLog[]
   aiPrompts         AIPrompt[]
   aiGenerationLogs  AIGenerationLog[]
+  reusableBlocks    ReusableBlock[]
+  customVariables   CustomVariable[]
 
   @@index([slug])
   @@index([customDomain])
@@ -153,11 +155,12 @@ model User {
   updatedAt       DateTime  @updatedAt
 
   // Relations
-  formations      Formation[]
-  files           File[]
-  sessions        FormationSession[]
-  auditLogs       AuditLog[]
-  aiGenerationLogs AIGenerationLog[]
+  formations        Formation[]
+  files             File[]
+  sessions          FormationSession[]
+  auditLogs         AuditLog[]
+  aiGenerationLogs  AIGenerationLog[]
+  templateVersions  TemplateVersion[] @relation("TemplateVersionCreator")
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -658,6 +661,116 @@ model AIPrompt {
   @@index([type])
   @@index([organizationId])
   @@index([isSystem])
+}
+
+// ===========================================
+// BLOCS REUTILISABLES (Bibliotheque)
+// ===========================================
+
+model ReusableBlock {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+
+  // Contenu WYSIWYG (TipTap JSON)
+  content         Json
+
+  // Categorie pour organisation
+  category        String       @default("general") // mentions_legales, cgv, signature, header, footer, general
+
+  // Tags pour recherche
+  tags            String[]
+
+  // Multi-tenant (null = bloc systeme)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Bloc systeme (disponible pour tous)
+  isSystem        Boolean      @default(false)
+
+  // Metadata
+  isActive        Boolean      @default(true)
+  usageCount      Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([isSystem])
+  @@index([tags])
+}
+
+// ===========================================
+// HISTORIQUE DES VERSIONS DE TEMPLATES
+// ===========================================
+
+model TemplateVersion {
+  id              String    @id @default(cuid())
+
+  // Template parent
+  templateId      String
+
+  // Numero de version
+  version         Int
+
+  // Contenu au moment de la version
+  content         Json
+  headerContent   Json?
+  footerContent   Json?
+
+  // Commentaire de version (optionnel)
+  changeNote      String?
+
+  // Qui a cree cette version
+  createdById     String?
+  createdBy       User?     @relation("TemplateVersionCreator", fields: [createdById], references: [id])
+
+  // Metadata
+  createdAt       DateTime  @default(now())
+
+  @@unique([templateId, version])
+  @@index([templateId])
+  @@index([createdAt])
+  @@index([createdById])
+}
+
+// ===========================================
+// VARIABLES PERSONNALISEES PAR ORGANISATION
+// ===========================================
+
+model CustomVariable {
+  id              String       @id @default(cuid())
+
+  // Identifiant de la variable (ex: "organisation.certification_qualiopi")
+  variableId      String
+
+  // Nom affiche
+  label           String
+
+  // Description
+  description     String?
+
+  // Categorie
+  category        String       @default("organisation")
+
+  // Valeur par defaut
+  defaultValue    String?
+
+  // Type de donnee (text, number, date, boolean, image)
+  dataType        String       @default("text")
+
+  // Multi-tenant
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([organizationId, variableId])
+  @@index([organizationId])
+  @@index([category])
 }
 
 // ===========================================

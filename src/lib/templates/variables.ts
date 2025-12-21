@@ -1042,6 +1042,48 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     isConditional: true,
   },
 
+  // ===== BOUCLES (blocs de repetition) =====
+  {
+    id: "#each participants",
+    label: "Boucle Participants",
+    category: "participants",
+    description: "Repeter le contenu pour chaque participant",
+    example: "{{#each participants}}...{{/each}}",
+    isLoop: true,
+  },
+  {
+    id: "#each modules",
+    label: "Boucle Modules",
+    category: "modules",
+    description: "Repeter le contenu pour chaque module",
+    example: "{{#each modules}}...{{/each}}",
+    isLoop: true,
+  },
+  {
+    id: "#each journees",
+    label: "Boucle Journees",
+    category: "journees",
+    description: "Repeter le contenu pour chaque journee",
+    example: "{{#each journees}}...{{/each}}",
+    isLoop: true,
+  },
+  {
+    id: "#each formation.objectifs",
+    label: "Boucle Objectifs",
+    category: "formation",
+    description: "Repeter le contenu pour chaque objectif pedagogique",
+    example: "{{#each formation.objectifs}}...{{/each}}",
+    isLoop: true,
+  },
+  {
+    id: "#each formation.prerequis",
+    label: "Boucle Prerequis",
+    category: "formation",
+    description: "Repeter le contenu pour chaque prerequis",
+    example: "{{#each formation.prerequis}}...{{/each}}",
+    isLoop: true,
+  },
+
   // ===== CONDITIONS (blocs conditionnels) =====
   {
     id: "#if client.type === 'entreprise'",

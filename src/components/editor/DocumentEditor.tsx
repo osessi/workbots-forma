@@ -26,6 +26,7 @@ import mammoth from "mammoth";
 import TemplateVariable from "./extensions/TemplateVariable";
 import PageBreak from "./extensions/PageBreak";
 import ConditionalBlock from "./extensions/ConditionalBlock";
+import LoopBlock from "./extensions/LoopBlock";
 import EditorToolbar from "./EditorToolbar";
 import { DocumentType, TemplateContext } from "@/lib/templates/types";
 import { DynamicVariableContext } from "@/lib/templates/variables";
@@ -135,6 +136,7 @@ export default function DocumentEditor({
       TemplateVariable,
       PageBreak,
       ConditionalBlock,
+      LoopBlock,
     ],
     content: parseContent(initialContent),
     editable: !readOnly,
@@ -194,6 +196,12 @@ export default function DocumentEditor({
           // Inserer un bloc conditionnel complet avec {{#if ...}}contenu{{/if}}
           const condition = variableId.substring(4); // Enlever "#if "
           editor.chain().focus().setConditionalBlock(condition).run();
+        }
+        // Verifier si c'est une boucle (commence par #each)
+        else if (variableId.startsWith("#each ")) {
+          // Inserer un bloc de boucle avec {{#each ...}}contenu{{/each}}
+          const collection = variableId.substring(6); // Enlever "#each "
+          editor.chain().focus().setLoopBlock(collection).run();
         } else {
           // Variable normale
           editor.chain().focus().insertVariable(variableId).run();

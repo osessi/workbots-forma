@@ -180,19 +180,26 @@
 .ProseMirror table {
   border-collapse: collapse;
   width: 100%;
-  margin: 1em 0;
-  overflow: hidden;
-  table-layout: fixed;
+  margin: 1.5em 0;
+  overflow: visible;
+  table-layout: auto;
+  border-radius: 0.5em;
+  border: 2px solid #e5e7eb;
+}
+
+.dark .ProseMirror table {
+  border-color: #374151;
 }
 
 .ProseMirror td,
 .ProseMirror th {
   border: 1px solid #d1d5db;
-  padding: 0.5em 0.75em;
+  padding: 0.75em 1em;
   vertical-align: top;
   box-sizing: border-box;
   position: relative;
-  min-width: 50px;
+  min-width: 80px;
+  transition: background-color 0.15s ease;
 }
 
 .dark .ProseMirror td,
@@ -200,18 +207,49 @@
   border-color: #4b5563;
 }
 
+/* En-tete de tableau */
 .ProseMirror th {
-  background-color: #f3f4f6;
+  background: linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%);
   font-weight: 600;
   text-align: left;
+  color: #374151;
+  border-bottom: 2px solid #d1d5db;
 }
 
 .dark .ProseMirror th {
-  background-color: #374151;
+  background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+  color: #f3f4f6;
+  border-bottom-color: #4b5563;
 }
 
-.ProseMirror .selectedCell {
+/* Colonne d'en-tete */
+.ProseMirror th[data-header-cell="true"],
+.ProseMirror td:first-child[data-header-cell="true"] {
+  background: linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%);
+  font-weight: 600;
+  border-right: 2px solid #d1d5db;
+}
+
+.dark .ProseMirror th[data-header-cell="true"],
+.dark .ProseMirror td:first-child[data-header-cell="true"] {
+  background: linear-gradient(90deg, #374151 0%, #1f2937 100%);
+  border-right-color: #4b5563;
+}
+
+/* Hover sur les cellules */
+.ProseMirror td:hover,
+.ProseMirror th:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.dark .ProseMirror td:hover,
+.dark .ProseMirror th:hover {
   background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Cellule selectionnee */
+.ProseMirror .selectedCell {
+  background-color: rgba(59, 130, 246, 0.15) !important;
 }
 
 .ProseMirror .selectedCell::after {
@@ -220,22 +258,101 @@
   inset: 0;
   border: 2px solid #3b82f6;
   pointer-events: none;
+  z-index: 10;
 }
 
-/* Resize handle pour les colonnes */
+/* Resize handle pour les colonnes - plus visible */
 .ProseMirror .column-resize-handle {
   position: absolute;
-  right: -2px;
+  right: -3px;
   top: 0;
   bottom: 0;
-  width: 4px;
-  background-color: #3b82f6;
-  pointer-events: none;
+  width: 6px;
+  background: linear-gradient(90deg, transparent 0%, #3b82f6 50%, transparent 100%);
+  cursor: col-resize;
   z-index: 20;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.ProseMirror table:hover .column-resize-handle {
+  opacity: 0.5;
+}
+
+.ProseMirror .column-resize-handle:hover {
+  opacity: 1 !important;
+  background: #3b82f6;
 }
 
 .ProseMirror.resize-cursor {
   cursor: col-resize;
+}
+
+/* Grip handles pour les cellules - indicateur de selection */
+.ProseMirror td::before,
+.ProseMirror th::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: transparent;
+  opacity: 0;
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.ProseMirror td:hover::before,
+.ProseMirror th:hover::before {
+  opacity: 0.3;
+  background: #9ca3af;
+}
+
+.ProseMirror .selectedCell::before {
+  opacity: 1 !important;
+  background: #3b82f6 !important;
+}
+
+/* Lignes alternees (optionnel - desactive par defaut) */
+.ProseMirror table.striped tbody tr:nth-child(even) td {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .ProseMirror table.striped tbody tr:nth-child(even) td {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Tableau vide - message d'aide */
+.ProseMirror table td:empty::after,
+.ProseMirror table th:empty::after {
+  content: "Tapez ici...";
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.85em;
+  pointer-events: none;
+}
+
+.dark .ProseMirror table td:empty::after,
+.dark .ProseMirror table th:empty::after {
+  color: #6b7280;
+}
+
+/* Contenu dans les cellules */
+.ProseMirror td p,
+.ProseMirror th p {
+  margin: 0;
+}
+
+.ProseMirror td p + p,
+.ProseMirror th p + p {
+  margin-top: 0.5em;
+}
+
+/* Tableau selectionne (outline global) */
+.ProseMirror table:has(.selectedCell) {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
 /* ===========================================
@@ -718,6 +835,114 @@
   background-color: rgba(107, 114, 128, 0.2);
   color: #d1d5db;
   border-color: rgba(107, 114, 128, 0.4);
+}
+
+/* ===========================================
+   BLOCS DE BOUCLE (EACH)
+   =========================================== */
+
+/* Container du bloc de boucle */
+.ProseMirror .loop-block {
+  position: relative;
+  margin: 1em 0;
+  padding: 1em;
+  padding-top: 2.5em;
+  border: 2px dashed #10b981;
+  border-radius: 0.5em;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.08) 100%);
+}
+
+.dark .ProseMirror .loop-block {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.15) 100%);
+  border-color: #059669;
+}
+
+/* Label de la boucle */
+.ProseMirror .loop-block::before {
+  content: attr(data-collection-label);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.35em 0.75em;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 0.25em 0.25em 0 0;
+}
+
+/* Icone de repetition */
+.ProseMirror .loop-block::after {
+  content: "🔄";
+  position: absolute;
+  top: 0.25em;
+  right: 0.5em;
+  font-size: 0.9em;
+}
+
+/* Couleurs par type de collection */
+.ProseMirror .loop-block-participants {
+  border-color: #8b5cf6;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.08) 100%);
+}
+
+.ProseMirror .loop-block-participants::before {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.dark .ProseMirror .loop-block-participants {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.15) 100%);
+}
+
+.ProseMirror .loop-block-modules {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(217, 119, 6, 0.08) 100%);
+}
+
+.ProseMirror .loop-block-modules::before {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.dark .ProseMirror .loop-block-modules {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.15) 100%);
+}
+
+.ProseMirror .loop-block-journees {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(37, 99, 235, 0.08) 100%);
+}
+
+.ProseMirror .loop-block-journees::before {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.dark .ProseMirror .loop-block-journees {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.15) 100%);
+}
+
+.ProseMirror .loop-block-objectifs,
+.ProseMirror .loop-block-prerequis {
+  border-color: #ec4899;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.05) 0%, rgba(219, 39, 119, 0.08) 100%);
+}
+
+.ProseMirror .loop-block-objectifs::before,
+.ProseMirror .loop-block-prerequis::before {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+}
+
+.dark .ProseMirror .loop-block-objectifs,
+.dark .ProseMirror .loop-block-prerequis {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.15) 100%);
+}
+
+/* Bloc selectionne */
+.ProseMirror .loop-block.ProseMirror-selectednode {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
 }
 
 /* ===========================================

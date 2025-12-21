@@ -7,6 +7,8 @@ import { Editor } from "@tiptap/react";
 import { useState, useCallback, useRef } from "react";
 import VariableDropdown from "./VariableDropdown";
 import AIGenerateButton from "./AIGenerateButton";
+import BlocksLibrary, { BlocksIcon } from "./BlocksLibrary";
+import { TableCreatorModal, TableContextToolbar } from "./TableTools";
 import { DocumentType } from "@/lib/templates/types";
 import { DynamicVariableContext } from "@/lib/templates/variables";
 
@@ -91,10 +93,15 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
   const [linkUrl, setLinkUrl] = useState("");
   const [showImageInput, setShowImageInput] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [showBlocksLibrary, setShowBlocksLibrary] = useState(false);
+  const [showTableCreator, setShowTableCreator] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wordInputRef = useRef<HTMLInputElement>(null);
+  const blocksButtonRef = useRef<HTMLButtonElement>(null);
   const imageButtonRef = useRef<HTMLButtonElement>(null);
   const linkButtonRef = useRef<HTMLButtonElement>(null);
+  const tableButtonRef = useRef<HTMLButtonElement>(null);
+  const tableDropdownPos = useDropdownPosition(showTableCreator, tableButtonRef);
 
   // Positions calculées pour les dropdowns
   const imageDropdownPos = useDropdownPosition(showImageInput, imageButtonRef);
@@ -117,13 +124,10 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
     editor?.chain().focus().setTextAlign(align).run();
   }, [editor]);
 
-  const insertTable = useCallback(() => {
-    editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  const insertTable = useCallback((rows: number, cols: number, withHeaderRow: boolean) => {
+    editor?.chain().focus().insertTable({ rows, cols, withHeaderRow }).run();
+    setShowTableCreator(false);
   }, [editor]);
-
-  const addTableRow = useCallback(() => editor?.chain().focus().addRowAfter().run(), [editor]);
-  const addTableColumn = useCallback(() => editor?.chain().focus().addColumnAfter().run(), [editor]);
-  const deleteTable = useCallback(() => editor?.chain().focus().deleteTable().run(), [editor]);
 
   const setLink = useCallback(() => {
     if (linkUrl && editor) {
@@ -337,22 +341,30 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
         <Divider />
 
         {/* Tableau */}
-        <ToolbarButton onClick={insertTable} title="Inserer un tableau">
-          <TableIcon />
-        </ToolbarButton>
-        {editor.isActive("table") && (
-          <>
-            <ToolbarButton onClick={addTableRow} title="Ajouter une ligne">
-              <AddRowIcon />
-            </ToolbarButton>
-            <ToolbarButton onClick={addTableColumn} title="Ajouter une colonne">
-              <AddColumnIcon />
-            </ToolbarButton>
-            <ToolbarButton onClick={deleteTable} title="Supprimer le tableau">
-              <DeleteTableIcon />
-            </ToolbarButton>
-          </>
-        )}
+        <div className="relative">
+          <button
+            ref={tableButtonRef}
+            type="button"
+            onClick={() => setShowTableCreator(!showTableCreator)}
+            title="Inserer un tableau"
+            className={`
+              p-2 rounded-lg transition-all
+              ${editor.isActive("table")
+                ? "bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400"
+                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+              }
+            `}
+          >
+            <TableIcon />
+          </button>
+          {showTableCreator && (
+            <TableCreatorModal
+              onInsert={insertTable}
+              onClose={() => setShowTableCreator(false)}
+              position={tableDropdownPos}
+            />
+          )}
+        </div>
 
         <Divider />
 
@@ -517,6 +529,48 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
 
         <Divider />
 
+        {/* Bibliotheque de blocs */}
+        <div className="relative">
+          <button
+            ref={blocksButtonRef}
+            type="button"
+            onClick={() => setShowBlocksLibrary(!showBlocksLibrary)}
+            title="Bibliothèque de blocs réutilisables"
+            className={`
+              p-2 rounded-lg transition-all flex items-center gap-1.5
+              ${showBlocksLibrary
+                ? "bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400"
+                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+              }
+            `}
+          >
+            <BlocksIcon className="w-4 h-4" />
+            <span className="text-xs font-medium hidden sm:inline">Blocs</span>
+          </button>
+          {showBlocksLibrary && (
+            <>
+              <div className="fixed inset-0 z-[9998]" onClick={() => setShowBlocksLibrary(false)} />
+              <div
+                className="fixed p-0 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-[9999] w-[480px] max-h-[600px] overflow-hidden"
+                style={{
+                  top: blocksButtonRef.current ? blocksButtonRef.current.getBoundingClientRect().bottom + 8 : 0,
+                  left: Math.max(8, Math.min(
+                    window.innerWidth - 496,
+                    blocksButtonRef.current ? blocksButtonRef.current.getBoundingClientRect().left - 200 : 0
+                  )),
+                }}
+              >
+                <BlocksLibrary
+                  editor={editor}
+                  onClose={() => setShowBlocksLibrary(false)}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        <Divider />
+
         {/* Generation IA */}
         <AIGenerateButton
           editor={editor}
@@ -525,11 +579,9 @@ export default function EditorToolbar({ editor, documentType, onInsertVariable, 
         />
       </div>
 
-      {/* Indication de selection de tableau */}
+      {/* Barre d'outils contextuelle pour les tableaux */}
       {editor.isActive("table") && (
-        <div className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
-          Tableau selectionne - Utilisez les boutons pour modifier
-        </div>
+        <TableContextToolbar editor={editor} />
       )}
     </div>
   );
@@ -729,24 +781,6 @@ const OrderedListIcon = () => (
 const TableIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
-  </svg>
-);
-
-const AddRowIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="12" y1="16" x2="12" y2="20" /><line x1="10" y1="18" x2="14" y2="18" />
-  </svg>
-);
-
-const AddColumnIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="12" y1="3" x2="12" y2="21" /><line x1="16" y1="12" x2="20" y2="12" /><line x1="18" y1="10" x2="18" y2="14" />
-  </svg>
-);
-
-const DeleteTableIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" />
   </svg>
 );
 

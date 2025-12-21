@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
           description: description || null,
           fichePedagogique: fichePedagogique || {},
           userId: user.id,
-          organizationId: user.organizationId,
+          organizationId: user.organizationId!,
           modules: modules && modules.length > 0 ? {
             create: modules.map((m: { titre: string; ordre: number; contenu?: object; duree?: number }) => ({
               titre: m.titre,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: titre,
           color: "#4277FF", // Couleur par défaut
-          organizationId: user.organizationId,
+          organizationId: user.organizationId!,
           formationId: newFormation.id, // Lier le dossier à la formation
           folderType: "formation",
         },

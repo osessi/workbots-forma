@@ -7,6 +7,7 @@ import AutomateSidebar from "@/components/automate/AutomateSidebar";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import SlideGenerationNotifications from "@/components/automate/SlideGenerationNotifications";
 import Backdrop from "@/layout/Backdrop";
+import { ToastProvider, ConfirmProvider } from "@/components/ui/feedback";
 import React from "react";
 
 export default function AutomateLayout({
@@ -24,20 +25,24 @@ export default function AutomateLayout({
 
   return (
     <AutomateProvider>
-      {/* Bandeau d'impersonation (visible uniquement en mode impersonation) */}
-      <ImpersonationBanner />
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 xl:flex">
-        <AutomateSidebar />
-        <Backdrop />
-        <div
-          className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
-        >
-          <AutomateHeader />
-          <div className="p-4 mx-auto max-w-7xl md:p-6 lg:p-8">{children}</div>
-        </div>
-      </div>
-      {/* Notifications de génération de slides */}
-      <SlideGenerationNotifications />
+      <ToastProvider position="top-right">
+        <ConfirmProvider>
+          {/* Bandeau d'impersonation (visible uniquement en mode impersonation) */}
+          <ImpersonationBanner />
+          <div className="min-h-screen bg-gray-50 dark:bg-gray-950 xl:flex">
+            <AutomateSidebar />
+            <Backdrop />
+            <div
+              className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
+            >
+              <AutomateHeader />
+              <div className="p-4 mx-auto max-w-7xl md:p-6 lg:p-8">{children}</div>
+            </div>
+          </div>
+          {/* Notifications de génération de slides */}
+          <SlideGenerationNotifications />
+        </ConfirmProvider>
+      </ToastProvider>
     </AutomateProvider>
   );
 }

@@ -55,6 +55,7 @@
     "bullmq": "^5.66.2",
     "date-fns": "^4.1.0",
     "flatpickr": "^4.6.13",
+    "framer-motion": "^12.23.26",
     "ioredis": "^5.8.2",
     "jszip": "^3.10.1",
     "lucide-react": "^0.559.0",

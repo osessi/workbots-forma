@@ -77,6 +77,15 @@ enum FileCategory {
   AUTRE
 }
 
+enum SlideGenerationStatus {
+  PENDING
+  ENRICHMENT
+  GENERATING
+  FINALIZING
+  COMPLETED
+  FAILED
+}
+
 enum DocumentType {
   FICHE_PEDAGOGIQUE
   PROGRAMME_FORMATION
@@ -136,6 +145,9 @@ model Organization {
   // Stripe
   stripeCustomerId  String?  @unique
   stripeSubscriptionId String?
+
+  // APIs externes (clés optionnelles par organisation)
+  gammaApiKey       String?  // Clé API Gamma pour génération slides
 
   // Metadata
   isActive          Boolean  @default(true)
@@ -228,8 +240,23 @@ model Formation {
   userId          String
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Fiche pédagogique (JSON)
+  // Étape courante du wizard (persistance navigation)
+  currentStep     String          @default("contexte") // contexte, fiche, slides, evaluations, documents
+  completedSteps  String[]        @default([])
+
+  // Données du contexte (étape 1)
+  contexteData    Json?
+
+  // Fiche pédagogique (JSON) - étape 2
   fichePedagogique Json?
+
+  // Slides générés (Gamma) - étape 3
+  slidesGenerated   Boolean   @default(false)
+  slidesData        Json?     // URLs et infos des slides par module
+  slidesGeneratedAt DateTime?
+
+  // Évaluations générées (JSON) - étape 4
+  evaluationsData   Json?     // QCMs, positionnement, évaluations finales
 
   // Metadata
   isArchived      Boolean         @default(false)
@@ -243,6 +270,7 @@ model Formation {
   files             File[]
   documentSessions  DocumentSession[]
   folder            Folder?          @relation("FormationFolder")
+  slideGenerations  SlideGeneration[]
 
   @@index([organizationId])
   @@index([userId])
@@ -269,6 +297,52 @@ model Module {
 
   @@index([formationId])
   @@index([ordre])
+}
+
+// ===========================================
+// GÉNÉRATION DE SLIDES (Workbots AI)
+// ===========================================
+
+model SlideGeneration {
+  id                  String                @id @default(cuid())
+
+  // Formation parent
+  formationId         String
+  formation           Formation             @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Statut global
+  status              SlideGenerationStatus @default(PENDING)
+  progress            Int                   @default(0) // 0-100
+
+  // Phase actuelle
+  currentPhase        String?               // enrichment, generation, finalizing
+  currentModuleIndex  Int                   @default(0)
+  currentModuleName   String?
+
+  // Options utilisées
+  themeId             String?
+  themeName           String?
+  tone                String?
+  cardsPerModule      Int                   @default(10)
+
+  // Erreur éventuelle
+  errorMessage        String?
+
+  // Résultats par module
+  moduleResults       Json?                 // Array des résultats de chaque module
+
+  // Utilisateur qui a lancé
+  userId              String
+
+  // Metadata
+  startedAt           DateTime              @default(now())
+  completedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([formationId])
+  @@index([userId])
+  @@index([status])
 }
 
 // ===========================================

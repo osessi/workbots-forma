@@ -1,11 +1,11 @@
 "use client";
-import React, { useState, useCallback, useEffect, Suspense } from "react";
+import { useState, useCallback, useEffect, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import FormationStepper, { StepId } from "@/components/automate/FormationStepper";
 import StepContexte from "@/components/automate/steps/StepContexte";
 import StepFichePedagogique from "@/components/automate/steps/StepFichePedagogique";
 import StepSlidesSupport from "@/components/automate/steps/StepSlidesSupport";
-import StepEvaluations from "@/components/automate/steps/StepEvaluations";
+import StepEvaluations, { EvaluationsDataSaved } from "@/components/automate/steps/StepEvaluations";
 import { DocumentsWizard, WizardData, FormationInfo } from "@/components/documents/wizard";
 import { useAutomate } from "@/context/AutomateContext";
 
@@ -23,6 +23,20 @@ function CreateFormationLoader() {
     </div>
   );
 }
+
+// Textes fixes qui ne doivent JAMAIS être modifiés par l'IA
+const FIXED_SUIVI_EVALUATION = `Feuilles d'émargement signées par demi-journée pour attester de la présence des participants
+Évaluation de fin de formation pour valider les acquis des participants
+Auto-évaluation des compétences en début et en fin de formation pour mesurer la progression
+Questionnaire de satisfaction à chaud remis à chaque participant
+Attestation de fin de formation délivrée aux participants ayant suivi l'intégralité de la session`;
+
+const FIXED_RESSOURCES_PEDAGOGIQUES = `Formation réalisée en présentiel (en salle équipée, en intra-entreprise) ou à distance via un outil de visioconférence (en classe virtuelle synchrone)
+Accompagnement par le formateur : suivi individualisé et réponses aux questions tout au long de la formation
+Ateliers pratiques : mises en situation et exercices appliqués pour ancrer les compétences
+Supports de cours remis aux participants (version numérique et/ou papier)`;
+
+const FIXED_DELAI_ACCES = `Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.`;
 
 // Données initiales pour l'étape Contexte
 const initialContexteData = {
@@ -52,9 +66,9 @@ const initialFicheData = {
   accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
   prerequis: "",
   publicVise: "",
-  suiviEvaluation: "",
-  ressourcesPedagogiques: "",
-  delaiAcces: "Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.",
+  suiviEvaluation: FIXED_SUIVI_EVALUATION,
+  ressourcesPedagogiques: FIXED_RESSOURCES_PEDAGOGIQUES,
+  delaiAcces: FIXED_DELAI_ACCES,
   imageUrl: "",
 };
 
@@ -99,14 +113,133 @@ function CreateFormationContent() {
   const [contexteData, setContexteData] = useState(initialContexteData);
   const [ficheData, setFicheData] = useState(initialFicheData);
   const [modules, setModules] = useState(initialModules);
+  const [evaluationsData, setEvaluationsData] = useState<EvaluationsDataSaved | null>(null);
 
   // Etat pour la formation creee (pour la generation de documents)
   const [formationId, setFormationId] = useState<string | null>(editFormationId);
   const [isSavingFormation, setIsSavingFormation] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!editFormationId);
 
   // Etats pour la generation IA
   const [isGeneratingFiche, setIsGeneratingFiche] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+
+  // Refs pour l'auto-save avec debounce
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedDataRef = useRef<string>("");
+
+  // Fonction d'auto-save avec debounce (2 secondes)
+  const autoSave = useCallback(async (
+    dataToSave: {
+      currentStep?: StepId;
+      completedSteps?: StepId[];
+      contexteData?: typeof contexteData;
+      ficheData?: typeof ficheData;
+      modules?: typeof modules;
+      evaluationsData?: EvaluationsDataSaved | null;
+    }
+  ) => {
+    // Annuler le timeout précédent
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Créer un hash des données pour éviter les sauvegardes inutiles
+    const dataHash = JSON.stringify(dataToSave);
+    if (dataHash === lastSavedDataRef.current) {
+      return; // Pas de changement, on ne sauvegarde pas
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      if (!formationId) return;
+
+      try {
+        setIsSavingFormation(true);
+        const payload: Record<string, unknown> = {};
+
+        if (dataToSave.currentStep) payload.currentStep = dataToSave.currentStep;
+        if (dataToSave.completedSteps) payload.completedSteps = dataToSave.completedSteps;
+        if (dataToSave.contexteData) payload.contexteData = dataToSave.contexteData;
+
+        // Si on a des données de fiche, mettre à jour fichePedagogique
+        if (dataToSave.ficheData) {
+          payload.titre = dataToSave.ficheData.titre;
+          payload.description = dataToSave.ficheData.description;
+          payload.image = dataToSave.ficheData.imageUrl;
+          payload.fichePedagogique = {
+            ...dataToSave.ficheData,
+            ...(dataToSave.contexteData || contexteData),
+            objectifGeneral: dataToSave.ficheData.description,
+          };
+        }
+
+        // Si on a des modules, les sauvegarder aussi
+        if (dataToSave.modules && dataToSave.modules.length > 0) {
+          payload.modules = dataToSave.modules.map((m, i) => ({
+            titre: m.titre,
+            ordre: i + 1,
+            contenu: { items: m.contenu },
+          }));
+        }
+
+        // Si on a des évaluations, les sauvegarder
+        if (dataToSave.evaluationsData) {
+          payload.evaluationsData = dataToSave.evaluationsData;
+        }
+
+        const response = await fetch(`/api/formations/${formationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          lastSavedDataRef.current = dataHash;
+        }
+      } catch (error) {
+        console.error("Erreur auto-save:", error);
+      } finally {
+        setIsSavingFormation(false);
+      }
+    }, 2000); // 2 secondes de debounce
+  }, [formationId, contexteData]);
+
+  // Auto-save quand contexteData change
+  useEffect(() => {
+    if (formationId && currentStep === "contexte") {
+      autoSave({ contexteData, currentStep });
+    }
+  }, [contexteData, formationId, currentStep, autoSave]);
+
+  // Auto-save quand ficheData change
+  useEffect(() => {
+    if (formationId && currentStep === "fiche") {
+      autoSave({ ficheData, modules, currentStep });
+    }
+  }, [ficheData, modules, formationId, currentStep, autoSave]);
+
+  // Auto-save quand on change d'étape
+  useEffect(() => {
+    if (formationId) {
+      autoSave({ currentStep, completedSteps });
+    }
+  }, [currentStep, completedSteps, formationId, autoSave]);
+
+  // Auto-save quand evaluationsData change
+  useEffect(() => {
+    if (formationId && currentStep === "evaluations" && evaluationsData) {
+      autoSave({ evaluationsData, currentStep });
+    }
+  }, [evaluationsData, formationId, currentStep, autoSave]);
+
+  // Cleanup au démontage
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Charger une formation existante si on est en mode édition
   useEffect(() => {
@@ -117,26 +250,47 @@ function CreateFormationContent() {
 
   // Fonction pour charger une formation existante
   const loadExistingFormation = async (id: string) => {
+    setIsLoading(true);
     try {
       const response = await fetch(`/api/formations/${id}`);
       if (response.ok) {
         const formation = await response.json();
 
-        // Restaurer les données du contexte depuis fichePedagogique
+        // Priorité 1: Charger depuis contexteData si disponible (nouveau format)
+        const savedContexte = formation.contexteData as Record<string, unknown> | null;
+        // Priorité 2: Fallback sur fichePedagogique (ancien format)
         const fiche = formation.fichePedagogique as Record<string, unknown> || {};
 
-        setContexteData({
-          typeSession: fiche.typeSession as string[] || [],
-          modalite: fiche.modalite as string || "",
-          dureeHeures: String(fiche.dureeHeures || ""),
-          dureeJours: String(fiche.dureeJours || ""),
-          nombreParticipants: String(fiche.nombreParticipants || ""),
-          tarifEntreprise: String(fiche.tarifEntreprise || ""),
-          tarifIndependant: String(fiche.tarifIndependant || ""),
-          tarifParticulier: String(fiche.tarifParticulier || ""),
-          description: fiche.description as string || formation.description || "",
-        });
+        // Restaurer les données du contexte
+        if (savedContexte) {
+          // Nouveau format: données sauvegardées directement
+          setContexteData({
+            typeSession: savedContexte.typeSession as string[] || [],
+            modalite: savedContexte.modalite as string || "",
+            dureeHeures: String(savedContexte.dureeHeures || ""),
+            dureeJours: String(savedContexte.dureeJours || ""),
+            nombreParticipants: String(savedContexte.nombreParticipants || ""),
+            tarifEntreprise: String(savedContexte.tarifEntreprise || ""),
+            tarifIndependant: String(savedContexte.tarifIndependant || ""),
+            tarifParticulier: String(savedContexte.tarifParticulier || ""),
+            description: savedContexte.description as string || "",
+          });
+        } else {
+          // Ancien format: extraire depuis fichePedagogique
+          setContexteData({
+            typeSession: fiche.typeSession as string[] || [],
+            modalite: fiche.modalite as string || "",
+            dureeHeures: String(fiche.dureeHeures || ""),
+            dureeJours: String(fiche.dureeJours || ""),
+            nombreParticipants: String(fiche.nombreParticipants || ""),
+            tarifEntreprise: String(fiche.tarifEntreprise || ""),
+            tarifIndependant: String(fiche.tarifIndependant || ""),
+            tarifParticulier: String(fiche.tarifParticulier || ""),
+            description: fiche.description as string || formation.description || "",
+          });
+        }
 
+        // Restaurer les données de la fiche pédagogique
         setFicheData({
           titre: formation.titre || "",
           description: fiche.objectifGeneral as string || "",
@@ -151,8 +305,8 @@ function CreateFormationContent() {
           accessibilite: fiche.accessibilite as string || initialFicheData.accessibilite,
           prerequis: fiche.prerequis as string || "",
           publicVise: fiche.publicVise as string || "",
-          suiviEvaluation: fiche.suiviEvaluation as string || "",
-          ressourcesPedagogiques: fiche.ressourcesPedagogiques as string || "",
+          suiviEvaluation: fiche.suiviEvaluation as string || FIXED_SUIVI_EVALUATION,
+          ressourcesPedagogiques: fiche.ressourcesPedagogiques as string || FIXED_RESSOURCES_PEDAGOGIQUES,
           delaiAcces: fiche.delaiAcces as string || initialFicheData.delaiAcces,
           imageUrl: formation.image || "",
         });
@@ -166,19 +320,40 @@ function CreateFormationContent() {
           })));
         }
 
-        // Déterminer les étapes complétées selon le statut
-        if (formation.status === "EN_COURS" || formation.status === "TERMINEE") {
-          setCompletedSteps(["contexte", "fiche"]);
-          setCurrentStep("slides");
-        } else if (formation.titre) {
-          setCompletedSteps(["contexte"]);
-          setCurrentStep("fiche");
+        // Restaurer les évaluations si disponibles
+        if (formation.evaluationsData) {
+          setEvaluationsData(formation.evaluationsData as EvaluationsDataSaved);
+        }
+
+        // Restaurer l'étape courante et les étapes complétées depuis la BDD
+        if (formation.currentStep) {
+          setCurrentStep(formation.currentStep as StepId);
+        }
+        if (formation.completedSteps && formation.completedSteps.length > 0) {
+          setCompletedSteps(formation.completedSteps as StepId[]);
+        } else {
+          // Fallback: déterminer les étapes complétées selon le statut
+          if (formation.status === "EN_COURS" || formation.status === "TERMINEE") {
+            setCompletedSteps(["contexte", "fiche"]);
+            if (!formation.currentStep) setCurrentStep("slides");
+          } else if (formation.titre) {
+            setCompletedSteps(["contexte"]);
+            if (!formation.currentStep) setCurrentStep("fiche");
+          }
         }
 
         setFormationId(id);
+
+        // Initialiser le hash pour éviter une sauvegarde immédiate
+        lastSavedDataRef.current = JSON.stringify({
+          currentStep: formation.currentStep,
+          completedSteps: formation.completedSteps,
+        });
       }
     } catch (error) {
       console.error("Erreur lors du chargement de la formation:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -346,10 +521,10 @@ function CreateFormationContent() {
           tarifIndependant: tarifIndependantFormate,
           tarifParticulier: tarifParticulierFormate,
           accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
-          suiviEvaluation: "Feuilles de presence\nFormulaires d'evaluation de la formation\nQuiz de validation des acquis en fin de module\nAttestation de fin de formation",
-          ressourcesPedagogiques: "Support de formation projete\nMise a disposition en ligne des supports\nExercices pratiques et mises en situation\nEtudes de cas",
+          suiviEvaluation: FIXED_SUIVI_EVALUATION,
+          ressourcesPedagogiques: FIXED_RESSOURCES_PEDAGOGIQUES,
           contenu: contenuModules,
-          delaiAcces: "Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.",
+          delaiAcces: FIXED_DELAI_ACCES,
           imageUrl: "", // Sera defini par l'utilisateur dans l'etape suivante
         });
 
@@ -381,10 +556,10 @@ function CreateFormationContent() {
           tarifIndependant: tarifIndependantFormate,
           tarifParticulier: tarifParticulierFormate,
           accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
-          suiviEvaluation: "Feuilles de presence\nFormulaires d'evaluation de la formation\nQuiz de validation des acquis en fin de module\nAttestation de fin de formation",
-          ressourcesPedagogiques: "Support de formation projete\nMise a disposition en ligne des supports\nExercices pratiques et mises en situation\nEtudes de cas",
+          suiviEvaluation: FIXED_SUIVI_EVALUATION,
+          ressourcesPedagogiques: FIXED_RESSOURCES_PEDAGOGIQUES,
           contenu: contenuModules,
-          delaiAcces: "Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.",
+          delaiAcces: FIXED_DELAI_ACCES,
           imageUrl: "",
         };
 
@@ -442,27 +617,37 @@ function CreateFormationContent() {
     }
   }, [completedSteps]);
 
-  // Handlers pour les generations de slides (a implementer avec Gamma)
-  const handleGeneratePowerPoint = (moduleId: string) => {
-    console.log("Generer PowerPoint pour module:", moduleId);
-    // TODO: Integrer Gamma API pour generation de slides
-  };
+  // Handler pour la sauvegarde des slides générés
+  const handleSlidesGenerated = useCallback((slidesData: { moduleId: string; moduleTitre: string; gammaUrl?: string; exportUrl?: string; status: string }[]) => {
+    console.log("Slides générés:", slidesData);
+    // Les slides sont automatiquement sauvegardés via l'API /api/gamma/generate
+  }, []);
 
-  const handleGenerateSupport = (moduleId: string) => {
-    console.log("Generer support pour module:", moduleId);
-    // TODO: Integrer Gamma API pour generation de support apprenant
-  };
+  // Afficher un loader pendant le chargement initial
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="animate-spin h-8 w-8 text-brand-500" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <span className="text-gray-500 dark:text-gray-400">Chargement de la formation...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Indicateur de sauvegarde */}
+      {/* Indicateur de sauvegarde automatique */}
       {isSavingFormation && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg shadow-lg">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg shadow-lg animate-pulse">
           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
-          <span className="text-sm font-medium">Sauvegarde en cours...</span>
+          <span className="text-sm font-medium">Sauvegarde automatique...</span>
         </div>
       )}
 
@@ -472,7 +657,7 @@ function CreateFormationContent() {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Formation sauvegardée
+          Sauvegarde auto activée
         </div>
       )}
 
@@ -512,10 +697,11 @@ function CreateFormationContent() {
       {currentStep === "slides" && (
         <StepSlidesSupport
           modules={modules}
+          formationId={formationId || undefined}
+          formationTitre={ficheData.titre}
           onNext={() => goToNextStep("slides", "evaluations")}
           onPrevious={() => goToPreviousStep("fiche")}
-          onGeneratePowerPoint={handleGeneratePowerPoint}
-          onGenerateSupport={handleGenerateSupport}
+          onSlidesGenerated={handleSlidesGenerated}
         />
       )}
 
@@ -524,6 +710,8 @@ function CreateFormationContent() {
           modules={modules}
           formationTitre={ficheData.titre}
           formationObjectifs={ficheData.objectifs}
+          initialData={evaluationsData || undefined}
+          onDataChange={setEvaluationsData}
           onNext={() => goToNextStep("evaluations", "documents")}
           onPrevious={() => goToPreviousStep("slides")}
         />

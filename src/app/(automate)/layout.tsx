@@ -5,6 +5,7 @@ import { AutomateProvider } from "@/context/AutomateContext";
 import AutomateHeader from "@/components/automate/AutomateHeader";
 import AutomateSidebar from "@/components/automate/AutomateSidebar";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
+import SlideGenerationNotifications from "@/components/automate/SlideGenerationNotifications";
 import Backdrop from "@/layout/Backdrop";
 import React from "react";
 
@@ -35,6 +36,8 @@ export default function AutomateLayout({
           <div className="p-4 mx-auto max-w-7xl md:p-6 lg:p-8">{children}</div>
         </div>
       </div>
+      {/* Notifications de génération de slides */}
+      <SlideGenerationNotifications />
     </AutomateProvider>
   );
 }

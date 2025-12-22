@@ -71,6 +71,11 @@ export async function GET(
           orderBy: { ordre: "asc" },
         },
         documents: true,
+        slideGenerations: {
+          where: { status: "COMPLETED" },
+          orderBy: { completedAt: "desc" },
+          take: 1,
+        },
         user: {
           select: {
             id: true,
@@ -137,6 +142,14 @@ export async function PATCH(
     if (body.status !== undefined) updateData.status = body.status;
     if (body.fichePedagogique !== undefined) updateData.fichePedagogique = body.fichePedagogique;
     if (body.isArchived !== undefined) updateData.isArchived = body.isArchived;
+
+    // Nouveaux champs pour la persistance du wizard
+    if (body.currentStep !== undefined) updateData.currentStep = body.currentStep;
+    if (body.completedSteps !== undefined) updateData.completedSteps = body.completedSteps;
+    if (body.contexteData !== undefined) updateData.contexteData = body.contexteData;
+    if (body.evaluationsData !== undefined) updateData.evaluationsData = body.evaluationsData;
+    if (body.slidesData !== undefined) updateData.slidesData = body.slidesData;
+    if (body.slidesGenerated !== undefined) updateData.slidesGenerated = body.slidesGenerated;
 
     const updatedFormation = await prisma.formation.update({
       where: { id },

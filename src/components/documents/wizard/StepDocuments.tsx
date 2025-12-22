@@ -103,7 +103,7 @@ const documentsConfig: DocumentConfig[] = [
   {
     id: "convention",
     label: "Convention de formation",
-    description: "Document contractuel pour les entreprises",
+    description: "Document contractuel pour les entreprises et indépendants (SIRET)",
     icon: <FileSignature size={20} />,
     perClient: true,
     perApprenant: false,
@@ -113,7 +113,7 @@ const documentsConfig: DocumentConfig[] = [
   {
     id: "contrat",
     label: "Contrat de formation",
-    description: "Document contractuel pour indépendants et particuliers",
+    description: "Document contractuel pour les particuliers",
     icon: <FileText size={20} />,
     perClient: true,
     perApprenant: false,
@@ -515,19 +515,25 @@ export default function StepDocuments({
   }, [previewDoc, editedContent]);
 
   // Obtenir les destinataires pour un type de document
+  // Convention = Entreprises + Indépendants (personnes avec SIRET)
+  // Contrat = Particuliers uniquement (personnes sans SIRET)
   const getDestinataires = (docType: DocumentType) => {
     switch (docType) {
       case "convention":
-        return clients.filter((c) => c.type === "ENTREPRISE").map((c) => ({
+        // Convention pour entreprises ET indépendants (ils ont un SIRET)
+        return clients.filter((c) => c.type === "ENTREPRISE" || c.type === "INDEPENDANT").map((c) => ({
           id: c.id,
-          name: c.entreprise?.raisonSociale || "Entreprise",
+          name: c.type === "ENTREPRISE"
+            ? c.entreprise?.raisonSociale || "Entreprise"
+            : c.apprenant ? `${c.apprenant.prenom} ${c.apprenant.nom}` : "Indépendant",
           type: "client" as const,
           clientType: c.type,
         }));
       case "contrat":
-        return clients.filter((c) => c.type === "INDEPENDANT" || c.type === "PARTICULIER").map((c) => ({
+        // Contrat uniquement pour les particuliers (sans SIRET)
+        return clients.filter((c) => c.type === "PARTICULIER").map((c) => ({
           id: c.id,
-          name: c.apprenant ? `${c.apprenant.prenom} ${c.apprenant.nom}` : "Client",
+          name: c.apprenant ? `${c.apprenant.prenom} ${c.apprenant.nom}` : "Particulier",
           type: "client" as const,
           clientType: c.type,
         }));
@@ -673,65 +679,76 @@ export default function StepDocuments({
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
 
   // Télécharger tous les documents en PDF (un par un en chaîne)
+  // Utilise un Set pour éviter les doublons
   const downloadAllAsPDF = async () => {
     if (generatedDocs.length === 0) return;
 
+    // Dédupliquer les documents par ID
+    const uniqueDocs = Array.from(
+      new Map(generatedDocs.map(doc => [doc.id, doc])).values()
+    );
+
+    if (uniqueDocs.length === 0) return;
+
     setIsDownloadingAll(true);
-    setDownloadProgress({ current: 0, total: generatedDocs.length });
+    setDownloadProgress({ current: 0, total: uniqueDocs.length });
 
-    for (let i = 0; i < generatedDocs.length; i++) {
-      const doc = generatedDocs[i];
-      setDownloadProgress({ current: i + 1, total: generatedDocs.length });
+    // Utiliser une seule fenêtre popup pour tous les documents
+    for (let i = 0; i < uniqueDocs.length; i++) {
+      const doc = uniqueDocs[i];
+      setDownloadProgress({ current: i + 1, total: uniqueDocs.length });
 
-      // Créer une iframe cachée pour l'impression
-      const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "none";
-      document.body.appendChild(iframe);
+      // Ouvrir une nouvelle fenêtre pour l'impression
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        alert("Veuillez autoriser les popups pour télécharger les documents.");
+        break;
+      }
 
-      const iframeDoc = iframe.contentWindow?.document;
-      if (iframeDoc) {
-        iframeDoc.open();
-        iframeDoc.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>${doc.titre}</title>
-            <style>${getDocumentStyles()}</style>
-          </head>
-          <body>
-            ${doc.renderedContent}
-          </body>
-          </html>
-        `);
-        iframeDoc.close();
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${doc.titre}</title>
+          <style>${getDocumentStyles()}</style>
+        </head>
+        <body>
+          ${doc.renderedContent}
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 300);
+            }
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
 
-        // Attendre que le contenu soit chargé puis imprimer
-        await new Promise<void>((resolve) => {
-          iframe.onload = () => {
-            setTimeout(() => {
-              iframe.contentWindow?.print();
-              // Attendre un peu pour que la boîte de dialogue s'ouvre
-              setTimeout(() => {
-                document.body.removeChild(iframe);
-                resolve();
-              }, 1000);
-            }, 500);
-          };
-          // Déclencher onload manuellement si déjà chargé
-          if (iframeDoc.readyState === "complete") {
-            iframe.onload?.(new Event("load"));
+      // Attendre que l'utilisateur ait fini avec ce document avant de passer au suivant
+      await new Promise<void>((resolve) => {
+        // Vérifier périodiquement si la fenêtre est fermée
+        const checkInterval = setInterval(() => {
+          if (printWindow.closed) {
+            clearInterval(checkInterval);
+            resolve();
           }
-        });
+        }, 500);
 
-        // Délai entre chaque document pour éviter les conflits
-        if (i < generatedDocs.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        }
+        // Timeout de sécurité après 60 secondes
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          if (!printWindow.closed) {
+            printWindow.close();
+          }
+          resolve();
+        }, 60000);
+      });
+
+      // Petit délai entre chaque document
+      if (i < uniqueDocs.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 

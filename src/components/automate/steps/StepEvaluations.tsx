@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 // Types
 interface Module {
@@ -31,10 +31,21 @@ interface EvaluationData {
   }>;
 }
 
+// Type pour les données d'évaluations sauvegardées
+export interface EvaluationsDataSaved {
+  positionnement: EvaluationData | null;
+  evaluationFinale: EvaluationData | null;
+  qcmByModule: Record<string, QCMData | null>;
+}
+
 interface StepEvaluationsProps {
   modules: Module[];
   formationTitre?: string;
   formationObjectifs?: string[];
+  // Données initiales (pour la persistance)
+  initialData?: EvaluationsDataSaved;
+  // Callback pour sauvegarder les changements
+  onDataChange?: (data: EvaluationsDataSaved) => void;
   onNext: () => void;
   onPrevious: () => void;
   onGeneratePositionnement?: () => void;
@@ -448,13 +459,26 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   modules,
   formationTitre = "Formation",
   formationObjectifs = [],
+  initialData,
+  onDataChange,
   onNext,
   onPrevious,
 }) => {
-  // Etats pour les evaluations generees
-  const [positionnement, setPositionnement] = useState<EvaluationData | null>(null);
-  const [evaluationFinale, setEvaluationFinale] = useState<EvaluationData | null>(null);
-  const [qcmByModule, setQcmByModule] = useState<Record<string, QCMData | null>>({});
+  // Etats pour les evaluations generees - initialisés avec les données sauvegardées si disponibles
+  const [positionnement, setPositionnement] = useState<EvaluationData | null>(initialData?.positionnement || null);
+  const [evaluationFinale, setEvaluationFinale] = useState<EvaluationData | null>(initialData?.evaluationFinale || null);
+  const [qcmByModule, setQcmByModule] = useState<Record<string, QCMData | null>>(initialData?.qcmByModule || {});
+
+  // Notifier le parent quand les données changent
+  useEffect(() => {
+    if (onDataChange) {
+      onDataChange({
+        positionnement,
+        evaluationFinale,
+        qcmByModule,
+      });
+    }
+  }, [positionnement, evaluationFinale, qcmByModule, onDataChange]);
 
   // Etats de chargement
   const [generatingPositionnement, setGeneratingPositionnement] = useState(false);

@@ -15,6 +15,8 @@ import {
   Link as LinkIcon,
   X,
   Search,
+  Check,
+  Save,
 } from "lucide-react";
 import DatePicker from "@/components/ui/DatePicker";
 import {
@@ -71,6 +73,16 @@ export default function StepLieu({
   const [loadingLieux, setLoadingLieux] = useState(false);
   const [showLieuModal, setShowLieuModal] = useState(false);
   const [searchLieu, setSearchLieu] = useState("");
+
+  // États pour la création rapide de lieu
+  const [showCreateLieu, setShowCreateLieu] = useState(false);
+  const [newLieuNom, setNewLieuNom] = useState("");
+  const [newLieuAdresse, setNewLieuAdresse] = useState("");
+  const [newLieuCodePostal, setNewLieuCodePostal] = useState("");
+  const [newLieuVille, setNewLieuVille] = useState("");
+  const [newLieuCapacite, setNewLieuCapacite] = useState("");
+  const [creatingLieu, setCreatingLieu] = useState(false);
+  const [savingAdresseLibre, setSavingAdresseLibre] = useState(false);
 
   // Charger les lieux depuis la BDD
   const fetchLieux = useCallback(async () => {
@@ -129,6 +141,95 @@ export default function StepLieu({
     });
     setShowLieuModal(false);
     setSearchLieu("");
+  };
+
+  // Créer un nouveau lieu
+  const handleCreateLieu = async () => {
+    if (!newLieuNom.trim() || !newLieuAdresse.trim()) return;
+
+    setCreatingLieu(true);
+    try {
+      const res = await fetch("/api/donnees/lieux", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom: newLieuNom.trim(),
+          lieuFormation: newLieuAdresse.trim(),
+          codePostal: newLieuCodePostal.trim(),
+          ville: newLieuVille.trim(),
+          capacite: newLieuCapacite ? parseInt(newLieuCapacite) : null,
+          typeLieu: "PRESENTIEL",
+        }),
+      });
+
+      if (res.ok) {
+        const newLieu = await res.json();
+        // Ajouter le nouveau lieu à la liste
+        setLieux((prev) => [newLieu, ...prev]);
+        // Réinitialiser le formulaire
+        setNewLieuNom("");
+        setNewLieuAdresse("");
+        setNewLieuCodePostal("");
+        setNewLieuVille("");
+        setNewLieuCapacite("");
+        setShowCreateLieu(false);
+        // Sélectionner automatiquement le nouveau lieu
+        selectLieu(newLieu);
+      } else {
+        const errorData = await res.json();
+        console.error("Erreur API création lieu:", errorData);
+        alert("Erreur lors de la création du lieu: " + (errorData.error || "Erreur inconnue"));
+      }
+    } catch (error) {
+      console.error("Erreur création lieu:", error);
+      alert("Erreur lors de la création du lieu");
+    } finally {
+      setCreatingLieu(false);
+    }
+  };
+
+  // Sauvegarder l'adresse libre comme nouveau lieu
+  const handleSaveAdresseLibre = async () => {
+    if (!lieu.adresseLibre?.trim()) return;
+
+    setSavingAdresseLibre(true);
+    try {
+      // Essayer de parser l'adresse
+      const lines = lieu.adresseLibre.split("\n").map(l => l.trim()).filter(Boolean);
+      const nom = lines[0] || "Lieu sans nom";
+      const adresse = lines.join(", ");
+
+      const res = await fetch("/api/donnees/lieux", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom: nom,
+          lieuFormation: adresse,
+          typeLieu: "PRESENTIEL",
+        }),
+      });
+
+      if (res.ok) {
+        const newLieu = await res.json();
+        setLieux((prev) => [newLieu, ...prev]);
+        // Sélectionner le nouveau lieu et vider l'adresse libre
+        onChange({
+          ...lieu,
+          lieuId: newLieu.id,
+          lieu: newLieu,
+          adresseLibre: "",
+        });
+        alert("Lieu sauvegardé dans votre base de données !");
+      } else {
+        const errorData = await res.json();
+        alert("Erreur: " + (errorData.error || "Erreur inconnue"));
+      }
+    } catch (error) {
+      console.error("Erreur sauvegarde lieu:", error);
+      alert("Erreur lors de la sauvegarde du lieu");
+    } finally {
+      setSavingAdresseLibre(false);
+    }
   };
 
   // Ajouter une journée
@@ -317,6 +418,20 @@ export default function StepLieu({
                   rows={2}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
+                {lieu.adresseLibre && (
+                  <button
+                    onClick={handleSaveAdresseLibre}
+                    disabled={savingAdresseLibre}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors disabled:opacity-50 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
+                  >
+                    {savingAdresseLibre ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Save size={14} />
+                    )}
+                    Sauvegarder dans Mes données
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -548,6 +663,115 @@ export default function StepLieu({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {/* Bouton création rapide */}
+              {!showCreateLieu ? (
+                <button
+                  onClick={() => setShowCreateLieu(true)}
+                  className="w-full flex items-center justify-center gap-2 p-3 mb-3 border-2 border-dashed border-brand-300 rounded-lg text-brand-600 hover:bg-brand-50 transition-colors dark:border-brand-500/50 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                >
+                  <Plus size={18} />
+                  Créer un nouveau lieu
+                </button>
+              ) : (
+                <div className="p-4 mb-3 bg-brand-50 dark:bg-brand-500/10 rounded-xl border border-brand-200 dark:border-brand-500/30">
+                  <h4 className="text-sm font-medium text-brand-700 dark:text-brand-400 mb-3">
+                    Nouveau lieu
+                  </h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Nom du lieu *
+                      </label>
+                      <input
+                        type="text"
+                        value={newLieuNom}
+                        onChange={(e) => setNewLieuNom(e.target.value)}
+                        placeholder="Ex: Salle de formation Paris"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Adresse complète *
+                      </label>
+                      <input
+                        type="text"
+                        value={newLieuAdresse}
+                        onChange={(e) => setNewLieuAdresse(e.target.value)}
+                        placeholder="Ex: 15 rue de la Formation"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          Code postal
+                        </label>
+                        <input
+                          type="text"
+                          value={newLieuCodePostal}
+                          onChange={(e) => setNewLieuCodePostal(e.target.value)}
+                          placeholder="75001"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          Ville
+                        </label>
+                        <input
+                          type="text"
+                          value={newLieuVille}
+                          onChange={(e) => setNewLieuVille(e.target.value)}
+                          placeholder="Paris"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Capacité (optionnel)
+                      </label>
+                      <input
+                        type="number"
+                        value={newLieuCapacite}
+                        onChange={(e) => setNewLieuCapacite(e.target.value)}
+                        placeholder="Ex: 12"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => {
+                          setShowCreateLieu(false);
+                          setNewLieuNom("");
+                          setNewLieuAdresse("");
+                          setNewLieuCodePostal("");
+                          setNewLieuVille("");
+                          setNewLieuCapacite("");
+                        }}
+                        className="flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        onClick={handleCreateLieu}
+                        disabled={!newLieuNom.trim() || !newLieuAdresse.trim() || creatingLieu}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {creatingLieu ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Check size={16} />
+                        )}
+                        Créer et sélectionner
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {loadingLieux ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="animate-spin text-brand-500" size={24} />
@@ -556,6 +780,9 @@ export default function StepLieu({
                 <div className="text-center py-8">
                   <MapPin className="w-12 h-12 mx-auto text-gray-300 mb-2" />
                   <p className="text-sm text-gray-500">Aucun lieu trouvé</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Créez un lieu ci-dessus ou ajoutez-en dans Mes données
+                  </p>
                 </div>
               ) : (
                 filteredLieux.map((lieuItem) => (

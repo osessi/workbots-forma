@@ -200,10 +200,14 @@ export default function StepTarifs({
 
   // Créer un nouveau financeur
   const handleCreateFinanceur = async () => {
-    if (!newFinanceurNom.trim()) return;
+    if (!newFinanceurNom.trim()) {
+      console.log("Nom du financeur vide, annulation");
+      return;
+    }
 
     setCreatingFinanceur(true);
     try {
+      console.log("Création du financeur:", { nom: newFinanceurNom.trim(), type: newFinanceurType });
       const res = await fetch("/api/donnees/financeurs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -215,17 +219,23 @@ export default function StepTarifs({
 
       if (res.ok) {
         const newFinanceur = await res.json();
+        console.log("Financeur créé:", newFinanceur);
         // Ajouter le nouveau financeur à la liste
         setFinanceurs((prev) => [newFinanceur, ...prev]);
-        // Sélectionner automatiquement le nouveau financeur
-        selectFinanceur(newFinanceur);
-        // Réinitialiser le formulaire
+        // Réinitialiser le formulaire AVANT de sélectionner pour éviter les problèmes de state
         setNewFinanceurNom("");
         setNewFinanceurType("OPCO");
         setShowCreateFinanceur(false);
+        // Sélectionner automatiquement le nouveau financeur
+        selectFinanceur(newFinanceur);
+      } else {
+        const errorData = await res.json();
+        console.error("Erreur API création financeur:", errorData);
+        alert("Erreur lors de la création du financeur: " + (errorData.error || "Erreur inconnue"));
       }
     } catch (error) {
       console.error("Erreur création financeur:", error);
+      alert("Erreur lors de la création du financeur");
     } finally {
       setCreatingFinanceur(false);
     }

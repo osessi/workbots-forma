@@ -28,6 +28,14 @@ export default function StepFormateurs({
   onNext,
   onPrev,
 }: StepFormateursProps) {
+  // Valeurs par défaut pour éviter les erreurs si undefined (données de BDD)
+  const safeFormateurs = {
+    formateurPrincipalId: formateurs?.formateurPrincipalId ?? null,
+    formateurPrincipal: formateurs?.formateurPrincipal,
+    coformateursIds: formateurs?.coformateursIds ?? [],
+    coformateurs: formateurs?.coformateurs ?? [],
+  };
+
   const [intervenants, setIntervenants] = useState<Intervenant[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [showFormateurModal, setShowFormateurModal] = useState(false);
@@ -83,15 +91,15 @@ export default function StepFormateurs({
   // Sélectionner le formateur principal
   const selectFormateurPrincipal = (intervenant: Intervenant) => {
     // Si l'intervenant était coformateur, le retirer
-    const newCoformateurs = formateurs.coformateurs.filter(
+    const newCoformateurs = safeFormateurs.coformateurs.filter(
       (c) => c.id !== intervenant.id
     );
-    const newCoformateursIds = formateurs.coformateursIds.filter(
+    const newCoformateursIds = safeFormateurs.coformateursIds.filter(
       (id) => id !== intervenant.id
     );
 
     onChange({
-      ...formateurs,
+      ...safeFormateurs,
       formateurPrincipalId: intervenant.id,
       formateurPrincipal: intervenant,
       coformateurs: newCoformateurs,
@@ -105,16 +113,16 @@ export default function StepFormateurs({
   const addCoformateur = (intervenant: Intervenant) => {
     // Ne pas ajouter si c'est déjà le formateur principal ou déjà coformateur
     if (
-      formateurs.formateurPrincipalId === intervenant.id ||
-      formateurs.coformateursIds.includes(intervenant.id)
+      safeFormateurs.formateurPrincipalId === intervenant.id ||
+      safeFormateurs.coformateursIds.includes(intervenant.id)
     ) {
       return;
     }
 
     onChange({
-      ...formateurs,
-      coformateursIds: [...formateurs.coformateursIds, intervenant.id],
-      coformateurs: [...formateurs.coformateurs, intervenant],
+      ...safeFormateurs,
+      coformateursIds: [...safeFormateurs.coformateursIds, intervenant.id],
+      coformateurs: [...safeFormateurs.coformateurs, intervenant],
     });
     setShowFormateurModal(false);
     setSearchFormateur("");
@@ -123,7 +131,7 @@ export default function StepFormateurs({
   // Retirer le formateur principal
   const removeFormateurPrincipal = () => {
     onChange({
-      ...formateurs,
+      ...safeFormateurs,
       formateurPrincipalId: null,
       formateurPrincipal: undefined,
     });
@@ -132,9 +140,9 @@ export default function StepFormateurs({
   // Retirer un coformateur
   const removeCoformateur = (intervenantId: string) => {
     onChange({
-      ...formateurs,
-      coformateursIds: formateurs.coformateursIds.filter((id) => id !== intervenantId),
-      coformateurs: formateurs.coformateurs.filter((c) => c.id !== intervenantId),
+      ...safeFormateurs,
+      coformateursIds: safeFormateurs.coformateursIds.filter((id) => id !== intervenantId),
+      coformateurs: safeFormateurs.coformateurs.filter((c) => c.id !== intervenantId),
     });
   };
 
@@ -171,16 +179,16 @@ export default function StepFormateurs({
   // Promouvoir un coformateur en formateur principal
   const promoteToFormateur = (intervenant: Intervenant) => {
     // Déplacer l'ancien formateur principal vers coformateurs
-    const newCoformateurs = [...formateurs.coformateurs.filter((c) => c.id !== intervenant.id)];
-    const newCoformateursIds = [...formateurs.coformateursIds.filter((id) => id !== intervenant.id)];
+    const newCoformateurs = [...safeFormateurs.coformateurs.filter((c) => c.id !== intervenant.id)];
+    const newCoformateursIds = [...safeFormateurs.coformateursIds.filter((id) => id !== intervenant.id)];
 
-    if (formateurs.formateurPrincipal) {
-      newCoformateurs.push(formateurs.formateurPrincipal);
-      newCoformateursIds.push(formateurs.formateurPrincipalId!);
+    if (safeFormateurs.formateurPrincipal) {
+      newCoformateurs.push(safeFormateurs.formateurPrincipal);
+      newCoformateursIds.push(safeFormateurs.formateurPrincipalId!);
     }
 
     onChange({
-      ...formateurs,
+      ...safeFormateurs,
       formateurPrincipalId: intervenant.id,
       formateurPrincipal: intervenant,
       coformateurs: newCoformateurs,
@@ -188,7 +196,7 @@ export default function StepFormateurs({
     });
   };
 
-  const canProceed = !!formateurs.formateurPrincipalId;
+  const canProceed = !!safeFormateurs.formateurPrincipalId;
 
   return (
     <div className="space-y-6">
@@ -217,35 +225,35 @@ export default function StepFormateurs({
           <span className="text-xs text-red-500">*</span>
         </h3>
 
-        {formateurs.formateurPrincipal ? (
+        {safeFormateurs.formateurPrincipal ? (
           <div className="p-4 rounded-lg border border-brand-200 bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center">
                   <span className="text-lg font-semibold text-brand-600 dark:text-brand-400">
-                    {formateurs.formateurPrincipal.prenom[0]}
-                    {formateurs.formateurPrincipal.nom[0]}
+                    {safeFormateurs.formateurPrincipal.prenom[0]}
+                    {safeFormateurs.formateurPrincipal.nom[0]}
                   </span>
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">
-                    {formateurs.formateurPrincipal.prenom}{" "}
-                    {formateurs.formateurPrincipal.nom}
+                    {safeFormateurs.formateurPrincipal.prenom}{" "}
+                    {safeFormateurs.formateurPrincipal.nom}
                   </p>
-                  {formateurs.formateurPrincipal.fonction && (
+                  {safeFormateurs.formateurPrincipal.fonction && (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {formateurs.formateurPrincipal.fonction}
+                      {safeFormateurs.formateurPrincipal.fonction}
                     </p>
                   )}
-                  {formateurs.formateurPrincipal.email && (
+                  {safeFormateurs.formateurPrincipal.email && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {formateurs.formateurPrincipal.email}
+                      {safeFormateurs.formateurPrincipal.email}
                     </p>
                   )}
-                  {formateurs.formateurPrincipal.specialites &&
-                    formateurs.formateurPrincipal.specialites.length > 0 && (
+                  {safeFormateurs.formateurPrincipal.specialites &&
+                    safeFormateurs.formateurPrincipal.specialites.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {formateurs.formateurPrincipal.specialites.map((s, i) => (
+                        {safeFormateurs.formateurPrincipal.specialites.map((s, i) => (
                           <span
                             key={i}
                             className="px-2 py-0.5 text-xs bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded"
@@ -284,9 +292,9 @@ export default function StepFormateurs({
           <span className="text-xs text-gray-400 font-normal">(optionnel)</span>
         </h3>
 
-        {formateurs.coformateurs.length > 0 && (
+        {safeFormateurs.coformateurs.length > 0 && (
           <div className="space-y-2 mb-4">
-            {formateurs.coformateurs.map((coformateur) => (
+            {safeFormateurs.coformateurs.map((coformateur) => (
               <div
                 key={coformateur.id}
                 className="p-3 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
@@ -341,20 +349,20 @@ export default function StepFormateurs({
       </div>
 
       {/* Récapitulatif */}
-      {(formateurs.formateurPrincipal || formateurs.coformateurs.length > 0) && (
+      {(safeFormateurs.formateurPrincipal || safeFormateurs.coformateurs.length > 0) && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             Équipe pédagogique
           </h4>
           <div className="flex flex-wrap gap-2">
-            {formateurs.formateurPrincipal && (
+            {safeFormateurs.formateurPrincipal && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-100 dark:bg-brand-500/20 text-sm font-medium text-brand-700 dark:text-brand-400">
                 <Star size={14} />
-                {formateurs.formateurPrincipal.prenom}{" "}
-                {formateurs.formateurPrincipal.nom}
+                {safeFormateurs.formateurPrincipal.prenom}{" "}
+                {safeFormateurs.formateurPrincipal.nom}
               </span>
             )}
-            {formateurs.coformateurs.map((c) => (
+            {safeFormateurs.coformateurs.map((c) => (
               <span
                 key={c.id}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -435,8 +443,8 @@ export default function StepFormateurs({
               ) : (
                 filteredIntervenants.map((intervenant) => {
                   const isFormateurPrincipal =
-                    formateurs.formateurPrincipalId === intervenant.id;
-                  const isCoformateur = formateurs.coformateursIds.includes(
+                    safeFormateurs.formateurPrincipalId === intervenant.id;
+                  const isCoformateur = safeFormateurs.coformateursIds.includes(
                     intervenant.id
                   );
                   const isDisabled =

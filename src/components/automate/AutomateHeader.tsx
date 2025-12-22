@@ -97,7 +97,7 @@ const AutomateHeader: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 flex w-full bg-white border-gray-200 z-[999] dark:border-gray-800 dark:bg-gray-900 lg:border-b">
+    <header className="sticky top-0 flex w-full bg-white border-gray-200 z-40 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
       <div className="flex items-center justify-between w-full px-4 py-3 lg:px-6 lg:py-4">
         {/* Left: Menu toggle */}
         <div className="flex items-center gap-4">

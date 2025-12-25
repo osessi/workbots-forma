@@ -11,6 +11,7 @@ export default async function SuperAdminLayout({
 }) {
   // Vérifier l'authentification
   const cookieStore = await cookies();
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -51,10 +52,8 @@ export default async function SuperAdminLayout({
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       <AdminSidebar />
-      <main className="lg:ml-64 min-h-screen pt-14 lg:pt-0">
-        <div className="p-4 sm:p-6 lg:p-8">
-          {children}
-        </div>
+      <main className="lg:ml-64 min-h-screen pt-14 lg:pt-0 p-4 sm:p-6 lg:p-8 [&:has(.slides-content)]:p-0">
+        {children}
       </main>
     </div>
   );

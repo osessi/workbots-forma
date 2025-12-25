@@ -15,6 +15,8 @@ import {
   Plus,
   Landmark,
   Check,
+  Trash2,
+  Percent,
 } from "lucide-react";
 import {
   SessionClient,
@@ -24,6 +26,7 @@ import {
   FormationInfo,
   FinanceurType,
   financeurTypeLabels,
+  ClientFinancement,
 } from "./types";
 
 interface StepTarifsProps {
@@ -71,6 +74,21 @@ const financeurTypes: FinanceurType[] = [
   "ORGANISME_PUBLIC",
   "AUTRE",
 ];
+
+// Helper pour calculer les montants
+const calculateTarifAmounts = (tarifHT: number, tauxTVA: number, financements: ClientFinancement[]): Partial<SessionTarif> => {
+  const totalFinance = financements.reduce((acc, f) => acc + f.montant, 0);
+  const resteAChargeHT = Math.max(0, tarifHT - totalFinance);
+  const montantTVA = resteAChargeHT * (tauxTVA / 100);
+  const resteAChargeTTC = resteAChargeHT + montantTVA;
+
+  return {
+    totalFinance,
+    resteAChargeHT,
+    montantTVA,
+    resteAChargeTTC,
+  };
+};
 
 export default function StepTarifs({
   clients,
@@ -127,47 +145,143 @@ export default function StepTarifs({
     }
   }, [formation]);
 
-  // Initialiser les tarifs pour chaque client s'ils n'existent pas
+  // Initialiser et migrer les tarifs
   useEffect(() => {
     const existingClientIds = new Set(tarifs.map((t) => t.clientId));
     const missingClients = clients.filter((c) => !existingClientIds.has(c.id));
 
-    if (missingClients.length > 0) {
-      const newTarifs: SessionTarif[] = missingClients.map((client) => {
-        const defaultTarif = getDefaultTarif(client.type);
+    // Migrer les anciens tarifs vers le nouveau format si nécessaire
+    const needsMigration = tarifs.some((t) => t.financements === undefined || t.tauxTVA === undefined);
+
+    if (missingClients.length > 0 || needsMigration) {
+      // Migrer les tarifs existants
+      const migratedTarifs = tarifs.map((t) => {
+        // Si le tarif a déjà le nouveau format, le garder tel quel
+        if (t.financements !== undefined && t.tauxTVA !== undefined) {
+          return t;
+        }
+        // Sinon, migrer depuis l'ancien format
+        const oldTarif = t as unknown as { tarifHT: number; financeurId?: string | null; montantFinance?: number; resteACharge?: number };
+        const tauxTVA = 20;
+        const financements: ClientFinancement[] = [];
+
+        // Migrer l'ancien financement unique vers le nouveau format
+        if (oldTarif.financeurId && oldTarif.montantFinance) {
+          financements.push({
+            id: `migrated-${Date.now()}`,
+            financeurId: oldTarif.financeurId,
+            montant: oldTarif.montantFinance,
+          });
+        }
+
+        const calculated = calculateTarifAmounts(oldTarif.tarifHT || 0, tauxTVA, financements);
         return {
-          clientId: client.id,
-          tarifHT: defaultTarif,
-          financeurId: null,
-          montantFinance: 0,
-          resteACharge: defaultTarif,
+          clientId: t.clientId,
+          tarifHT: oldTarif.tarifHT || 0,
+          tauxTVA,
+          financements,
+          totalFinance: calculated.totalFinance || 0,
+          resteAChargeHT: calculated.resteAChargeHT || oldTarif.tarifHT || 0,
+          montantTVA: calculated.montantTVA || 0,
+          resteAChargeTTC: calculated.resteAChargeTTC || oldTarif.tarifHT || 0,
         };
       });
 
-      onChange([...tarifs, ...newTarifs]);
+      // Ajouter les nouveaux tarifs pour les clients manquants
+      const newTarifs: SessionTarif[] = missingClients.map((client) => {
+        const defaultTarif = getDefaultTarif(client.type);
+        const tauxTVA = 20;
+        const calculated = calculateTarifAmounts(defaultTarif, tauxTVA, []);
+        return {
+          clientId: client.id,
+          tarifHT: defaultTarif,
+          tauxTVA,
+          financements: [],
+          totalFinance: calculated.totalFinance || 0,
+          resteAChargeHT: calculated.resteAChargeHT || defaultTarif,
+          montantTVA: calculated.montantTVA || 0,
+          resteAChargeTTC: calculated.resteAChargeTTC || defaultTarif,
+        };
+      });
+
+      onChange([...migratedTarifs, ...newTarifs]);
     }
   }, [clients, tarifs, getDefaultTarif, onChange]);
 
-  // Mettre à jour un tarif
-  const updateTarif = (clientId: string, field: keyof SessionTarif, value: number | string | null) => {
+  // Recalculer un tarif
+  const recalculateTarif = (tarif: SessionTarif): SessionTarif => {
+    const calculated = calculateTarifAmounts(tarif.tarifHT, tarif.tauxTVA, tarif.financements);
+    return {
+      ...tarif,
+      ...calculated,
+    } as SessionTarif;
+  };
+
+  // Mettre à jour le tarif HT d'un client
+  const updateTarifHT = (clientId: string, value: number) => {
     onChange(
       tarifs.map((t) => {
         if (t.clientId === clientId) {
-          const updated = { ...t, [field]: value };
+          return recalculateTarif({ ...t, tarifHT: value });
+        }
+        return t;
+      })
+    );
+  };
 
-          // Recalculer le reste à charge
-          if (field === "tarifHT" || field === "montantFinance") {
-            updated.resteACharge = (updated.tarifHT || 0) - (updated.montantFinance || 0);
-            if (updated.resteACharge < 0) updated.resteACharge = 0;
-          }
+  // Mettre à jour la TVA d'un client
+  const updateTauxTVA = (clientId: string, value: number) => {
+    onChange(
+      tarifs.map((t) => {
+        if (t.clientId === clientId) {
+          return recalculateTarif({ ...t, tauxTVA: value });
+        }
+        return t;
+      })
+    );
+  };
 
-          // Si on retire le financeur, remettre montant à 0
-          if (field === "financeurId" && !value) {
-            updated.montantFinance = 0;
-            updated.resteACharge = updated.tarifHT;
-          }
+  // Ajouter un financement à un client
+  const addFinancement = (clientId: string, financeur: Financeur, montant: number) => {
+    onChange(
+      tarifs.map((t) => {
+        if (t.clientId === clientId) {
+          const newFinancement: ClientFinancement = {
+            id: `fin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            financeurId: financeur.id,
+            financeur,
+            montant,
+          };
+          const updatedFinancements = [...t.financements, newFinancement];
+          return recalculateTarif({ ...t, financements: updatedFinancements });
+        }
+        return t;
+      })
+    );
+  };
 
-          return updated;
+  // Supprimer un financement
+  const removeFinancement = (clientId: string, financementId: string) => {
+    onChange(
+      tarifs.map((t) => {
+        if (t.clientId === clientId) {
+          const updatedFinancements = t.financements.filter((f) => f.id !== financementId);
+          return recalculateTarif({ ...t, financements: updatedFinancements });
+        }
+        return t;
+      })
+    );
+  };
+
+  // Mettre à jour le montant d'un financement
+  const updateFinancementMontant = (clientId: string, financementId: string, montant: number) => {
+    onChange(
+      tarifs.map((t) => {
+        if (t.clientId === clientId) {
+          const updatedFinancements = t.financements.map((f) =>
+            f.id === financementId ? { ...f, montant } : f
+          );
+          return recalculateTarif({ ...t, financements: updatedFinancements });
         }
         return t;
       })
@@ -180,18 +294,17 @@ export default function StepTarifs({
     setShowFinanceurModal(true);
     setSearchFinanceur("");
     setSelectedFinanceurType("");
+    setShowCreateFinanceur(false);
   };
 
-  // Sélectionner un financeur
+  // Sélectionner un financeur (ajoute au client avec montant à définir)
   const selectFinanceur = (financeur: Financeur) => {
     if (selectedClientForFinanceur) {
       const tarif = tarifs.find((t) => t.clientId === selectedClientForFinanceur);
-      updateTarif(selectedClientForFinanceur, "financeurId", financeur.id);
-      // Pré-remplir le montant financé avec le tarif total
       if (tarif) {
-        setTimeout(() => {
-          updateTarif(selectedClientForFinanceur, "montantFinance", tarif.tarifHT);
-        }, 0);
+        // Calculer le montant restant disponible
+        const montantRestant = tarif.tarifHT - tarif.totalFinance;
+        addFinancement(selectedClientForFinanceur, financeur, Math.max(0, montantRestant));
       }
     }
     setShowFinanceurModal(false);
@@ -201,13 +314,11 @@ export default function StepTarifs({
   // Créer un nouveau financeur
   const handleCreateFinanceur = async () => {
     if (!newFinanceurNom.trim()) {
-      console.log("Nom du financeur vide, annulation");
       return;
     }
 
     setCreatingFinanceur(true);
     try {
-      console.log("Création du financeur:", { nom: newFinanceurNom.trim(), type: newFinanceurType });
       const res = await fetch("/api/donnees/financeurs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -219,10 +330,9 @@ export default function StepTarifs({
 
       if (res.ok) {
         const newFinanceur = await res.json();
-        console.log("Financeur créé:", newFinanceur);
-        // Ajouter le nouveau financeur à la liste
+        // Ajouter le nouveau financeur à la liste locale
         setFinanceurs((prev) => [newFinanceur, ...prev]);
-        // Réinitialiser le formulaire AVANT de sélectionner pour éviter les problèmes de state
+        // Réinitialiser le formulaire
         setNewFinanceurNom("");
         setNewFinanceurType("OPCO");
         setShowCreateFinanceur(false);
@@ -230,7 +340,6 @@ export default function StepTarifs({
         selectFinanceur(newFinanceur);
       } else {
         const errorData = await res.json();
-        console.error("Erreur API création financeur:", errorData);
         alert("Erreur lors de la création du financeur: " + (errorData.error || "Erreur inconnue"));
       }
     } catch (error) {
@@ -241,11 +350,6 @@ export default function StepTarifs({
     }
   };
 
-  // Retirer le financeur
-  const removeFinanceur = (clientId: string) => {
-    updateTarif(clientId, "financeurId", null);
-  };
-
   // Filtrer les financeurs
   const filteredFinanceurs = financeurs.filter((f) => {
     const matchesSearch = f.nom.toLowerCase().includes(searchFinanceur.toLowerCase());
@@ -253,10 +357,10 @@ export default function StepTarifs({
     return matchesSearch && matchesType;
   });
 
-  // Calculer le total
+  // Calculer les totaux
   const totalTarifHT = tarifs.reduce((acc, t) => acc + (t.tarifHT || 0), 0);
-  const totalFinance = tarifs.reduce((acc, t) => acc + (t.montantFinance || 0), 0);
-  const totalResteACharge = tarifs.reduce((acc, t) => acc + (t.resteACharge || 0), 0);
+  const totalFinance = tarifs.reduce((acc, t) => acc + (t.totalFinance || 0), 0);
+  const totalResteAChargeTTC = tarifs.reduce((acc, t) => acc + (t.resteAChargeTTC || 0), 0);
   const totalApprenants = clients.reduce((acc, c) => acc + c.apprenants.length, 0);
 
   const canProceed = tarifs.length > 0 && tarifs.every((t) => t.tarifHT >= 0);
@@ -299,16 +403,13 @@ export default function StepTarifs({
       <div className="space-y-4">
         {clients.map((client) => {
           const tarif = tarifs.find((t) => t.clientId === client.id);
-          if (!tarif) return null;
+          // Ne pas rendre si le tarif n'existe pas ou n'est pas encore migré
+          if (!tarif || tarif.resteAChargeTTC === undefined) return null;
 
           const clientName =
             client.type === "ENTREPRISE"
               ? client.entreprise?.raisonSociale
               : `${client.apprenant?.prenom} ${client.apprenant?.nom}`;
-
-          const selectedFinanceur = tarif.financeurId
-            ? financeurs.find((f) => f.id === tarif.financeurId)
-            : null;
 
           return (
             <div
@@ -337,15 +438,15 @@ export default function StepTarifs({
                   </div>
                 </div>
 
-                {/* Reste à charge */}
+                {/* Reste à charge TTC */}
                 <div className="text-right">
-                  <p className="text-xs text-gray-500 mb-1">Reste à charge</p>
+                  <p className="text-xs text-gray-500 mb-1">Reste à charge TTC</p>
                   <p className={`text-xl font-bold ${
-                    tarif.resteACharge === 0
+                    tarif.resteAChargeTTC === 0
                       ? "text-green-600 dark:text-green-400"
                       : "text-gray-900 dark:text-white"
                   }`}>
-                    {tarif.resteACharge.toLocaleString("fr-FR", {
+                    {tarif.resteAChargeTTC.toLocaleString("fr-FR", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })} €
@@ -353,115 +454,162 @@ export default function StepTarifs({
                 </div>
               </div>
 
-              {/* Tarif et financement */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Tarif HT */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {clientTypeLabels[client.type].tarifLabel}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={tarif.tarifHT || ""}
-                      onChange={(e) =>
-                        updateTarif(client.id, "tarifHT", parseFloat(e.target.value) || 0)
-                      }
-                      className="w-full pr-10 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      placeholder="0.00"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">
-                      €
-                    </span>
+              {/* Tarif, TVA et financement */}
+              <div className="space-y-4">
+                {/* Ligne 1: Tarif HT + Financements + TVA (ordre logique du calcul) */}
+                <div className="grid grid-cols-[1fr_1fr_0.5fr] gap-3">
+                  {/* 1. Tarif HT */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      {clientTypeLabels[client.type].tarifLabel}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={tarif.tarifHT || ""}
+                        onChange={(e) => updateTarifHT(client.id, parseFloat(e.target.value) || 0)}
+                        className="w-full pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        placeholder="0.00"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+                    </div>
+                    {getDefaultTarif(client.type) > 0 && tarif.tarifHT !== getDefaultTarif(client.type) && (
+                      <button
+                        onClick={() => updateTarifHT(client.id, getDefaultTarif(client.type))}
+                        className="text-xs text-brand-500 hover:text-brand-600 mt-0.5"
+                      >
+                        Défaut: {getDefaultTarif(client.type)} €
+                      </button>
+                    )}
                   </div>
-                  {getDefaultTarif(client.type) > 0 && tarif.tarifHT !== getDefaultTarif(client.type) && (
+
+                  {/* 2. Financements */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Financements
+                    </label>
                     <button
-                      onClick={() => updateTarif(client.id, "tarifHT", getDefaultTarif(client.type))}
-                      className="text-xs text-brand-500 hover:text-brand-600 mt-1"
+                      onClick={() => openFinanceurModal(client.id)}
+                      className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-green-300 hover:text-green-500 transition-colors dark:border-gray-700 dark:hover:border-green-500"
                     >
-                      Réinitialiser au tarif par défaut ({getDefaultTarif(client.type)} €)
+                      <Plus size={14} />
+                      Ajouter
                     </button>
-                  )}
+                    {tarif.financements.length > 0 && (
+                      <p className="text-xs text-green-600 mt-0.5 text-center">
+                        {tarif.financements.length} financeur{tarif.financements.length > 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 3. TVA (s'applique sur le reste à charge) */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      <span className="flex items-center gap-1">
+                        <Percent size={10} />
+                        TVA
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={tarif.tauxTVA}
+                        onChange={(e) => updateTauxTVA(client.id, parseFloat(e.target.value) || 0)}
+                        className="w-full pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        placeholder="20"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      = {tarif.montantTVA.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+                    </p>
+                  </div>
                 </div>
 
-                {/* Financement */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Financement externe
-                  </label>
-
-                  {selectedFinanceur ? (
-                    <div className="space-y-2">
-                      {/* Financeur sélectionné */}
-                      <div className="flex items-center justify-between p-2 rounded-lg border border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-900/20">
-                        <div className="flex items-center gap-2">
-                          <Landmark size={16} className="text-green-600 dark:text-green-400" />
-                          <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                            {selectedFinanceur.nom}
-                          </span>
+                {/* Ligne 2: Liste des financements (si présents) */}
+                {tarif.financements.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {tarif.financements.map((financement) => (
+                      <div
+                        key={financement.id}
+                        className="p-2.5 rounded-lg border border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-900/20"
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Landmark size={14} className="text-green-600 dark:text-green-400 flex-shrink-0" />
+                            <span className="text-xs font-medium text-green-700 dark:text-green-400 truncate">
+                              {financement.financeur?.nom || financeurs.find(f => f.id === financement.financeurId)?.nom || "Financeur"}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => removeFinancement(client.id, financement.id)}
+                            className="p-1 text-green-600 hover:text-red-500 hover:bg-red-50 rounded dark:hover:bg-red-500/10 flex-shrink-0"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={12} />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => removeFinanceur(client.id)}
-                          className="p-1 text-green-600 hover:text-red-500 hover:bg-red-50 rounded dark:hover:bg-red-500/10"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
 
-                      {/* Montant financé */}
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Montant pris en charge
-                        </label>
                         <div className="relative">
                           <input
                             type="number"
                             min="0"
                             max={tarif.tarifHT}
                             step="0.01"
-                            value={tarif.montantFinance || ""}
+                            value={financement.montant || ""}
                             onChange={(e) =>
-                              updateTarif(
+                              updateFinancementMontant(
                                 client.id,
-                                "montantFinance",
+                                financement.id,
                                 Math.min(parseFloat(e.target.value) || 0, tarif.tarifHT)
                               )
                             }
-                            className="w-full pr-10 py-2 text-sm border border-green-300 rounded-lg bg-green-50 focus:ring-green-500 focus:border-green-500 dark:border-green-700 dark:bg-green-900/20 dark:text-white"
-                            placeholder="Montant financé"
+                            className="w-full pr-8 py-1.5 text-sm border border-green-300 rounded bg-white focus:ring-green-500 focus:border-green-500 dark:border-green-700 dark:bg-green-900/30 dark:text-white"
+                            placeholder="Montant"
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600 text-sm font-medium">
-                            €
-                          </span>
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600 text-xs">€</span>
                         </div>
                         <div className="flex justify-between mt-1">
                           <button
-                            onClick={() => updateTarif(client.id, "montantFinance", tarif.tarifHT)}
-                            className="text-xs text-green-600 hover:text-green-700"
+                            onClick={() => updateFinancementMontant(client.id, financement.id, tarif.tarifHT - tarif.totalFinance + financement.montant)}
+                            className="text-[10px] text-green-600 hover:text-green-700"
                           >
-                            100% financé
+                            Max
                           </button>
                           <button
-                            onClick={() => updateTarif(client.id, "montantFinance", tarif.tarifHT / 2)}
-                            className="text-xs text-green-600 hover:text-green-700"
+                            onClick={() => updateFinancementMontant(client.id, financement.id, (tarif.tarifHT - tarif.totalFinance + financement.montant) / 2)}
+                            className="text-[10px] text-green-600 hover:text-green-700"
                           >
-                            50% financé
+                            50%
                           </button>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Récap financement pour ce client */}
+                {tarif.financements.length > 0 && (
+                  <div className="flex items-center gap-4 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
+                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                      <span>Financé:</span>
+                      <span className="font-medium text-green-600">-{tarif.totalFinance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</span>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => openFinanceurModal(client.id)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-200 rounded-lg text-gray-500 hover:border-green-300 hover:text-green-500 transition-colors dark:border-gray-700 dark:hover:border-green-500"
-                    >
-                      <Plus size={16} />
-                      Ajouter un financeur
-                    </button>
-                  )}
-                </div>
+                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                      <span>Reste HT:</span>
+                      <span className="font-medium">{tarif.resteAChargeHT.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                      <span>TVA:</span>
+                      <span className="font-medium">{tarif.montantTVA.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -497,7 +645,7 @@ export default function StepTarifs({
           <div className="p-3 rounded-lg bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30">
             <p className="text-xs text-brand-600 dark:text-brand-400 mb-1">Reste à charge clients</p>
             <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
-              {totalResteACharge.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+              {totalResteAChargeTTC.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
             </p>
           </div>
         </div>
@@ -650,7 +798,7 @@ export default function StepTarifs({
                         ) : (
                           <Check size={16} />
                         )}
-                        Créer et sélectionner
+                        Créer et ajouter
                       </button>
                     </div>
                   </div>

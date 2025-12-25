@@ -16,7 +16,6 @@ export {
   extractVariablesFromText,
   // Fonctions pour variables dynamiques
   generateJourneeVariables,
-  generateSalarieVariables,
   getVariablesWithDynamicContext,
   getVariableGroupsWithDynamicContext,
 } from "./variables";

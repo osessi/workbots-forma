@@ -46,7 +46,6 @@ const SparklesIcon = () => (
 const modaliteOptions = [
   { value: "presentiel", label: "Présentiel" },
   { value: "distanciel", label: "Distanciel" },
-  { value: "elearning", label: "E-learning" },
   { value: "mixte", label: "Mixte" },
 ];
 

@@ -9,7 +9,6 @@ import {
   X,
   Mail,
   Phone,
-  Briefcase,
   Building2,
   Loader2,
   Tag,
@@ -252,11 +251,6 @@ export default function IntervenantsPage() {
                   <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                     {intervenant.prenom} {intervenant.nom}
                   </h3>
-                  {intervenant.fonction && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {intervenant.fonction}
-                    </p>
-                  )}
                 </div>
                 <div className="flex items-center gap-1 ml-2">
                   <button
@@ -392,18 +386,6 @@ export default function IntervenantsPage() {
                       type="tel"
                       value={formData.telephone}
                       onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Fonction / Titre
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fonction}
-                      onChange={(e) => setFormData({ ...formData, fonction: e.target.value })}
-                      placeholder="Ex: Consultant en management, Formateur expert..."
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>

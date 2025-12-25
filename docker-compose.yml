@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # Next.js Frontend & API
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SLIDES_API_URL=http://slides-api:8000
+    depends_on:
+      - slides-api
+    restart: unless-stopped
+    networks:
+      - automate-network
+
+  # FastAPI Slides Generator
+  slides-api:
+    build:
+      context: ./services/slides-api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+    volumes:
+      - slides-data:/app/static
+      - slides-chroma:/app/chroma
+    restart: unless-stopped
+    networks:
+      - automate-network
+
+  # Optional: Ollama for local LLM (comment out if not needed)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   restart: unless-stopped
+  #   networks:
+  #     - automate-network
+
+networks:
+  automate-network:
+    driver: bridge
+
+volumes:
+  slides-data:
+  slides-chroma:
+  # ollama-data:

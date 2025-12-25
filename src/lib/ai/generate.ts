@@ -94,6 +94,143 @@ async function withRetry<T>(
 }
 
 // ===========================================
+// FONCTION UTILITAIRE POUR REPARER LE JSON
+// ===========================================
+
+/**
+ * Tente de reparer un JSON mal forme (tronque, virgules manquantes, etc.)
+ */
+function tryRepairJSON(jsonString: string): string {
+  let repaired = jsonString.trim();
+
+  // Supprimer les caracteres de controle invalides
+  repaired = repaired.replace(/[\x00-\x1F\x7F]/g, (char) => {
+    if (char === '\n' || char === '\r' || char === '\t') return char;
+    return '';
+  });
+
+  // Compter les accolades et crochets ouverts/fermes
+  let braceCount = 0;
+  let bracketCount = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < repaired.length; i++) {
+    const char = repaired[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') braceCount++;
+      else if (char === '}') braceCount--;
+      else if (char === '[') bracketCount++;
+      else if (char === ']') bracketCount--;
+    }
+  }
+
+  // Fermer les crochets manquants
+  while (bracketCount > 0) {
+    // Verifier si on est au milieu d'un element de tableau
+    const lastCommaIndex = repaired.lastIndexOf(',');
+    const lastBracketIndex = repaired.lastIndexOf('[');
+    const lastBraceIndex = repaired.lastIndexOf('}');
+
+    // Si la derniere chose est une virgule, la supprimer avant de fermer
+    if (lastCommaIndex > lastBracketIndex && lastCommaIndex > lastBraceIndex) {
+      repaired = repaired.substring(0, lastCommaIndex) + repaired.substring(lastCommaIndex + 1);
+    }
+
+    repaired += ']';
+    bracketCount--;
+  }
+
+  // Fermer les accolades manquantes
+  while (braceCount > 0) {
+    // Verifier si on est au milieu d'une propriete
+    const trimmed = repaired.trimEnd();
+
+    // Si ca se termine par une virgule, la supprimer
+    if (trimmed.endsWith(',')) {
+      repaired = trimmed.slice(0, -1);
+    }
+    // Si ca se termine par deux-points, ajouter null
+    else if (trimmed.endsWith(':')) {
+      repaired = trimmed + 'null';
+    }
+    // Si ca se termine par une string non fermee (rare)
+    else if (trimmed.endsWith('"') && !trimmed.endsWith('\\"')) {
+      // Probablement OK
+    }
+
+    repaired += '}';
+    braceCount--;
+  }
+
+  // Supprimer les virgules avant les fermetures
+  repaired = repaired.replace(/,\s*\]/g, ']');
+  repaired = repaired.replace(/,\s*\}/g, '}');
+
+  return repaired;
+}
+
+/**
+ * Extrait et parse le JSON de la reponse IA avec reparation automatique
+ */
+function extractAndParseJSON(text: string): unknown {
+  // Essayer de trouver le JSON dans la reponse
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("La reponse ne contient pas de JSON valide");
+  }
+
+  let jsonString = jsonMatch[0];
+
+  // Premier essai: parser directement
+  try {
+    return JSON.parse(jsonString);
+  } catch (firstError) {
+    console.warn("Premier parsing JSON echoue, tentative de reparation...", firstError);
+
+    // Deuxieme essai: reparer et parser
+    try {
+      const repaired = tryRepairJSON(jsonString);
+      console.log("JSON repare, nouvelle tentative de parsing...");
+      return JSON.parse(repaired);
+    } catch (secondError) {
+      console.error("Echec de la reparation JSON:", secondError);
+
+      // Troisieme essai: chercher un JSON plus petit valide
+      // Parfois l'IA genere du texte apres le JSON
+      const strictMatch = text.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+      if (strictMatch && strictMatch[0] !== jsonString) {
+        try {
+          return JSON.parse(strictMatch[0]);
+        } catch {
+          // Ignorer
+        }
+      }
+
+      // Dernier recours: retourner l'erreur originale avec contexte
+      const errorMessage = firstError instanceof Error ? firstError.message : String(firstError);
+      throw new Error(`JSON invalide: ${errorMessage}. Debut du JSON: ${jsonString.substring(0, 200)}...`);
+    }
+  }
+}
+
+// ===========================================
 // FONCTION GENERIQUE DE GENERATION
 // ===========================================
 
@@ -133,18 +270,8 @@ async function generateWithAI<T>(
       options
     );
 
-    // Parser le JSON de la reponse
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return {
-        success: false,
-        error: "La reponse ne contient pas de JSON valide",
-        retries,
-        provider: provider || undefined,
-      };
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
+    // Parser le JSON de la reponse avec reparation automatique
+    const parsed = extractAndParseJSON(result.text);
     const validated = schema.parse(parsed);
 
     // Extraire les tokens de l'usage

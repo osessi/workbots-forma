@@ -149,7 +149,8 @@ export async function GET(
 
     let renderedContent = "";
     try {
-      renderedContent = renderTemplate(contentStr, context, { previewMode: false });
+      // Cast to TemplateContext pour compatibilité avec l'ancien format
+      renderedContent = renderTemplate(contentStr, context as unknown as Parameters<typeof renderTemplate>[1], { previewMode: false });
     } catch {
       renderedContent = contentStr;
     }
@@ -164,7 +165,7 @@ export async function GET(
           ? document.template.headerContent
           : JSON.stringify(document.template.headerContent);
         try {
-          renderedHeader = renderTemplate(headerStr, context, { previewMode: false });
+          renderedHeader = renderTemplate(headerStr, context as unknown as Parameters<typeof renderTemplate>[1], { previewMode: false });
         } catch {
           renderedHeader = "";
         }
@@ -175,7 +176,7 @@ export async function GET(
           ? document.template.footerContent
           : JSON.stringify(document.template.footerContent);
         try {
-          renderedFooter = renderTemplate(footerStr, context, { previewMode: false });
+          renderedFooter = renderTemplate(footerStr, context as unknown as Parameters<typeof renderTemplate>[1], { previewMode: false });
         } catch {
           renderedFooter = "";
         }

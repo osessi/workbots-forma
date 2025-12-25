@@ -220,6 +220,29 @@ export async function POST(request: NextRequest) {
         horaires_matin: j.horaireMatin,
         horaires_apres_midi: j.horaireApresMidi,
       })),
+      // Nouveau format OF (of_)
+      of: {
+        raison_sociale: user.organization?.name || "",
+        nom_commercial: user.organization?.nomCommercial || "",
+        siret: user.organization?.siret || "",
+        ville_rcs: user.organization?.villeRcs || "",
+        nda: user.organization?.numeroFormateur || "",
+        region_enregistrement: user.organization?.prefectureRegion || "",
+        adresse: user.organization?.adresse || "",
+        code_postal: user.organization?.codePostal || "",
+        ville: user.organization?.ville || "",
+        pays: "France",
+        representant_nom: user.organization?.representantNom || "",
+        representant_prenom: user.organization?.representantPrenom || "",
+        representant_fonction: user.organization?.representantFonction || "",
+        email: user.organization?.email || "",
+        telephone: user.organization?.telephone || "",
+        site_web: user.organization?.siteWeb || "",
+        signature_responsable: user.organization?.signature || "",
+        cachet: user.organization?.cachet || "",
+        logo_organisme: user.organization?.logo || "",
+      },
+      // Ancien format pour compatibilité (legacy)
       organisation: {
         nom: user.organization?.name || "",
         siret: user.organization?.siret || "",
@@ -230,7 +253,9 @@ export async function POST(request: NextRequest) {
         telephone: user.organization?.telephone || "",
         email: user.organization?.email || "",
         logo: user.organization?.logo || "",
-        representant: user.organization?.representantLegal || "",
+        representant: user.organization?.representantLegal || user.organization?.representantNom && user.organization?.representantPrenom
+          ? `${user.organization.representantPrenom} ${user.organization.representantNom}`
+          : "",
         prefecture_region: user.organization?.prefectureRegion || "",
       },
       formateur: {

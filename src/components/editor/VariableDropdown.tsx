@@ -1,10 +1,11 @@
 "use client";
 // ===========================================
 // DROPDOWN POUR INSERTION DE VARIABLES
+// Mise à jour avec les nouvelles catégories
 // ===========================================
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { DocumentType, TemplateVariable, VariableGroup } from "@/lib/templates/types";
+import { DocumentType, TemplateVariable } from "@/lib/templates/types";
 import {
   getVariablesForDocumentType,
   VARIABLE_GROUPS,
@@ -34,13 +35,13 @@ export default function VariableDropdown({
 
   // Obtenir les groupes de variables selon le type de document et le contexte dynamique
   const variableGroups = useMemo(() => {
-    if (dynamicContext && (dynamicContext.nombreJournees || dynamicContext.nombreSalaries)) {
+    if (dynamicContext && dynamicContext.nombreJournees) {
       // Utiliser les variables dynamiques si un contexte est fourni
       return getVariableGroupsWithDynamicContext(dynamicContext);
     }
     // Sinon utiliser les groupes statiques
     return documentType ? getVariablesForDocumentType(documentType) : VARIABLE_GROUPS;
-  }, [documentType, dynamicContext?.nombreJournees, dynamicContext?.nombreSalaries]);
+  }, [documentType, dynamicContext?.nombreJournees]);
 
   // Filtrer les variables par recherche
   const filteredGroups = variableGroups
@@ -115,26 +116,46 @@ export default function VariableDropdown({
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case "formation":
+      // Nouvelles catégories
+      case "of":
+        return <Building2Icon />;
+      case "entreprise":
+        return <BriefcaseIcon />;
+      case "apprenant":
         return <GraduationCapIcon />;
+      case "financeur":
+        return <LandmarkIcon />;
+      case "intervenant":
+        return <UserCheckIcon />;
+      case "lieu":
+        return <MapPinIcon />;
+      case "formation":
+        return <BookOpenIcon />;
+      case "dates":
+        return <CalendarIcon />;
+      case "client":
+        return <UserCircleIcon />;
+      case "tarifs":
+        return <CreditCardIcon />;
+      case "conditions":
+        return <GitBranchIcon />;
+      // Legacy (pour compatibilité)
+      case "organisation":
+        return <Building2Icon />;
       case "journees":
         return <CalendarDaysIcon />;
       case "modules":
         return <LayersIcon />;
-      case "organisation":
-        return <Building2Icon />;
-      case "entreprise":
-        return <BriefcaseIcon />;
       case "particulier":
         return <UserIcon />;
       case "participants":
         return <UsersIcon />;
       case "formateur":
         return <UserCheckIcon />;
-      case "dates":
-        return <CalendarIcon />;
       case "document":
         return <FileTextIcon />;
+      case "signature":
+        return <PenToolIcon />;
       default:
         return <VariableIcon />;
     }
@@ -270,6 +291,11 @@ function VariableItem({ variable, onInsert }: VariableItemProps) {
               Boucle
             </span>
           )}
+          {variable.isConditional && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+              Condition
+            </span>
+          )}
         </div>
         <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
           {variable.label}
@@ -400,5 +426,64 @@ const FileTextIcon = () => (
     <line x1="16" y1="13" x2="8" y2="13" />
     <line x1="16" y1="17" x2="8" y2="17" />
     <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
+// Nouvelles icônes pour les catégories ajoutées
+const LandmarkIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="22" x2="21" y2="22" />
+    <line x1="6" y1="18" x2="6" y2="11" />
+    <line x1="10" y1="18" x2="10" y2="11" />
+    <line x1="14" y1="18" x2="14" y2="11" />
+    <line x1="18" y1="18" x2="18" y2="11" />
+    <polygon points="12 2 20 7 4 7" />
+  </svg>
+);
+
+const MapPinIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+const BookOpenIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+  </svg>
+);
+
+const UserCircleIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="10" r="3" />
+    <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
+  </svg>
+);
+
+const CreditCardIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+    <line x1="1" y1="10" x2="23" y2="10" />
+  </svg>
+);
+
+const GitBranchIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="6" y1="3" x2="6" y2="15" />
+    <circle cx="18" cy="6" r="3" />
+    <circle cx="6" cy="18" r="3" />
+    <path d="M18 9a9 9 0 0 1-9 9" />
+  </svg>
+);
+
+const PenToolIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 19l7-7 3 3-7 7-3-3z" />
+    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+    <path d="M2 2l7.586 7.586" />
+    <circle cx="11" cy="11" r="2" />
   </svg>
 );

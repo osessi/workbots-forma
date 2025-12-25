@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" fill="none">
+  <!-- Warm background -->
+  <rect width="320" height="180" fill="#FEF3C7"/>
+
+  <!-- Abstract decorative shapes -->
+  <circle cx="280" cy="30" r="40" fill="#FDE68A" opacity="0.6"/>
+  <circle cx="50" cy="150" r="30" fill="#FDE68A" opacity="0.4"/>
+
+  <!-- Large title -->
+  <rect x="30" y="35" width="180" height="14" rx="3" fill="#78350F"/>
+
+  <!-- Subtitle -->
+  <rect x="30" y="58" width="120" height="6" rx="1" fill="#92400E" opacity="0.7"/>
+
+  <!-- Main content block -->
+  <rect x="30" y="80" width="260" height="60" rx="6" fill="#FFFBEB"/>
+
+  <!-- Icon placeholders -->
+  <circle cx="60" cy="110" r="15" fill="#F59E0B"/>
+  <text x="60" y="115" font-family="Arial" font-size="14" fill="white" text-anchor="middle">1</text>
+
+  <circle cx="130" cy="110" r="15" fill="#F59E0B"/>
+  <text x="130" y="115" font-family="Arial" font-size="14" fill="white" text-anchor="middle">2</text>
+
+  <circle cx="200" cy="110" r="15" fill="#F59E0B"/>
+  <text x="200" y="115" font-family="Arial" font-size="14" fill="white" text-anchor="middle">3</text>
+
+  <circle cx="270" cy="110" r="15" fill="#F59E0B"/>
+  <text x="270" y="115" font-family="Arial" font-size="14" fill="white" text-anchor="middle">4</text>
+
+  <!-- Footer minimal -->
+  <rect x="130" y="160" width="60" height="3" rx="1" fill="#92400E" opacity="0.4"/>
+</svg>

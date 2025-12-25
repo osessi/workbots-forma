@@ -26,9 +26,12 @@ interface Apprenant {
   prenom: string;
   email: string;
   telephone: string | null;
+  raisonSociale: string | null;
+  siret: string | null;
   adresse: string | null;
   codePostal: string | null;
   ville: string | null;
+  pays: string;
   statut: "SALARIE" | "INDEPENDANT" | "PARTICULIER";
   entrepriseId: string | null;
   entreprise: Entreprise | null;
@@ -63,9 +66,12 @@ export default function ApprenantsPage() {
     prenom: "",
     email: "",
     telephone: "",
+    raisonSociale: "",
+    siret: "",
     adresse: "",
     codePostal: "",
     ville: "",
+    pays: "France",
     statut: "PARTICULIER" as "SALARIE" | "INDEPENDANT" | "PARTICULIER",
     entrepriseId: "",
     notes: "",
@@ -111,9 +117,12 @@ export default function ApprenantsPage() {
       prenom: "",
       email: "",
       telephone: "",
+      raisonSociale: "",
+      siret: "",
       adresse: "",
       codePostal: "",
       ville: "",
+      pays: "France",
       statut: "PARTICULIER",
       entrepriseId: "",
       notes: "",
@@ -129,9 +138,12 @@ export default function ApprenantsPage() {
         prenom: apprenant.prenom,
         email: apprenant.email,
         telephone: apprenant.telephone || "",
+        raisonSociale: apprenant.raisonSociale || "",
+        siret: apprenant.siret || "",
         adresse: apprenant.adresse || "",
         codePostal: apprenant.codePostal || "",
         ville: apprenant.ville || "",
+        pays: apprenant.pays || "France",
         statut: apprenant.statut,
         entrepriseId: apprenant.entrepriseId || "",
         notes: apprenant.notes || "",
@@ -451,12 +463,40 @@ export default function ApprenantsPage() {
                     </select>
                   </div>
                 )}
+
+                {/* Champs indépendant */}
+                {formData.statut === "INDEPENDANT" && (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Raison sociale de l'apprenant
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.raisonSociale}
+                        onChange={(e) => setFormData({ ...formData, raisonSociale: e.target.value })}
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Numéro SIRET
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.siret}
+                        onChange={(e) => setFormData({ ...formData, siret: e.target.value })}
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Adresse */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Adresse (optionnel)
+                  Adresse
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
@@ -483,6 +523,15 @@ export default function ApprenantsPage() {
                       placeholder="Ville"
                       value={formData.ville}
                       onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <input
+                      type="text"
+                      placeholder="Pays"
+                      value={formData.pays}
+                      onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>

@@ -1,34 +1,31 @@
 // ===========================================
 // TYPES POUR LE SYSTEME DE TEMPLATES
+// Mise à jour avec les nouvelles catégories
 // ===========================================
 
 /**
  * Categories de variables disponibles dans les templates
  */
 export type VariableCategory =
-  | "formation"
-  | "journees"
-  | "modules"
-  | "organisation"
-  | "entreprise"
-  | "particulier"
-  | "independant"
-  | "financeur"
-  | "client"
-  | "participants"
-  | "formateur"
-  | "dates"
-  | "document"
-  | "signature"
-  | "conditions";
+  | "of"           // Organisme de Formation
+  | "entreprise"   // Entreprise cliente
+  | "apprenant"    // Apprenant (salarié, indépendant, particulier)
+  | "financeur"    // Financeur (OPCO, Région, etc.)
+  | "intervenant"  // Intervenant/Formateur
+  | "lieu"         // Lieu de formation
+  | "formation"    // Formation et session
+  | "dates"        // Dates
+  | "client"       // Type de client (pour conditions)
+  | "tarifs"       // Tarifs et financement
+  | "conditions";  // Blocs conditionnels
 
 /**
  * Definition d'une variable de template
  */
 export interface TemplateVariable {
-  /** Identifiant unique de la variable (ex: "formation.titre") */
+  /** Identifiant unique de la variable (ex: "of_raison_sociale") */
   id: string;
-  /** Nom affiche dans l'interface (ex: "Titre de la formation") */
+  /** Nom affiche dans l'interface (ex: "Raison sociale de l'organisme") */
   label: string;
   /** Categorie de la variable */
   category: VariableCategory;
@@ -73,6 +70,8 @@ export type DocumentType =
   | "certificat"
   | "devis"
   | "facture"
+  | "contrat_sous_traitance"
+  | "cgv"
   | "autre"
   | "custom";
 
@@ -93,7 +92,7 @@ export interface DocumentTypeConfig {
 /**
  * Types de clients disponibles pour les conditions
  */
-export type ClientType = "entreprise" | "particulier" | "independant" | "salarie" | "financeur";
+export type ClientType = "entreprise" | "particulier" | "independant" | "salarie" | "financeur" | "intervenant";
 
 /**
  * Donnees du client (pour les conditions)
@@ -102,111 +101,304 @@ export interface ClientData {
   type: ClientType;
 }
 
-/**
- * Donnees du financeur (OPCO, Pole Emploi, etc.)
- */
-export interface FinanceurData {
-  nom: string;
+// ===========================================
+// DONNEES ORGANISME DE FORMATION (of_)
+// ===========================================
+export interface OrganismeFormationData {
+  raison_sociale: string;
+  nom_commercial?: string;
+  siret: string;
+  ville_rcs?: string;
+  nda: string; // Numéro de déclaration d'activité
+  region_enregistrement?: string;
+  adresse: string;
+  code_postal: string;
+  ville: string;
+  pays?: string;
+  representant_nom?: string;
+  representant_prenom?: string;
+  representant_fonction?: string;
+  email?: string;
+  telephone?: string;
+  site_web?: string; // Site web de l'organisme
+  signature_responsable?: string; // URL image
+  cachet?: string; // URL image
+  logo_organisme?: string; // URL image
+}
+
+// ===========================================
+// DONNEES ENTREPRISE (entreprise_)
+// ===========================================
+export interface EntrepriseData {
+  id?: string;
+  raison_sociale?: string;
   siret?: string;
   adresse?: string;
   code_postal?: string;
   ville?: string;
-  adresse_complete?: string;
-  telephone?: string;
+  pays?: string;
+  representant_civilite?: string;
+  representant_nom?: string;
+  representant_prenom?: string;
+  representant_fonction?: string;
   email?: string;
+  telephone?: string;
+  tva_intracom?: string;
+  // Calculés automatiquement lors d'une session
+  nombre_apprenants?: number;
+  liste_apprenants?: string;
+  // Legacy: support ancien format
+  nom?: string;
   representant?: string;
-  fonction_representant?: string;
-  numero_dossier?: string;
+  adresse_complete?: string;
 }
 
-/**
- * Donnees de l'independant
- */
-export interface IndependantData {
-  civilite?: string;
+// ===========================================
+// DONNEES APPRENANT (apprenant_)
+// ===========================================
+export interface ApprenantData {
+  id?: string;
   nom: string;
   prenom: string;
-  nom_complet?: string;
-  siret: string;
+  statut: "SALARIE" | "INDEPENDANT" | "PARTICULIER";
+  raison_sociale?: string; // Si indépendant
+  siret?: string; // Si indépendant
   adresse?: string;
   code_postal?: string;
   ville?: string;
-  adresse_complete?: string;
+  pays?: string;
   email?: string;
   telephone?: string;
-  activite?: string; // Activite professionnelle
-  date_naissance?: string;
-  lieu_naissance?: string;
 }
 
-/**
- * Contexte de donnees pour le rendu d'un template
- */
-export interface TemplateContext {
-  formation?: FormationData;
-  journees?: JourneeData[];
-  modules?: ModuleData[];
-  organisation?: OrganisationData;
-  entreprise?: EntrepriseData;
-  particulier?: ParticulierData;
-  independant?: IndependantData;
-  financeur?: FinanceurData;
-  client?: ClientData;
-  participants?: ParticipantData[];
-  formateur?: FormateurData;
-  dates?: DatesData;
-  document?: DocumentData;
-  signature?: SignatureData;
+// ===========================================
+// DONNEES FINANCEUR (financeur_)
+// ===========================================
+export interface FinanceurData {
+  id?: string;
+  nom: string;
+  type?: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  pays?: string;
+  email?: string;
+  telephone?: string;
 }
 
-/**
- * Donnees d'une formation
- */
+// ===========================================
+// DONNEES INTERVENANT (intervenant_)
+// ===========================================
+export interface IntervenantData {
+  id?: string;
+  nom: string;
+  prenom: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  pays?: string;
+  email?: string;
+  telephone?: string;
+  specialites?: string[];
+  raison_sociale?: string; // Si externe
+  siret?: string; // Si entreprise
+  nda?: string; // Si organisme de formation
+}
+
+// ===========================================
+// DONNEES LIEU (lieu_)
+// ===========================================
+export interface LieuData {
+  id?: string;
+  type: "PRESENTIEL" | "VISIOCONFERENCE";
+  nom: string;
+  formation?: string; // Adresse ou lien
+  code_postal?: string;
+  ville?: string;
+  informations_pratiques?: string;
+  capacite?: number;
+}
+
+// ===========================================
+// DONNEES FORMATION (formation_)
+// ===========================================
 export interface FormationData {
   id?: string;
   titre: string;
+  modalite?: string;
+  categorie_action?: string;
+  duree_heures?: number;
+  duree_jours?: number;
+  duree_heures_jours?: string;
+  nb_participants_max?: number;
   description?: string;
-  duree: string;
-  duree_heures: number;
-  nombre_jours?: number;
-  prix?: number | string;
-  prix_format?: string;
-  prix_ttc?: number | string;
-  tva?: number | string;
-  objectifs?: string[];
-  prerequis?: string[];
-  public_cible?: string;
-  modalites?: string;
-  lieu?: string;
-  adresse?: string;
-  code_postal?: string;
-  ville?: string;
-  date_debut?: string;
-  date_fin?: string;
-  horaires_matin?: string;
-  horaires_apres_midi?: string;
-  reference?: string;
-  methodes_pedagogiques?: string;
-  moyens_techniques?: string;
-  modalites_evaluation?: string;
+  objectifs_pedagogiques?: string;
+  prerequis?: string;
+  public_vise?: string;
+  contenu_detaille?: string;
+  suivi_execution_evaluation?: string;
+  ressources_pedagogiques?: string;
   accessibilite?: string;
   delai_acces?: string;
+  // Tarifs fiche pédagogique
+  tarif_entreprise_ht_fiche_peda?: string;
+  tarif_independant_ht_fiche_peda?: string;
+  tarif_particulier_ttc_fiche_peda?: string;
+  // Legacy/flexible properties
+  [key: string]: unknown;
 }
 
-/**
- * Donnees d'une journee de formation
- */
+// ===========================================
+// DONNEES SESSION
+// ===========================================
+export interface SessionData {
+  id?: string;
+  modalite?: string;
+  date_debut?: string;
+  date_fin?: string;
+  // Journées
+  journees?: JourneeData[];
+  planning_journees_formation?: string;
+}
+
 export interface JourneeData {
   numero: number;
   date: string;
-  date_courte: string;
-  horaires_matin?: string;
-  horaires_apres_midi?: string;
+  horaire_matin?: string;
+  horaire_apres_midi?: string;
 }
 
-/**
- * Donnees d'un particulier (stagiaire individuel)
- */
+// ===========================================
+// DONNEES DATES (date_)
+// ===========================================
+export interface DatesData {
+  jour: string;
+  mois: string;
+  annee: string;
+  complete_longue: string;
+  complete_courte: string;
+  // Legacy
+  date_complete?: string;
+  date_courte?: string;
+}
+
+// ===========================================
+// DONNEES TARIFS (tarifs_)
+// ===========================================
+export interface TarifsData {
+  // Entreprise
+  tarif_entreprise_ht_documents?: string;
+  entreprise_montant_tva?: string;
+  entreprise_prix_ttc?: string;
+  entreprise_montant_financeur_ht?: string;
+  entreprise_montant_financeur_ttc?: string;
+  entreprise_reste_a_charge_ht?: string;
+  entreprise_reste_a_charge_ttc?: string;
+  entreprise_a_financeur?: boolean;
+  // Indépendant
+  tarif_independant_ht_documents?: string;
+  independant_montant_tva?: string;
+  independant_prix_ttc?: string;
+  independant_montant_financeur_ht?: string;
+  independant_montant_financeur_ttc?: string;
+  independant_reste_a_charge_ht?: string;
+  independant_reste_a_charge_ttc?: string;
+  independant_a_financeur?: boolean;
+  // Particulier
+  particulier_prix_ttc?: string;
+}
+
+// ===========================================
+// CONTEXTE DE TEMPLATE COMPLET
+// ===========================================
+export interface TemplateContext {
+  // Organisme de formation (nouveau format)
+  of?: OrganismeFormationData;
+  // Entreprise cliente
+  entreprise?: EntrepriseData;
+  // Apprenant
+  apprenant?: ApprenantData;
+  apprenants?: ApprenantData[];
+  apprenants_liste?: string;
+  // Financeur
+  financeur?: FinanceurData;
+  // Intervenant
+  intervenant?: IntervenantData;
+  intervenants?: IntervenantData[];
+  intervenant_equipe_pedagogique?: string;
+  // Lieu
+  lieu?: LieuData;
+  // Formation
+  formation?: FormationData;
+  // Session
+  session?: SessionData;
+  // Dates
+  dates?: DatesData;
+  // Tarifs
+  tarifs?: TarifsData;
+  // Client (pour conditions)
+  client?: ClientData;
+
+  // ===========================================
+  // LEGACY PROPERTIES (pour compatibilité avec ancien code)
+  // ===========================================
+  /** @deprecated Utiliser 'of' */
+  organisation?: OrganisationData;
+  /** @deprecated Utiliser 'intervenant' */
+  formateur?: FormateurData;
+  /** @deprecated Utiliser 'apprenants' */
+  participants?: ParticipantData[];
+  /** @deprecated */
+  particulier?: ParticulierData;
+  /** @deprecated */
+  independant?: IndependantData;
+  /** @deprecated */
+  modules?: ModuleData[];
+  /** @deprecated */
+  journees?: Array<{
+    numero: number;
+    date: string;
+    date_courte?: string;
+    horaires_matin?: string;
+    horaires_apres_midi?: string;
+  }>;
+  /** @deprecated */
+  document?: DocumentData;
+  /** @deprecated */
+  signature?: SignatureData;
+  // Index signature pour propriétés additionnelles legacy
+  [key: string]: unknown;
+}
+
+// ===========================================
+// TYPES LEGACY (pour compatibilité)
+// ===========================================
+
+/** @deprecated Utiliser OrganismeFormationData */
+export interface OrganisationData {
+  id?: string;
+  nom: string;
+  siret: string;
+  adresse: string;
+  code_postal: string;
+  ville: string;
+  adresse_complete?: string;
+  telephone?: string;
+  email?: string;
+  site_web?: string;
+  numero_da: string;
+  logo?: string;
+  logo_url?: string;
+  representant?: string;
+  fonction_representant?: string;
+  tva_intra?: string;
+  capital?: string;
+  forme_juridique?: string;
+  rcs?: string;
+  prefecture_region?: string;
+}
+
+/** @deprecated Utiliser ApprenantData */
 export interface ParticulierData {
   civilite?: string;
   nom: string;
@@ -220,12 +412,58 @@ export interface ParticulierData {
   telephone?: string;
   date_naissance?: string;
   lieu_naissance?: string;
-  statut?: string; // demandeur d'emploi, salarie, independant, etc.
+  statut?: string;
 }
 
-/**
- * Donnees d'un module
- */
+/** @deprecated Utiliser ApprenantData */
+export interface IndependantData {
+  civilite?: string;
+  nom: string;
+  prenom: string;
+  nom_complet?: string;
+  siret: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  adresse_complete?: string;
+  email?: string;
+  telephone?: string;
+  activite?: string;
+  date_naissance?: string;
+  lieu_naissance?: string;
+}
+
+/** @deprecated Utiliser ApprenantData */
+export interface ParticipantData {
+  id?: string;
+  civilite?: string;
+  nom: string;
+  prenom: string;
+  email?: string;
+  telephone?: string;
+  fonction?: string;
+  type: "salarie" | "independant" | "particulier";
+  siret?: string;
+  adresse?: string;
+  code_postal?: string;
+  ville?: string;
+  date_naissance?: string;
+  lieu_naissance?: string;
+}
+
+/** @deprecated Utiliser IntervenantData */
+export interface FormateurData {
+  id?: string;
+  civilite?: string;
+  nom: string;
+  prenom: string;
+  email?: string;
+  telephone?: string;
+  specialite?: string;
+  entreprise?: string;
+  siret?: string;
+}
+
 export interface ModuleData {
   id?: string;
   numero: number;
@@ -237,102 +475,6 @@ export interface ModuleData {
   methodes?: string[];
 }
 
-/**
- * Donnees de l'organisation (organisme de formation)
- */
-export interface OrganisationData {
-  id?: string;
-  nom: string;
-  siret: string;
-  adresse: string;
-  code_postal: string;
-  ville: string;
-  adresse_complete?: string;
-  telephone?: string;
-  email?: string;
-  site_web?: string;
-  numero_da: string; // Numero de declaration d'activite
-  logo?: string; // URL du logo
-  logo_url?: string; // Alias pour compatibilite
-  representant?: string;
-  fonction_representant?: string;
-  tva_intra?: string; // Numero TVA intracommunautaire
-  capital?: string; // Capital social
-  forme_juridique?: string; // SAS, SARL, etc.
-  rcs?: string; // RCS
-  prefecture_region?: string; // Region d'acquisition du numero de declaration d'activite
-}
-
-/**
- * Donnees de l'entreprise cliente
- */
-export interface EntrepriseData {
-  id?: string;
-  nom: string;
-  siret: string;
-  adresse: string;
-  code_postal: string;
-  ville: string;
-  adresse_complete?: string;
-  telephone?: string;
-  email?: string;
-  representant: string;
-  fonction_representant?: string;
-}
-
-/**
- * Donnees d'un participant
- */
-export interface ParticipantData {
-  id?: string;
-  civilite?: string;
-  nom: string;
-  prenom: string;
-  email?: string;
-  telephone?: string;
-  fonction?: string;
-  type: "salarie" | "independant" | "particulier";
-  // Pour independants et salaries
-  siret?: string;
-  adresse?: string;
-  code_postal?: string;
-  ville?: string;
-  // Informations personnelles
-  date_naissance?: string;
-  lieu_naissance?: string;
-}
-
-/**
- * Donnees du formateur
- */
-export interface FormateurData {
-  id?: string;
-  civilite?: string;
-  nom: string;
-  prenom: string;
-  email?: string;
-  telephone?: string;
-  specialite?: string;
-  // Entreprise du formateur (si externe)
-  entreprise?: string;
-  siret?: string;
-}
-
-/**
- * Donnees de dates
- */
-export interface DatesData {
-  jour: string;
-  mois: string;
-  annee: string;
-  date_complete: string;
-  date_courte: string;
-  heure?: string;
-}
-
-/**
- * Donnees du document
- */
 export interface DocumentData {
   reference?: string;
   date_creation: string;
@@ -341,11 +483,8 @@ export interface DocumentData {
   total_pages?: number;
 }
 
-/**
- * Donnees de signature
- */
 export interface SignatureData {
-  responsable_organisme?: string; // URL de l'image de signature
+  responsable_organisme?: string;
 }
 
 /**
@@ -356,7 +495,7 @@ export interface Template {
   name: string;
   type: DocumentType;
   description?: string;
-  content: string; // JSON TipTap
+  content: string;
   isGlobal: boolean;
   organizationId?: string;
   createdAt: Date;
@@ -369,10 +508,7 @@ export interface Template {
  * Options de rendu
  */
 export interface RenderOptions {
-  /** Mode preview (affiche les variables non resolues) */
   previewMode?: boolean;
-  /** Format de sortie */
   outputFormat?: "html" | "json" | "text";
-  /** Inclure les styles inline */
   inlineStyles?: boolean;
 }

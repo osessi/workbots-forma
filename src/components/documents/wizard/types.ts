@@ -96,12 +96,23 @@ export interface SessionClient {
   apprenants: Apprenant[]; // Apprenants sélectionnés (pour entreprise)
 }
 
+// Financement individuel
+export interface ClientFinancement {
+  id: string;
+  financeurId: string;
+  financeur?: Financeur;
+  montant: number;
+}
+
 export interface SessionTarif {
   clientId: string;
   tarifHT: number;
-  financeurId: string | null;
-  montantFinance: number;
-  resteACharge: number;
+  tauxTVA: number; // Taux de TVA en % (défaut 20)
+  financements: ClientFinancement[]; // Plusieurs financeurs possibles
+  totalFinance: number; // Somme des montants financés
+  resteAChargeHT: number; // Reste à charge HT (tarifHT - totalFinance)
+  montantTVA: number; // Montant de la TVA sur le reste à charge
+  resteAChargeTTC: number; // Reste à charge TTC final
 }
 
 export interface SessionJournee {

@@ -365,7 +365,7 @@ export default function StepDocuments({
   // Calculs pour le récap
   const totalApprenants = clients.reduce((acc, c) => acc + c.apprenants.length, 0);
   const totalTarif = tarifs.reduce((acc, t) => acc + (t.tarifHT || 0), 0);
-  const totalFinance = tarifs.reduce((acc, t) => acc + (t.montantFinance || 0), 0);
+  const totalFinance = tarifs.reduce((acc, t) => acc + (t.totalFinance || 0), 0);
 
   // Contenu pour la pagination (soit édité, soit original)
   const currentPreviewContent = useMemo(() => {

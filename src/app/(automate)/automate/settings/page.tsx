@@ -60,15 +60,23 @@ const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
 // Interface pour les données de l'organisme
 interface OrganismeData {
   name: string;
-  representantLegal: string;
+  nomCommercial: string;
+  siret: string;
+  villeRcs: string;
   numeroFormateur: string;
   prefectureRegion: string;
-  siret: string;
+  representantNom: string;
+  representantPrenom: string;
+  representantFonction: string;
   adresse: string;
   codePostal: string;
   ville: string;
   email: string;
   telephone: string;
+  siteWeb: string;
+  logo: string;
+  signature: string;
+  cachet: string;
 }
 
 // Preset colors for branding
@@ -107,22 +115,64 @@ function SettingsTabHandler({ onTabChange }: { onTabChange: (tab: TabType) => vo
   return null;
 }
 
+// Helper pour upload des images
+async function uploadOrganismeImage(file: File, type: "logo" | "signature" | "cachet"): Promise<{ url: string | null; error: string | null }> {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+
+    const response = await fetch("/api/user/avatar", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { url: null, error: data.error || "Erreur lors de l'upload" };
+    }
+
+    return { url: data.url, error: null };
+  } catch {
+    return { url: null, error: "Erreur de connexion" };
+  }
+}
+
 export default function SettingsPage() {
   const { user, primaryColor, setPrimaryColor, refreshUser } = useAutomate();
   const [activeTab, setActiveTab] = useState<TabType>("organisme");
 
+  // Refs pour les inputs file
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
+  const signatureInputRef = React.useRef<HTMLInputElement>(null);
+  const cachetInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Upload states
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+  const [isUploadingCachet, setIsUploadingCachet] = useState(false);
+
   // Organisme state
   const [organisme, setOrganisme] = useState<OrganismeData>({
     name: "",
-    representantLegal: "",
+    nomCommercial: "",
+    siret: "",
+    villeRcs: "",
     numeroFormateur: "",
     prefectureRegion: "",
-    siret: "",
+    representantNom: "",
+    representantPrenom: "",
+    representantFonction: "",
     adresse: "",
     codePostal: "",
     ville: "",
     email: "",
     telephone: "",
+    siteWeb: "",
+    logo: "",
+    signature: "",
+    cachet: "",
   });
   const [isLoadingOrganisme, setIsLoadingOrganisme] = useState(true);
   const [isSavingOrganisme, setIsSavingOrganisme] = useState(false);
@@ -138,15 +188,23 @@ export default function SettingsPage() {
           if (data.organization) {
             setOrganisme({
               name: data.organization.name || "",
-              representantLegal: data.organization.representantLegal || "",
+              nomCommercial: data.organization.nomCommercial || "",
+              siret: data.organization.siret || "",
+              villeRcs: data.organization.villeRcs || "",
               numeroFormateur: data.organization.numeroFormateur || "",
               prefectureRegion: data.organization.prefectureRegion || "",
-              siret: data.organization.siret || "",
+              representantNom: data.organization.representantNom || "",
+              representantPrenom: data.organization.representantPrenom || "",
+              representantFonction: data.organization.representantFonction || "",
               adresse: data.organization.adresse || "",
               codePostal: data.organization.codePostal || "",
               ville: data.organization.ville || "",
               email: data.organization.email || "",
               telephone: data.organization.telephone || "",
+              siteWeb: data.organization.siteWeb || "",
+              logo: data.organization.logo || "",
+              signature: data.organization.signature || "",
+              cachet: data.organization.cachet || "",
             });
           }
         }
@@ -187,6 +245,54 @@ export default function SettingsPage() {
     } finally {
       setIsSavingOrganisme(false);
     }
+  };
+
+  // Handlers pour upload des images
+  const handleImageUpload = async (file: File, type: "logo" | "signature" | "cachet") => {
+    if (!file.type.startsWith("image/")) {
+      alert("Veuillez sélectionner une image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("L'image ne doit pas dépasser 5MB");
+      return;
+    }
+
+    const setLoading = type === "logo" ? setIsUploadingLogo : type === "signature" ? setIsUploadingSignature : setIsUploadingCachet;
+    setLoading(true);
+
+    try {
+      const result = await uploadOrganismeImage(file, type);
+      if (result.url) {
+        setOrganisme(prev => ({ ...prev, [type]: result.url }));
+        await refreshUser();
+      } else {
+        alert(result.error || "Erreur lors de l'upload");
+      }
+    } catch {
+      alert("Erreur lors de l'upload de l'image");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file, "logo");
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
+
+  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file, "signature");
+    if (signatureInputRef.current) signatureInputRef.current.value = "";
+  };
+
+  const handleCachetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file, "cachet");
+    if (cachetInputRef.current) cachetInputRef.current.value = "";
   };
 
   // Members state
@@ -297,20 +403,48 @@ export default function SettingsPage() {
                           type="text"
                           value={organisme.name}
                           onChange={(e) => handleOrganismeChange("name", e.target.value)}
-                          placeholder="Nom de votre organisme de formation"
+                          placeholder="Nom juridique de votre organisme"
                           className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Nom et prenom du representant legal
+                          Nom commercial de l&apos;organisme
                         </label>
                         <input
                           type="text"
-                          value={organisme.representantLegal}
-                          onChange={(e) => handleOrganismeChange("representantLegal", e.target.value)}
-                          placeholder="Jean Dupont"
+                          value={organisme.nomCommercial}
+                          onChange={(e) => handleOrganismeChange("nomCommercial", e.target.value)}
+                          placeholder="Nom commercial (si different)"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Numero SIRET
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.siret}
+                          onChange={(e) => handleOrganismeChange("siret", e.target.value)}
+                          placeholder="123 456 789 00012"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Ville d&apos;immatriculation RCS
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.villeRcs}
+                          onChange={(e) => handleOrganismeChange("villeRcs", e.target.value)}
+                          placeholder="Paris"
                           className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
                         />
                       </div>
@@ -346,16 +480,51 @@ export default function SettingsPage() {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Representant legal */}
+                  <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Representant legal
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Nom du representant legal
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.representantNom}
+                          onChange={(e) => handleOrganismeChange("representantNom", e.target.value)}
+                          placeholder="DUPONT"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Prenom du representant legal
+                        </label>
+                        <input
+                          type="text"
+                          value={organisme.representantPrenom}
+                          onChange={(e) => handleOrganismeChange("representantPrenom", e.target.value)}
+                          placeholder="Jean"
+                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                        />
+                      </div>
+                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                        Numero SIRET
+                        Fonction du representant legal
                       </label>
                       <input
                         type="text"
-                        value={organisme.siret}
-                        onChange={(e) => handleOrganismeChange("siret", e.target.value)}
-                        placeholder="123 456 789 00012"
+                        value={organisme.representantFonction}
+                        onChange={(e) => handleOrganismeChange("representantFonction", e.target.value)}
+                        placeholder="Gerant, PDG, Directeur General..."
                         className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
                       />
                     </div>
@@ -433,6 +602,171 @@ export default function SettingsPage() {
                           placeholder="01 23 45 67 89"
                           className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
                         />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                        Site web
+                      </label>
+                      <input
+                        type="url"
+                        value={organisme.siteWeb}
+                        onChange={(e) => handleOrganismeChange("siteWeb", e.target.value)}
+                        placeholder="https://www.votre-organisme.fr"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Visuels - Logo, Signature, Cachet */}
+                  <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Logo, Signature et Cachet
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Ces elements apparaitront sur vos documents officiels (conventions, attestations, etc.)
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Logo */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Logo de l&apos;organisme
+                        </label>
+                        <input
+                          ref={logoInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoChange}
+                          className="hidden"
+                        />
+                        <div
+                          onClick={() => logoInputRef.current?.click()}
+                          className="mt-2 flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-brand-400 transition-colors min-h-[100px] cursor-pointer"
+                        >
+                          {isUploadingLogo ? (
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                          ) : organisme.logo ? (
+                            <div className="relative">
+                              <Image
+                                src={organisme.logo}
+                                alt="Logo"
+                                width={120}
+                                height={60}
+                                className="object-contain max-h-16"
+                              />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOrganismeChange("logo", ""); }}
+                                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full text-xs hover:bg-red-600"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M18 6L6 18M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <CameraIcon />
+                              <span className="mt-2 text-xs text-gray-500">Cliquez pour ajouter un logo</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Signature */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Signature du responsable
+                        </label>
+                        <input
+                          ref={signatureInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleSignatureChange}
+                          className="hidden"
+                        />
+                        <div
+                          onClick={() => signatureInputRef.current?.click()}
+                          className="mt-2 flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-brand-400 transition-colors min-h-[100px] cursor-pointer"
+                        >
+                          {isUploadingSignature ? (
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                          ) : organisme.signature ? (
+                            <div className="relative">
+                              <Image
+                                src={organisme.signature}
+                                alt="Signature"
+                                width={120}
+                                height={60}
+                                className="object-contain max-h-16"
+                              />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOrganismeChange("signature", ""); }}
+                                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full text-xs hover:bg-red-600"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M18 6L6 18M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              <span className="mt-2 text-xs text-gray-500">Cliquez pour ajouter une signature</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Cachet */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                          Cachet de l&apos;entreprise
+                        </label>
+                        <input
+                          ref={cachetInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCachetChange}
+                          className="hidden"
+                        />
+                        <div
+                          onClick={() => cachetInputRef.current?.click()}
+                          className="mt-2 flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-brand-400 transition-colors min-h-[100px] cursor-pointer"
+                        >
+                          {isUploadingCachet ? (
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                          ) : organisme.cachet ? (
+                            <div className="relative">
+                              <Image
+                                src={organisme.cachet}
+                                alt="Cachet"
+                                width={80}
+                                height={80}
+                                className="object-contain max-h-16"
+                              />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOrganismeChange("cachet", ""); }}
+                                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full text-xs hover:bg-red-600"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M18 6L6 18M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M12 8v8M8 12h8" strokeLinecap="round"/>
+                              </svg>
+                              <span className="mt-2 text-xs text-gray-500">Cliquez pour ajouter un cachet</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

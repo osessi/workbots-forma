@@ -436,7 +436,6 @@ function CreateFormationContent() {
     const modaliteLabel: Record<string, string> = {
       presentiel: "Presentiel",
       distanciel: "Distanciel / Classe virtuelle",
-      elearning: "E-learning",
       mixte: "Formation mixte",
     };
 

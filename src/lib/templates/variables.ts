@@ -1,5 +1,6 @@
 // ===========================================
 // DEFINITIONS DES VARIABLES DE TEMPLATES
+// Mise à jour complète avec toutes les balises
 // ===========================================
 
 import { TemplateVariable, VariableGroup, DocumentTypeConfig, DocumentType, VariableCategory } from "./types";
@@ -15,127 +16,28 @@ import { TemplateVariable, VariableGroup, DocumentTypeConfig, DocumentType, Vari
 export function generateJourneeVariables(count: number): TemplateVariable[] {
   const variables: TemplateVariable[] = [];
 
-  for (let i = 1; i <= count; i++) {
+  for (let i = 1; i <= Math.min(count, 10); i++) {
     variables.push(
       {
-        id: `journee${i}.date`,
+        id: `j${i}_date`,
         label: `Jour ${i} - Date`,
-        category: "journees",
-        description: `Date de la journee ${i}`,
+        category: "formation",
+        description: `Date de la journée ${i}`,
         example: "15 janvier 2025",
       },
       {
-        id: `journee${i}.date_courte`,
-        label: `Jour ${i} - Date courte`,
-        category: "journees",
-        description: `Date courte de la journee ${i}`,
-        example: "15/01/2025",
-      },
-      {
-        id: `journee${i}.horaires_matin`,
+        id: `j${i}_horaire_matin`,
         label: `Jour ${i} - Horaires matin`,
-        category: "journees",
+        category: "formation",
         description: `Horaires du matin pour le jour ${i}`,
         example: "09:00 - 12:30",
       },
       {
-        id: `journee${i}.horaires_apres_midi`,
-        label: `Jour ${i} - Horaires apres-midi`,
-        category: "journees",
-        description: `Horaires de l'apres-midi pour le jour ${i}`,
+        id: `j${i}_horaire_apres_midi`,
+        label: `Jour ${i} - Horaires après-midi`,
+        category: "formation",
+        description: `Horaires de l'après-midi pour le jour ${i}`,
         example: "14:00 - 17:30",
-      }
-    );
-  }
-
-  return variables;
-}
-
-/**
- * Genere les variables numerotees pour les salaries basees sur le nombre reel
- * @param count - Nombre de salaries (0 = pas de variables numerotees affichees)
- */
-export function generateSalarieVariables(count: number): TemplateVariable[] {
-  const variables: TemplateVariable[] = [];
-
-  for (let i = 1; i <= count; i++) {
-    variables.push(
-      {
-        id: `salarie${i}.nom`,
-        label: `Salarie ${i} - Nom`,
-        category: "participants",
-        description: `Nom du salarie ${i}`,
-        example: "DUPONT",
-      },
-      {
-        id: `salarie${i}.prenom`,
-        label: `Salarie ${i} - Prenom`,
-        category: "participants",
-        description: `Prenom du salarie ${i}`,
-        example: "Jean",
-      },
-      {
-        id: `salarie${i}.nom_complet`,
-        label: `Salarie ${i} - Nom complet`,
-        category: "participants",
-        description: `Nom complet du salarie ${i}`,
-        example: "Jean DUPONT",
-      },
-      {
-        id: `salarie${i}.adresse`,
-        label: `Salarie ${i} - Adresse`,
-        category: "participants",
-        description: `Adresse du salarie ${i}`,
-        example: "12 rue de la Paix",
-      },
-      {
-        id: `salarie${i}.code_postal`,
-        label: `Salarie ${i} - Code postal`,
-        category: "participants",
-        description: `Code postal du salarie ${i}`,
-        example: "75001",
-      },
-      {
-        id: `salarie${i}.ville`,
-        label: `Salarie ${i} - Ville`,
-        category: "participants",
-        description: `Ville du salarie ${i}`,
-        example: "Paris",
-      },
-      {
-        id: `salarie${i}.adresse_complete`,
-        label: `Salarie ${i} - Adresse complete`,
-        category: "participants",
-        description: `Adresse complete du salarie ${i}`,
-        example: "12 rue de la Paix, 75001 Paris",
-      },
-      {
-        id: `salarie${i}.telephone`,
-        label: `Salarie ${i} - Telephone`,
-        category: "participants",
-        description: `Telephone du salarie ${i}`,
-        example: "06 12 34 56 78",
-      },
-      {
-        id: `salarie${i}.email`,
-        label: `Salarie ${i} - Email`,
-        category: "participants",
-        description: `Email du salarie ${i}`,
-        example: "jean.dupont@email.com",
-      },
-      {
-        id: `salarie${i}.date_naissance`,
-        label: `Salarie ${i} - Date naissance`,
-        category: "participants",
-        description: `Date de naissance du salarie ${i}`,
-        example: "15/03/1985",
-      },
-      {
-        id: `salarie${i}.lieu_naissance`,
-        label: `Salarie ${i} - Lieu naissance`,
-        category: "participants",
-        description: `Lieu de naissance du salarie ${i}`,
-        example: "Paris",
       }
     );
   }
@@ -153,33 +55,26 @@ export interface DynamicVariableContext {
 
 /**
  * Obtenir toutes les variables avec les variables dynamiques basees sur le contexte
- * @param context - Contexte avec le nombre d'elements (journees, salaries)
+ * @param context - Contexte avec le nombre d'elements (journees)
  */
 export function getVariablesWithDynamicContext(context: DynamicVariableContext = {}): TemplateVariable[] {
-  const { nombreJournees = 0, nombreSalaries = 0 } = context;
+  const { nombreJournees = 0 } = context;
 
-  // Variables de base (sans les variables numerotees)
-  const baseVariables = TEMPLATE_VARIABLES.filter(v => {
-    // Exclure les variables generees statiquement (on les regenere dynamiquement)
-    const isStaticJournee = v.id.match(/^journee\d+\./);
-    const isStaticSalarie = v.id.match(/^salarie\d+\./);
-    return !isStaticJournee && !isStaticSalarie;
-  });
+  // Variables de base (sans les variables numerotees dynamiques au-delà de j4)
+  const baseVariables = [...TEMPLATE_VARIABLES];
 
-  // Ajouter les variables dynamiques
-  const dynamicJournees = generateJourneeVariables(nombreJournees);
-  const dynamicSalaries = generateSalarieVariables(nombreSalaries);
+  // Ajouter les variables dynamiques pour les journées > 4
+  if (nombreJournees > 4) {
+    const dynamicJournees = generateJourneeVariables(nombreJournees).filter(v => {
+      const match = v.id.match(/^j(\d+)_/);
+      return match && parseInt(match[1]) > 4;
+    });
 
-  // Inserer les variables de journees apres journees.count
-  const journeesCountIndex = baseVariables.findIndex(v => v.id === "journees.count");
-  if (journeesCountIndex !== -1) {
-    baseVariables.splice(journeesCountIndex + 1, 0, ...dynamicJournees);
-  }
-
-  // Inserer les variables de salaries apres participants.count
-  const participantsCountIndex = baseVariables.findIndex(v => v.id === "participants.count");
-  if (participantsCountIndex !== -1) {
-    baseVariables.splice(participantsCountIndex + 1, 0, ...dynamicSalaries);
+    // Inserer les variables de journees apres planning_journees_formation
+    const planningIndex = baseVariables.findIndex(v => v.id === "planning_journees_formation");
+    if (planningIndex !== -1) {
+      baseVariables.splice(planningIndex + 1, 0, ...dynamicJournees);
+    }
   }
 
   return baseVariables;
@@ -199,34 +94,10 @@ export function getVariableGroupsWithDynamicContext(context: DynamicVariableCont
       variables: allVariables.filter((v) => v.category === "conditions"),
     },
     {
-      category: "client",
-      label: "Client",
-      icon: "UserCircle",
-      variables: allVariables.filter((v) => v.category === "client"),
-    },
-    {
-      category: "formation",
-      label: "Formation",
-      icon: "GraduationCap",
-      variables: allVariables.filter((v) => v.category === "formation"),
-    },
-    {
-      category: "journees",
-      label: "Journees",
-      icon: "CalendarDays",
-      variables: allVariables.filter((v) => v.category === "journees"),
-    },
-    {
-      category: "modules",
-      label: "Modules",
-      icon: "Layers",
-      variables: allVariables.filter((v) => v.category === "modules"),
-    },
-    {
-      category: "organisation",
-      label: "Organisme",
+      category: "of",
+      label: "Organisme de Formation",
       icon: "Building2",
-      variables: allVariables.filter((v) => v.category === "organisation"),
+      variables: allVariables.filter((v) => v.category === "of"),
     },
     {
       category: "entreprise",
@@ -235,16 +106,10 @@ export function getVariableGroupsWithDynamicContext(context: DynamicVariableCont
       variables: allVariables.filter((v) => v.category === "entreprise"),
     },
     {
-      category: "particulier",
-      label: "Particulier",
-      icon: "User",
-      variables: allVariables.filter((v) => v.category === "particulier"),
-    },
-    {
-      category: "independant",
-      label: "Independant",
-      icon: "UserCog",
-      variables: allVariables.filter((v) => v.category === "independant"),
+      category: "apprenant",
+      label: "Apprenant",
+      icon: "GraduationCap",
+      variables: allVariables.filter((v) => v.category === "apprenant"),
     },
     {
       category: "financeur",
@@ -253,16 +118,22 @@ export function getVariableGroupsWithDynamicContext(context: DynamicVariableCont
       variables: allVariables.filter((v) => v.category === "financeur"),
     },
     {
-      category: "participants",
-      label: "Participants",
-      icon: "Users",
-      variables: allVariables.filter((v) => v.category === "participants"),
+      category: "intervenant",
+      label: "Intervenant",
+      icon: "UserCheck",
+      variables: allVariables.filter((v) => v.category === "intervenant"),
     },
     {
-      category: "formateur",
-      label: "Formateur",
-      icon: "UserCheck",
-      variables: allVariables.filter((v) => v.category === "formateur"),
+      category: "lieu",
+      label: "Lieux",
+      icon: "MapPin",
+      variables: allVariables.filter((v) => v.category === "lieu"),
+    },
+    {
+      category: "formation",
+      label: "Formation",
+      icon: "BookOpen",
+      variables: allVariables.filter((v) => v.category === "formation"),
     },
     {
       category: "dates",
@@ -271,16 +142,16 @@ export function getVariableGroupsWithDynamicContext(context: DynamicVariableCont
       variables: allVariables.filter((v) => v.category === "dates"),
     },
     {
-      category: "document",
-      label: "Document",
-      icon: "FileText",
-      variables: allVariables.filter((v) => v.category === "document"),
+      category: "client",
+      label: "Client",
+      icon: "UserCircle",
+      variables: allVariables.filter((v) => v.category === "client"),
     },
     {
-      category: "signature",
-      label: "Signature",
-      icon: "PenTool",
-      variables: allVariables.filter((v) => v.category === "signature"),
+      category: "tarifs",
+      label: "Tarifs & Financement",
+      icon: "CreditCard",
+      variables: allVariables.filter((v) => v.category === "tarifs"),
     },
   ];
 }
@@ -289,808 +160,973 @@ export function getVariableGroupsWithDynamicContext(context: DynamicVariableCont
  * Toutes les variables disponibles dans le systeme
  */
 export const TEMPLATE_VARIABLES: TemplateVariable[] = [
-  // ===== FORMATION =====
+  // =====================================================
+  // ORGANISME DE FORMATION (of_)
+  // Source: Paramètres > Organisme de formation
+  // =====================================================
   {
-    id: "formation.titre",
+    id: "of_raison_sociale",
+    label: "Raison sociale de l'organisme",
+    category: "of",
+    description: "Raison sociale officielle de l'organisme de formation",
+    example: "Automate Formation SAS",
+  },
+  {
+    id: "of_nom_commercial",
+    label: "Nom commercial de l'organisme",
+    category: "of",
+    description: "Nom commercial utilisé par l'organisme",
+    example: "Automate Formation",
+  },
+  {
+    id: "of_siret",
+    label: "Numéro SIRET",
+    category: "of",
+    description: "Numéro SIRET de l'organisme de formation",
+    example: "123 456 789 00012",
+  },
+  {
+    id: "of_ville_rcs",
+    label: "Ville immatriculation du RCS",
+    category: "of",
+    description: "Ville d'immatriculation au Registre du Commerce et des Sociétés",
+    example: "Paris",
+  },
+  {
+    id: "of_nda",
+    label: "Numéro de déclaration d'activité",
+    category: "of",
+    description: "Numéro de déclaration d'activité auprès de la DREETS",
+    example: "11 75 12345 67",
+  },
+  {
+    id: "of_region_enregistrement",
+    label: "Région d'enregistrement",
+    category: "of",
+    description: "Région d'acquisition du numéro de déclaration d'activité",
+    example: "Île-de-France",
+  },
+  {
+    id: "of_adresse",
+    label: "Adresse",
+    category: "of",
+    description: "Adresse de l'organisme de formation",
+    example: "15 rue de la Formation",
+  },
+  {
+    id: "of_code_postal",
+    label: "Code postal",
+    category: "of",
+    description: "Code postal de l'organisme",
+    example: "75001",
+  },
+  {
+    id: "of_ville",
+    label: "Ville",
+    category: "of",
+    description: "Ville de l'organisme",
+    example: "Paris",
+  },
+  {
+    id: "of_pays",
+    label: "Pays",
+    category: "of",
+    description: "Pays de l'organisme",
+    example: "France",
+  },
+  {
+    id: "of_representant_nom",
+    label: "Nom du représentant légal",
+    category: "of",
+    description: "Nom du représentant légal de l'organisme",
+    example: "DUPONT",
+  },
+  {
+    id: "of_representant_prenom",
+    label: "Prénom du représentant légal",
+    category: "of",
+    description: "Prénom du représentant légal de l'organisme",
+    example: "Jean",
+  },
+  {
+    id: "of_representant_fonction",
+    label: "Fonction du représentant légal",
+    category: "of",
+    description: "Fonction du représentant légal",
+    example: "Directeur Général",
+  },
+  {
+    id: "of_email",
+    label: "Email de contact",
+    category: "of",
+    description: "Email de contact de l'organisme",
+    example: "contact@automate-formation.fr",
+  },
+  {
+    id: "of_telephone",
+    label: "Téléphone",
+    category: "of",
+    description: "Numéro de téléphone de l'organisme",
+    example: "01 23 45 67 89",
+  },
+  {
+    id: "of_site_web",
+    label: "Site web",
+    category: "of",
+    description: "Site web de l'organisme de formation",
+    example: "www.automate-formation.fr",
+  },
+  {
+    id: "of_signature_responsable",
+    label: "Signature du responsable de l'OF",
+    category: "of",
+    description: "Image de signature du responsable de l'organisme de formation",
+    example: "[Image de signature]",
+  },
+  {
+    id: "of_cachet",
+    label: "Cachet de l'OF",
+    category: "of",
+    description: "Image du cachet de l'organisme de formation",
+    example: "[Image du cachet]",
+  },
+  {
+    id: "of_logo_organisme",
+    label: "Logo de l'organisme",
+    category: "of",
+    description: "Logo de l'organisme de formation",
+    example: "[Logo]",
+  },
+
+  // =====================================================
+  // ENTREPRISE (entreprise_)
+  // Source: Mes données > Entreprises
+  // =====================================================
+  {
+    id: "entreprise_raison_sociale",
+    label: "Raison sociale de l'entreprise",
+    category: "entreprise",
+    description: "Raison sociale de l'entreprise cliente",
+    example: "ACME Corporation",
+  },
+  {
+    id: "entreprise_siret",
+    label: "Numéro SIRET",
+    category: "entreprise",
+    description: "Numéro SIRET de l'entreprise",
+    example: "987 654 321 00098",
+  },
+  {
+    id: "entreprise_adresse",
+    label: "Adresse",
+    category: "entreprise",
+    description: "Adresse de l'entreprise",
+    example: "100 avenue des Champs-Élysées",
+  },
+  {
+    id: "entreprise_code_postal",
+    label: "Code postal",
+    category: "entreprise",
+    description: "Code postal de l'entreprise",
+    example: "75008",
+  },
+  {
+    id: "entreprise_ville",
+    label: "Ville",
+    category: "entreprise",
+    description: "Ville de l'entreprise",
+    example: "Paris",
+  },
+  {
+    id: "entreprise_pays",
+    label: "Pays",
+    category: "entreprise",
+    description: "Pays de l'entreprise",
+    example: "France",
+  },
+  {
+    id: "entreprise_representant_civilite",
+    label: "Civilité du représentant légal",
+    category: "entreprise",
+    description: "Civilité du représentant légal (M. / Mme)",
+    example: "Mme",
+  },
+  {
+    id: "entreprise_representant_nom",
+    label: "Nom du représentant légal",
+    category: "entreprise",
+    description: "Nom du représentant légal de l'entreprise",
+    example: "MARTIN",
+  },
+  {
+    id: "entreprise_representant_prenom",
+    label: "Prénom du représentant légal",
+    category: "entreprise",
+    description: "Prénom du représentant légal de l'entreprise",
+    example: "Marie",
+  },
+  {
+    id: "entreprise_representant_fonction",
+    label: "Fonction du représentant légal",
+    category: "entreprise",
+    description: "Fonction du représentant légal",
+    example: "Directrice des Ressources Humaines",
+  },
+  {
+    id: "entreprise_email",
+    label: "Email",
+    category: "entreprise",
+    description: "Email de l'entreprise",
+    example: "contact@acme.com",
+  },
+  {
+    id: "entreprise_telephone",
+    label: "Téléphone",
+    category: "entreprise",
+    description: "Téléphone de l'entreprise",
+    example: "01 23 45 67 89",
+  },
+  {
+    id: "entreprise_tva_intracom",
+    label: "TVA intracommunautaire",
+    category: "entreprise",
+    description: "Numéro de TVA intracommunautaire",
+    example: "FR12345678901",
+  },
+  {
+    id: "entreprise_nombre_apprenants",
+    label: "Nombre d'apprenants de l'entreprise",
+    category: "entreprise",
+    description: "Nombre d'apprenants de l'entreprise inscrits sur cette formation (calculé automatiquement)",
+    example: "3",
+  },
+  {
+    id: "entreprise_liste_apprenants",
+    label: "Liste des participants de l'entreprise",
+    category: "entreprise",
+    description: "Liste formatée des participants de cette entreprise pour la formation",
+    example: "DUPONT Marie\nMARTIN Paul\nDURAND Julie",
+  },
+
+  // =====================================================
+  // APPRENANT (apprenant_)
+  // Source: Mes données > Apprenants
+  // =====================================================
+  {
+    id: "apprenant_nom",
+    label: "Nom de l'apprenant",
+    category: "apprenant",
+    description: "Nom de famille de l'apprenant",
+    example: "DUPONT",
+  },
+  {
+    id: "apprenant_prenom",
+    label: "Prénom de l'apprenant",
+    category: "apprenant",
+    description: "Prénom de l'apprenant",
+    example: "Marie",
+  },
+  {
+    id: "apprenant_statut",
+    label: "Statut de l'apprenant",
+    category: "apprenant",
+    description: "Statut de l'apprenant (salarié, indépendant, particulier)",
+    example: "Salarié",
+  },
+  {
+    id: "apprenant_raison_sociale",
+    label: "Raison sociale de l'apprenant",
+    category: "apprenant",
+    description: "Raison sociale (si indépendant)",
+    example: "Consulting Pro",
+  },
+  {
+    id: "apprenant_siret",
+    label: "Numéro SIRET",
+    category: "apprenant",
+    description: "Numéro SIRET de l'apprenant (si indépendant)",
+    example: "123 456 789 00012",
+  },
+  {
+    id: "apprenant_adresse",
+    label: "Adresse",
+    category: "apprenant",
+    description: "Adresse de l'apprenant",
+    example: "25 rue de la Paix",
+  },
+  {
+    id: "apprenant_code_postal",
+    label: "Code postal",
+    category: "apprenant",
+    description: "Code postal de l'apprenant",
+    example: "75002",
+  },
+  {
+    id: "apprenant_ville",
+    label: "Ville",
+    category: "apprenant",
+    description: "Ville de l'apprenant",
+    example: "Paris",
+  },
+  {
+    id: "apprenant_pays",
+    label: "Pays",
+    category: "apprenant",
+    description: "Pays de l'apprenant",
+    example: "France",
+  },
+  {
+    id: "apprenant_email",
+    label: "Email",
+    category: "apprenant",
+    description: "Email de l'apprenant",
+    example: "marie.dupont@email.com",
+  },
+  {
+    id: "apprenant_telephone",
+    label: "Téléphone",
+    category: "apprenant",
+    description: "Téléphone de l'apprenant",
+    example: "06 12 34 56 78",
+  },
+  {
+    id: "apprenants_liste",
+    label: "Liste des apprenants",
+    category: "apprenant",
+    description: "Liste de tous les apprenants de la session (calculé automatiquement)",
+    example: "DUPONT Marie, MARTIN Paul, DURAND Julie",
+  },
+
+  // =====================================================
+  // FINANCEUR (financeur_)
+  // Source: Mes données > Financeurs
+  // =====================================================
+  {
+    id: "financeur_nom",
+    label: "Nom du financeur",
+    category: "financeur",
+    description: "Nom de l'organisme financeur (OPCO, Pôle Emploi...)",
+    example: "OPCO Atlas",
+  },
+  {
+    id: "financeur_type",
+    label: "Type de financeur",
+    category: "financeur",
+    description: "Type de financeur (OPCO, Région, France Travail...)",
+    example: "OPCO",
+  },
+  {
+    id: "financeur_adresse",
+    label: "Adresse",
+    category: "financeur",
+    description: "Adresse du financeur",
+    example: "30 rue de la Solidarité",
+  },
+  {
+    id: "financeur_code_postal",
+    label: "Code postal",
+    category: "financeur",
+    description: "Code postal du financeur",
+    example: "75015",
+  },
+  {
+    id: "financeur_ville",
+    label: "Ville",
+    category: "financeur",
+    description: "Ville du financeur",
+    example: "Paris",
+  },
+  {
+    id: "financeur_pays",
+    label: "Pays",
+    category: "financeur",
+    description: "Pays du financeur",
+    example: "France",
+  },
+  {
+    id: "financeur_email",
+    label: "Email",
+    category: "financeur",
+    description: "Email du financeur",
+    example: "contact@opco-atlas.fr",
+  },
+  {
+    id: "financeur_telephone",
+    label: "Téléphone",
+    category: "financeur",
+    description: "Téléphone du financeur",
+    example: "01 45 67 89 00",
+  },
+
+  // =====================================================
+  // INTERVENANT (intervenant_)
+  // Source: Mes données > Intervenants
+  // =====================================================
+  {
+    id: "intervenant_nom",
+    label: "Nom de l'intervenant",
+    category: "intervenant",
+    description: "Nom de l'intervenant/formateur",
+    example: "BERNARD",
+  },
+  {
+    id: "intervenant_prenom",
+    label: "Prénom de l'intervenant",
+    category: "intervenant",
+    description: "Prénom de l'intervenant/formateur",
+    example: "Sophie",
+  },
+  {
+    id: "intervenant_adresse",
+    label: "Adresse",
+    category: "intervenant",
+    description: "Adresse de l'intervenant",
+    example: "10 rue du Commerce",
+  },
+  {
+    id: "intervenant_code_postal",
+    label: "Code postal",
+    category: "intervenant",
+    description: "Code postal de l'intervenant",
+    example: "75011",
+  },
+  {
+    id: "intervenant_ville",
+    label: "Ville",
+    category: "intervenant",
+    description: "Ville de l'intervenant",
+    example: "Paris",
+  },
+  {
+    id: "intervenant_pays",
+    label: "Pays",
+    category: "intervenant",
+    description: "Pays de l'intervenant",
+    example: "France",
+  },
+  {
+    id: "intervenant_email",
+    label: "Email",
+    category: "intervenant",
+    description: "Email de l'intervenant",
+    example: "s.bernard@formation.fr",
+  },
+  {
+    id: "intervenant_telephone",
+    label: "Téléphone",
+    category: "intervenant",
+    description: "Téléphone de l'intervenant",
+    example: "06 12 34 56 78",
+  },
+  {
+    id: "intervenant_specialites",
+    label: "Spécialités",
+    category: "intervenant",
+    description: "Domaines d'expertise de l'intervenant",
+    example: "Management, Leadership, Communication",
+  },
+  {
+    id: "intervenant_raison_sociale",
+    label: "Raison sociale de l'intervenant (si externe)",
+    category: "intervenant",
+    description: "Raison sociale si l'intervenant est une entreprise externe",
+    example: "Consulting Expert SARL",
+  },
+  {
+    id: "intervenant_siret",
+    label: "SIRET de l'intervenant (si entreprise)",
+    category: "intervenant",
+    description: "Numéro SIRET si l'intervenant est une entreprise",
+    example: "123 456 789 00012",
+  },
+  {
+    id: "intervenant_nda",
+    label: "Numéro de déclaration d'activité de l'intervenant (si entreprise)",
+    category: "intervenant",
+    description: "NDA de l'intervenant si c'est un organisme de formation",
+    example: "11 75 12345 67",
+  },
+  {
+    id: "intervenant_equipe_pedagogique",
+    label: "Équipe pédagogique",
+    category: "intervenant",
+    description: "Liste des intervenants de la session (calculé automatiquement)",
+    example: "Sophie BERNARD, Pierre MARTIN",
+  },
+
+  // =====================================================
+  // LIEUX (lieu_)
+  // Source: Mes données > Lieux
+  // =====================================================
+  {
+    id: "lieu_type",
+    label: "Type de lieu",
+    category: "lieu",
+    description: "Type de lieu (présentiel ou visioconférence)",
+    example: "Présentiel",
+  },
+  {
+    id: "lieu_nom",
+    label: "Nom du lieu",
+    category: "lieu",
+    description: "Nom du lieu de formation",
+    example: "Salle de formation Paris 9",
+  },
+  {
+    id: "lieu_informations_pratiques",
+    label: "Informations pratiques",
+    category: "lieu",
+    description: "Informations pratiques (code porte, étage, accès...)",
+    example: "Code porte: 1234, 3ème étage",
+  },
+  {
+    id: "lieu_formation",
+    label: "Lieu de la formation",
+    category: "lieu",
+    description: "Adresse complète ou lien de connexion",
+    example: "12 rue de la Formation, 75009 Paris",
+  },
+  {
+    id: "lieu_capacite",
+    label: "Capacité (nombre de personnes)",
+    category: "lieu",
+    description: "Capacité maximale du lieu",
+    example: "15",
+  },
+
+  // =====================================================
+  // FORMATION (formation_)
+  // Source: Formations (fiche pédagogique)
+  // =====================================================
+  {
+    id: "formation_titre",
     label: "Titre de la formation",
     category: "formation",
     description: "Nom complet de la formation",
     example: "Management Agile et Leadership",
   },
   {
-    id: "formation.description",
-    label: "Description",
+    id: "formation_modalite",
+    label: "Modalité de la formation (fiche pédagogique)",
     category: "formation",
-    description: "Description detaillee de la formation",
-    example: "Cette formation vous permettra de maitriser les fondamentaux du management agile...",
+    description: "Modalité définie dans la fiche pédagogique",
+    example: "Présentiel",
   },
   {
-    id: "formation.duree",
-    label: "Duree",
+    id: "session_modalite",
+    label: "Modalité de la formation (documents)",
     category: "formation",
-    description: "Duree totale de la formation",
-    example: "14 heures (2 jours)",
+    description: "Modalité définie pour la session de documents",
+    example: "Distanciel",
   },
   {
-    id: "formation.duree_heures",
-    label: "Duree en heures",
+    id: "formation_categorie_action",
+    label: "Catégorie de l'action de formation",
     category: "formation",
-    description: "Nombre d'heures total",
+    description: "Catégorie de l'action selon le code du travail",
+    example: "Action de formation",
+  },
+  {
+    id: "formation_duree_heures",
+    label: "Durée en heures",
+    category: "formation",
+    description: "Durée totale en heures",
     example: "14",
   },
   {
-    id: "formation.prix",
-    label: "Prix",
+    id: "formation_duree_jours",
+    label: "Durée en jours",
     category: "formation",
-    description: "Prix de la formation",
-    example: "1500",
+    description: "Durée totale en jours",
+    example: "2",
   },
   {
-    id: "formation.prix_format",
-    label: "Prix formate",
+    id: "formation_duree_heures_jours",
+    label: "Durée heures et jours",
     category: "formation",
-    description: "Prix avec devise et formatage",
-    example: "1 500,00 EUR HT",
+    description: "Durée formatée en heures et jours",
+    example: "14 heures (2 jours)",
   },
   {
-    id: "formation.objectifs",
-    label: "Objectifs pedagogiques",
+    id: "formation_nb_participants_max",
+    label: "Nombre maximum de participants par session",
     category: "formation",
-    description: "Liste des objectifs de la formation",
-    example: "Comprendre les principes du management agile",
-    isLoop: true,
+    description: "Nombre maximum de participants autorisés",
+    example: "12",
   },
   {
-    id: "formation.prerequis",
-    label: "Prerequis",
+    id: "formation_description",
+    label: "Description de la formation",
     category: "formation",
-    description: "Prerequis necessaires",
-    example: "Aucun prerequis particulier",
-    isLoop: true,
+    description: "Description détaillée de la formation",
+    example: "Cette formation vous permettra de maîtriser les fondamentaux...",
   },
   {
-    id: "formation.public_cible",
-    label: "Public cible",
+    id: "formation_objectifs_pedagogiques",
+    label: "Objectifs pédagogiques de la formation",
     category: "formation",
-    description: "Public vise par la formation",
-    example: "Managers, chefs de projet, responsables d'equipe",
+    description: "Liste des objectifs pédagogiques",
+    example: "- Comprendre les principes du management agile\n- Développer son leadership",
   },
   {
-    id: "formation.modalites",
-    label: "Modalites",
+    id: "formation_prerequis",
+    label: "Prérequis",
     category: "formation",
-    description: "Modalites de la formation (presentiel, distanciel...)",
-    example: "Presentiel",
+    description: "Prérequis nécessaires pour suivre la formation",
+    example: "Aucun prérequis particulier",
   },
   {
-    id: "formation.lieu",
-    label: "Lieu",
+    id: "formation_public_vise",
+    label: "Public visé",
     category: "formation",
-    description: "Lieu de la formation",
-    example: "Paris - Centre de formation",
+    description: "Public cible de la formation",
+    example: "Managers, chefs de projet, responsables d'équipe",
   },
   {
-    id: "formation.date_debut",
-    label: "Date de debut",
+    id: "formation_contenu_detaille",
+    label: "Contenu de la formation",
     category: "formation",
-    description: "Date de debut de la formation",
-    example: "15/01/2025",
+    description: "Contenu détaillé et programme de la formation",
+    example: "Module 1: Introduction au management agile...",
   },
   {
-    id: "formation.date_fin",
-    label: "Date de fin",
+    id: "formation_suivi_execution_evaluation",
+    label: "Suivi de l'exécution et évaluation des résultats",
     category: "formation",
-    description: "Date de fin de la formation",
-    example: "16/01/2025",
+    description: "Modalités de suivi et d'évaluation",
+    example: "Feuilles d'émargement, évaluation de fin de formation, QCM",
   },
   {
-    id: "formation.reference",
-    label: "Reference",
+    id: "formation_ressources_pedagogiques",
+    label: "Ressources pédagogiques",
     category: "formation",
-    description: "Reference unique de la formation",
-    example: "FORM-2025-001",
+    description: "Ressources et moyens pédagogiques mis à disposition",
+    example: "Support de cours, exercices pratiques, études de cas",
   },
   {
-    id: "formation.horaires_matin",
-    label: "Horaires matin",
+    id: "formation_accessibilite",
+    label: "Accessibilité",
     category: "formation",
-    description: "Horaires de la session du matin",
-    example: "09:00 - 12:30",
-  },
-  {
-    id: "formation.horaires_apres_midi",
-    label: "Horaires apres-midi",
-    category: "formation",
-    description: "Horaires de la session de l'apres-midi",
-    example: "14:00 - 17:30",
-  },
-  {
-    id: "formation.nombre_jours",
-    label: "Nombre de jours",
-    category: "formation",
-    description: "Nombre total de jours de formation",
-    example: "3",
-  },
-  {
-    id: "formation.tva",
-    label: "TVA",
-    category: "formation",
-    description: "Montant de la TVA",
-    example: "300,00",
-  },
-  {
-    id: "formation.prix_ttc",
-    label: "Prix TTC",
-    category: "formation",
-    description: "Prix toutes taxes comprises",
-    example: "1 800,00 EUR TTC",
-  },
-  {
-    id: "formation.methodes_pedagogiques",
-    label: "Methodes pedagogiques",
-    category: "formation",
-    description: "Methodes utilisees (expose, cas pratiques...)",
-    example: "Apports theoriques, exercices pratiques, mises en situation",
-  },
-  {
-    id: "formation.moyens_techniques",
-    label: "Moyens techniques",
-    category: "formation",
-    description: "Equipements et supports utilises",
-    example: "Salle equipee, videoprojecteur, supports de cours",
-  },
-  {
-    id: "formation.modalites_evaluation",
-    label: "Modalites d'evaluation",
-    category: "formation",
-    description: "Comment les acquis sont evalues",
-    example: "QCM, mise en situation, evaluation continue",
-  },
-  {
-    id: "formation.accessibilite",
-    label: "Accessibilite",
-    category: "formation",
-    description: "Informations d'accessibilite handicap",
+    description: "Informations d'accessibilité handicap",
     example: "Formation accessible aux personnes en situation de handicap",
   },
   {
-    id: "formation.delai_acces",
-    label: "Delai d'acces",
+    id: "formation_delai_acces",
+    label: "Délai d'accès",
     category: "formation",
-    description: "Delai pour acceder a la formation",
+    description: "Délai pour accéder à la formation",
     example: "14 jours ouvrables",
   },
-
-  // ===== JOURNEES DE FORMATION =====
   {
-    id: "journees.premiere_date",
-    label: "Premiere journee (date debut)",
-    category: "journees",
-    description: "Date de la premiere journee de formation",
+    id: "tarif_entreprise_ht_fiche_peda",
+    label: "Tarif entreprise (HT) (fiche pédagogique)",
+    category: "formation",
+    description: "Tarif HT pour les entreprises (affiché sur la fiche pédagogique)",
+    example: "1 500,00 €",
+  },
+  {
+    id: "tarif_independant_ht_fiche_peda",
+    label: "Tarif indépendant (HT) (fiche pédagogique)",
+    category: "formation",
+    description: "Tarif HT pour les indépendants (affiché sur la fiche pédagogique)",
+    example: "1 200,00 €",
+  },
+  {
+    id: "tarif_particulier_ttc_fiche_peda",
+    label: "Tarif particulier (TTC) (fiche pédagogique)",
+    category: "formation",
+    description: "Tarif TTC pour les particuliers (affiché sur la fiche pédagogique)",
+    example: "1 440,00 €",
+  },
+  {
+    id: "session_date_debut",
+    label: "Date de début de la formation",
+    category: "formation",
+    description: "Date de début de la session",
+    example: "15/01/2025",
+  },
+  {
+    id: "session_date_fin",
+    label: "Date de fin de la formation",
+    category: "formation",
+    description: "Date de fin de la session",
+    example: "16/01/2025",
+  },
+  // Journées de formation (j1 à j4 sont les variables statiques de base)
+  {
+    id: "j1_date",
+    label: "Jour 1 – Date",
+    category: "formation",
+    description: "Date du premier jour de formation",
     example: "15 janvier 2025",
   },
   {
-    id: "journees.derniere_date",
-    label: "Derniere journee (date fin)",
-    category: "journees",
-    description: "Date de la derniere journee de formation (dynamique)",
+    id: "j1_horaire_matin",
+    label: "Jour 1 – Horaires matin",
+    category: "formation",
+    description: "Horaires du matin du jour 1",
+    example: "09:00 - 12:30",
+  },
+  {
+    id: "j1_horaire_apres_midi",
+    label: "Jour 1 – Horaires après-midi",
+    category: "formation",
+    description: "Horaires de l'après-midi du jour 1",
+    example: "14:00 - 17:30",
+  },
+  {
+    id: "j2_date",
+    label: "Jour 2 – Date",
+    category: "formation",
+    description: "Date du deuxième jour de formation",
+    example: "16 janvier 2025",
+  },
+  {
+    id: "j2_horaire_matin",
+    label: "Jour 2 – Horaires matin",
+    category: "formation",
+    description: "Horaires du matin du jour 2",
+    example: "09:00 - 12:30",
+  },
+  {
+    id: "j2_horaire_apres_midi",
+    label: "Jour 2 – Horaires après-midi",
+    category: "formation",
+    description: "Horaires de l'après-midi du jour 2",
+    example: "14:00 - 17:30",
+  },
+  {
+    id: "j3_date",
+    label: "Jour 3 – Date",
+    category: "formation",
+    description: "Date du troisième jour de formation",
     example: "17 janvier 2025",
   },
   {
-    id: "journees.count",
-    label: "Nombre de journees",
-    category: "journees",
-    description: "Nombre total de journees programmees",
-    example: "3",
-  },
-  // Note: Les variables journee1, journee2, etc. sont generees dynamiquement
-  // via getVariablesWithDynamicContext() selon le nombre reel de journees
-
-  // ===== MODULES =====
-  {
-    id: "modules",
-    label: "Liste des modules",
-    category: "modules",
-    description: "Boucle sur tous les modules de la formation",
-    example: "",
-    isLoop: true,
-    children: [
-      {
-        id: "module.numero",
-        label: "Numero du module",
-        category: "modules",
-        description: "Numero d'ordre du module",
-        example: "1",
-      },
-      {
-        id: "module.titre",
-        label: "Titre du module",
-        category: "modules",
-        description: "Nom du module",
-        example: "Introduction au Management Agile",
-      },
-      {
-        id: "module.duree",
-        label: "Duree du module",
-        category: "modules",
-        description: "Duree du module",
-        example: "3 heures",
-      },
-      {
-        id: "module.objectifs",
-        label: "Objectifs du module",
-        category: "modules",
-        description: "Objectifs specifiques du module",
-        example: "Comprendre l'historique de l'agilite",
-        isLoop: true,
-      },
-      {
-        id: "module.contenu",
-        label: "Contenu du module",
-        category: "modules",
-        description: "Points abordes dans le module",
-        example: "Les 4 valeurs du Manifeste Agile",
-        isLoop: true,
-      },
-    ],
-  },
-
-  // ===== ORGANISATION =====
-  {
-    id: "organisation.nom",
-    label: "Raison sociale",
-    category: "organisation",
-    description: "Raison sociale de l'organisme de formation",
-    example: "Automate Formation SAS",
-  },
-  {
-    id: "organisation.siret",
-    label: "SIRET",
-    category: "organisation",
-    description: "Numero SIRET de l'organisme",
-    example: "123 456 789 00012",
-  },
-  {
-    id: "organisation.adresse",
-    label: "Adresse",
-    category: "organisation",
-    description: "Adresse complete",
-    example: "15 rue de la Formation",
-  },
-  {
-    id: "organisation.code_postal",
-    label: "Code postal",
-    category: "organisation",
-    description: "Code postal",
-    example: "75001",
-  },
-  {
-    id: "organisation.ville",
-    label: "Ville",
-    category: "organisation",
-    description: "Ville",
-    example: "Paris",
-  },
-  {
-    id: "organisation.adresse_complete",
-    label: "Adresse complete",
-    category: "organisation",
-    description: "Adresse avec code postal et ville",
-    example: "15 rue de la Formation, 75001 Paris",
-  },
-  {
-    id: "organisation.telephone",
-    label: "Telephone",
-    category: "organisation",
-    description: "Numero de telephone",
-    example: "01 23 45 67 89",
-  },
-  {
-    id: "organisation.email",
-    label: "Email",
-    category: "organisation",
-    description: "Adresse email",
-    example: "contact@automate-formation.fr",
-  },
-  {
-    id: "organisation.site_web",
-    label: "Site web",
-    category: "organisation",
-    description: "URL du site web",
-    example: "www.automate-formation.fr",
-  },
-  {
-    id: "organisation.numero_da",
-    label: "N° Declaration d'Activite",
-    category: "organisation",
-    description: "Numero de declaration d'activite",
-    example: "11 75 12345 67",
-  },
-  {
-    id: "organisation.representant",
-    label: "Representant legal",
-    category: "organisation",
-    description: "Nom du representant legal",
-    example: "Jean DUPONT",
-  },
-  {
-    id: "organisation.fonction_representant",
-    label: "Fonction du representant",
-    category: "organisation",
-    description: "Fonction du representant legal",
-    example: "Directeur General",
-  },
-  {
-    id: "organisation.logo",
-    label: "Logo de l'organisme",
-    category: "organisation",
-    description: "URL du logo de l'organisme de formation",
-    example: "https://example.com/logo.png",
-  },
-  {
-    id: "organisation.tva_intra",
-    label: "N° TVA intracommunautaire",
-    category: "organisation",
-    description: "Numero de TVA intracommunautaire",
-    example: "FR12345678901",
-  },
-  {
-    id: "organisation.capital",
-    label: "Capital social",
-    category: "organisation",
-    description: "Capital social de la societe",
-    example: "10 000 EUR",
-  },
-  {
-    id: "organisation.forme_juridique",
-    label: "Forme juridique",
-    category: "organisation",
-    description: "Forme juridique de l'entreprise",
-    example: "SAS",
-  },
-  {
-    id: "organisation.rcs",
-    label: "RCS",
-    category: "organisation",
-    description: "Numero RCS",
-    example: "Paris B 123 456 789",
-  },
-  {
-    id: "organisation.prefecture_region",
-    label: "Region prefecture",
-    category: "organisation",
-    description: "Region d'acquisition du numero de declaration d'activite",
-    example: "Ile-de-France",
-  },
-
-  // ===== FORMATION - SECTIONS FIXES =====
-  {
-    id: "formation.execution_resultats",
-    label: "Suivi execution et resultats",
+    id: "j3_horaire_matin",
+    label: "Jour 3 – Horaires matin",
     category: "formation",
-    description: "Section fixe: Suivi de l'execution et evaluation des resultats (texte standard Qualiopi)",
-    example: "Feuilles d'emargement, evaluation de fin de formation, auto-evaluation, questionnaire satisfaction, attestation",
+    description: "Horaires du matin du jour 3",
+    example: "09:00 - 12:30",
   },
   {
-    id: "formation.ressources_pedagogiques",
-    label: "Ressources pedagogiques",
+    id: "j3_horaire_apres_midi",
+    label: "Jour 3 – Horaires après-midi",
     category: "formation",
-    description: "Section fixe: Ressources et moyens pedagogiques (texte standard Qualiopi)",
-    example: "Formation presentiel/distanciel, accompagnement formateur, ateliers pratiques, supports de cours",
+    description: "Horaires de l'après-midi du jour 3",
+    example: "14:00 - 17:30",
+  },
+  {
+    id: "j4_date",
+    label: "Jour 4 – Date",
+    category: "formation",
+    description: "Date du quatrième jour de formation",
+    example: "18 janvier 2025",
+  },
+  {
+    id: "j4_horaire_matin",
+    label: "Jour 4 – Horaires matin",
+    category: "formation",
+    description: "Horaires du matin du jour 4",
+    example: "09:00 - 12:30",
+  },
+  {
+    id: "j4_horaire_apres_midi",
+    label: "Jour 4 – Horaires après-midi",
+    category: "formation",
+    description: "Horaires de l'après-midi du jour 4",
+    example: "14:00 - 17:30",
+  },
+  {
+    id: "planning_journees_formation",
+    label: "Planning des journées de formation",
+    category: "formation",
+    description: "Planning complet (jour + dates + horaires par jour)",
+    example: "Jour 1 - 15/01/2025 : 09:00-12:30 / 14:00-17:30\nJour 2 - 16/01/2025 : 09:00-12:30 / 14:00-17:30",
   },
 
-  // ===== SIGNATURE =====
+  // =====================================================
+  // DATES (date_)
+  // =====================================================
   {
-    id: "signature.responsable_organisme",
-    label: "Signature responsable OF",
-    category: "signature",
-    description: "Image de signature du responsable de l'organisme de formation",
-    example: "https://example.com/signature.png",
+    id: "date_jour",
+    label: "Jour",
+    category: "dates",
+    description: "Jour actuel (numéro)",
+    example: "15",
+  },
+  {
+    id: "date_mois",
+    label: "Mois",
+    category: "dates",
+    description: "Mois actuel (en lettres)",
+    example: "janvier",
+  },
+  {
+    id: "date_annee",
+    label: "Année",
+    category: "dates",
+    description: "Année actuelle",
+    example: "2025",
+  },
+  {
+    id: "date_complete_longue",
+    label: "Date complète (longue)",
+    category: "dates",
+    description: "Date complète au format long",
+    example: "15 janvier 2025",
+  },
+  {
+    id: "date_complete_courte",
+    label: "Date complète (courte)",
+    category: "dates",
+    description: "Date complète au format court",
+    example: "15/01/2025",
   },
 
-  // ===== ENTREPRISE =====
-  {
-    id: "entreprise.nom",
-    label: "Nom de l'entreprise",
-    category: "entreprise",
-    description: "Raison sociale de l'entreprise cliente",
-    example: "ACME Corporation",
-  },
-  {
-    id: "entreprise.siret",
-    label: "SIRET entreprise",
-    category: "entreprise",
-    description: "Numero SIRET de l'entreprise",
-    example: "987 654 321 00098",
-  },
-  {
-    id: "entreprise.adresse",
-    label: "Adresse entreprise",
-    category: "entreprise",
-    description: "Adresse de l'entreprise",
-    example: "100 avenue des Champs-Elysees",
-  },
-  {
-    id: "entreprise.code_postal",
-    label: "Code postal entreprise",
-    category: "entreprise",
-    description: "Code postal de l'entreprise",
-    example: "75008",
-  },
-  {
-    id: "entreprise.ville",
-    label: "Ville entreprise",
-    category: "entreprise",
-    description: "Ville de l'entreprise",
-    example: "Paris",
-  },
-  {
-    id: "entreprise.adresse_complete",
-    label: "Adresse complete entreprise",
-    category: "entreprise",
-    description: "Adresse complete de l'entreprise",
-    example: "100 avenue des Champs-Elysees, 75008 Paris",
-  },
-  {
-    id: "entreprise.representant",
-    label: "Representant entreprise",
-    category: "entreprise",
-    description: "Nom du representant de l'entreprise",
-    example: "Marie MARTIN",
-  },
-  {
-    id: "entreprise.fonction_representant",
-    label: "Fonction representant",
-    category: "entreprise",
-    description: "Fonction du representant",
-    example: "Directrice des Ressources Humaines",
-  },
-  {
-    id: "entreprise.email",
-    label: "Email entreprise",
-    category: "entreprise",
-    description: "Email de l'entreprise",
-    example: "contact@acme.com",
-  },
-  {
-    id: "entreprise.telephone",
-    label: "Telephone entreprise",
-    category: "entreprise",
-    description: "Telephone de l'entreprise",
-    example: "01 23 45 67 89",
-  },
-
-  // ===== PARTICULIER =====
-  {
-    id: "particulier.civilite",
-    label: "Civilite",
-    category: "particulier",
-    description: "Civilite du particulier (M. / Mme)",
-    example: "M.",
-  },
-  {
-    id: "particulier.nom",
-    label: "Nom",
-    category: "particulier",
-    description: "Nom du particulier",
-    example: "MARTIN",
-  },
-  {
-    id: "particulier.prenom",
-    label: "Prenom",
-    category: "particulier",
-    description: "Prenom du particulier",
-    example: "Pierre",
-  },
-  {
-    id: "particulier.nom_complet",
-    label: "Nom complet",
-    category: "particulier",
-    description: "Prenom et nom du particulier",
-    example: "Pierre MARTIN",
-  },
-  {
-    id: "particulier.adresse",
-    label: "Adresse",
-    category: "particulier",
-    description: "Adresse du particulier",
-    example: "25 rue de la Paix",
-  },
-  {
-    id: "particulier.code_postal",
-    label: "Code postal",
-    category: "particulier",
-    description: "Code postal du particulier",
-    example: "75002",
-  },
-  {
-    id: "particulier.ville",
-    label: "Ville",
-    category: "particulier",
-    description: "Ville du particulier",
-    example: "Paris",
-  },
-  {
-    id: "particulier.adresse_complete",
-    label: "Adresse complete",
-    category: "particulier",
-    description: "Adresse complete du particulier",
-    example: "25 rue de la Paix, 75002 Paris",
-  },
-  {
-    id: "particulier.email",
-    label: "Email",
-    category: "particulier",
-    description: "Email du particulier",
-    example: "pierre.martin@email.com",
-  },
-  {
-    id: "particulier.telephone",
-    label: "Telephone",
-    category: "particulier",
-    description: "Telephone du particulier",
-    example: "06 12 34 56 78",
-  },
-  {
-    id: "particulier.date_naissance",
-    label: "Date de naissance",
-    category: "particulier",
-    description: "Date de naissance du particulier",
-    example: "15/03/1985",
-  },
-  {
-    id: "particulier.lieu_naissance",
-    label: "Lieu de naissance",
-    category: "particulier",
-    description: "Lieu de naissance du particulier",
-    example: "Paris",
-  },
-  {
-    id: "particulier.statut",
-    label: "Statut",
-    category: "particulier",
-    description: "Statut du particulier (salarie, demandeur d'emploi...)",
-    example: "Demandeur d'emploi",
-  },
-
-  // ===== INDEPENDANT =====
-  {
-    id: "independant.civilite",
-    label: "Civilite",
-    category: "independant",
-    description: "Civilite de l'independant (M. / Mme)",
-    example: "M.",
-  },
-  {
-    id: "independant.nom",
-    label: "Nom",
-    category: "independant",
-    description: "Nom de l'independant",
-    example: "DURAND",
-  },
-  {
-    id: "independant.prenom",
-    label: "Prenom",
-    category: "independant",
-    description: "Prenom de l'independant",
-    example: "Jean",
-  },
-  {
-    id: "independant.nom_complet",
-    label: "Nom complet",
-    category: "independant",
-    description: "Prenom et nom de l'independant",
-    example: "Jean DURAND",
-  },
-  {
-    id: "independant.siret",
-    label: "SIRET",
-    category: "independant",
-    description: "Numero SIRET de l'independant",
-    example: "123 456 789 00012",
-  },
-  {
-    id: "independant.adresse",
-    label: "Adresse",
-    category: "independant",
-    description: "Adresse de l'independant",
-    example: "10 rue du Commerce",
-  },
-  {
-    id: "independant.code_postal",
-    label: "Code postal",
-    category: "independant",
-    description: "Code postal de l'independant",
-    example: "75011",
-  },
-  {
-    id: "independant.ville",
-    label: "Ville",
-    category: "independant",
-    description: "Ville de l'independant",
-    example: "Paris",
-  },
-  {
-    id: "independant.adresse_complete",
-    label: "Adresse complete",
-    category: "independant",
-    description: "Adresse complete de l'independant",
-    example: "10 rue du Commerce, 75011 Paris",
-  },
-  {
-    id: "independant.email",
-    label: "Email",
-    category: "independant",
-    description: "Email de l'independant",
-    example: "jean.durand@email.com",
-  },
-  {
-    id: "independant.telephone",
-    label: "Telephone",
-    category: "independant",
-    description: "Telephone de l'independant",
-    example: "06 98 76 54 32",
-  },
-  {
-    id: "independant.activite",
-    label: "Activite",
-    category: "independant",
-    description: "Activite professionnelle de l'independant",
-    example: "Consultant informatique",
-  },
-  {
-    id: "independant.date_naissance",
-    label: "Date de naissance",
-    category: "independant",
-    description: "Date de naissance de l'independant",
-    example: "20/06/1980",
-  },
-  {
-    id: "independant.lieu_naissance",
-    label: "Lieu de naissance",
-    category: "independant",
-    description: "Lieu de naissance de l'independant",
-    example: "Lyon",
-  },
-
-  // ===== FINANCEUR =====
-  {
-    id: "financeur.nom",
-    label: "Nom du financeur",
-    category: "financeur",
-    description: "Nom de l'organisme financeur (OPCO, Pole Emploi...)",
-    example: "OPCO Atlas",
-  },
-  {
-    id: "financeur.siret",
-    label: "SIRET financeur",
-    category: "financeur",
-    description: "Numero SIRET du financeur",
-    example: "852 963 741 00025",
-  },
-  {
-    id: "financeur.adresse",
-    label: "Adresse financeur",
-    category: "financeur",
-    description: "Adresse du financeur",
-    example: "30 rue de la Solidarite",
-  },
-  {
-    id: "financeur.code_postal",
-    label: "Code postal financeur",
-    category: "financeur",
-    description: "Code postal du financeur",
-    example: "75015",
-  },
-  {
-    id: "financeur.ville",
-    label: "Ville financeur",
-    category: "financeur",
-    description: "Ville du financeur",
-    example: "Paris",
-  },
-  {
-    id: "financeur.adresse_complete",
-    label: "Adresse complete financeur",
-    category: "financeur",
-    description: "Adresse complete du financeur",
-    example: "30 rue de la Solidarite, 75015 Paris",
-  },
-  {
-    id: "financeur.telephone",
-    label: "Telephone financeur",
-    category: "financeur",
-    description: "Telephone du financeur",
-    example: "01 45 67 89 00",
-  },
-  {
-    id: "financeur.email",
-    label: "Email financeur",
-    category: "financeur",
-    description: "Email du financeur",
-    example: "contact@opco-atlas.fr",
-  },
-  {
-    id: "financeur.representant",
-    label: "Representant financeur",
-    category: "financeur",
-    description: "Nom du representant du financeur",
-    example: "Marie FINANCE",
-  },
-  {
-    id: "financeur.fonction_representant",
-    label: "Fonction representant",
-    category: "financeur",
-    description: "Fonction du representant du financeur",
-    example: "Charge de mission",
-  },
-  {
-    id: "financeur.numero_dossier",
-    label: "Numero de dossier",
-    category: "financeur",
-    description: "Numero de dossier de financement",
-    example: "DOSSIER-2025-001234",
-  },
-
-  // ===== CLIENT (pour les conditions) =====
+  // =====================================================
+  // CLIENT (client.)
+  // Pour les conditions
+  // =====================================================
   {
     id: "client.type",
-    label: "Type de client",
+    label: "Type du client",
     category: "client",
-    description: "Type de client pour les conditions (entreprise, particulier, independant, salarie, financeur)",
+    description: "Type de client (entreprise, independant, particulier, financeur)",
     example: "entreprise",
     isConditional: true,
   },
 
-  // ===== BOUCLES (blocs de repetition) =====
+  // =====================================================
+  // TARIFS & FINANCEMENT
+  // Calculés dans les documents de session
+  // =====================================================
+  // Entreprise
   {
-    id: "#each participants",
-    label: "Boucle Participants",
-    category: "participants",
-    description: "Repeter le contenu pour chaque participant",
-    example: "{{#each participants}}...{{/each}}",
-    isLoop: true,
+    id: "tarif_entreprise_ht_documents",
+    label: "Tarif entreprise (HT) (documents)",
+    category: "tarifs",
+    description: "Tarif HT appliqué pour l'entreprise dans les documents",
+    example: "1 500,00 €",
   },
   {
-    id: "#each modules",
-    label: "Boucle Modules",
-    category: "modules",
-    description: "Repeter le contenu pour chaque module",
-    example: "{{#each modules}}...{{/each}}",
-    isLoop: true,
+    id: "entreprise_montant_tva",
+    label: "Montant de la TVA entreprise (documents)",
+    category: "tarifs",
+    description: "Montant de la TVA pour l'entreprise",
+    example: "300,00 €",
   },
   {
-    id: "#each journees",
-    label: "Boucle Journees",
-    category: "journees",
-    description: "Repeter le contenu pour chaque journee",
-    example: "{{#each journees}}...{{/each}}",
-    isLoop: true,
+    id: "entreprise_prix_ttc",
+    label: "Tarif entreprise TTC (documents)",
+    category: "tarifs",
+    description: "Tarif TTC pour l'entreprise",
+    example: "1 800,00 €",
   },
   {
-    id: "#each formation.objectifs",
-    label: "Boucle Objectifs",
-    category: "formation",
-    description: "Repeter le contenu pour chaque objectif pedagogique",
-    example: "{{#each formation.objectifs}}...{{/each}}",
-    isLoop: true,
+    id: "entreprise_montant_financeur_ht",
+    label: "Montant financé HT par un financeur externe (entreprise)",
+    category: "tarifs",
+    description: "Montant pris en charge par le financeur (HT)",
+    example: "1 200,00 €",
   },
   {
-    id: "#each formation.prerequis",
-    label: "Boucle Prerequis",
-    category: "formation",
-    description: "Repeter le contenu pour chaque prerequis",
-    example: "{{#each formation.prerequis}}...{{/each}}",
-    isLoop: true,
+    id: "entreprise_montant_financeur_ttc",
+    label: "Montant financé TTC par un financeur externe (entreprise)",
+    category: "tarifs",
+    description: "Montant pris en charge par le financeur (TTC)",
+    example: "1 440,00 €",
+  },
+  {
+    id: "entreprise_reste_a_charge_ht",
+    label: "Reste à charge pour entreprise HT",
+    category: "tarifs",
+    description: "Montant restant à la charge de l'entreprise (HT)",
+    example: "300,00 €",
+  },
+  {
+    id: "entreprise_reste_a_charge_ttc",
+    label: "Reste à charge pour entreprise TTC",
+    category: "tarifs",
+    description: "Montant restant à la charge de l'entreprise (TTC)",
+    example: "360,00 €",
+  },
+  // Indépendant
+  {
+    id: "tarif_independant_ht_documents",
+    label: "Tarif indépendant (HT) (documents)",
+    category: "tarifs",
+    description: "Tarif HT appliqué pour l'indépendant dans les documents",
+    example: "1 200,00 €",
+  },
+  {
+    id: "independant_montant_tva",
+    label: "Montant de la TVA indépendant (documents)",
+    category: "tarifs",
+    description: "Montant de la TVA pour l'indépendant",
+    example: "240,00 €",
+  },
+  {
+    id: "independant_prix_ttc",
+    label: "Tarif indépendant TTC (documents)",
+    category: "tarifs",
+    description: "Tarif TTC pour l'indépendant",
+    example: "1 440,00 €",
+  },
+  {
+    id: "independant_montant_financeur_ht",
+    label: "Montant financé HT par un financeur externe (indépendant)",
+    category: "tarifs",
+    description: "Montant pris en charge par le financeur (HT)",
+    example: "1 000,00 €",
+  },
+  {
+    id: "independant_montant_financeur_ttc",
+    label: "Montant financé TTC par un financeur externe (indépendant)",
+    category: "tarifs",
+    description: "Montant pris en charge par le financeur (TTC)",
+    example: "1 200,00 €",
+  },
+  {
+    id: "independant_reste_a_charge_ht",
+    label: "Reste à charge pour indépendant HT",
+    category: "tarifs",
+    description: "Montant restant à la charge de l'indépendant (HT)",
+    example: "200,00 €",
+  },
+  {
+    id: "independant_reste_a_charge_ttc",
+    label: "Reste à charge pour indépendant TTC",
+    category: "tarifs",
+    description: "Montant restant à la charge de l'indépendant (TTC)",
+    example: "240,00 €",
+  },
+  // Particulier
+  {
+    id: "particulier_prix_ttc",
+    label: "Tarif particulier TTC (documents)",
+    category: "tarifs",
+    description: "Tarif TTC pour le particulier",
+    example: "1 440,00 €",
   },
 
-  // ===== CONDITIONS (blocs conditionnels) =====
+  // =====================================================
+  // CONDITIONS (blocs conditionnels)
+  // =====================================================
   {
     id: "#if client.type === 'entreprise'",
     label: "Si Entreprise",
     category: "conditions",
     description: "Afficher uniquement si le client est une entreprise",
     example: "{{#if client.type === 'entreprise'}}...{{/if}}",
+    isConditional: true,
+  },
+  {
+    id: "#if client.type === 'independant'",
+    label: "Si Indépendant",
+    category: "conditions",
+    description: "Afficher uniquement si le client est un indépendant",
+    example: "{{#if client.type === 'independant'}}...{{/if}}",
     isConditional: true,
   },
   {
@@ -1102,241 +1138,44 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     isConditional: true,
   },
   {
-    id: "#if client.type === 'independant'",
-    label: "Si Independant",
-    category: "conditions",
-    description: "Afficher uniquement si le client est un independant",
-    example: "{{#if client.type === 'independant'}}...{{/if}}",
-    isConditional: true,
-  },
-  {
-    id: "#if client.type === 'salarie'",
-    label: "Si Salarie",
-    category: "conditions",
-    description: "Afficher uniquement si le client est un salarie",
-    example: "{{#if client.type === 'salarie'}}...{{/if}}",
-    isConditional: true,
-  },
-  {
     id: "#if client.type === 'financeur'",
     label: "Si Financeur",
     category: "conditions",
-    description: "Afficher uniquement si le client est un financeur (OPCO...)",
+    description: "Afficher uniquement si le client est un financeur",
     example: "{{#if client.type === 'financeur'}}...{{/if}}",
     isConditional: true,
   },
   {
-    id: "#if entreprise",
-    label: "Si Entreprise existe",
+    id: "#if client.type === 'salarie'",
+    label: "Si Salarié",
     category: "conditions",
-    description: "Afficher si les donnees entreprise sont presentes",
-    example: "{{#if entreprise}}...{{/if}}",
+    description: "Afficher uniquement si le client est un salarié",
+    example: "{{#if client.type === 'salarie'}}...{{/if}}",
     isConditional: true,
   },
   {
-    id: "#if particulier",
-    label: "Si Particulier existe",
+    id: "#if client.type === 'intervenant'",
+    label: "Si intervenant entreprise",
     category: "conditions",
-    description: "Afficher si les donnees particulier sont presentes",
-    example: "{{#if particulier}}...{{/if}}",
+    description: "Afficher uniquement si l'intervenant est une entreprise",
+    example: "{{#if client.type === 'intervenant'}}...{{/if}}",
     isConditional: true,
   },
   {
-    id: "#if independant",
-    label: "Si Independant existe",
+    id: "#if entreprise_a_financeur",
+    label: "Si financeur externe entreprise",
     category: "conditions",
-    description: "Afficher si les donnees independant sont presentes",
-    example: "{{#if independant}}...{{/if}}",
+    description: "Afficher si l'entreprise a un financeur externe",
+    example: "{{#if entreprise_a_financeur}}...{{/if}}",
     isConditional: true,
   },
   {
-    id: "#if financeur",
-    label: "Si Financeur existe",
+    id: "#if independant_a_financeur",
+    label: "Si financeur externe indépendant",
     category: "conditions",
-    description: "Afficher si les donnees financeur sont presentes",
-    example: "{{#if financeur}}...{{/if}}",
+    description: "Afficher si l'indépendant a un financeur externe",
+    example: "{{#if independant_a_financeur}}...{{/if}}",
     isConditional: true,
-  },
-
-  // ===== PARTICIPANTS =====
-  {
-    id: "participants",
-    label: "Liste des participants",
-    category: "participants",
-    description: "Boucle sur tous les participants",
-    example: "",
-    isLoop: true,
-    children: [
-      {
-        id: "participant.civilite",
-        label: "Civilite",
-        category: "participants",
-        description: "Civilite du participant",
-        example: "M.",
-      },
-      {
-        id: "participant.nom",
-        label: "Nom",
-        category: "participants",
-        description: "Nom du participant",
-        example: "DURAND",
-      },
-      {
-        id: "participant.prenom",
-        label: "Prenom",
-        category: "participants",
-        description: "Prenom du participant",
-        example: "Pierre",
-      },
-      {
-        id: "participant.nom_complet",
-        label: "Nom complet",
-        category: "participants",
-        description: "Prenom et nom du participant",
-        example: "Pierre DURAND",
-      },
-      {
-        id: "participant.email",
-        label: "Email",
-        category: "participants",
-        description: "Email du participant",
-        example: "p.durand@example.com",
-      },
-      {
-        id: "participant.fonction",
-        label: "Fonction",
-        category: "participants",
-        description: "Poste du participant",
-        example: "Chef de projet",
-      },
-    ],
-  },
-  {
-    id: "participants.count",
-    label: "Nombre de participants",
-    category: "participants",
-    description: "Nombre total de participants",
-    example: "8",
-  },
-  // Note: Les variables salarie1, salarie2, etc. sont generees dynamiquement
-  // via getVariablesWithDynamicContext() selon le nombre reel de salaries
-
-  // ===== FORMATEUR =====
-  {
-    id: "formateur.civilite",
-    label: "Civilite formateur",
-    category: "formateur",
-    description: "Civilite du formateur",
-    example: "Mme",
-  },
-  {
-    id: "formateur.nom",
-    label: "Nom formateur",
-    category: "formateur",
-    description: "Nom du formateur",
-    example: "BERNARD",
-  },
-  {
-    id: "formateur.prenom",
-    label: "Prenom formateur",
-    category: "formateur",
-    description: "Prenom du formateur",
-    example: "Sophie",
-  },
-  {
-    id: "formateur.nom_complet",
-    label: "Nom complet formateur",
-    category: "formateur",
-    description: "Prenom et nom du formateur",
-    example: "Sophie BERNARD",
-  },
-  {
-    id: "formateur.email",
-    label: "Email formateur",
-    category: "formateur",
-    description: "Email du formateur",
-    example: "s.bernard@formation.fr",
-  },
-  {
-    id: "formateur.telephone",
-    label: "Telephone formateur",
-    category: "formateur",
-    description: "Telephone du formateur",
-    example: "06 12 34 56 78",
-  },
-  {
-    id: "formateur.specialite",
-    label: "Specialite",
-    category: "formateur",
-    description: "Domaine d'expertise du formateur",
-    example: "Management et Leadership",
-  },
-
-  // ===== DATES =====
-  {
-    id: "date.jour",
-    label: "Jour",
-    category: "dates",
-    description: "Jour actuel",
-    example: "15",
-  },
-  {
-    id: "date.mois",
-    label: "Mois",
-    category: "dates",
-    description: "Mois actuel (en lettres)",
-    example: "janvier",
-  },
-  {
-    id: "date.mois_numero",
-    label: "Mois (numero)",
-    category: "dates",
-    description: "Mois actuel (en chiffres)",
-    example: "01",
-  },
-  {
-    id: "date.annee",
-    label: "Annee",
-    category: "dates",
-    description: "Annee actuelle",
-    example: "2025",
-  },
-  {
-    id: "date.complete",
-    label: "Date complete",
-    category: "dates",
-    description: "Date complete formatee",
-    example: "15 janvier 2025",
-  },
-  {
-    id: "date.courte",
-    label: "Date courte",
-    category: "dates",
-    description: "Date au format court",
-    example: "15/01/2025",
-  },
-
-  // ===== DOCUMENT =====
-  {
-    id: "document.reference",
-    label: "Reference document",
-    category: "document",
-    description: "Reference unique du document",
-    example: "CONV-2025-001",
-  },
-  {
-    id: "document.date_creation",
-    label: "Date de creation",
-    category: "document",
-    description: "Date de creation du document",
-    example: "15/01/2025",
-  },
-  {
-    id: "document.version",
-    label: "Version",
-    category: "document",
-    description: "Version du document",
-    example: "1.0",
   },
 ];
 
@@ -1351,34 +1190,10 @@ export const VARIABLE_GROUPS: VariableGroup[] = [
     variables: TEMPLATE_VARIABLES.filter((v) => v.category === "conditions"),
   },
   {
-    category: "client",
-    label: "Client",
-    icon: "UserCircle",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "client"),
-  },
-  {
-    category: "formation",
-    label: "Formation",
-    icon: "GraduationCap",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "formation"),
-  },
-  {
-    category: "journees",
-    label: "Journees",
-    icon: "CalendarDays",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "journees"),
-  },
-  {
-    category: "modules",
-    label: "Modules",
-    icon: "Layers",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "modules"),
-  },
-  {
-    category: "organisation",
-    label: "Organisme",
+    category: "of",
+    label: "Organisme de Formation",
     icon: "Building2",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "organisation"),
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "of"),
   },
   {
     category: "entreprise",
@@ -1387,16 +1202,10 @@ export const VARIABLE_GROUPS: VariableGroup[] = [
     variables: TEMPLATE_VARIABLES.filter((v) => v.category === "entreprise"),
   },
   {
-    category: "particulier",
-    label: "Particulier",
-    icon: "User",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "particulier"),
-  },
-  {
-    category: "independant",
-    label: "Independant",
-    icon: "UserCog",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "independant"),
+    category: "apprenant",
+    label: "Apprenant",
+    icon: "GraduationCap",
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "apprenant"),
   },
   {
     category: "financeur",
@@ -1405,16 +1214,22 @@ export const VARIABLE_GROUPS: VariableGroup[] = [
     variables: TEMPLATE_VARIABLES.filter((v) => v.category === "financeur"),
   },
   {
-    category: "participants",
-    label: "Participants",
-    icon: "Users",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "participants"),
+    category: "intervenant",
+    label: "Intervenant",
+    icon: "UserCheck",
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "intervenant"),
   },
   {
-    category: "formateur",
-    label: "Formateur",
-    icon: "UserCheck",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "formateur"),
+    category: "lieu",
+    label: "Lieux",
+    icon: "MapPin",
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "lieu"),
+  },
+  {
+    category: "formation",
+    label: "Formation",
+    icon: "BookOpen",
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "formation"),
   },
   {
     category: "dates",
@@ -1423,16 +1238,16 @@ export const VARIABLE_GROUPS: VariableGroup[] = [
     variables: TEMPLATE_VARIABLES.filter((v) => v.category === "dates"),
   },
   {
-    category: "document",
-    label: "Document",
-    icon: "FileText",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "document"),
+    category: "client",
+    label: "Client",
+    icon: "UserCircle",
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "client"),
   },
   {
-    category: "signature",
-    label: "Signature",
-    icon: "PenTool",
-    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "signature"),
+    category: "tarifs",
+    label: "Tarifs & Financement",
+    icon: "CreditCard",
+    variables: TEMPLATE_VARIABLES.filter((v) => v.category === "tarifs"),
   },
 ];
 
@@ -1441,15 +1256,15 @@ export const VARIABLE_GROUPS: VariableGroup[] = [
  */
 // Toutes les categories disponibles pour harmonisation
 const ALL_CATEGORIES: VariableCategory[] = [
-  "formation", "journees", "modules", "organisation", "entreprise",
-  "particulier", "participants", "formateur", "dates", "document", "signature"
+  "of", "entreprise", "apprenant", "financeur", "intervenant",
+  "lieu", "formation", "dates", "client", "tarifs", "conditions"
 ];
 
 export const DOCUMENT_TYPES: DocumentTypeConfig[] = [
   {
     type: "fiche_pedagogique",
-    label: "Fiche Pedagogique",
-    description: "Document detaillant le contenu pedagogique de la formation",
+    label: "Fiche Pédagogique",
+    description: "Document détaillant le contenu pédagogique de la formation",
     icon: "BookOpen",
     availableCategories: ALL_CATEGORIES,
   },
@@ -1470,42 +1285,42 @@ export const DOCUMENT_TYPES: DocumentTypeConfig[] = [
   {
     type: "programme_formation",
     label: "Programme de Formation",
-    description: "Programme detaille de la formation",
+    description: "Programme détaillé de la formation",
     icon: "ListOrdered",
     availableCategories: ALL_CATEGORIES,
   },
   {
     type: "attestation_fin",
     label: "Attestation de Fin de Formation",
-    description: "Attestation delivree a la fin de la formation",
+    description: "Attestation délivrée à la fin de la formation",
     icon: "Award",
     availableCategories: ALL_CATEGORIES,
   },
   {
     type: "feuille_emargement",
-    label: "Feuille d'Emargement",
-    description: "Feuille de presence pour signature",
+    label: "Feuille d'Émargement",
+    description: "Feuille de présence pour signature",
     icon: "ClipboardCheck",
     availableCategories: ALL_CATEGORIES,
   },
   {
     type: "reglement_interieur",
-    label: "Reglement Interieur",
-    description: "Reglement interieur applicable aux stagiaires",
+    label: "Règlement Intérieur",
+    description: "Règlement intérieur applicable aux stagiaires",
     icon: "Scale",
     availableCategories: ALL_CATEGORIES,
   },
   {
     type: "evaluation_chaud",
-    label: "Evaluation a Chaud",
+    label: "Évaluation à Chaud",
     description: "Questionnaire de satisfaction post-formation",
     icon: "ThermometerSun",
     availableCategories: ALL_CATEGORIES,
   },
   {
     type: "evaluation_froid",
-    label: "Evaluation a Froid",
-    description: "Questionnaire d'evaluation differee",
+    label: "Évaluation à Froid",
+    description: "Questionnaire d'évaluation différée",
     icon: "ThermometerSnowflake",
     availableCategories: ALL_CATEGORIES,
   },
@@ -1526,20 +1341,34 @@ export const DOCUMENT_TYPES: DocumentTypeConfig[] = [
   {
     type: "convocation",
     label: "Convocation",
-    description: "Convocation a la formation",
+    description: "Convocation à la formation",
     icon: "Mail",
     availableCategories: ALL_CATEGORIES,
   },
   {
     type: "certificat",
     label: "Certificat",
-    description: "Certificat de realisation",
+    description: "Certificat de réalisation",
     icon: "Award",
     availableCategories: ALL_CATEGORIES,
   },
   {
+    type: "contrat_sous_traitance",
+    label: "Contrat de Sous-traitance",
+    description: "Contrat avec un intervenant externe",
+    icon: "FileSignature",
+    availableCategories: ALL_CATEGORIES,
+  },
+  {
+    type: "cgv",
+    label: "Conditions Générales de Vente",
+    description: "CGV de l'organisme de formation",
+    icon: "FileText",
+    availableCategories: ALL_CATEGORIES,
+  },
+  {
     type: "custom",
-    label: "Document Personnalise",
+    label: "Document Personnalisé",
     description: "Document libre",
     icon: "FileEdit",
     availableCategories: ALL_CATEGORIES,
@@ -1562,19 +1391,7 @@ export function getVariablesForDocumentType(documentType: DocumentType): Variabl
  * Obtenir une variable par son ID
  */
 export function getVariableById(id: string): TemplateVariable | undefined {
-  // Chercher dans les variables de premier niveau
-  const found = TEMPLATE_VARIABLES.find((v) => v.id === id);
-  if (found) return found;
-
-  // Chercher dans les enfants (pour les boucles)
-  for (const variable of TEMPLATE_VARIABLES) {
-    if (variable.children) {
-      const childFound = variable.children.find((c) => c.id === id);
-      if (childFound) return childFound;
-    }
-  }
-
-  return undefined;
+  return TEMPLATE_VARIABLES.find((v) => v.id === id);
 }
 
 /**
@@ -1596,5 +1413,5 @@ export function extractVariablesFromText(text: string): string[] {
     matches.push(match[1]);
   }
 
-  return [...new Set(matches)]; // Retirer les doublons
+  return Array.from(new Set(matches)); // Retirer les doublons
 }

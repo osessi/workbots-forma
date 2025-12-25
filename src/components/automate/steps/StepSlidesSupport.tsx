@@ -13,10 +13,12 @@ import {
   Clock,
   FileDown,
   Loader2,
+  Save,
+  FolderOpen,
 } from "lucide-react";
 import WorkbotsOptionsModal, { WorkbotsGenerationOptions } from "./WorkbotsOptionsModal";
 import GenerationProgress from "./GenerationProgress";
-import { ModuleGenerationResult } from "@/lib/gamma/types";
+import { WorkbotsModuleResult } from "@/lib/workbots/types";
 
 interface Module {
   id: string;
@@ -29,8 +31,10 @@ interface SlidesData {
   moduleId: string;
   moduleTitre: string;
   generationId: string;
-  gammaUrl?: string;
   exportUrl?: string;
+  editUrl?: string;
+  driveUrl?: string; // URL in internal Drive
+  driveFileId?: string; // File ID in Drive
   status: "pending" | "completed" | "failed";
   error?: string;
 }
@@ -52,25 +56,6 @@ interface StepSlidesSupportProps {
 // Phases de génération
 type GenerationPhase = "enrichment" | "generation" | "finalizing" | "complete";
 
-// Types pour SSE
-interface SSEEvent {
-  type: string;
-  data: {
-    message: string;
-    moduleIndex?: number;
-    moduleName?: string;
-    totalModules?: number;
-    progress?: number;
-    result?: {
-      success: boolean;
-      result: {
-        modules: ModuleGenerationResult[];
-      };
-    };
-    error?: string;
-  };
-}
-
 export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
   modules,
   formationId,
@@ -83,6 +68,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [isSavingToDrive, setIsSavingToDrive] = useState<string | null>(null);
   const [generationPhase, setGenerationPhase] = useState<GenerationPhase>("enrichment");
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
   const [currentModuleName, setCurrentModuleName] = useState("");
@@ -91,11 +77,8 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // Mode développement pour afficher les liens Gamma
-  const isDev = process.env.NODE_ENV === "development";
-
-  // Référence pour EventSource
-  const eventSourceRef = useRef<EventSource | null>(null);
+  // Référence pour le polling interval
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Mettre à jour les données si elles changent depuis les props
   useEffect(() => {
@@ -110,7 +93,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
       if (!formationId) return;
 
       try {
-        const response = await fetch(`/api/slides/status?formationId=${formationId}`);
+        const response = await fetch(`/api/workbots/status?formationId=${formationId}`);
         if (response.ok) {
           const data = await response.json();
 
@@ -124,6 +107,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
 
             // Mapper le statut vers la phase
             const phaseMap: Record<string, GenerationPhase> = {
+              PENDING: "enrichment",
               ENRICHMENT: "enrichment",
               GENERATING: "generation",
               FINALIZING: "finalizing",
@@ -137,18 +121,17 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
           else if (data.completed && data.completed.length > 0) {
             const completed = data.completed[0];
             if (completed.moduleResults) {
-              setSlidesData(completed.moduleResults);
+              const newSlidesData = mapModuleResults(completed.moduleResults);
+              setSlidesData(newSlidesData);
             }
           }
           // S'il y a des générations échouées récentes (montrer l'erreur)
-          // Mais seulement si c'est très récent (moins de 2 minutes) - l'utilisateur vient de revenir
           else if (data.failed && data.failed.length > 0) {
             const failed = data.failed[0];
             const failedTime = new Date(failed.updatedAt).getTime();
             const now = Date.now();
             // N'afficher que si vraiment récent (2 minutes)
             if (now - failedTime < 2 * 60 * 1000) {
-              // Message simplifié pour l'utilisateur
               const errorMsg = failed.errorMessage?.includes("timeout")
                 ? "La génération précédente a été interrompue. Vous pouvez relancer la génération."
                 : "La génération précédente a échoué. Vous pouvez réessayer.";
@@ -164,10 +147,20 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
     checkActiveGeneration();
   }, [formationId]);
 
-  // Référence pour le polling interval
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Mapper les résultats de modules vers SlidesData
+  const mapModuleResults = (results: WorkbotsModuleResult[]): SlidesData[] => {
+    return results.map((r) => ({
+      moduleId: r.moduleId,
+      moduleTitre: r.moduleTitre,
+      generationId: r.presentationId || "",
+      exportUrl: r.exportUrl,
+      editUrl: r.editUrl,
+      status: r.status === "completed" ? "completed" : r.status === "failed" ? "failed" : "pending",
+      error: r.error,
+    }));
+  };
 
-  // Polling pour suivre une génération en cours (après refresh)
+  // Polling pour suivre une génération en cours
   const pollGenerationStatus = async (fId: string) => {
     // Nettoyer l'ancien interval si existant
     if (pollIntervalRef.current) {
@@ -176,7 +169,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const response = await fetch(`/api/slides/status?formationId=${fId}`);
+        const response = await fetch(`/api/workbots/status?formationId=${fId}`);
         if (response.ok) {
           const data = await response.json();
 
@@ -187,6 +180,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
             setCurrentModuleIndex(activeGen.currentModuleIndex || 0);
 
             const phaseMap: Record<string, GenerationPhase> = {
+              PENDING: "enrichment",
               ENRICHMENT: "enrichment",
               GENERATING: "generation",
               FINALIZING: "finalizing",
@@ -202,9 +196,10 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
             if (data.completed && data.completed.length > 0) {
               const completed = data.completed[0];
               if (completed.moduleResults) {
-                setSlidesData(completed.moduleResults);
+                const newSlidesData = mapModuleResults(completed.moduleResults);
+                setSlidesData(newSlidesData);
                 if (onSlidesGenerated) {
-                  onSlidesGenerated(completed.moduleResults);
+                  onSlidesGenerated(newSlidesData);
                 }
               }
               setGenerationPhase("complete");
@@ -215,7 +210,6 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
                 setProgressPercentage(0);
               }, 2000);
             } else if (data.failed && data.failed.length > 0) {
-              // Génération échouée (timeout ou erreur)
               const failed = data.failed[0];
               setError(failed.errorMessage || "La génération a échoué. Veuillez réessayer.");
               setIsGenerating(false);
@@ -254,15 +248,6 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
     };
   }, []);
 
-  // Cleanup EventSource
-  useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, []);
-
   // Toggle expansion d'un module
   const toggleModule = (moduleId: string) => {
     const newExpanded = new Set(expandedModules);
@@ -274,7 +259,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
     setExpandedModules(newExpanded);
   };
 
-  // Lancer la génération en arrière-plan (persistant)
+  // Lancer la génération avec Workbots
   const handleGenerateSlides = async (options: WorkbotsGenerationOptions) => {
     setIsGenerating(true);
     setError(null);
@@ -285,32 +270,31 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
     setProgressPercentage(0);
 
     try {
-      // Préparer les modules pour l'API
+      // Préparer les modules pour l'API Workbots
       const modulesForApi = modules.map((m) => ({
-        id: m.id,
-        titre: m.titre,
+        moduleId: m.id,
+        moduleTitre: m.titre,
         contenu: m.contenu.join("\n"),
-        objectifs: m.objectifs,
-        numCards: options.cardsPerModule,
+        objectifs: m.objectifs?.join("\n"),
+        nSlides: options.cardsPerModule,
       }));
 
       const requestBody = {
         formationId,
         formationTitre,
         modules: modulesForApi,
-        themeId: options.themeId,
+        templateId: options.templateId,
         tone: options.tone,
-        audience: options.audience,
-        imageSource: options.imageSource,
-        imageStyle: options.imageStyle,
+        verbosity: options.verbosity,
+        language: options.language,
         includeIntro: options.includeIntro,
         includeConclusion: options.includeConclusion,
-        cardsPerModule: options.cardsPerModule,
-        language: options.language,
+        includeTableOfContents: options.includeTableOfContents,
+        audience: options.audience,
       };
 
-      // Lancer la génération en arrière-plan
-      const response = await fetch("/api/slides/generate-background", {
+      // Lancer la génération en arrière-plan via l'API Workbots
+      const response = await fetch("/api/workbots/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
@@ -322,7 +306,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
       }
 
       const data = await response.json();
-      console.log("Génération lancée:", data.generationId);
+      console.log("Génération Workbots lancée:", data.generationId);
 
       // Démarrer le polling pour suivre la progression
       if (formationId) {
@@ -339,96 +323,49 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
     }
   };
 
-  // Gérer les événements SSE
-  const handleSSEEvent = (event: SSEEvent) => {
-    const { type, data } = event;
+  // Sauvegarder un fichier dans le Drive
+  const handleSaveToDrive = async (slideData: SlidesData) => {
+    if (!formationId || !slideData.exportUrl) return;
 
-    // Mettre à jour la progression
-    if (data.progress !== undefined) {
-      setProgressPercentage(data.progress);
-    }
+    setIsSavingToDrive(slideData.moduleId);
+    setError(null);
 
-    if (data.moduleName) {
-      setCurrentModuleName(data.moduleName);
-    }
+    try {
+      const response = await fetch("/api/workbots/save-to-drive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formationId,
+          moduleId: slideData.moduleId,
+          moduleTitre: slideData.moduleTitre,
+          filePath: slideData.exportUrl,
+        }),
+      });
 
-    if (data.moduleIndex !== undefined) {
-      setCurrentModuleIndex(data.moduleIndex);
-    }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erreur lors de la sauvegarde");
+      }
 
-    switch (type) {
-      case "start":
-        setGenerationPhase("enrichment");
-        setCurrentModuleName("Démarrage...");
-        break;
+      const data = await response.json();
 
-      case "enrichment_start":
-      case "enrichment_progress":
-        setGenerationPhase("enrichment");
-        break;
-
-      case "enrichment_complete":
-        setCurrentModuleName("Enrichissement terminé");
-        break;
-
-      case "generation_start":
-      case "generation_progress":
-        setGenerationPhase("generation");
-        break;
-
-      case "module_complete":
-        // Un module a été généré
-        break;
-
-      case "generation_complete":
-        setCurrentModuleName("Génération terminée");
-        break;
-
-      case "finalizing":
-        setGenerationPhase("finalizing");
-        setCurrentModuleName("Finalisation...");
-        break;
-
-      case "complete":
-        setGenerationPhase("complete");
-        setCurrentModuleName("Terminé !");
-
-        // Extraire les résultats
-        if (data.result?.success && data.result.result) {
-          const newSlidesData: SlidesData[] = data.result.result.modules.map(
-            (m: ModuleGenerationResult) => ({
-              moduleId: m.moduleId,
-              moduleTitre: m.moduleTitre,
-              generationId: m.generationId,
-              gammaUrl: m.gammaUrl,
-              exportUrl: m.exportUrl,
-              status: m.status,
-              error: m.error,
-            })
-          );
-
-          setSlidesData(newSlidesData);
-
-          if (onSlidesGenerated) {
-            onSlidesGenerated(newSlidesData);
-          }
-        }
-
-        // Fermer après un délai
-        setTimeout(() => {
-          setIsGenerating(false);
-          setGenerationPhase("enrichment");
-          setCurrentModuleIndex(0);
-          setProgressPercentage(0);
-        }, 2000);
-        break;
-
-      case "error":
-        setError(data.error || data.message || "Erreur inconnue");
-        setIsGenerating(false);
-        setGenerationPhase("enrichment");
-        setProgressPercentage(0);
-        break;
+      // Mettre à jour les données du slide avec les infos Drive
+      setSlidesData((prev) =>
+        prev.map((s) =>
+          s.moduleId === slideData.moduleId
+            ? {
+                ...s,
+                driveUrl: data.file.publicUrl,
+                driveFileId: data.file.id,
+              }
+            : s
+        )
+      );
+    } catch (err) {
+      console.error("Erreur sauvegarde Drive:", err);
+      setError(err instanceof Error ? err.message : "Erreur lors de la sauvegarde");
+    } finally {
+      setIsSavingToDrive(null);
     }
   };
 
@@ -436,13 +373,14 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
   const hasGeneratedSlides = slidesData.length > 0;
   const completedCount = slidesData.filter((s) => s.status === "completed").length;
   const allCompleted = hasGeneratedSlides && completedCount === slidesData.length;
+  const savedToDriveCount = slidesData.filter((s) => s.driveFileId).length;
 
   // Obtenir le statut d'un module
   const getModuleSlideData = (moduleId: string) => {
     return slidesData.find((s) => s.moduleId === moduleId);
   };
 
-  // Télécharger tous les PPTX fusionnés
+  // Télécharger tous les PPTX
   const handleDownloadAll = async () => {
     if (!allCompleted) return;
 
@@ -455,7 +393,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
         .filter((s) => s.status === "completed" && s.exportUrl)
         .map((s) => ({
           moduleId: s.moduleId,
-          moduleTitre: s.moduleTitre,
+          moduleTitre: s.moduleTitre || `Module-${s.moduleId}`,
           exportUrl: s.exportUrl!,
         }));
 
@@ -463,31 +401,27 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
         throw new Error("Aucun fichier à télécharger");
       }
 
-      // Appeler l'API de fusion
-      const response = await fetch("/api/slides/merge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          formationTitre,
-          modules: exportUrls,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Erreur lors de la fusion");
+      // Télécharger chaque fichier individuellement ou fusionner si API disponible
+      for (const item of exportUrls) {
+        const response = await fetch(`/api/workbots/download?path=${encodeURIComponent(item.exportUrl)}`);
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          // Sécuriser le nom de fichier - utiliser un fallback si moduleTitre est vide
+          const safeTitle = (item.moduleTitre || "presentation")
+            .replace(/[^a-zA-Z0-9àâäéèêëïîôùûüç\s-]/gi, "")
+            .replace(/\s+/g, "-") || "presentation";
+          a.download = `${safeTitle}.pptx`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } else {
+          console.error(`Erreur téléchargement ${item.moduleTitre}: ${response.status}`);
+        }
       }
-
-      // Télécharger le fichier ZIP
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${formationTitre.replace(/[^a-zA-Z0-9àâäéèêëïîôùûüç\s-]/gi, "").replace(/\s+/g, "-")}-slides.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
     } catch (err) {
       console.error("Erreur téléchargement:", err);
       setError(
@@ -495,6 +429,17 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
       );
     } finally {
       setIsDownloadingAll(false);
+    }
+  };
+
+  // Sauvegarder tous dans le Drive
+  const handleSaveAllToDrive = async () => {
+    if (!allCompleted || !formationId) return;
+
+    const unsavedSlides = slidesData.filter((s) => s.status === "completed" && !s.driveFileId);
+
+    for (const slide of unsavedSlides) {
+      await handleSaveToDrive(slide);
     }
   };
 
@@ -521,11 +466,11 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Générez automatiquement des présentations PowerPoint pour chaque
-              module de votre formation grâce à Workbots AI.
+              module de votre formation grâce à Workbots Slides.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {hasGeneratedSlides && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg dark:bg-green-500/10 dark:text-green-400">
                 <CheckCircle size={16} />
@@ -534,24 +479,42 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
                 </span>
               </div>
             )}
+            {savedToDriveCount > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg dark:bg-blue-500/10 dark:text-blue-400">
+                <FolderOpen size={16} />
+                <span className="text-sm font-medium">
+                  {savedToDriveCount} dans Drive
+                </span>
+              </div>
+            )}
             {allCompleted ? (
-              <button
-                onClick={handleDownloadAll}
-                disabled={isDownloadingAll}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-xl hover:from-brand-600 hover:to-purple-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50"
-              >
-                {isDownloadingAll ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Préparation...
-                  </>
-                ) : (
-                  <>
-                    <FileDown size={16} />
-                    Télécharger tout
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSaveAllToDrive}
+                  disabled={savedToDriveCount === slidesData.length}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 disabled:opacity-50"
+                >
+                  <Save size={16} />
+                  Sauvegarder tout
+                </button>
+                <button
+                  onClick={handleDownloadAll}
+                  disabled={isDownloadingAll}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-xl hover:from-brand-600 hover:to-purple-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50"
+                >
+                  {isDownloadingAll ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Préparation...
+                    </>
+                  ) : (
+                    <>
+                      <FileDown size={16} />
+                      Télécharger tout
+                    </>
+                  )}
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setShowOptionsModal(true)}
@@ -559,7 +522,7 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
                 className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-xl hover:from-brand-600 hover:to-purple-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50"
               >
                 <Wand2 size={16} />
-                Générer avec Workbots AI
+                Générer avec Workbots
               </button>
             )}
           </div>
@@ -627,6 +590,12 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
                   {/* Status */}
                   {slideData && (
                     <div className="flex items-center gap-2">
+                      {slideData.driveFileId && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-blue-600 bg-blue-50 rounded-full dark:bg-blue-500/10 dark:text-blue-400">
+                          <FolderOpen size={10} />
+                          Drive
+                        </span>
+                      )}
                       {slideData.status === "completed" ? (
                         <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 rounded-full dark:bg-green-500/10 dark:text-green-400">
                           <CheckCircle size={12} />
@@ -676,27 +645,50 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
 
                     {/* Actions si slide généré */}
                     {slideData && slideData.status === "completed" && (
-                      <div className="flex items-center gap-3">
-                        {/* Lien Gamma visible uniquement en dev */}
-                        {isDev && slideData.gammaUrl && (
-                          <a
-                            href={slideData.gammaUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20"
-                          >
-                            <ExternalLink size={14} />
-                            <span className="text-xs">[DEV]</span> Voir sur Gamma
-                          </a>
-                        )}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {/* Bouton télécharger */}
                         {slideData.exportUrl && (
                           <a
-                            href={slideData.exportUrl}
+                            href={`/api/workbots/download?path=${encodeURIComponent(slideData.exportUrl)}`}
                             download
                             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
                           >
                             <Download size={14} />
                             Télécharger PPTX
+                          </a>
+                        )}
+
+                        {/* Bouton sauvegarder dans Drive */}
+                        {!slideData.driveFileId && slideData.exportUrl && (
+                          <button
+                            onClick={() => handleSaveToDrive(slideData)}
+                            disabled={isSavingToDrive === slideData.moduleId}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 disabled:opacity-50"
+                          >
+                            {isSavingToDrive === slideData.moduleId ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                Sauvegarde...
+                              </>
+                            ) : (
+                              <>
+                                <Save size={14} />
+                                Sauvegarder dans Drive
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {/* Lien vers le fichier Drive */}
+                        {slideData.driveUrl && (
+                          <a
+                            href={slideData.driveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20"
+                          >
+                            <ExternalLink size={14} />
+                            Ouvrir depuis Drive
                           </a>
                         )}
                       </div>

@@ -78,6 +78,8 @@ export interface UserProfile {
   codePostal: string;
   ville: string;
   numeroFormateur: string;
+  prefectureRegion: string; // Région d'acquisition du NDA
+  siteWeb: string; // Site web de l'organisme
   avatarUrl?: string | null;
   logoUrl?: string | null;
   signatureUrl?: string | null;
@@ -141,6 +143,8 @@ const defaultUser: UserProfile = {
   codePostal: "",
   ville: "",
   numeroFormateur: "",
+  prefectureRegion: "",
+  siteWeb: "",
   avatarUrl: null,
   logoUrl: null,
   signatureUrl: null,
@@ -230,6 +234,8 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           entreprise: org?.name || "",
           siret: org?.siret || "",
           numeroFormateur: org?.numeroFormateur || "",
+          prefectureRegion: org?.prefectureRegion || "",
+          siteWeb: org?.siteWeb || "",
           adresse: org?.adresse || "",
           codePostal: org?.codePostal || "",
           ville: org?.ville || "",
@@ -274,6 +280,8 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (updates.entreprise !== undefined) apiData.entreprise = updates.entreprise;
     if (updates.siret !== undefined) apiData.siret = updates.siret;
     if (updates.numeroFormateur !== undefined) apiData.numeroFormateur = updates.numeroFormateur;
+    if (updates.prefectureRegion !== undefined) apiData.prefectureRegion = updates.prefectureRegion;
+    if (updates.siteWeb !== undefined) apiData.siteWeb = updates.siteWeb;
     if (updates.adresse !== undefined) apiData.adresse = updates.adresse;
     if (updates.codePostal !== undefined) apiData.codePostal = updates.codePostal;
     if (updates.ville !== undefined) apiData.ville = updates.ville;

@@ -2,19 +2,22 @@
 // MOTEUR DE RENDU DES TEMPLATES
 // ===========================================
 // Remplace les variables {{variable}} par leurs valeurs reelles
+// Nouveau format: {{of_raison_sociale}} au lieu de {{organisation.nom}}
 
 import {
   TemplateContext,
-  FormationData,
-  JourneeData,
-  ModuleData,
-  OrganisationData,
+  OrganismeFormationData,
   EntrepriseData,
-  ParticulierData,
-  ParticipantData,
-  FormateurData,
+  ApprenantData,
+  FinanceurData,
+  IntervenantData,
+  LieuData,
+  FormationData,
+  SessionData,
+  JourneeData,
   DatesData,
-  DocumentData,
+  TarifsData,
+  ClientData,
   RenderOptions,
 } from "./types";
 
@@ -47,14 +50,14 @@ export function renderTemplate(
     }
   }
 
-  // Remplacer les variables simples
-  htmlContent = replaceSimpleVariables(htmlContent, context, previewMode);
+  // Remplacer les conditions {{#if}}...{{/if}} D'ABORD
+  htmlContent = replaceConditions(htmlContent, context, previewMode);
 
   // Remplacer les boucles {{#each}}
   htmlContent = replaceLoops(htmlContent, context, previewMode);
 
-  // Remplacer les conditions {{#if}}
-  htmlContent = replaceConditions(htmlContent, context, previewMode);
+  // Remplacer les variables simples
+  htmlContent = replaceSimpleVariables(htmlContent, context, previewMode);
 
   return htmlContent;
 }
@@ -64,49 +67,49 @@ export function renderTemplate(
 // ===========================================
 
 /**
- * Remplacer les variables simples {{variable.path}}
+ * Remplacer les variables simples {{variable_name}}
+ * Nouveau format avec underscores: {{of_raison_sociale}}, {{entreprise_siret}}, etc.
  */
 function replaceSimpleVariables(
   content: string,
   context: TemplateContext,
   previewMode: boolean
 ): string {
-  // Pattern pour capturer {{variable.path}}
-  const variablePattern = /\{\{([^#/][^}]*)\}\}/g;
+  // Pattern pour capturer {{variable_name}} (exclut les # et / pour conditions/boucles)
+  const variablePattern = /\{\{([^#/}][^}]*)\}\}/g;
 
-  return content.replace(variablePattern, (match, variablePath) => {
-    const trimmedPath = variablePath.trim();
-    const value = getValueFromPath(context, trimmedPath);
+  return content.replace(variablePattern, (match, variableName) => {
+    const trimmedName = variableName.trim();
+    const value = getValueFromVariableName(context, trimmedName);
 
-    if (value !== undefined && value !== null) {
+    if (value !== undefined && value !== null && value !== "") {
       // Si c'est un tableau, le formater en liste à puces HTML
       if (Array.isArray(value)) {
         if (value.length === 0) {
           return "";
         }
-        // Vérifier si c'est un tableau d'objets (modules, participants)
+        // Vérifier si c'est un tableau d'objets
         if (typeof value[0] === "object" && value[0] !== null) {
-          return formatArrayOfObjects(value, trimmedPath);
+          return formatArrayOfObjects(value, trimmedName);
         }
         // Tableau de strings - faire une liste à puces
         return `<ul class="template-list">${value.map(item => `<li>${escapeHtml(String(item))}</li>`).join("")}</ul>`;
       }
 
       // Si c'est une variable de type logo/image (URL), afficher une balise img
-      if (isImageVariable(trimmedPath) && typeof value === "string" && isValidImageUrl(value)) {
-        // Ajouter onerror pour cacher l'image si elle ne charge pas
-        return `<img src="${escapeHtml(value)}" alt="Logo" style="max-height: 80px; max-width: 200px; height: auto; width: auto;" onerror="this.style.display='none'" />`;
+      if (isImageVariable(trimmedName) && typeof value === "string" && isValidImageUrl(value)) {
+        return `<img src="${escapeHtml(value)}" alt="Image" style="max-height: 80px; max-width: 200px; height: auto; width: auto;" onerror="this.style.display='none'" />`;
       }
 
       return String(value);
     }
 
-    // En mode preview, afficher la variable telle quelle
+    // En mode preview, afficher la variable telle quelle avec style
     if (previewMode) {
       return `<span class="template-variable-unresolved">${match}</span>`;
     }
 
-    // Variable non trouvee - retourner vide ou la variable
+    // Variable non trouvee - retourner vide
     return "";
   });
 }
@@ -114,15 +117,17 @@ function replaceSimpleVariables(
 /**
  * Verifier si une variable est de type image/logo
  */
-function isImageVariable(path: string): boolean {
+function isImageVariable(variableName: string): boolean {
   const imageVariables = [
-    "organisation.logo",
-    "entreprise.logo",
-    "formateur.photo",
-    "participant.photo",
-    "signature.responsable_organisme",
+    "of_logo_organisme",
+    "of_signature_responsable",
+    "of_cachet",
   ];
-  return imageVariables.includes(path) || path.endsWith(".logo") || path.endsWith(".image") || path.endsWith(".photo") || path.startsWith("signature.");
+  return imageVariables.includes(variableName) ||
+         variableName.endsWith("_logo") ||
+         variableName.endsWith("_image") ||
+         variableName.endsWith("_signature") ||
+         variableName.endsWith("_cachet");
 }
 
 /**
@@ -130,11 +135,364 @@ function isImageVariable(path: string): boolean {
  */
 function isValidImageUrl(url: string): boolean {
   if (!url || typeof url !== "string") return false;
-  // Verifier que c'est une URL
   if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("data:image/")) {
     return false;
   }
   return true;
+}
+
+// ===========================================
+// MAPPING DES VARIABLES VERS CONTEXTE
+// ===========================================
+
+/**
+ * Obtenir une valeur depuis le nom de la variable
+ * Gère le nouveau format avec underscores (of_raison_sociale, entreprise_siret, etc.)
+ */
+function getValueFromVariableName(context: TemplateContext, variableName: string): unknown {
+  // ===========================================
+  // ORGANISME DE FORMATION (of_)
+  // ===========================================
+  if (variableName.startsWith("of_")) {
+    const field = variableName.replace("of_", "");
+    const of = context.of;
+    if (!of) return undefined;
+
+    switch (field) {
+      case "raison_sociale": return of.raison_sociale;
+      case "nom_commercial": return of.nom_commercial;
+      case "siret": return of.siret;
+      case "ville_rcs": return of.ville_rcs;
+      case "nda": return of.nda;
+      case "region_enregistrement": return of.region_enregistrement;
+      case "adresse": return of.adresse;
+      case "code_postal": return of.code_postal;
+      case "ville": return of.ville;
+      case "pays": return of.pays;
+      case "representant_nom": return of.representant_nom;
+      case "representant_prenom": return of.representant_prenom;
+      case "representant_fonction": return of.representant_fonction;
+      case "email": return of.email;
+      case "telephone": return of.telephone;
+      case "site_web": return of.site_web;
+      case "signature_responsable": return of.signature_responsable;
+      case "cachet": return of.cachet;
+      case "logo_organisme": return of.logo_organisme;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // ENTREPRISE (entreprise_)
+  // ===========================================
+  if (variableName.startsWith("entreprise_")) {
+    const field = variableName.replace("entreprise_", "");
+    const entreprise = context.entreprise;
+    if (!entreprise) return undefined;
+
+    switch (field) {
+      case "raison_sociale": return entreprise.raison_sociale;
+      case "siret": return entreprise.siret;
+      case "adresse": return entreprise.adresse;
+      case "code_postal": return entreprise.code_postal;
+      case "ville": return entreprise.ville;
+      case "pays": return entreprise.pays;
+      case "representant_civilite": return entreprise.representant_civilite;
+      case "representant_nom": return entreprise.representant_nom;
+      case "representant_prenom": return entreprise.representant_prenom;
+      case "representant_fonction": return entreprise.representant_fonction;
+      case "email": return entreprise.email;
+      case "telephone": return entreprise.telephone;
+      case "tva_intracom": return entreprise.tva_intracom;
+      // Variables calculées
+      case "nombre_apprenants": return entreprise.nombre_apprenants;
+      case "liste_apprenants": return entreprise.liste_apprenants;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // APPRENANT (apprenant_)
+  // ===========================================
+  if (variableName.startsWith("apprenant_")) {
+    const field = variableName.replace("apprenant_", "");
+    const apprenant = context.apprenant;
+    if (!apprenant) return undefined;
+
+    switch (field) {
+      case "nom": return apprenant.nom;
+      case "prenom": return apprenant.prenom;
+      case "statut": return apprenant.statut;
+      case "raison_sociale": return apprenant.raison_sociale;
+      case "siret": return apprenant.siret;
+      case "adresse": return apprenant.adresse;
+      case "code_postal": return apprenant.code_postal;
+      case "ville": return apprenant.ville;
+      case "pays": return apprenant.pays;
+      case "email": return apprenant.email;
+      case "telephone": return apprenant.telephone;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // FINANCEUR (financeur_)
+  // ===========================================
+  if (variableName.startsWith("financeur_")) {
+    const field = variableName.replace("financeur_", "");
+    const financeur = context.financeur;
+    if (!financeur) return undefined;
+
+    switch (field) {
+      case "nom": return financeur.nom;
+      case "type": return financeur.type;
+      case "adresse": return financeur.adresse;
+      case "code_postal": return financeur.code_postal;
+      case "ville": return financeur.ville;
+      case "pays": return financeur.pays;
+      case "email": return financeur.email;
+      case "telephone": return financeur.telephone;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // INTERVENANT (intervenant_)
+  // ===========================================
+  if (variableName.startsWith("intervenant_")) {
+    const field = variableName.replace("intervenant_", "");
+    const intervenant = context.intervenant;
+    if (!intervenant) return undefined;
+
+    switch (field) {
+      case "nom": return intervenant.nom;
+      case "prenom": return intervenant.prenom;
+      case "adresse": return intervenant.adresse;
+      case "code_postal": return intervenant.code_postal;
+      case "ville": return intervenant.ville;
+      case "pays": return intervenant.pays;
+      case "email": return intervenant.email;
+      case "telephone": return intervenant.telephone;
+      case "specialites":
+        return Array.isArray(intervenant.specialites)
+          ? intervenant.specialites.join(", ")
+          : intervenant.specialites;
+      case "raison_sociale": return intervenant.raison_sociale;
+      case "siret": return intervenant.siret;
+      case "nda": return intervenant.nda;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // LIEU (lieu_)
+  // ===========================================
+  if (variableName.startsWith("lieu_")) {
+    const field = variableName.replace("lieu_", "");
+    const lieu = context.lieu;
+    if (!lieu) return undefined;
+
+    switch (field) {
+      case "type": return lieu.type;
+      case "nom": return lieu.nom;
+      case "adresse": return lieu.formation;
+      case "code_postal": return lieu.code_postal;
+      case "ville": return lieu.ville;
+      case "informations_pratiques": return lieu.informations_pratiques;
+      case "capacite": return lieu.capacite;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // FORMATION (formation_)
+  // ===========================================
+  if (variableName.startsWith("formation_")) {
+    const field = variableName.replace("formation_", "");
+    const formation = context.formation;
+    if (!formation) return undefined;
+
+    switch (field) {
+      case "titre": return formation.titre;
+      case "modalite": return formation.modalite;
+      case "categorie_action": return formation.categorie_action;
+      case "duree_heures": return formation.duree_heures;
+      case "duree_jours": return formation.duree_jours;
+      case "duree_heures_jours": return formation.duree_heures_jours;
+      case "nb_participants_max": return formation.nb_participants_max;
+      case "description": return formation.description;
+      case "objectifs_pedagogiques": return formation.objectifs_pedagogiques;
+      case "prerequis": return formation.prerequis;
+      case "public_vise": return formation.public_vise;
+      case "contenu_detaille": return formation.contenu_detaille;
+      case "suivi_execution_evaluation": return formation.suivi_execution_evaluation;
+      case "ressources_pedagogiques": return formation.ressources_pedagogiques;
+      case "accessibilite": return formation.accessibilite;
+      case "delai_acces": return formation.delai_acces;
+      case "tarif_entreprise_ht_fiche_peda": return formation.tarif_entreprise_ht_fiche_peda;
+      case "tarif_independant_ht_fiche_peda": return formation.tarif_independant_ht_fiche_peda;
+      case "tarif_particulier_ttc_fiche_peda": return formation.tarif_particulier_ttc_fiche_peda;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // SESSION (session_)
+  // ===========================================
+  if (variableName.startsWith("session_")) {
+    const field = variableName.replace("session_", "");
+    const session = context.session;
+    if (!session) return undefined;
+
+    switch (field) {
+      case "modalite": return session.modalite;
+      case "date_debut": return session.date_debut;
+      case "date_fin": return session.date_fin;
+      case "planning_journees_formation": return session.planning_journees_formation;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // JOURNÉES DYNAMIQUES (j1_, j2_, etc.)
+  // ===========================================
+  const journeeMatch = variableName.match(/^j(\d+)_(.+)$/);
+  if (journeeMatch) {
+    const index = parseInt(journeeMatch[1], 10) - 1; // Index 0-based
+    const field = journeeMatch[2];
+    const journees = context.session?.journees;
+    if (journees && journees[index]) {
+      const journee = journees[index];
+      switch (field) {
+        case "date": return journee.date;
+        case "horaire_matin": return journee.horaire_matin;
+        case "horaire_apres_midi": return journee.horaire_apres_midi;
+        default: return undefined;
+      }
+    }
+    return undefined;
+  }
+
+  // ===========================================
+  // DATES (date_)
+  // ===========================================
+  if (variableName.startsWith("date_")) {
+    const field = variableName.replace("date_", "");
+    const dates = context.dates;
+    if (!dates) {
+      // Générer les dates du jour si pas fournies
+      const now = new Date();
+      const months = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+      ];
+      switch (field) {
+        case "jour": return String(now.getDate()).padStart(2, "0");
+        case "mois": return months[now.getMonth()];
+        case "annee": return String(now.getFullYear());
+        case "complete_longue": return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+        case "complete_courte": return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+        default: return undefined;
+      }
+    }
+
+    switch (field) {
+      case "jour": return dates.jour;
+      case "mois": return dates.mois;
+      case "annee": return dates.annee;
+      case "complete_longue": return dates.complete_longue;
+      case "complete_courte": return dates.complete_courte;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // TARIFS (tarifs_)
+  // ===========================================
+  if (variableName.startsWith("tarifs_")) {
+    const field = variableName.replace("tarifs_", "");
+    const tarifs = context.tarifs;
+    if (!tarifs) return undefined;
+
+    switch (field) {
+      // Entreprise
+      case "tarif_entreprise_ht_documents": return tarifs.tarif_entreprise_ht_documents;
+      case "entreprise_montant_tva": return tarifs.entreprise_montant_tva;
+      case "entreprise_prix_ttc": return tarifs.entreprise_prix_ttc;
+      case "entreprise_montant_financeur_ht": return tarifs.entreprise_montant_financeur_ht;
+      case "entreprise_montant_financeur_ttc": return tarifs.entreprise_montant_financeur_ttc;
+      case "entreprise_reste_a_charge_ht": return tarifs.entreprise_reste_a_charge_ht;
+      case "entreprise_reste_a_charge_ttc": return tarifs.entreprise_reste_a_charge_ttc;
+      // Indépendant
+      case "tarif_independant_ht_documents": return tarifs.tarif_independant_ht_documents;
+      case "independant_montant_tva": return tarifs.independant_montant_tva;
+      case "independant_prix_ttc": return tarifs.independant_prix_ttc;
+      case "independant_montant_financeur_ht": return tarifs.independant_montant_financeur_ht;
+      case "independant_montant_financeur_ttc": return tarifs.independant_montant_financeur_ttc;
+      case "independant_reste_a_charge_ht": return tarifs.independant_reste_a_charge_ht;
+      case "independant_reste_a_charge_ttc": return tarifs.independant_reste_a_charge_ttc;
+      // Particulier
+      case "particulier_prix_ttc": return tarifs.particulier_prix_ttc;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // CLIENT (client_) - pour conditions
+  // ===========================================
+  if (variableName.startsWith("client_") || variableName.startsWith("client.")) {
+    const field = variableName.replace(/^client[._]/, "");
+    const client = context.client;
+    if (!client) return undefined;
+
+    switch (field) {
+      case "type": return client.type;
+      default: return undefined;
+    }
+  }
+
+  // ===========================================
+  // VARIABLES CALCULÉES GLOBALES
+  // ===========================================
+  if (variableName === "apprenants_liste") {
+    return context.apprenants_liste;
+  }
+
+  if (variableName === "intervenant_equipe_pedagogique") {
+    return context.intervenant_equipe_pedagogique;
+  }
+
+  // ===========================================
+  // SUPPORT ANCIEN FORMAT (pour compatibilité)
+  // Chemin avec points: organisation.nom, entreprise.siret, etc.
+  // ===========================================
+  if (variableName.includes(".")) {
+    return getValueFromLegacyPath(context, variableName);
+  }
+
+  return undefined;
+}
+
+/**
+ * Support de l'ancien format avec points pour compatibilité
+ */
+function getValueFromLegacyPath(context: TemplateContext, path: string): unknown {
+  const parts = path.split(".");
+  let current: unknown = context;
+
+  for (const part of parts) {
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+
+    if (typeof current === "object") {
+      current = (current as Record<string, unknown>)[part];
+    } else {
+      return undefined;
+    }
+  }
+
+  return current;
 }
 
 // ===========================================
@@ -153,7 +511,7 @@ function replaceLoops(
   const loopPattern = /\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
 
   return content.replace(loopPattern, (match, arrayName, innerContent) => {
-    const array = getValueFromPath(context, arrayName);
+    const array = getArrayFromContext(context, arrayName);
 
     if (!Array.isArray(array) || array.length === 0) {
       if (previewMode) {
@@ -176,11 +534,12 @@ function replaceLoops(
         itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
         itemContent = itemContent.replace(/\{\{@number\}\}/g, String(index + 1));
 
-        // Remplacer les proprietes de l'element (ex: {{module.titre}})
+        // Remplacer les proprietes de l'element
         if (typeof item === "object" && item !== null) {
           const singularName = getSingularName(arrayName);
-          const itemPattern = new RegExp(`\\{\\{${singularName}\\.([^}]+)\\}\\}`, "g");
 
+          // Pattern pour {{singulier.propriete}}
+          const itemPattern = new RegExp(`\\{\\{${singularName}\\.([^}]+)\\}\\}`, "g");
           itemContent = itemContent.replace(itemPattern, (m: string, prop: string) => {
             const value = (item as Record<string, unknown>)[prop];
             if (value !== undefined && value !== null) {
@@ -192,7 +551,7 @@ function replaceLoops(
             return previewMode ? m : "";
           });
 
-          // Aussi supporter {{titre}} directement (sans prefixe)
+          // Pattern pour {{propriete}} directement
           const directPattern = /\{\{([a-z_]+)\}\}/g;
           itemContent = itemContent.replace(directPattern, (m: string, prop: string) => {
             const value = (item as Record<string, unknown>)[prop];
@@ -202,7 +561,6 @@ function replaceLoops(
               }
               return String(value);
             }
-            // Ne pas remplacer si c'est une variable globale
             return m;
           });
         }
@@ -213,6 +571,22 @@ function replaceLoops(
   });
 }
 
+/**
+ * Obtenir un tableau depuis le contexte
+ */
+function getArrayFromContext(context: TemplateContext, arrayName: string): unknown[] | undefined {
+  switch (arrayName) {
+    case "apprenants":
+      return context.apprenants;
+    case "intervenants":
+      return context.intervenants;
+    case "journees":
+      return context.session?.journees;
+    default:
+      return (context as Record<string, unknown>)[arrayName] as unknown[] | undefined;
+  }
+}
+
 // ===========================================
 // REMPLACEMENT DES CONDITIONS
 // ===========================================
@@ -221,9 +595,8 @@ function replaceLoops(
  * Remplacer les conditions {{#if condition}}...{{/if}}
  * Supporte:
  * - {{#if variable}} - verifie si la variable existe et est truthy
- * - {{#if variable === "valeur"}} - comparaison d'egalite
- * - {{#if variable !== "valeur"}} - comparaison de difference
- * - {{#if client.type === "entreprise"}} - comparaison avec chemin de variable
+ * - {{#if client.type === "entreprise"}} - comparaison d'egalite
+ * - {{#if client.type !== "particulier"}} - comparaison de difference
  */
 function replaceConditions(
   content: string,
@@ -231,13 +604,12 @@ function replaceConditions(
   previewMode: boolean
 ): string {
   // Pattern pour {{#if condition}}...{{else}}...{{/if}}
-  // On gere aussi {{#elseif condition}} pour les conditions multiples
   const conditionPattern = /\{\{#if\s+([^}]+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g;
 
   return content.replace(conditionPattern, (match, condition, ifContent, elseContent = "") => {
     const trimmedCondition = condition.trim();
 
-    // Evaluer la condition (simple ou avec comparaison)
+    // Evaluer la condition
     const isTruthy = evaluateAdvancedCondition(trimmedCondition, context);
 
     if (isTruthy) {
@@ -246,7 +618,7 @@ function replaceConditions(
       result = replaceSimpleVariables(result, context, previewMode);
       return result;
     } else if (elseContent) {
-      // Rendre le contenu du else (recursif pour les conditions imbriquees)
+      // Rendre le contenu du else
       let result = replaceConditions(elseContent, context, previewMode);
       result = replaceSimpleVariables(result, context, previewMode);
       return result;
@@ -262,11 +634,9 @@ function replaceConditions(
  * - "client.type" -> verifie si la variable existe
  * - "client.type === 'entreprise'" -> comparaison egalite
  * - "client.type !== 'particulier'" -> comparaison difference
- * - "formation.prix > 1000" -> comparaison numerique
  */
 function evaluateAdvancedCondition(condition: string, context: TemplateContext): boolean {
   // Pattern pour detecter les comparaisons
-  // Supporte: ===, !==, ==, !=, >, <, >=, <=
   const comparisonPattern = /^(.+?)\s*(===|!==|==|!=|>=|<=|>|<)\s*(.+)$/;
   const match = condition.match(comparisonPattern);
 
@@ -276,12 +646,12 @@ function evaluateAdvancedCondition(condition: string, context: TemplateContext):
     let rightTrimmed = rightValue.trim();
 
     // Obtenir la valeur de gauche depuis le contexte
-    const leftValue = getValueFromPath(context, leftTrimmed);
+    const leftValue = getValueFromVariableName(context, leftTrimmed);
 
     // Determiner la valeur de droite
     let rightParsed: unknown;
 
-    // Verifier si c'est une string entre quotes (simples ou doubles)
+    // Verifier si c'est une string entre quotes
     if ((rightTrimmed.startsWith('"') && rightTrimmed.endsWith('"')) ||
         (rightTrimmed.startsWith("'") && rightTrimmed.endsWith("'"))) {
       rightParsed = rightTrimmed.slice(1, -1);
@@ -298,7 +668,7 @@ function evaluateAdvancedCondition(condition: string, context: TemplateContext):
     }
     // Sinon c'est peut-etre une autre variable
     else {
-      rightParsed = getValueFromPath(context, rightTrimmed);
+      rightParsed = getValueFromVariableName(context, rightTrimmed);
     }
 
     // Effectuer la comparaison
@@ -323,174 +693,13 @@ function evaluateAdvancedCondition(condition: string, context: TemplateContext):
   }
 
   // Pas de comparaison, evaluer comme condition simple (verifie existence/truthiness)
-  const value = getValueFromPath(context, condition);
+  const value = getValueFromVariableName(context, condition);
   return evaluateCondition(value);
 }
 
 // ===========================================
 // HELPERS
 // ===========================================
-
-/**
- * Obtenir une valeur depuis un chemin (ex: "formation.titre")
- * Supporte les variables speciales calculees dynamiquement
- */
-function getValueFromPath(context: TemplateContext, path: string): unknown {
-  // Variables speciales calculees dynamiquement
-  if (path === "journees.premiere_date") {
-    const journees = context.journees;
-    if (journees && journees.length > 0) {
-      return journees[0].date;
-    }
-    return context.formation?.date_debut || undefined;
-  }
-
-  if (path === "journees.derniere_date") {
-    const journees = context.journees;
-    if (journees && journees.length > 0) {
-      return journees[journees.length - 1].date; // Derniere journee dynamique !
-    }
-    return context.formation?.date_fin || undefined;
-  }
-
-  if (path === "journees.count") {
-    const journees = context.journees;
-    if (journees) {
-      return journees.length;
-    }
-    return context.formation?.nombre_jours || 0;
-  }
-
-  if (path === "participants.count") {
-    const participants = context.participants;
-    if (participants) {
-      return participants.length;
-    }
-    return 0;
-  }
-
-  // Variables calculees pour le particulier
-  if (path === "particulier.nom_complet" && context.particulier) {
-    const p = context.particulier;
-    if (!p.nom_complet && p.prenom && p.nom) {
-      return `${p.prenom} ${p.nom}`;
-    }
-  }
-
-  if (path === "particulier.adresse_complete" && context.particulier) {
-    const p = context.particulier;
-    if (!p.adresse_complete && p.adresse) {
-      return `${p.adresse}, ${p.code_postal || ""} ${p.ville || ""}`.trim();
-    }
-  }
-
-  // Variables calculees pour le formateur
-  if (path === "formateur.nom_complet" && context.formateur) {
-    const f = context.formateur;
-    return `${f.prenom || ""} ${f.nom || ""}`.trim();
-  }
-
-  // Variables calculees pour l'organisation
-  if (path === "organisation.adresse_complete" && context.organisation) {
-    const o = context.organisation;
-    if (!o.adresse_complete && o.adresse) {
-      return `${o.adresse}, ${o.code_postal || ""} ${o.ville || ""}`.trim();
-    }
-  }
-
-  // Variables calculees pour l'entreprise
-  if (path === "entreprise.adresse_complete" && context.entreprise) {
-    const e = context.entreprise;
-    if (!e.adresse_complete && e.adresse) {
-      return `${e.adresse}, ${e.code_postal || ""} ${e.ville || ""}`.trim();
-    }
-  }
-
-  // Variables numerotees pour les journees (journee1.date, journee2.horaires_matin, etc.)
-  const journeeMatch = path.match(/^journee(\d+)\.(.+)$/);
-  if (journeeMatch) {
-    const index = parseInt(journeeMatch[1], 10) - 1; // Index 0-based
-    const field = journeeMatch[2];
-    const journees = context.journees;
-    if (journees && journees[index]) {
-      const journee = journees[index];
-      switch (field) {
-        case "date":
-          return journee.date;
-        case "date_courte":
-          return journee.date_courte;
-        case "horaires_matin":
-          return journee.horaires_matin;
-        case "horaires_apres_midi":
-          return journee.horaires_apres_midi;
-        case "numero":
-          return journee.numero;
-        default:
-          return undefined;
-      }
-    }
-    return undefined;
-  }
-
-  // Variables numerotees pour les salaries (salarie1.nom, salarie2.email, etc.)
-  const salarieMatch = path.match(/^salarie(\d+)\.(.+)$/);
-  if (salarieMatch) {
-    const index = parseInt(salarieMatch[1], 10) - 1; // Index 0-based
-    const field = salarieMatch[2];
-    const participants = context.participants;
-    if (participants && participants[index]) {
-      const participant = participants[index];
-      switch (field) {
-        case "nom":
-          return participant.nom;
-        case "prenom":
-          return participant.prenom;
-        case "nom_complet":
-          return `${participant.prenom || ""} ${participant.nom || ""}`.trim();
-        case "email":
-          return participant.email;
-        case "telephone":
-          return participant.telephone;
-        case "adresse":
-          return participant.adresse;
-        case "code_postal":
-          return participant.code_postal;
-        case "ville":
-          return participant.ville;
-        case "adresse_complete":
-          if (participant.adresse) {
-            return `${participant.adresse}, ${participant.code_postal || ""} ${participant.ville || ""}`.trim();
-          }
-          return undefined;
-        case "date_naissance":
-          return participant.date_naissance;
-        case "lieu_naissance":
-          return participant.lieu_naissance;
-        default:
-          return undefined;
-      }
-    }
-    return undefined;
-  }
-
-  // Chemin standard
-  const parts = path.split(".");
-  let current: unknown = context;
-
-  for (const part of parts) {
-    if (current === null || current === undefined) {
-      return undefined;
-    }
-
-    if (typeof current === "object") {
-      current = (current as Record<string, unknown>)[part];
-    } else {
-      return undefined;
-    }
-  }
-
-  return current;
-}
 
 /**
  * Evaluer si une valeur est "truthy" pour les conditions
@@ -522,9 +731,11 @@ function evaluateCondition(value: unknown): boolean {
  */
 function getSingularName(pluralName: string): string {
   const singulars: Record<string, string> = {
+    apprenants: "apprenant",
+    intervenants: "intervenant",
+    journees: "journee",
     modules: "module",
     participants: "participant",
-    journees: "journee",
     objectifs: "objectif",
     prerequis: "prerequis",
     contenus: "contenu",
@@ -535,7 +746,6 @@ function getSingularName(pluralName: string): string {
 
 /**
  * Convertir du JSON TipTap en HTML basique
- * Note: Pour une conversion complete, utiliser l'export de TipTap
  */
 function tiptapJsonToHtml(json: unknown): string {
   if (!json || typeof json !== "object") {
@@ -631,11 +841,9 @@ function tiptapJsonToHtml(json: unknown): string {
       return '<div data-type="page-break" class="page-break"></div>';
     case "conditionalBlock":
       const condition = attrs?.condition as string || "";
-      // Generer le contenu du bloc conditionnel avec les balises handlebars
       return `{{#if ${condition}}}${childrenHtml}{{/if}}`;
     case "loopBlock":
       const collection = attrs?.collection as string || "items";
-      // Generer le contenu du bloc de boucle avec les balises handlebars
       return `{{#each ${collection}}}${childrenHtml}{{/each}}`;
     case "table":
       return `<table>${childrenHtml}</table>`;
@@ -649,7 +857,6 @@ function tiptapJsonToHtml(json: unknown): string {
       const imgSrc = attrs?.src as string;
       const imgAlt = attrs?.alt as string || "";
       const imgWidth = attrs?.width as number | undefined;
-      const imgHeight = attrs?.height as number | undefined;
       const imgStyle = imgWidth ? ` style="width: ${imgWidth}px; height: auto; max-width: 100%;"` : "";
       return `<img src="${imgSrc}" alt="${imgAlt}"${imgStyle} />`;
     case "resizableImage":
@@ -687,47 +894,39 @@ function escapeHtml(text: string): string {
  */
 function formatArrayOfObjects(array: Record<string, unknown>[], variablePath: string): string {
   // Cas spéciaux pour certains types de données
-  if (variablePath === "modules") {
-    return array.map((module, index) => {
-      const numero = module.numero || index + 1;
-      const titre = module.titre || "";
-      const duree = module.duree || "";
-      const objectifs = module.objectifs as string[] || [];
-      const contenu = module.contenu as string[] || [];
-
-      let html = `<div class="module-section" style="margin-bottom: 1.5rem;">`;
-      html += `<h4 style="margin-bottom: 0.5rem;"><strong>Module ${numero} :</strong> ${escapeHtml(String(titre))}</h4>`;
-      if (duree) {
-        html += `<p><em>Durée : ${escapeHtml(String(duree))}</em></p>`;
-      }
-      if (objectifs.length > 0) {
-        html += `<p><strong>Objectifs :</strong></p>`;
-        html += `<ul>${objectifs.map(obj => `<li>${escapeHtml(String(obj))}</li>`).join("")}</ul>`;
-      }
-      if (contenu.length > 0) {
-        html += `<p><strong>Contenu :</strong></p>`;
-        html += `<ul>${contenu.map(c => `<li>${escapeHtml(String(c))}</li>`).join("")}</ul>`;
-      }
-      html += `</div>`;
-      return html;
+  if (variablePath === "apprenants") {
+    return array.map((apprenant, index) => {
+      const nom = apprenant.nom || "";
+      const prenom = apprenant.prenom || "";
+      const email = apprenant.email || "";
+      return `<p>${index + 1}. ${escapeHtml(String(prenom))} ${escapeHtml(String(nom))}${email ? ` (${escapeHtml(String(email))})` : ""}</p>`;
     }).join("");
   }
 
-  if (variablePath === "participants") {
-    return array.map((participant, index) => {
-      const nom = participant.nom || "";
-      const prenom = participant.prenom || "";
-      const email = participant.email || "";
-      const fonction = participant.fonction || "";
-      return `<p>${index + 1}. ${escapeHtml(String(prenom))} ${escapeHtml(String(nom))}${fonction ? ` - ${escapeHtml(String(fonction))}` : ""}${email ? ` (${escapeHtml(String(email))})` : ""}</p>`;
+  if (variablePath === "intervenants") {
+    return array.map((intervenant, index) => {
+      const nom = intervenant.nom || "";
+      const prenom = intervenant.prenom || "";
+      const specialites = intervenant.specialites as string[] || [];
+      return `<p>${index + 1}. ${escapeHtml(String(prenom))} ${escapeHtml(String(nom))}${specialites.length > 0 ? ` - ${escapeHtml(specialites.join(", "))}` : ""}</p>`;
+    }).join("");
+  }
+
+  if (variablePath === "journees") {
+    return array.map((journee) => {
+      const numero = journee.numero || "";
+      const date = journee.date || "";
+      const horaire_matin = journee.horaire_matin || "";
+      const horaire_apres_midi = journee.horaire_apres_midi || "";
+      return `<p><strong>Jour ${numero}:</strong> ${escapeHtml(String(date))} - Matin: ${escapeHtml(String(horaire_matin))}, Après-midi: ${escapeHtml(String(horaire_apres_midi))}</p>`;
     }).join("");
   }
 
   // Par défaut, lister les objets
-  return array.map((obj, index) => {
+  return `<ul>${array.map((obj, index) => {
     const mainValue = obj.titre || obj.nom || obj.name || obj.label || Object.values(obj)[0];
     return `<li>${escapeHtml(String(mainValue || `Item ${index + 1}`))}</li>`;
-  }).join("");
+  }).join("")}</ul>`;
 }
 
 // ===========================================
@@ -736,222 +935,226 @@ function formatArrayOfObjects(array: Record<string, unknown>[], variablePath: st
 
 /**
  * Generer un contexte de donnees de test pour preview
+ * Utilise le nouveau format de données
  */
 export function generateTestContext(): TemplateContext {
   const now = new Date();
   const months = [
-    "janvier", "fevrier", "mars", "avril", "mai", "juin",
-    "juillet", "aout", "septembre", "octobre", "novembre", "decembre"
+    "janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre"
   ];
 
   return {
-    formation: {
-      id: "FORM-001",
-      titre: "Management Agile et Leadership",
-      description: "Cette formation permet de maitriser les fondamentaux du management agile et de developper ses competences de leader.",
-      duree: "14 heures (2 jours)",
-      duree_heures: 14,
-      nombre_jours: 2,
-      prix: 1500,
-      prix_format: "1 500,00 EUR HT",
-      prix_ttc: "1 800,00 EUR TTC",
-      tva: "300,00",
-      objectifs: [
-        "Comprendre les principes du management agile",
-        "Developper ses competences de leader",
-        "Mettre en place des rituels d'equipe efficaces",
-        "Gerer les conflits et la resistance au changement",
-      ],
-      prerequis: [
-        "Aucun prerequis technique",
-        "Experience en management souhaitee",
-      ],
-      public_cible: "Managers, chefs de projet, responsables d'equipe",
-      modalites: "Presentiel",
-      lieu: "Paris - Centre de formation",
-      adresse: "15 rue de la Formation",
-      code_postal: "75001",
-      ville: "Paris",
-      date_debut: "15/01/2025",
-      date_fin: "16/01/2025",
-      horaires_matin: "09:00 - 12:30",
-      horaires_apres_midi: "14:00 - 17:30",
-      reference: "FORM-2025-001",
-      methodes_pedagogiques: "Apports theoriques, exercices pratiques, mises en situation, etudes de cas",
-      moyens_techniques: "Salle equipee, videoprojecteur, supports de cours remis aux participants",
-      modalites_evaluation: "QCM d'evaluation des acquis, mise en situation pratique, evaluation continue",
-      accessibilite: "Formation accessible aux personnes en situation de handicap. Contactez-nous pour etudier les adaptations possibles.",
-      delai_acces: "14 jours ouvrables avant le debut de la formation",
-    },
-    journees: [
-      {
-        numero: 1,
-        date: "15 janvier 2025",
-        date_courte: "15/01/2025",
-        horaires_matin: "09:00 - 12:30",
-        horaires_apres_midi: "14:00 - 17:30",
-      },
-      {
-        numero: 2,
-        date: "16 janvier 2025",
-        date_courte: "16/01/2025",
-        horaires_matin: "09:00 - 12:30",
-        horaires_apres_midi: "14:00 - 17:30",
-      },
-    ],
-    modules: [
-      {
-        id: "MOD-001",
-        numero: 1,
-        titre: "Introduction au Management Agile",
-        duree: "3 heures",
-        duree_heures: 3,
-        objectifs: [
-          "Comprendre l'histoire de l'agilite",
-          "Connaitre les 4 valeurs du Manifeste Agile",
-        ],
-        contenu: [
-          "Histoire et evolution de l'agilite",
-          "Les 4 valeurs du Manifeste Agile",
-          "Les 12 principes",
-          "Comparaison avec les methodes traditionnelles",
-        ],
-      },
-      {
-        id: "MOD-002",
-        numero: 2,
-        titre: "Leadership et Communication",
-        duree: "4 heures",
-        duree_heures: 4,
-        objectifs: [
-          "Developper son style de leadership",
-          "Maitriser la communication non-violente",
-        ],
-        contenu: [
-          "Les differents styles de leadership",
-          "Communication non-violente",
-          "Feedback constructif",
-          "Gestion des emotions",
-        ],
-      },
-      {
-        id: "MOD-003",
-        numero: 3,
-        titre: "Mise en Pratique",
-        duree: "7 heures",
-        duree_heures: 7,
-        objectifs: [
-          "Appliquer les concepts sur des cas reels",
-          "Construire son plan d'action personnel",
-        ],
-        contenu: [
-          "Etudes de cas",
-          "Simulations et jeux de roles",
-          "Plan d'action personnel",
-          "Cloture et evaluation",
-        ],
-      },
-    ],
-    organisation: {
-      id: "ORG-001",
-      nom: "Automate Formation SAS",
+    // Organisme de Formation
+    of: {
+      raison_sociale: "Automate Formation SAS",
+      nom_commercial: "Automate Formation",
       siret: "123 456 789 00012",
+      ville_rcs: "Paris",
+      nda: "11 75 12345 67",
+      region_enregistrement: "Île-de-France",
       adresse: "15 rue de la Formation",
       code_postal: "75001",
       ville: "Paris",
-      adresse_complete: "15 rue de la Formation, 75001 Paris",
-      telephone: "01 23 45 67 89",
+      pays: "France",
+      representant_nom: "DUPONT",
+      representant_prenom: "Jean",
+      representant_fonction: "Directeur Général",
       email: "contact@automate-formation.fr",
-      site_web: "www.automate-formation.fr",
-      numero_da: "11 75 12345 67",
-      logo: "https://example.com/logo.png",
-      representant: "Jean DUPONT",
-      fonction_representant: "Directeur General",
-      tva_intra: "FR12345678901",
-      capital: "10 000 EUR",
-      forme_juridique: "SAS",
-      rcs: "Paris B 123 456 789",
+      telephone: "01 23 45 67 89",
+      logo_organisme: "https://example.com/logo.png",
     },
+
+    // Entreprise cliente
     entreprise: {
       id: "ENT-001",
-      nom: "ACME Corporation",
+      raison_sociale: "ACME Corporation",
       siret: "987 654 321 00098",
-      adresse: "100 avenue des Champs-Elysees",
+      adresse: "100 avenue des Champs-Élysées",
       code_postal: "75008",
       ville: "Paris",
-      adresse_complete: "100 avenue des Champs-Elysees, 75008 Paris",
-      telephone: "01 98 76 54 32",
+      pays: "France",
+      representant_civilite: "Mme",
+      representant_nom: "MARTIN",
+      representant_prenom: "Marie",
+      representant_fonction: "Directrice des Ressources Humaines",
       email: "contact@acme.fr",
-      representant: "Marie MARTIN",
-      fonction_representant: "Directrice des Ressources Humaines",
+      telephone: "01 98 76 54 32",
+      tva_intracom: "FR12345678901",
+      nombre_apprenants: 3,
+      liste_apprenants: "Pierre DURAND, Sophie LEROY, Thomas MOREAU",
     },
-    particulier: {
-      civilite: "M.",
+
+    // Apprenant (pour contrat individuel)
+    apprenant: {
+      id: "APP-001",
       nom: "DURAND",
       prenom: "Pierre",
-      nom_complet: "Pierre DURAND",
+      statut: "SALARIE",
       adresse: "25 rue de la Paix",
       code_postal: "75002",
       ville: "Paris",
-      adresse_complete: "25 rue de la Paix, 75002 Paris",
+      pays: "France",
       email: "pierre.durand@email.com",
       telephone: "06 12 34 56 78",
-      date_naissance: "15/03/1985",
-      lieu_naissance: "Paris",
-      statut: "Demandeur d'emploi",
     },
-    participants: [
+
+    // Liste des apprenants (pour conventions)
+    apprenants: [
       {
-        id: "PART-001",
-        civilite: "M.",
+        id: "APP-001",
         nom: "DURAND",
         prenom: "Pierre",
+        statut: "SALARIE" as const,
         email: "p.durand@acme.fr",
-        fonction: "Chef de projet",
-        type: "salarie",
+        telephone: "06 12 34 56 78",
       },
       {
-        id: "PART-002",
-        civilite: "Mme",
+        id: "APP-002",
         nom: "LEROY",
         prenom: "Sophie",
+        statut: "SALARIE" as const,
         email: "s.leroy@acme.fr",
-        fonction: "Responsable d'equipe",
-        type: "salarie",
+        telephone: "06 23 45 67 89",
       },
       {
-        id: "PART-003",
-        civilite: "M.",
+        id: "APP-003",
         nom: "MOREAU",
         prenom: "Thomas",
+        statut: "SALARIE" as const,
         email: "t.moreau@acme.fr",
-        fonction: "Manager",
-        type: "salarie",
+        telephone: "06 34 56 78 90",
       },
     ],
-    formateur: {
-      id: "FORM-001",
-      civilite: "Mme",
+    apprenants_liste: "Pierre DURAND, Sophie LEROY, Thomas MOREAU",
+
+    // Financeur
+    financeur: {
+      id: "FIN-001",
+      nom: "OPCO Atlas",
+      type: "OPCO",
+      adresse: "10 rue de l'OPCO",
+      code_postal: "75009",
+      ville: "Paris",
+      pays: "France",
+      email: "contact@opco-atlas.fr",
+      telephone: "01 40 50 60 70",
+    },
+
+    // Intervenant
+    intervenant: {
+      id: "INT-001",
       nom: "BERNARD",
       prenom: "Sophie",
+      adresse: "30 rue du Formateur",
+      code_postal: "75003",
+      ville: "Paris",
+      pays: "France",
       email: "s.bernard@automate-formation.fr",
       telephone: "06 12 34 56 78",
-      specialite: "Management et Leadership",
+      specialites: ["Management", "Leadership", "Communication"],
     },
+
+    // Liste des intervenants
+    intervenants: [
+      {
+        id: "INT-001",
+        nom: "BERNARD",
+        prenom: "Sophie",
+        email: "s.bernard@automate-formation.fr",
+        specialites: ["Management", "Leadership"],
+      },
+    ],
+    intervenant_equipe_pedagogique: "Sophie BERNARD (Management, Leadership)",
+
+    // Lieu
+    lieu: {
+      id: "LIEU-001",
+      type: "PRESENTIEL",
+      nom: "Centre de formation Paris",
+      formation: "15 rue de la Formation, 75001 Paris",
+      code_postal: "75001",
+      ville: "Paris",
+      informations_pratiques: "Métro ligne 1 - Louvre Rivoli",
+      capacite: 12,
+    },
+
+    // Formation
+    formation: {
+      id: "FORM-001",
+      titre: "Management Agile et Leadership",
+      modalite: "Présentiel",
+      categorie_action: "Action de formation",
+      duree_heures: 14,
+      duree_jours: 2,
+      duree_heures_jours: "14 heures (2 jours)",
+      nb_participants_max: 12,
+      description: "Cette formation permet de maîtriser les fondamentaux du management agile et de développer ses compétences de leader.",
+      objectifs_pedagogiques: "- Comprendre les principes du management agile\n- Développer ses compétences de leader\n- Mettre en place des rituels d'équipe efficaces",
+      prerequis: "Aucun prérequis technique. Expérience en management souhaitée.",
+      public_vise: "Managers, chefs de projet, responsables d'équipe",
+      contenu_detaille: "Module 1: Introduction au management agile\nModule 2: Leadership et communication\nModule 3: Mise en pratique",
+      suivi_execution_evaluation: "Feuilles de présence signées, QCM d'évaluation des acquis",
+      ressources_pedagogiques: "Supports de cours, exercices pratiques, études de cas",
+      accessibilite: "Formation accessible aux personnes en situation de handicap",
+      delai_acces: "14 jours ouvrables avant le début de la formation",
+      tarif_entreprise_ht_fiche_peda: "1 500,00 € HT",
+      tarif_independant_ht_fiche_peda: "1 200,00 € HT",
+      tarif_particulier_ttc_fiche_peda: "1 440,00 € TTC",
+    },
+
+    // Session
+    session: {
+      id: "SESS-001",
+      modalite: "Présentiel",
+      date_debut: "15/01/2025",
+      date_fin: "16/01/2025",
+      journees: [
+        {
+          numero: 1,
+          date: "15 janvier 2025",
+          horaire_matin: "09:00 - 12:30",
+          horaire_apres_midi: "14:00 - 17:30",
+        },
+        {
+          numero: 2,
+          date: "16 janvier 2025",
+          horaire_matin: "09:00 - 12:30",
+          horaire_apres_midi: "14:00 - 17:30",
+        },
+      ],
+      planning_journees_formation: "Jour 1: Introduction et fondamentaux\nJour 2: Pratique et mise en application",
+    },
+
+    // Dates du jour
     dates: {
       jour: String(now.getDate()).padStart(2, "0"),
       mois: months[now.getMonth()],
       annee: String(now.getFullYear()),
-      date_complete: `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`,
-      date_courte: `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`,
+      complete_longue: `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`,
+      complete_courte: `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`,
     },
-    document: {
-      reference: "DOC-2025-001",
-      date_creation: `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`,
-      version: "1.0",
+
+    // Tarifs
+    tarifs: {
+      tarif_entreprise_ht_documents: "1 500,00 € HT",
+      entreprise_montant_tva: "300,00 €",
+      entreprise_prix_ttc: "1 800,00 € TTC",
+      entreprise_montant_financeur_ht: "1 000,00 € HT",
+      entreprise_montant_financeur_ttc: "1 200,00 € TTC",
+      entreprise_reste_a_charge_ht: "500,00 € HT",
+      entreprise_reste_a_charge_ttc: "600,00 € TTC",
+      entreprise_a_financeur: true,
+      tarif_independant_ht_documents: "1 200,00 € HT",
+      independant_montant_tva: "240,00 €",
+      independant_prix_ttc: "1 440,00 € TTC",
+      independant_a_financeur: false,
+      particulier_prix_ttc: "1 440,00 € TTC",
     },
-    signature: {
-      responsable_organisme: "https://example.com/signature.png",
+
+    // Client (pour conditions)
+    client: {
+      type: "entreprise",
     },
   };
 }

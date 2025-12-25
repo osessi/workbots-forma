@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const sanitizedId = supabaseUser.id.replace(/[^a-zA-Z0-9]/g, "_");
-    const folder = type === "logo" ? "logos" : type === "signature" ? "signatures" : "avatars";
+    const folder = type === "logo" ? "logos" : type === "signature" ? "signatures" : type === "cachet" ? "cachets" : "avatars";
     const path = `${folder}/${sanitizedId}/${timestamp}.${ext}`;
 
     // Convertir File en ArrayBuffer
@@ -137,18 +137,25 @@ export async function POST(request: NextRequest) {
         where: { supabaseId: supabaseUser.id },
         data: { avatar: publicUrl },
       });
-    } else if (type === "logo" || type === "signature") {
+    } else if (type === "logo" || type === "signature" || type === "cachet") {
       // Récupérer l'utilisateur pour avoir son organizationId
       const user = await prisma.user.findUnique({
         where: { supabaseId: supabaseUser.id },
         select: { organizationId: true, email: true },
       });
 
+      // Construire l'objet data selon le type
+      const updateData = type === "logo"
+        ? { logo: publicUrl }
+        : type === "signature"
+          ? { signature: publicUrl }
+          : { cachet: publicUrl };
+
       if (user?.organizationId) {
         // Mettre à jour l'organisation existante
         await prisma.organization.update({
           where: { id: user.organizationId },
-          data: type === "logo" ? { logo: publicUrl } : { signature: publicUrl },
+          data: updateData,
         });
       } else {
         // Créer une organisation pour l'utilisateur s'il n'en a pas
@@ -157,7 +164,7 @@ export async function POST(request: NextRequest) {
           data: {
             name: "Mon entreprise",
             slug: slug,
-            ...(type === "logo" ? { logo: publicUrl } : { signature: publicUrl }),
+            ...updateData,
           },
         });
         // Associer l'organisation à l'utilisateur

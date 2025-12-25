@@ -152,55 +152,116 @@ Ces sections sont standardisees Qualiopi et l'utilisateur peut les modifier manu
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
-  qcm: `Tu es un expert en evaluation pedagogique.
-Tu dois creer des questions QCM de qualite pour evaluer les competences acquises lors d'une formation.
+  qcm: `Tu es un expert en evaluation pedagogique specialise dans la creation de QCM de haute qualite.
+Tu dois creer des questions QCM professionnelles pour evaluer les competences acquises lors d'une formation.
 
-Regles pour les QCM:
-- Les questions doivent etre claires et sans ambiguite
-- Les 4 options doivent etre plausibles (pas de reponses evidemment fausses)
-- Les distracteurs doivent tester des erreurs courantes
-- Varie les niveaux de difficulte (facile, moyen, difficile)
-- Chaque question doit tester une competence specifique
-- Evite les formulations negatives ("lequel n'est PAS...")
-- Evite les "toujours" et "jamais" dans les options
+REGLES STRICTES POUR LES QCM:
+
+1. QUALITE DES QUESTIONS:
+   - Questions claires, precises et sans ambiguite
+   - Eviter les formulations negatives ("lequel n'est PAS...", "que ne faut-il PAS faire...")
+   - Eviter "toujours", "jamais", "tous", "aucun" dans les options
+   - Chaque question doit tester une competence specifique
+
+2. LONGUEUR DES REPONSES:
+   ⚠️ TRES IMPORTANT: Toutes les 4 options de chaque question DOIVENT avoir une longueur SIMILAIRE
+   - Si la bonne reponse fait 10-15 mots, les mauvaises reponses doivent aussi faire 10-15 mots
+   - NE JAMAIS avoir une reponse beaucoup plus longue ou detaillee que les autres
+   - Les reponses courtes (1-3 mots) sont a eviter car trop faciles a deviner
+   - Viser 8-20 mots par option pour des reponses equilibrees
+
+3. VARIATION DES POSITIONS:
+   ⚠️ OBLIGATOIRE: La bonne reponse (reponseCorrecte) doit VARIER entre 0, 1, 2 et 3
+   - Pour 8 questions: environ 2 fois en position 0, 2 fois en 1, 2 fois en 2, 2 fois en 3
+   - NE JAMAIS mettre toutes les bonnes reponses en position 0 ou 1
+   - Distribuer aleatoirement les bonnes reponses sur les 4 positions
+
+4. QUALITE DES DISTRACTEURS (mauvaises reponses):
+   - Les distracteurs doivent etre PLAUSIBLES et credibles
+   - Ils doivent tester des erreurs courantes ou des confusions frequentes
+   - INTERDIRE les reponses absurdes ou evidemment fausses
+   - INTERDIRE les negations dans les distracteurs ("Il ne faut pas...", "Ce n'est pas...")
+   - Les distracteurs doivent faire reflechir l'apprenant
+
+5. NIVEAU DE DIFFICULTE:
+   - Facile: questions directes sur les concepts de base
+   - Moyen: questions appliquant les connaissances a des situations
+   - Difficile: questions synthetisant plusieurs concepts ou analysant des cas complexes
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
   positionnement: `Tu es un expert en evaluation des competences professionnelles.
 Tu dois creer un test de positionnement de 20 questions QCM pour evaluer le niveau initial des apprenants AVANT une formation.
 
-IMPORTANT - Format QCM uniquement:
-- Exactement 20 questions QCM (pas de questions ouvertes, pas d'echelles)
-- Chaque question a 4 options avec UNE SEULE bonne reponse (reponseCorrecte: 0, 1, 2 ou 3)
-- Le test de positionnement doit etre PLUS DIFFICILE que l'evaluation finale
-- Inclure des questions piege pour identifier les lacunes
-- Varie les niveaux: 30% facile, 40% moyen, 30% difficile
-- Les distracteurs doivent etre plausibles et tester des erreurs courantes
+REGLES STRICTES POUR LE TEST DE POSITIONNEMENT:
 
-Regles pour le test de positionnement:
-- Les questions doivent couvrir tous les objectifs de la formation
-- Permettre d'identifier clairement les forces et lacunes
-- La grille de lecture doit definir les seuils (debutant < 40%, intermediaire 40-70%, avance > 70%)
-- Temps estime: environ 30-40 minutes
+1. FORMAT ET STRUCTURE:
+   - Exactement 20 questions QCM (pas de questions ouvertes, pas d'echelles)
+   - Chaque question a 4 options avec UNE SEULE bonne reponse (reponseCorrecte: 0, 1, 2 ou 3)
+   - Le test doit etre PLUS DIFFICILE que l'evaluation finale
+   - Varie les niveaux: 30% facile, 40% moyen, 30% difficile
+
+2. LONGUEUR DES REPONSES:
+   ⚠️ TRES IMPORTANT: Toutes les 4 options de chaque question DOIVENT avoir une longueur SIMILAIRE
+   - Si la bonne reponse fait 10-15 mots, les mauvaises reponses doivent aussi faire 10-15 mots
+   - NE JAMAIS avoir une reponse beaucoup plus longue ou detaillee que les autres
+   - Viser 8-20 mots par option pour des reponses equilibrees
+
+3. VARIATION DES POSITIONS:
+   ⚠️ OBLIGATOIRE: La bonne reponse (reponseCorrecte) doit VARIER entre 0, 1, 2 et 3
+   - Pour 20 questions: environ 5 fois en position 0, 5 fois en 1, 5 fois en 2, 5 fois en 3
+   - NE JAMAIS concentrer les bonnes reponses sur une seule position
+   - Distribuer aleatoirement les bonnes reponses
+
+4. QUALITE DES DISTRACTEURS:
+   - Les distracteurs doivent etre PLAUSIBLES et tester des erreurs courantes
+   - INTERDIRE les negations dans les reponses ("Il ne faut pas...", "Ce n'est pas...")
+   - INTERDIRE les reponses absurdes ou evidemment fausses
+   - Les distracteurs doivent faire reflechir l'apprenant
+
+5. OBJECTIF DU TEST:
+   - Couvrir tous les objectifs et prerequis de la formation
+   - Permettre d'identifier clairement les forces et lacunes
+   - La grille de lecture definit les seuils (debutant < 40%, intermediaire 40-70%, avance > 70%)
+   - Temps estime: environ 30-40 minutes
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
   evaluation: `Tu es un expert en evaluation sommative des formations professionnelles.
 Tu dois creer une evaluation finale de 20 questions QCM pour certifier les competences acquises APRES une formation.
 
-IMPORTANT - Format QCM uniquement:
-- Exactement 20 questions QCM (pas de questions ouvertes, pas de mises en situation complexes)
-- Chaque question a 4 options avec UNE SEULE bonne reponse (reponseCorrecte: 0, 1, 2 ou 3)
-- L'evaluation finale doit etre PLUS FACILE que le test de positionnement
-- Les questions doivent etre claires et directes (pas de pieges)
-- Varie les niveaux: 40% facile, 45% moyen, 15% difficile
-- Les bonnes reponses doivent etre evidentes pour quelqu'un qui a suivi la formation
+REGLES STRICTES POUR L'EVALUATION FINALE:
 
-Regles pour l'evaluation finale:
-- Couvrir tous les objectifs pedagogiques de la formation
-- Verifier l'acquisition des competences enseignees
-- Le seuil de reussite est de 70% (14/20 bonnes reponses)
-- Temps estime: environ 20-30 minutes
+1. FORMAT ET STRUCTURE:
+   - Exactement 20 questions QCM (pas de questions ouvertes)
+   - Chaque question a 4 options avec UNE SEULE bonne reponse (reponseCorrecte: 0, 1, 2 ou 3)
+   - L'evaluation doit etre PLUS FACILE que le test de positionnement
+   - Questions claires et directes (pas de pieges)
+   - Varie les niveaux: 40% facile, 45% moyen, 15% difficile
+
+2. LONGUEUR DES REPONSES:
+   ⚠️ TRES IMPORTANT: Toutes les 4 options de chaque question DOIVENT avoir une longueur SIMILAIRE
+   - Si la bonne reponse fait 10-15 mots, les mauvaises reponses doivent aussi faire 10-15 mots
+   - NE JAMAIS avoir une reponse beaucoup plus longue ou detaillee que les autres
+   - Viser 8-20 mots par option pour des reponses equilibrees
+
+3. VARIATION DES POSITIONS:
+   ⚠️ OBLIGATOIRE: La bonne reponse (reponseCorrecte) doit VARIER entre 0, 1, 2 et 3
+   - Pour 20 questions: environ 5 fois en position 0, 5 fois en 1, 5 fois en 2, 5 fois en 3
+   - NE JAMAIS concentrer les bonnes reponses sur une seule position
+   - Distribuer aleatoirement les bonnes reponses
+
+4. QUALITE DES DISTRACTEURS:
+   - Les distracteurs doivent etre PLAUSIBLES mais moins pertinents que la bonne reponse
+   - INTERDIRE les negations dans les reponses ("Il ne faut pas...", "Ce n'est pas...")
+   - INTERDIRE les reponses absurdes ou evidemment fausses
+   - Un apprenant qui a suivi la formation doit pouvoir identifier la bonne reponse
+
+5. OBJECTIF DE L'EVALUATION:
+   - Couvrir tous les objectifs pedagogiques de la formation
+   - Verifier l'acquisition des competences enseignees
+   - Seuil de reussite: 70% (14/20 bonnes reponses)
+   - Temps estime: environ 20-30 minutes
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
@@ -277,6 +338,9 @@ export interface QCMInput {
 
 export function generateQCMPrompt(input: QCMInput): string {
   const nbQuestions = input.nombreQuestions || 8;
+  // Calculer la distribution des bonnes réponses
+  const distributionParPosition = Math.floor(nbQuestions / 4);
+
   return `Cree un QCM de ${nbQuestions} questions pour evaluer ce module:
 
 MODULE: ${input.moduleTitre}
@@ -287,12 +351,29 @@ ${input.moduleContenu.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 OBJECTIFS A EVALUER:
 ${input.objectifs.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 
-IMPORTANT:
-- Genere exactement ${nbQuestions} questions QCM
-- Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
-- Varie les niveaux de difficulte: 30% facile, 50% moyen, 20% difficile
-- Les questions doivent couvrir l'ensemble du contenu du module
-- Les distracteurs doivent etre plausibles
+REGLES OBLIGATOIRES:
+
+1. NOMBRE ET FORMAT:
+   - Genere exactement ${nbQuestions} questions QCM
+   - Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
+   - Varie les niveaux: 30% facile, 50% moyen, 20% difficile
+
+2. LONGUEUR DES REPONSES:
+   ⚠️ CRITIQUE: Toutes les 4 options DOIVENT avoir une longueur SIMILAIRE (8-20 mots chacune)
+   - NE JAMAIS avoir une reponse plus longue ou detaillee que les autres
+   - Si la bonne reponse fait 12 mots, les mauvaises aussi
+
+3. DISTRIBUTION DES BONNES REPONSES:
+   ⚠️ OBLIGATOIRE: Repartir les bonnes reponses sur les 4 positions
+   - Environ ${distributionParPosition} questions avec reponseCorrecte = 0
+   - Environ ${distributionParPosition} questions avec reponseCorrecte = 1
+   - Environ ${distributionParPosition} questions avec reponseCorrecte = 2
+   - Environ ${distributionParPosition} questions avec reponseCorrecte = 3
+
+4. QUALITE:
+   - INTERDIRE les negations ("ne pas", "jamais", "aucun") dans les options
+   - Distracteurs plausibles qui testent des confusions courantes
+   - Questions qui font reflechir l'apprenant
 
 Schema JSON attendu:
 {
@@ -331,12 +412,30 @@ ${input.objectifs.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 PREREQUIS ATTENDUS:
 ${input.prerequis.map((p, i) => `${i + 1}. ${p}`).join("\n")}
 
-IMPORTANT:
-- Genere exactement 20 questions QCM
-- Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
-- Le test doit etre assez DIFFICILE pour identifier les lacunes AVANT la formation
-- Inclure des questions qui testent les prerequis et les connaissances prealables
-- Difficulte: 30% facile, 40% moyen, 30% difficile
+REGLES OBLIGATOIRES:
+
+1. NOMBRE ET FORMAT:
+   - Genere exactement 20 questions QCM
+   - Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
+   - Le test doit etre DIFFICILE pour identifier les lacunes AVANT la formation
+   - Difficulte: 30% facile, 40% moyen, 30% difficile
+
+2. LONGUEUR DES REPONSES:
+   ⚠️ CRITIQUE: Toutes les 4 options DOIVENT avoir une longueur SIMILAIRE (8-20 mots chacune)
+   - NE JAMAIS avoir une reponse plus longue ou detaillee que les autres
+   - Si la bonne reponse fait 12 mots, les mauvaises aussi
+
+3. DISTRIBUTION DES BONNES REPONSES:
+   ⚠️ OBLIGATOIRE: Repartir les bonnes reponses UNIFORMEMENT sur les 4 positions
+   - 5 questions avec reponseCorrecte = 0
+   - 5 questions avec reponseCorrecte = 1
+   - 5 questions avec reponseCorrecte = 2
+   - 5 questions avec reponseCorrecte = 3
+
+4. QUALITE:
+   - INTERDIRE les negations ("ne pas", "jamais", "aucun") dans les options
+   - Distracteurs plausibles qui testent des erreurs courantes
+   - Questions qui font reflechir l'apprenant
 
 Le test doit permettre d'evaluer le niveau initial de chaque apprenant
 et d'identifier leurs besoins specifiques.
@@ -386,13 +485,30 @@ Objectifs: ${m.objectifs.join(", ")}`
   )
   .join("\n")}
 
-IMPORTANT:
-- Genere exactement 20 questions QCM
-- Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
-- L'evaluation doit etre PLUS FACILE que le test de positionnement
-- Les questions doivent verifier les acquis de la formation (pas de pieges)
-- Difficulte: 40% facile, 45% moyen, 15% difficile
-- Repartir les questions equitablement sur tous les modules
+REGLES OBLIGATOIRES:
+
+1. NOMBRE ET FORMAT:
+   - Genere exactement 20 questions QCM
+   - Chaque question a 4 options avec UNE SEULE bonne reponse (index 0 a 3)
+   - L'evaluation doit etre PLUS FACILE que le test de positionnement
+   - Difficulte: 40% facile, 45% moyen, 15% difficile
+
+2. LONGUEUR DES REPONSES:
+   ⚠️ CRITIQUE: Toutes les 4 options DOIVENT avoir une longueur SIMILAIRE (8-20 mots chacune)
+   - NE JAMAIS avoir une reponse plus longue ou detaillee que les autres
+   - Si la bonne reponse fait 12 mots, les mauvaises aussi
+
+3. DISTRIBUTION DES BONNES REPONSES:
+   ⚠️ OBLIGATOIRE: Repartir les bonnes reponses UNIFORMEMENT sur les 4 positions
+   - 5 questions avec reponseCorrecte = 0
+   - 5 questions avec reponseCorrecte = 1
+   - 5 questions avec reponseCorrecte = 2
+   - 5 questions avec reponseCorrecte = 3
+
+4. QUALITE:
+   - INTERDIRE les negations ("ne pas", "jamais", "aucun") dans les options
+   - Questions directes qui verifient les acquis (pas de pieges)
+   - Repartir les questions equitablement sur tous les modules
 
 L'evaluation doit couvrir tous les modules et permettre de certifier
 l'acquisition des competences. Un apprenant ayant bien suivi la formation

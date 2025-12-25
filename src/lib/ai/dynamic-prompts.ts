@@ -219,6 +219,7 @@ export function injectVariablesInPrompt(
 
 /**
  * Convertit un TemplateContext en DynamicPromptContext
+ * Adapté au nouveau format de TemplateContext
  */
 export function templateContextToPromptContext(
   templateContext: TemplateContext
@@ -228,66 +229,65 @@ export function templateContextToPromptContext(
       ? {
           titre: templateContext.formation.titre,
           description: templateContext.formation.description,
-          duree: templateContext.formation.duree,
+          duree: templateContext.formation.duree_heures_jours,
           dureeHeures: templateContext.formation.duree_heures,
-          objectifs: templateContext.formation.objectifs,
-          prerequis: templateContext.formation.prerequis,
-          publicCible: templateContext.formation.public_cible,
-          modalites: templateContext.formation.modalites,
-          moyensPedagogiques: templateContext.formation.methodes_pedagogiques
-            ? [templateContext.formation.methodes_pedagogiques]
+          objectifs: templateContext.formation.objectifs_pedagogiques
+            ? templateContext.formation.objectifs_pedagogiques.split("\n").filter(Boolean)
             : undefined,
-          modalitesEvaluation: templateContext.formation.modalites_evaluation
-            ? [templateContext.formation.modalites_evaluation]
+          prerequis: templateContext.formation.prerequis
+            ? templateContext.formation.prerequis.split("\n").filter(Boolean)
+            : undefined,
+          publicCible: templateContext.formation.public_vise,
+          modalites: templateContext.formation.modalite,
+          moyensPedagogiques: templateContext.formation.ressources_pedagogiques
+            ? [templateContext.formation.ressources_pedagogiques]
+            : undefined,
+          modalitesEvaluation: templateContext.formation.suivi_execution_evaluation
+            ? [templateContext.formation.suivi_execution_evaluation]
             : undefined,
         }
       : undefined,
-    modules: templateContext.modules?.map((m) => ({
-      titre: m.titre,
-      duree: m.duree,
-      objectifs: m.objectifs,
-      contenu: m.contenu,
+    // Les modules ne sont plus dans le nouveau format TemplateContext
+    modules: undefined,
+    organisation: templateContext.of
+      ? {
+          nom: templateContext.of.raison_sociale,
+          siret: templateContext.of.siret,
+          numeroDa: templateContext.of.nda,
+          adresse: `${templateContext.of.adresse || ""}, ${templateContext.of.code_postal || ""} ${templateContext.of.ville || ""}`.trim(),
+          telephone: templateContext.of.telephone,
+          email: templateContext.of.email,
+        }
+      : undefined,
+    formateur: templateContext.intervenant
+      ? {
+          nom: templateContext.intervenant.nom,
+          prenom: templateContext.intervenant.prenom,
+          email: templateContext.intervenant.email,
+          telephone: templateContext.intervenant.telephone,
+          specialites: templateContext.intervenant.specialites,
+        }
+      : undefined,
+    participants: templateContext.apprenants?.map((a) => ({
+      nom: a.nom,
+      prenom: a.prenom,
+      email: a.email,
     })),
-    organisation: templateContext.organisation
+    session: templateContext.session
       ? {
-          nom: templateContext.organisation.nom,
-          siret: templateContext.organisation.siret,
-          numeroDa: templateContext.organisation.numero_da,
-          adresse: templateContext.organisation.adresse_complete,
-          telephone: templateContext.organisation.telephone,
-          email: templateContext.organisation.email,
-        }
-      : undefined,
-    formateur: templateContext.formateur
-      ? {
-          nom: templateContext.formateur.nom,
-          prenom: templateContext.formateur.prenom,
-          email: templateContext.formateur.email,
-          telephone: templateContext.formateur.telephone,
-          specialites: templateContext.formateur.specialite
-            ? [templateContext.formateur.specialite]
-            : undefined,
-        }
-      : undefined,
-    participants: templateContext.participants?.map((p) => ({
-      nom: p.nom,
-      prenom: p.prenom,
-      email: p.email,
-      fonction: p.fonction,
-    })),
-    session: templateContext.dates
-      ? {
-          dateDebut: templateContext.dates.date_complete,
-          dateFin: templateContext.dates.date_complete,
-          lieu: templateContext.formation?.lieu,
+          dateDebut: templateContext.session.date_debut || templateContext.dates?.complete_longue || "",
+          dateFin: templateContext.session.date_fin || templateContext.dates?.complete_longue || "",
+          lieu: templateContext.lieu?.nom,
         }
       : undefined,
     entreprise: templateContext.entreprise
       ? {
-          nom: templateContext.entreprise.nom,
+          nom: templateContext.entreprise.raison_sociale || templateContext.entreprise.nom || "",
           siret: templateContext.entreprise.siret,
-          adresse: templateContext.entreprise.adresse_complete,
-          representant: templateContext.entreprise.representant,
+          adresse: `${templateContext.entreprise.adresse || ""}, ${templateContext.entreprise.code_postal || ""} ${templateContext.entreprise.ville || ""}`.trim(),
+          representant: templateContext.entreprise.representant_nom
+            ? `${templateContext.entreprise.representant_prenom || ""} ${templateContext.entreprise.representant_nom}`.trim()
+            : templateContext.entreprise.representant,
         }
       : undefined,
   };

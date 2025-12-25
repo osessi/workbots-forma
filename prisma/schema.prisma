@@ -120,7 +120,9 @@ model Organization {
   plan              Plan     @default(FREE)
 
   // Infos entreprise
+  nomCommercial     String?  // Nom commercial de l'organisme
   siret             String?
+  villeRcs          String?  // Ville d'immatriculation au RCS
   numeroFormateur   String?  // N° déclaration d'activité DREETS
   prefectureRegion  String?  // Région d'acquisition du numéro de déclaration
   adresse           String?
@@ -128,11 +130,18 @@ model Organization {
   ville             String?
   telephone         String?
   email             String?  // Email de contact de l'organisme
-  representantLegal String?  // Nom et prénom du représentant légal
+  siteWeb           String?  // Site web de l'organisme
 
-  // White-label
-  logo              String?
+  // Représentant légal
+  representantLegal String?  // DEPRECATED - Ancien champ nom complet
+  representantNom   String?  // Nom du représentant légal
+  representantPrenom String? // Prénom du représentant légal
+  representantFonction String? // Fonction du représentant légal (ex: Gérant, PDG)
+
+  // White-label & Visuels
+  logo              String?  // Logo de l'organisme
   signature         String?  // URL de l'image de signature du responsable
+  cachet            String?  // URL du cachet de l'entreprise
   primaryColor      String   @default("#4277FF")
   secondaryColor    String?
   customDomain      String?  @unique
@@ -983,9 +992,11 @@ model Entreprise {
   siret             String?
   tvaIntracom       String?
 
-  // Contact référent
+  // Représentant légal
+  contactCivilite   String?         // Civilité du représentant (M., Mme)
   contactNom        String?
   contactPrenom     String?
+  contactFonction   String?         // Fonction du représentant légal
   contactEmail      String?
   contactTelephone  String?
 
@@ -1027,10 +1038,15 @@ model Apprenant {
   email             String
   telephone         String?
 
-  // Adresse (optionnel)
+  // Infos indépendant (si statut = INDEPENDANT)
+  raisonSociale     String?         // Raison sociale de l'apprenant indépendant
+  siret             String?         // Numéro SIRET de l'apprenant indépendant
+
+  // Adresse
   adresse           String?
   codePostal        String?
   ville             String?
+  pays              String       @default("France")
 
   // Statut
   statut            ApprenantStatus @default(PARTICULIER)
@@ -1145,9 +1161,12 @@ model Financeur {
   // Contact (facultatif)
   email             String?
   telephone         String?
+
+  // Adresse
   adresse           String?
   codePostal        String?
   ville             String?
+  pays              String        @default("France")
   siteWeb           String?
 
   // Notes

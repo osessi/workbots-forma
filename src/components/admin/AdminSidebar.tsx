@@ -52,6 +52,28 @@ const AIIcon = () => (
   </svg>
 );
 
+// Workbots Slides Icons
+const SlidesIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.33333 2.5H16.6667C17.1269 2.5 17.5 2.8731 17.5 3.33333V13.3333C17.5 13.7936 17.1269 14.1667 16.6667 14.1667H3.33333C2.8731 14.1667 2.5 13.7936 2.5 13.3333V3.33333C2.5 2.8731 2.8731 2.5 3.33333 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M10 14.1667V17.5M6.66667 17.5H13.3333M5.83333 5.83333H9.16667M5.83333 8.33333H14.1667M5.83333 10.8333H11.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const SlidesTemplatesIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.5 5.83333C2.5 4.45262 3.61929 3.33333 5 3.33333H15C16.3807 3.33333 17.5 4.45262 17.5 5.83333V14.1667C17.5 15.5474 16.3807 16.6667 15 16.6667H5C3.61929 16.6667 2.5 15.5474 2.5 14.1667V5.83333Z" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M2.5 7.5H17.5M7.5 7.5V16.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+const SlidesSettingsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M2.5 10H4.16667M15.8333 10H17.5M10 2.5V4.16667M10 15.8333V17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
 const MenuIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -71,6 +93,7 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
+// Main navigation items
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/admin", icon: <DashboardIcon /> },
   { id: "organizations", label: "Organisations", href: "/admin/organizations", icon: <OrganizationIcon /> },
@@ -79,6 +102,23 @@ const navItems: NavItem[] = [
   { id: "ai-prompts", label: "Prompts IA", href: "/admin/ai-prompts", icon: <AIIcon /> },
   { id: "api-keys", label: "Cles API", href: "/admin/api-keys", icon: <KeyIcon /> },
   { id: "settings", label: "Configuration", href: "/admin/settings", icon: <SettingsIcon /> },
+];
+
+// Smart Templates Icon
+const SmartTemplatesIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 2.5L11.5 6.5L15.8333 7.08333L12.5 10L13.3333 14.1667L10 12.25L6.66667 14.1667L7.5 10L4.16667 7.08333L8.5 6.5L10 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M3.33333 16.6667H16.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+// Workbots Slides navigation items (separate section)
+const slidesNavItems: NavItem[] = [
+  { id: "slides-upload", label: "Nouvelle Presentation", href: "/admin/slides/upload", icon: <SlidesIcon /> },
+  { id: "slides-dashboard", label: "Mes Presentations", href: "/admin/slides/dashboard", icon: <SlidesTemplatesIcon /> },
+  { id: "slides-templates", label: "Templates", href: "/admin/slides/template-preview", icon: <SlidesTemplatesIcon /> },
+  { id: "smart-templates", label: "Smart Templates", href: "/admin/slides/smart-templates", icon: <SmartTemplatesIcon /> },
+  { id: "slides-settings", label: "Configuration LLM", href: "/admin/slides/settings", icon: <SlidesSettingsIcon /> },
 ];
 
 // Theme icons
@@ -214,7 +254,7 @@ export default function AdminSidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1">
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.id}
@@ -227,6 +267,34 @@ export default function AdminSidebar() {
               }`}
             >
               <span className={isActive(item.href) ? "text-orange-500 dark:text-orange-400" : ""}>{item.icon}</span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
+
+          {/* Workbots Slides Section Separator */}
+          <div className="pt-4 pb-2">
+            <div className="flex items-center gap-2 px-4">
+              <div className="flex-1 border-t border-gray-200 dark:border-gray-800" />
+              <span className="text-xs font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-wider">
+                Workbots Slides
+              </span>
+              <div className="flex-1 border-t border-gray-200 dark:border-gray-800" />
+            </div>
+          </div>
+
+          {/* Workbots Slides Navigation */}
+          {slidesNavItems.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={closeMobileMenu}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                isActive(item.href)
+                  ? "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-500 dark:text-blue-400 border border-blue-500/30"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
+            >
+              <span className={isActive(item.href) ? "text-blue-500 dark:text-blue-400" : ""}>{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           ))}

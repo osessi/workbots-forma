@@ -216,7 +216,8 @@ export async function POST(request: NextRequest) {
       ? template.content
       : JSON.stringify(template.content);
 
-    const renderedContent = renderTemplate(templateContent, context, { previewMode: false });
+    // Cast to TemplateContext pour compatibilité avec l'ancien format
+    const renderedContent = renderTemplate(templateContent, context as unknown as Parameters<typeof renderTemplate>[1], { previewMode: false });
 
     // Rendre le header et footer si présents
     let renderedHeader = "";
@@ -226,14 +227,14 @@ export async function POST(request: NextRequest) {
       const headerStr = typeof template.headerContent === "string"
         ? template.headerContent
         : JSON.stringify(template.headerContent);
-      renderedHeader = renderTemplate(headerStr, context, { previewMode: false });
+      renderedHeader = renderTemplate(headerStr, context as unknown as Parameters<typeof renderTemplate>[1], { previewMode: false });
     }
 
     if (template.footerContent) {
       const footerStr = typeof template.footerContent === "string"
         ? template.footerContent
         : JSON.stringify(template.footerContent);
-      renderedFooter = renderTemplate(footerStr, context, { previewMode: false });
+      renderedFooter = renderTemplate(footerStr, context as unknown as Parameters<typeof renderTemplate>[1], { previewMode: false });
     }
 
     // Créer ou mettre à jour le document en base

@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
       const modaliteLabels: Record<string, string> = {
         presentiel: "Presentiel",
         distanciel: "Distanciel",
-        elearning: "E-learning",
         mixte: "Formation mixte",
       };
       contextParts.push(`Modalite: ${modaliteLabels[data.modalite] || data.modalite}`);

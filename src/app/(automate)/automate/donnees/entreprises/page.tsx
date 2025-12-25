@@ -19,8 +19,10 @@ interface Entreprise {
   raisonSociale: string;
   siret: string | null;
   tvaIntracom: string | null;
+  contactCivilite: string | null;
   contactNom: string | null;
   contactPrenom: string | null;
+  contactFonction: string | null;
   contactEmail: string | null;
   contactTelephone: string | null;
   adresse: string | null;
@@ -47,8 +49,10 @@ export default function EntreprisesPage() {
     raisonSociale: "",
     siret: "",
     tvaIntracom: "",
+    contactCivilite: "",
     contactNom: "",
     contactPrenom: "",
+    contactFonction: "",
     contactEmail: "",
     contactTelephone: "",
     adresse: "",
@@ -81,8 +85,10 @@ export default function EntreprisesPage() {
       raisonSociale: "",
       siret: "",
       tvaIntracom: "",
+      contactCivilite: "",
       contactNom: "",
       contactPrenom: "",
+      contactFonction: "",
       contactEmail: "",
       contactTelephone: "",
       adresse: "",
@@ -101,8 +107,10 @@ export default function EntreprisesPage() {
         raisonSociale: entreprise.raisonSociale,
         siret: entreprise.siret || "",
         tvaIntracom: entreprise.tvaIntracom || "",
+        contactCivilite: entreprise.contactCivilite || "",
         contactNom: entreprise.contactNom || "",
         contactPrenom: entreprise.contactPrenom || "",
+        contactFonction: entreprise.contactFonction || "",
         contactEmail: entreprise.contactEmail || "",
         contactTelephone: entreprise.contactTelephone || "",
         adresse: entreprise.adresse || "",
@@ -381,12 +389,38 @@ export default function EntreprisesPage() {
                 </div>
               </div>
 
-              {/* Contact */}
+              {/* Représentant légal */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Contact référent
+                  Représentant légal
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Civilité
+                    </label>
+                    <select
+                      value={formData.contactCivilite}
+                      onChange={(e) => setFormData({ ...formData, contactCivilite: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    >
+                      <option value="">Sélectionner</option>
+                      <option value="M.">M.</option>
+                      <option value="Mme">Mme</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Fonction
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Gérant, PDG, DRH..."
+                      value={formData.contactFonction}
+                      onChange={(e) => setFormData({ ...formData, contactFonction: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
                       Prénom
@@ -434,10 +468,10 @@ export default function EntreprisesPage() {
                 </div>
               </div>
 
-              {/* Adresse */}
+              {/* Adresse de l'entreprise */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Adresse
+                  Adresse de l'entreprise
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">

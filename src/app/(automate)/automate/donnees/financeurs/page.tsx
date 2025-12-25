@@ -34,6 +34,9 @@ interface Financeur {
   email: string | null;
   telephone: string | null;
   adresse: string | null;
+  codePostal: string | null;
+  ville: string | null;
+  pays: string;
   notes: string | null;
 }
 
@@ -98,6 +101,9 @@ export default function FinanceursPage() {
     email: "",
     telephone: "",
     adresse: "",
+    codePostal: "",
+    ville: "",
+    pays: "France",
     notes: "",
   });
 
@@ -129,6 +135,9 @@ export default function FinanceursPage() {
       email: "",
       telephone: "",
       adresse: "",
+      codePostal: "",
+      ville: "",
+      pays: "France",
       notes: "",
     });
     setEditingFinanceur(null);
@@ -143,6 +152,9 @@ export default function FinanceursPage() {
         email: financeur.email || "",
         telephone: financeur.telephone || "",
         adresse: financeur.adresse || "",
+        codePostal: financeur.codePostal || "",
+        ville: financeur.ville || "",
+        pays: financeur.pays || "France",
         notes: financeur.notes || "",
       });
     } else {
@@ -426,6 +438,43 @@ export default function FinanceursPage() {
                   type="text"
                   value={formData.adresse}
                   onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Code postal
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.codePostal}
+                    onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
+                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Ville
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.ville}
+                    onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
+                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Pays
+                </label>
+                <input
+                  type="text"
+                  value={formData.pays}
+                  onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
                   className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
               </div>

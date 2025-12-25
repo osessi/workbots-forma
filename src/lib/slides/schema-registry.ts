@@ -2,7 +2,19 @@
  * Schema Registry - Centralizes all slide template schemas
  * Converts Zod schemas to JSON Schema for the backend API
  */
-import { zodToJsonSchema } from 'zod-to-json-schema';
+// Dynamic import to avoid ESM/CJS mismatch with Zod 4
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let zodToJsonSchemaFn: any = null;
+
+async function getZodToJsonSchema() {
+  if (!zodToJsonSchemaFn) {
+    const module = await import('zod-to-json-schema');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = module as any;
+    zodToJsonSchemaFn = mod.zodToJsonSchema || mod.default?.zodToJsonSchema || mod.default;
+  }
+  return zodToJsonSchemaFn;
+}
 import type { ZodTypeAny } from 'zod';
 
 // General templates
@@ -133,10 +145,11 @@ const schemaRegistry: Record<string, TemplateSchema[]> = {
 /**
  * Convert a Zod schema to JSON Schema
  */
-function convertToJsonSchema(zodSchema: ZodTypeAny): Record<string, unknown> {
+async function convertToJsonSchema(zodSchema: ZodTypeAny): Promise<Record<string, unknown>> {
   try {
+    const converter = await getZodToJsonSchema();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jsonSchema = zodToJsonSchema(zodSchema as any, {
+    const jsonSchema = converter(zodSchema as any, {
       $refStrategy: 'none',
       target: 'jsonSchema7',
     });
@@ -153,7 +166,7 @@ function convertToJsonSchema(zodSchema: ZodTypeAny): Record<string, unknown> {
 /**
  * Get all templates for a specific group with their JSON schemas
  */
-export function getTemplateGroup(groupName: string): TemplateGroup | null {
+export async function getTemplateGroup(groupName: string): Promise<TemplateGroup | null> {
   const normalizedName = groupName.toLowerCase();
   const schemas = schemaRegistry[normalizedName];
 
@@ -161,12 +174,14 @@ export function getTemplateGroup(groupName: string): TemplateGroup | null {
     return null;
   }
 
-  const slides: SlideLayoutWithSchema[] = schemas.map((item, index) => ({
-    id: String(index),
-    name: item.name,
-    description: item.description,
-    json_schema: convertToJsonSchema(item.schema),
-  }));
+  const slides: SlideLayoutWithSchema[] = await Promise.all(
+    schemas.map(async (item, index) => ({
+      id: String(index),
+      name: item.name,
+      description: item.description,
+      json_schema: await convertToJsonSchema(item.schema),
+    }))
+  );
 
   return {
     name: normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1),
@@ -185,7 +200,7 @@ export function getAvailableGroups(): string[] {
 /**
  * Get a specific template's JSON schema by group and index
  */
-export function getTemplateSchema(groupName: string, index: number): Record<string, unknown> | null {
+export async function getTemplateSchema(groupName: string, index: number): Promise<Record<string, unknown> | null> {
   const normalizedName = groupName.toLowerCase();
   const schemas = schemaRegistry[normalizedName];
 
@@ -193,5 +208,5 @@ export function getTemplateSchema(groupName: string, index: number): Record<stri
     return null;
   }
 
-  return convertToJsonSchema(schemas[index].schema);
+  return await convertToJsonSchema(schemas[index].schema);
 }

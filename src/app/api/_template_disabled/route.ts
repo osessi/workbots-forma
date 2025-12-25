@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     }
 
     // Get the template group with properly converted JSON schemas
-    const templateGroup = getTemplateGroup(group);
+    const templateGroup = await getTemplateGroup(group);
 
     if (!templateGroup) {
       return NextResponse.json(

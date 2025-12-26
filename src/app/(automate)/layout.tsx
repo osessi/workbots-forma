@@ -8,7 +8,7 @@ import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import SlideGenerationNotifications from "@/components/automate/SlideGenerationNotifications";
 import Backdrop from "@/layout/Backdrop";
 import { ToastProvider, ConfirmProvider } from "@/components/ui/feedback";
-import React from "react";
+import React, { Suspense } from "react";
 
 export default function AutomateLayout({
   children,
@@ -30,7 +30,9 @@ export default function AutomateLayout({
           {/* Bandeau d'impersonation (visible uniquement en mode impersonation) */}
           <ImpersonationBanner />
           <div className="min-h-screen bg-gray-50 dark:bg-gray-950 xl:flex">
-            <AutomateSidebar />
+            <Suspense fallback={null}>
+              <AutomateSidebar />
+            </Suspense>
             <Backdrop />
             <div
               className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}

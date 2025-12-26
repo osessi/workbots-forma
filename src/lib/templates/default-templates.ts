@@ -1057,6 +1057,131 @@ export const REGLEMENT_INTERIEUR_TEMPLATE: DefaultTemplate = {
 };
 
 // ===========================================
+// TEMPLATE: CERTIFICAT DE RÉALISATION
+// ===========================================
+export const CERTIFICAT_REALISATION_TEMPLATE: DefaultTemplate = {
+  name: "Certificat de réalisation",
+  description: "Document Qualiopi attestant de la réalisation de l'action de formation pour les financeurs",
+  documentType: "CERTIFICAT_REALISATION",
+  category: "DOCUMENT",
+  variables: [
+    "organisation.nom",
+    "organisation.siret",
+    "organisation.numero_da",
+    "organisation.adresse",
+    "entreprise.nom",
+    "entreprise.siret",
+    "formation.titre",
+    "formation.duree",
+    "formation.duree_heures",
+    "formation.objectifs",
+    "formation.nature_action",
+    "participant.nom",
+    "participant.prenom",
+    "dates.debut",
+    "dates.fin",
+    "dates.date_complete",
+    "formateur.nom",
+    "formateur.prenom",
+  ],
+  headerContent: createTipTapContent([
+    centeredTextWithVariable([{ var: "organisation.nom" }]),
+    centeredTextWithVariable(["N° de déclaration d'activité : ", { var: "organisation.numero_da" }]),
+  ]),
+  content: createTipTapContent([
+    spacer(),
+    spacer(),
+    centeredHeading(1, "CERTIFICAT DE RÉALISATION"),
+    centeredParagraph("(Article L.6353-1 du Code du travail)"),
+    spacer(),
+    horizontalRule(),
+    spacer(),
+    spacer(),
+
+    paragraph("Je soussigné(e), représentant légal de l'organisme de formation :"),
+    spacer(),
+    centeredTextWithVariable([{ bold: "" }, { var: "organisation.nom" }]),
+    centeredTextWithVariable(["N° SIRET : ", { var: "organisation.siret" }]),
+    centeredTextWithVariable(["N° de déclaration d'activité : ", { var: "organisation.numero_da" }]),
+    centeredTextWithVariable([{ var: "organisation.adresse" }]),
+    spacer(),
+    spacer(),
+
+    centeredParagraph("atteste que"),
+    spacer(),
+    spacer(),
+
+    centeredTextWithVariable([{ bold: "M./Mme " }, { var: "participant.prenom" }, " ", { var: "participant.nom" }]),
+    spacer(),
+    centeredTextWithVariable(["de l'entreprise : ", { var: "entreprise.nom" }]),
+    centeredTextWithVariable(["SIRET : ", { var: "entreprise.siret" }]),
+    spacer(),
+    spacer(),
+
+    centeredParagraph("a bien réalisé l'action de formation suivante :"),
+    spacer(),
+
+    heading(2, "INTITULÉ DE LA FORMATION"),
+    centeredTextWithVariable(["« ", { var: "formation.titre" }, " »"]),
+    spacer(),
+
+    heading(2, "NATURE DE L'ACTION DE FORMATION"),
+    textWithVariable([{ var: "formation.nature_action" }]),
+    paragraph("(au sens de l'article L.6313-1 du Code du travail)"),
+    spacer(),
+
+    heading(2, "OBJECTIFS DE LA FORMATION"),
+    textWithVariable([{ var: "formation.objectifs" }]),
+    spacer(),
+
+    heading(2, "PÉRIODE DE RÉALISATION"),
+    textWithVariable([{ bold: "Du " }, { var: "dates.debut" }, { bold: " au " }, { var: "dates.fin" }]),
+    spacer(),
+
+    heading(2, "DURÉE EFFECTIVE"),
+    textWithVariable([{ var: "formation.duree" }, " (", { var: "formation.duree_heures" }, " heures)"]),
+    spacer(),
+
+    heading(2, "MODALITÉS DE DÉROULEMENT"),
+    bulletList([
+      "☑ Action réalisée en totalité",
+      "☐ Action réalisée partiellement (préciser) : _______________",
+    ]),
+    spacer(),
+
+    heading(2, "FORMATEUR"),
+    textWithVariable([{ var: "formateur.prenom" }, " ", { var: "formateur.nom" }]),
+    spacer(),
+    spacer(),
+
+    paragraph("Ce certificat est établi pour servir et valoir ce que de droit, notamment pour justifier de la réalisation de l'action de formation auprès des financeurs (OPCO, Pôle Emploi, Région, etc.)."),
+    spacer(),
+    spacer(),
+
+    textWithVariable(["Fait à _____________________, le ", { var: "dates.date_complete" }]),
+    spacer(),
+    spacer(),
+    spacer(),
+
+    paragraph("Le représentant de l'organisme de formation"),
+    spacer(),
+    paragraph("(Signature et cachet)"),
+    spacer(),
+    spacer(),
+    spacer(),
+
+    horizontalRule(),
+    spacer(),
+    paragraph("Signature du bénéficiaire (attestant de sa participation) :"),
+    spacer(),
+    paragraph("_________________________________"),
+  ]),
+  footerContent: createTipTapContent([
+    centeredTextWithVariable([{ var: "organisation.nom" }, " — Certificat de réalisation"]),
+  ]),
+};
+
+// ===========================================
 // LISTE DE TOUS LES TEMPLATES
 // ===========================================
 export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
@@ -1064,6 +1189,7 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
   CONVENTION_TEMPLATE,
   CONTRAT_FORMATION_TEMPLATE,
   ATTESTATION_FIN_TEMPLATE,
+  CERTIFICAT_REALISATION_TEMPLATE,
   EMARGEMENT_TEMPLATE,
   CONVOCATION_TEMPLATE,
   EVALUATION_CHAUD_TEMPLATE,

@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
 
+  // Disable Turbopack for dev to avoid manifest issues
+  devIndicators: false,
+
   // Increase HTTP server timeout for long-running API calls (like OpenAI GPT-5)
   httpAgentOptions: {
     keepAlive: true,
@@ -53,6 +56,41 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "picsum.photos",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.brandfetch.io",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "xapi.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "logo.clearbit.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "svgl.app",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.brandfetch.io",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "resend.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "xapi.com",
         pathname: "/**",
       },
     ],

@@ -231,8 +231,8 @@ export default function StepFormateurs({
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center">
                   <span className="text-lg font-semibold text-brand-600 dark:text-brand-400">
-                    {safeFormateurs.formateurPrincipal.prenom[0]}
-                    {safeFormateurs.formateurPrincipal.nom[0]}
+                    {safeFormateurs.formateurPrincipal.prenom?.[0] || ""}
+                    {safeFormateurs.formateurPrincipal.nom?.[0] || ""}
                   </span>
                 </div>
                 <div>
@@ -303,8 +303,8 @@ export default function StepFormateurs({
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                       <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                        {coformateur.prenom[0]}
-                        {coformateur.nom[0]}
+                        {coformateur.prenom?.[0] || ""}
+                        {coformateur.nom?.[0] || ""}
                       </span>
                     </div>
                     <div>
@@ -473,8 +473,8 @@ export default function StepFormateurs({
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                           <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                            {intervenant.prenom[0]}
-                            {intervenant.nom[0]}
+                            {intervenant.prenom?.[0] || ""}
+                            {intervenant.nom?.[0] || ""}
                           </span>
                         </div>
                         <div className="flex-1">

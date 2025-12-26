@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       lieuId: lieu?.lieuId || null,
       lieuTexteLibre: lieu?.adresseLibre || null,
       lienConnexion: lieu?.lienConnexion || null,
-      formateurId: formateurs?.formateurPrincipal || null,
+      formateurId: formateurs?.formateurPrincipalId || null,
       status: "en_cours",
     };
 
@@ -102,11 +102,12 @@ export async function POST(request: NextRequest) {
         data: sessionData,
       });
 
-      // Supprimer les anciennes données pour les recréer
+      // Supprimer les anciennes données pour les recréer (SAUF les documents générés)
       await prisma.sessionClient.deleteMany({ where: { sessionId } });
       await prisma.sessionJournee.deleteMany({ where: { sessionId } });
       await prisma.sessionCoFormateur.deleteMany({ where: { sessionId } });
-      await prisma.sessionDocument.deleteMany({ where: { sessionId } });
+      // Note: On ne supprime PAS sessionDocument car ils doivent persister
+      // Les documents sont gérés via upsert plus bas
     } else {
       // Création
       session = await prisma.documentSession.create({
@@ -202,7 +203,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Créer les documents générés
+    // Créer les documents générés (avec upsert pour préserver les existants)
     if (generatedDocs && generatedDocs.length > 0) {
       for (const doc of generatedDocs) {
         // Mapper le type de document
@@ -211,22 +212,46 @@ export async function POST(request: NextRequest) {
           contrat: "CONTRAT_FORMATION",
           convocation: "CONVOCATION",
           attestation: "ATTESTATION_FIN",
+          certificat_realisation: "CERTIFICAT_REALISATION",
           emargement: "ATTESTATION_PRESENCE",
           facture: "FACTURE",
         };
 
-        await prisma.sessionDocument.create({
-          data: {
+        const documentData = {
+          sessionId: session.id,
+          type: (docTypeMap[doc.type] as import("@prisma/client").DocumentType) || "AUTRE",
+          clientId: doc.clientId || null,
+          apprenantId: doc.apprenantId || null,
+          content: { html: doc.renderedContent, json: doc.jsonContent },
+          fileName: doc.titre,
+          status: doc.savedToDrive ? "sent" : "generated",
+          generatedAt: new Date(),
+        };
+
+        // Si l'ID du document existe déjà, on met à jour, sinon on crée
+        const existingDoc = await prisma.sessionDocument.findFirst({
+          where: {
             sessionId: session.id,
-            type: (docTypeMap[doc.type] as import("@prisma/client").DocumentType) || "AUTRE",
-            clientId: doc.clientId || null,
-            apprenantId: doc.apprenantId || null,
-            content: { html: doc.renderedContent, json: doc.jsonContent },
-            fileName: doc.titre,
-            status: "generated",
-            generatedAt: new Date(),
+            type: documentData.type,
+            clientId: documentData.clientId,
+            apprenantId: documentData.apprenantId,
           },
         });
+
+        if (existingDoc) {
+          await prisma.sessionDocument.update({
+            where: { id: existingDoc.id },
+            data: {
+              content: documentData.content,
+              fileName: documentData.fileName,
+              status: documentData.status,
+            },
+          });
+        } else {
+          await prisma.sessionDocument.create({
+            data: documentData,
+          });
+        }
       }
     }
 
@@ -370,10 +395,10 @@ export async function GET(request: NextRequest) {
         })),
       },
       formateurs: {
-        formateurPrincipal: session.formateurId,
-        formateur: session.formateur,
-        coFormateurs: session.coFormateurs.map((cf) => cf.intervenantId),
-        coFormateursDetails: session.coFormateurs.map((cf) => cf.intervenant),
+        formateurPrincipalId: session.formateurId,
+        formateurPrincipal: session.formateur,
+        coformateursIds: session.coFormateurs.map((cf) => cf.intervenantId),
+        coformateurs: session.coFormateurs.map((cf) => cf.intervenant),
       },
       generatedDocs: session.documentsGeneres.map((d) => {
         const content = d.content as { html?: string; json?: string } | null;

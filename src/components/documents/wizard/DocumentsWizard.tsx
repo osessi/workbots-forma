@@ -8,6 +8,7 @@ import {
   SessionTarif,
   SessionLieu,
   SessionFormateurs,
+  GeneratedDocument,
   initialWizardData,
 } from "./types";
 import WizardStepper from "./WizardStepper";
@@ -31,6 +32,7 @@ export default function DocumentsWizard({
   const [currentStep, setCurrentStep] = useState<WizardStep>("clients");
   const [completedSteps, setCompletedSteps] = useState<WizardStep[]>([]);
   const [data, setData] = useState<WizardData>(initialWizardData);
+  const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,6 +59,11 @@ export default function DocumentsWizard({
               lieu: result.session.lieu || initialWizardData.lieu,
               formateurs: result.session.formateurs || initialWizardData.formateurs,
             });
+
+            // Charger les documents générés
+            if (result.session.generatedDocs?.length > 0) {
+              setGeneratedDocs(result.session.generatedDocs);
+            }
 
             // Déterminer les étapes complétées
             const completed: WizardStep[] = [];
@@ -187,6 +194,27 @@ export default function DocumentsWizard({
     });
   }, [debouncedSave]);
 
+  // Callback pour les changements de documents générés
+  const handleGeneratedDocsChange = useCallback((docs: GeneratedDocument[]) => {
+    setGeneratedDocs(docs);
+    // Sauvegarder immédiatement les documents générés
+    if (formation.id && sessionId) {
+      fetch("/api/document-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formationId: formation.id,
+          sessionId,
+          clients: data.clients,
+          tarifs: data.tarifs,
+          lieu: data.lieu,
+          formateurs: data.formateurs,
+          generatedDocs: docs,
+        }),
+      }).catch(console.error);
+    }
+  }, [formation.id, sessionId, data]);
+
   // Callback pour la génération (appelé depuis StepDocuments si nécessaire)
   const handleGenerate = async (selectedDocs: string[]) => {
     // Marquer l'étape documents comme complétée
@@ -278,6 +306,8 @@ export default function DocumentsWizard({
             lieu={data.lieu}
             formateurs={data.formateurs}
             formation={formation}
+            initialGeneratedDocs={generatedDocs}
+            onGeneratedDocsChange={handleGeneratedDocsChange}
             onPrev={goPrev}
             onGenerate={handleGenerate}
           />

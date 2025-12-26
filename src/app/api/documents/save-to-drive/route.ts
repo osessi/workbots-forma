@@ -3,12 +3,15 @@
 // ===========================================
 // POST /api/documents/save-to-drive
 // Sauvegarde un document généré dans le Drive (avec création auto des dossiers)
+// Convertit le HTML en PDF avant stockage
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import { FileCategory } from "@prisma/client";
+import { generatePDFFromHtml } from "@/lib/services/pdf-generator";
+import { createClient } from "@supabase/supabase-js";
 
 // Helper pour authentifier l'utilisateur
 async function authenticateUser() {
@@ -56,6 +59,15 @@ interface SaveDocumentRequest {
   clientId?: string;
   entrepriseId?: string;
   apprenantId?: string;
+  saveAsPdf?: boolean; // Optionnel, défaut true
+}
+
+// Client Supabase admin pour le stockage
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 }
 
 // Mapper le type de document vers FileCategory
@@ -80,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: SaveDocumentRequest = await request.json();
-    const { formationId, documentType, titre, content, entrepriseId, apprenantId } = body;
+    const { formationId, documentType, titre, content, entrepriseId, apprenantId, saveAsPdf = true } = body;
 
     if (!formationId || !documentType || !titre || !content) {
       return NextResponse.json(
@@ -88,6 +100,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Vérifier que la formation appartient à l'organisation
     const formation = await prisma.formation.findFirst({
@@ -227,18 +241,61 @@ export async function POST(request: NextRequest) {
     // Générer un nom de fichier unique
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const sanitizedTitre = titre.replace(/[^a-zA-Z0-9àâäéèêëïîôùûüç\s-]/g, "").substring(0, 50);
-    const fileName = `${sanitizedTitre}_${timestamp}.html`;
+
+    let fileBuffer: Buffer;
+    let fileName: string;
+    let mimeType: string;
+    let fileExtension: string;
+
+    if (saveAsPdf) {
+      // Convertir HTML en PDF
+      try {
+        fileBuffer = await generatePDFFromHtml(content, titre);
+        fileExtension = "pdf";
+        mimeType = "application/pdf";
+      } catch (pdfError) {
+        console.error("Erreur génération PDF, fallback HTML:", pdfError);
+        fileBuffer = Buffer.from(content, "utf-8");
+        fileExtension = "html";
+        mimeType = "text/html";
+      }
+    } else {
+      fileBuffer = Buffer.from(content, "utf-8");
+      fileExtension = "html";
+      mimeType = "text/html";
+    }
+
+    fileName = `${sanitizedTitre}_${timestamp}.${fileExtension}`;
+    const storagePath = `documents/${user.organizationId}/${formationId}/${fileName}`;
+
+    // Upload vers Supabase Storage
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from("files")
+      .upload(storagePath, fileBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Erreur upload Supabase Storage:", uploadError);
+      // Continue quand même pour créer l'entrée DB avec le contenu
+    }
+
+    // Obtenir l'URL publique
+    const { data: urlData } = supabaseAdmin.storage
+      .from("files")
+      .getPublicUrl(storagePath);
 
     // Créer l'enregistrement du fichier dans la base de données
     const file = await prisma.file.create({
       data: {
         name: fileName,
-        originalName: `${titre}.html`,
-        mimeType: "text/html",
-        size: Buffer.byteLength(content, "utf-8"),
+        originalName: `${titre}.${fileExtension}`,
+        mimeType: mimeType,
+        size: fileBuffer.length,
         category: mapToFileCategory(documentType),
-        storagePath: `documents/${user.organizationId}/${formationId}/${fileName}`,
-        publicUrl: null, // Sera mis à jour après l'upload réel si nécessaire
+        storagePath: storagePath,
+        publicUrl: urlData?.publicUrl || null,
         organizationId: user.organizationId,
         userId: user.id,
         formationId: formationId,
@@ -255,16 +312,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Stocker également le contenu HTML original pour édition future
+    await prisma.fileContent.create({
+      data: {
+        fileId: file.id,
+        content: content,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       file: {
         id: file.id,
         name: file.name,
         originalName: file.originalName,
+        mimeType: file.mimeType,
         folderId: file.folderId,
         folder: file.folder,
+        publicUrl: urlData?.publicUrl || null,
       },
-      message: `Document "${titre}" sauvegardé dans le Drive`,
+      message: `Document "${titre}" sauvegardé en ${fileExtension.toUpperCase()} dans le Drive`,
     });
   } catch (error) {
     console.error("Erreur sauvegarde document dans Drive:", error);

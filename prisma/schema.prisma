@@ -186,6 +186,15 @@ model Organization {
   // Sessions documentaires
   documentSessions  DocumentSession[]
 
+  // CRM
+  opportunites      CRMOpportunite[]
+
+  // Signature électronique
+  signatureDocuments SignatureDocument[]
+
+  // SCORM LMS
+  scormPackages     SCORMPackage[]
+
   @@index([slug])
   @@index([customDomain])
 }
@@ -224,6 +233,7 @@ model User {
   auditLogs         AuditLog[]
   aiGenerationLogs  AIGenerationLog[]
   templateVersions  TemplateVersion[] @relation("TemplateVersionCreator")
+  opportunites      CRMOpportunite[]
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -267,8 +277,13 @@ model Formation {
   // Évaluations générées (JSON) - étape 4
   evaluationsData   Json?     // QCMs, positionnement, évaluations finales
 
+  // Documents générés (JSON) - étape 5
+  documentsData     Json?     // Documents générés dans le wizard (conventions, contrats, etc.)
+
   // Metadata
   isArchived      Boolean         @default(false)
+  isPublished     Boolean         @default(false)  // Publié dans le LMS
+  publishedAt     DateTime?       // Date de publication
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -280,6 +295,9 @@ model Formation {
   documentSessions  DocumentSession[]
   folder            Folder?          @relation("FormationFolder")
   slideGenerations  SlideGeneration[]
+  opportunites      CRMOpportunite[]
+  lmsInscriptions   LMSInscription[]
+  scormPackages     SCORMPackage[]
 
   @@index([organizationId])
   @@index([userId])
@@ -303,6 +321,9 @@ model Module {
   // Metadata
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // Relations LMS
+  lmsProgressions LMSProgressionModule[]
 
   @@index([formationId])
   @@index([ordre])
@@ -1022,6 +1043,8 @@ model Entreprise {
   apprenants        Apprenant[]
   sessionClients    SessionClient[]
   folders           Folder[]
+  opportunites      CRMOpportunite[]
+  signatureDocuments SignatureDocument[]
 
   @@index([organizationId])
   @@index([raisonSociale])
@@ -1070,6 +1093,9 @@ model Apprenant {
   // Relations
   sessionParticipants SessionParticipant[]
   folders           Folder[]
+  lmsInscriptions   LMSInscription[]
+  signatureDocuments SignatureDocument[]
+  scormTrackings    SCORMTracking[]
 
   @@index([organizationId])
   @@index([entrepriseId])
@@ -1110,6 +1136,7 @@ model Intervenant {
   // Relations
   sessionsFormateur    DocumentSession[]  @relation("SessionFormateur")
   sessionsCoFormateur  SessionCoFormateur[]
+  signaturesEmargement SignatureEmargement[]
 
   @@index([organizationId])
   @@index([nom])
@@ -1236,6 +1263,7 @@ model DocumentSession {
   journees          SessionJournee[]
   coFormateurs      SessionCoFormateur[]
   documentsGeneres  SessionDocument[]
+  signatureDocuments SignatureDocument[]
 
   @@index([formationId])
   @@index([organizationId])
@@ -1265,6 +1293,9 @@ model SessionJournee {
   // Metadata
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  // Relations
+  feuillesEmargement FeuilleEmargement[]
 
   @@index([sessionId])
   @@index([date])
@@ -1368,6 +1399,9 @@ model SessionParticipant {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
+  // Relations
+  signatures        SignatureEmargement[]
+
   @@unique([clientId, apprenantId])
   @@index([clientId])
   @@index([apprenantId])
@@ -1405,4 +1439,647 @@ model SessionDocument {
   @@index([sessionId])
   @@index([type])
   @@index([status])
+}
+
+// ===========================================
+// ÉMARGEMENT - Feuilles de présence QR Code
+// ===========================================
+
+// Feuille d'émargement pour une journée de session
+model FeuilleEmargement {
+  id                String          @id @default(cuid())
+
+  // Journée de session parent
+  journeeId         String
+  journee           SessionJournee  @relation(fields: [journeeId], references: [id], onDelete: Cascade)
+
+  // Token unique pour le QR code (sécurité)
+  token             String          @unique @default(cuid())
+
+  // QR Code expiré ?
+  expiresAt         DateTime?
+
+  // Statut
+  status            String          @default("active")  // active, closed, expired
+
+  // Metadata
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  signatures        SignatureEmargement[]
+
+  @@index([journeeId])
+  @@index([token])
+  @@index([status])
+}
+
+// Signature d'un participant OU formateur sur une feuille
+model SignatureEmargement {
+  id                String            @id @default(cuid())
+
+  // Feuille parent
+  feuilleId         String
+  feuille           FeuilleEmargement @relation(fields: [feuilleId], references: [id], onDelete: Cascade)
+
+  // Type de signataire
+  signataire        String            @default("participant") // "participant" ou "formateur"
+
+  // Participant (si signataire = participant)
+  participantId     String?
+  participant       SessionParticipant? @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  // Formateur/Intervenant (si signataire = formateur)
+  intervenantId     String?
+  intervenant       Intervenant? @relation(fields: [intervenantId], references: [id], onDelete: SetNull)
+
+  // Période (matin ou après-midi)
+  periode           String            // "matin", "apres_midi"
+
+  // Signature (base64 ou URL si stockée)
+  signatureData     String?           @db.Text  // Signature manuscrite en base64
+
+  // Horodatage précis de la signature
+  signedAt          DateTime          @default(now())
+
+  // IP et User-Agent pour traçabilité
+  ipAddress         String?
+  userAgent         String?
+
+  // Géolocalisation (optionnel)
+  latitude          Float?
+  longitude         Float?
+
+  // Metadata
+  createdAt         DateTime          @default(now())
+
+  @@unique([feuilleId, participantId, periode])
+  @@unique([feuilleId, intervenantId, periode])
+  @@index([feuilleId])
+  @@index([participantId])
+  @@index([intervenantId])
+  @@index([signedAt])
+}
+
+// ===========================================
+// CRM - Pipeline de vente
+// ===========================================
+
+enum CRMStage {
+  ENTRANT            // Nouveau prospect entrant
+  DISCUSSION         // En discussion avec le prospect
+  DEVIS              // Devis envoyé
+  CONVENTION         // Convention en cours
+  FACTURE            // Facturé
+  GAGNE              // Affaire gagnée
+  PERDU              // Affaire perdue
+}
+
+enum CRMSource {
+  SITE_WEB
+  BOUCHE_A_OREILLE
+  RESEAUX_SOCIAUX
+  SALON_EVENEMENT
+  PARTENAIRE
+  DEMARCHAGE
+  AUTRE
+}
+
+// Opportunité commerciale (Lead/Deal)
+model CRMOpportunite {
+  id                String       @id @default(cuid())
+
+  // Infos de base
+  titre             String       // Ex: "Formation Excel - Société ABC"
+  description       String?      @db.Text
+
+  // Étape du pipeline
+  stage             CRMStage     @default(ENTRANT)
+  ordre             Int          @default(0)  // Ordre dans la colonne
+
+  // Valeur et probabilité
+  montantHT         Float?
+  probabilite       Int          @default(50)  // 0-100%
+
+  // Source
+  source            CRMSource    @default(AUTRE)
+
+  // Contact principal
+  contactNom        String?
+  contactEmail      String?
+  contactTelephone  String?
+  contactFonction   String?
+
+  // Entreprise liée (optionnel)
+  entrepriseId      String?
+  entreprise        Entreprise?  @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+
+  // Formation liée (optionnel)
+  formationId       String?
+  formation         Formation?   @relation(fields: [formationId], references: [id], onDelete: SetNull)
+
+  // Dates importantes
+  dateRelance       DateTime?    // Prochaine relance prévue
+  dateCloturePrevu  DateTime?    // Date de clôture prévue
+
+  // Notes et activité
+  notes             String?      @db.Text
+  dernierContact    DateTime?
+
+  // Raison de perte (si stage = PERDU)
+  raisonPerte       String?
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Créateur
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  activites         CRMActivite[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([stage])
+  @@index([entrepriseId])
+  @@index([dateRelance])
+}
+
+// Activités liées à une opportunité
+model CRMActivite {
+  id                String          @id @default(cuid())
+
+  // Opportunité parent
+  opportuniteId     String
+  opportunite       CRMOpportunite  @relation(fields: [opportuniteId], references: [id], onDelete: Cascade)
+
+  // Type d'activité
+  type              String          // appel, email, reunion, note, relance
+
+  // Contenu
+  titre             String
+  description       String?         @db.Text
+
+  // Date de l'activité
+  date              DateTime        @default(now())
+
+  // Fait ou à faire
+  estFait           Boolean         @default(true)
+
+  // Metadata
+  createdAt         DateTime        @default(now())
+
+  @@index([opportuniteId])
+  @@index([date])
+}
+
+// ===========================================
+// LMS - Suivi de progression des apprenants
+// ===========================================
+
+enum LMSStatut {
+  NON_COMMENCE
+  EN_COURS
+  COMPLETE
+}
+
+// Inscription d'un apprenant à une formation (parcours LMS)
+model LMSInscription {
+  id                String       @id @default(cuid())
+
+  // Formation
+  formationId       String
+  formation         Formation    @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Apprenant
+  apprenantId       String
+  apprenant         Apprenant    @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Progression globale
+  progression       Int          @default(0)  // 0-100%
+  statut            LMSStatut    @default(NON_COMMENCE)
+
+  // Dates
+  dateInscription   DateTime     @default(now())
+  dateDebut         DateTime?    // Première activité
+  dateFin           DateTime?    // Complétion
+
+  // Temps passé (en minutes)
+  tempsTotal        Int          @default(0)
+
+  // Notes/Résultats
+  noteFinale        Float?       // Note moyenne ou finale
+  certificatGenere  Boolean      @default(false)
+
+  // Multi-tenant
+  organizationId    String
+
+  // Metadata
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  // Relations
+  progressionModules LMSProgressionModule[]
+  scormTrackings     SCORMTracking[]
+
+  @@unique([formationId, apprenantId])
+  @@index([formationId])
+  @@index([apprenantId])
+  @@index([organizationId])
+  @@index([statut])
+}
+
+// Progression par module
+model LMSProgressionModule {
+  id                String         @id @default(cuid())
+
+  // Inscription parent
+  inscriptionId     String
+  inscription       LMSInscription @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
+
+  // Module
+  moduleId          String
+  module            Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  // Progression
+  progression       Int            @default(0)  // 0-100%
+  statut            LMSStatut      @default(NON_COMMENCE)
+
+  // Temps passé (en minutes)
+  tempsPasse        Int            @default(0)
+
+  // Dates
+  dateDebut         DateTime?
+  dateFin           DateTime?
+
+  // Évaluations
+  scoreQuiz         Float?
+  tentativesQuiz    Int            @default(0)
+
+  // Metadata
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([inscriptionId, moduleId])
+  @@index([inscriptionId])
+  @@index([moduleId])
+}
+
+// ===========================================
+// CLASSE VIRTUELLE - Visioconférence intégrée
+// ===========================================
+
+enum VirtualRoomStatus {
+  SCHEDULED     // Programmée
+  ACTIVE        // En cours
+  ENDED         // Terminée
+}
+
+// Salle de classe virtuelle
+model VirtualRoom {
+  id                String            @id @default(cuid())
+
+  // Infos de base
+  titre             String            // Ex: "Session Module 1 - Excel Avancé"
+  description       String?
+
+  // Session liée (optionnel)
+  sessionId         String?
+
+  // Formateur hôte
+  hosteNom          String?
+  hosteEmail        String?
+
+  // Configuration de la salle
+  roomId            String            @unique @default(cuid())  // ID unique pour MiroTalk
+  password          String?           // Mot de passe optionnel
+
+  // Dates
+  dateDebut         DateTime
+  dateFin           DateTime?
+  dureeMinutes      Int               @default(60)
+
+  // Statut
+  status            VirtualRoomStatus @default(SCHEDULED)
+
+  // Configuration MiroTalk
+  maxParticipants   Int               @default(50)
+  enregistrement    Boolean           @default(false)
+  chatActif         Boolean           @default(true)
+  ecranPartageActif Boolean           @default(true)
+
+  // Statistiques post-session
+  nombreParticipants Int?
+  dureeTotale        Int?             // Minutes effectives
+
+  // Multi-tenant
+  organizationId    String
+
+  // Créateur
+  userId            String
+
+  // Metadata
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([roomId])
+  @@index([status])
+  @@index([dateDebut])
+}
+
+// ===========================================
+// SIGNATURE ÉLECTRONIQUE SÉCURISÉE
+// ===========================================
+
+enum SignatureDocumentStatus {
+  DRAFT              // Brouillon, pas encore envoyé
+  PENDING_SIGNATURE  // En attente de signature
+  SIGNED             // Signé
+  EXPIRED            // Expiré (délai dépassé)
+  CANCELLED          // Annulé
+}
+
+enum SignatureAuthMethod {
+  EMAIL_ONLY         // Simple validation email
+  EMAIL_SMS          // Double auth : email + SMS
+  EMAIL_CODE         // Email + code à 6 chiffres
+}
+
+// Document à faire signer
+model SignatureDocument {
+  id                String                  @id @default(cuid())
+
+  // Lien vers le document source (template rendu)
+  titre             String                  // Ex: "Convention de formation - Jean Dupont"
+  documentType      DocumentType            // Type de document
+  contenuHtml       String                  @db.Text // Contenu HTML du document
+  signedContenuHtml String?                 @db.Text // Contenu HTML avec signature intégrée (après signature)
+
+  // Destinataire
+  destinataireNom   String
+  destinataireEmail String
+  destinataireTel   String?                 // Pour double auth SMS
+
+  // Lien optionnel vers apprenant ou entreprise
+  apprenantId       String?
+  apprenant         Apprenant?              @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+  entrepriseId      String?
+  entreprise        Entreprise?             @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+
+  // Session de formation liée (optionnel)
+  sessionId         String?
+  session           DocumentSession?        @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Configuration de signature
+  authMethod        SignatureAuthMethod     @default(EMAIL_SMS)
+  expiresAt         DateTime?               // Date d'expiration
+  status            SignatureDocumentStatus @default(DRAFT)
+
+  // Token unique pour accès signature (lien sécurisé)
+  token             String                  @unique @default(cuid())
+
+  // Envoi
+  sentAt            DateTime?               // Date d'envoi
+  sentBy            String?                 // ID de l'utilisateur qui a envoyé
+
+  // Relances
+  lastReminderAt    DateTime?
+  reminderCount     Int                     @default(0)
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  // Relations
+  signatures        SignatureRecord[]
+  verificationCodes SignatureVerificationCode[]
+
+  @@index([organizationId])
+  @@index([token])
+  @@index([status])
+  @@index([apprenantId])
+  @@index([entrepriseId])
+  @@index([sessionId])
+  @@index([destinataireEmail])
+}
+
+// Code de vérification pour double authentification
+model SignatureVerificationCode {
+  id              String            @id @default(cuid())
+
+  documentId      String
+  document        SignatureDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Code
+  code            String            // Code à 6 chiffres
+  method          String            // "sms" ou "email"
+  expiresAt       DateTime          // Expiration (5 min)
+  usedAt          DateTime?         // Date d'utilisation
+
+  // Tentatives
+  attempts        Int               @default(0)
+
+  // Metadata
+  createdAt       DateTime          @default(now())
+
+  @@index([documentId])
+  @@index([code])
+}
+
+// Enregistrement de signature (preuve légale)
+model SignatureRecord {
+  id              String            @id @default(cuid())
+
+  documentId      String
+  document        SignatureDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Identification du signataire
+  signataireName  String
+  signataireEmail String
+
+  // Signature manuscrite
+  signatureData   String            @db.Text  // Image base64 de la signature
+
+  // Authentification effectuée
+  authMethod      SignatureAuthMethod
+
+  // Horodatage certifié
+  signedAt        DateTime          @default(now())
+
+  // Preuve d'intégrité
+  documentHash    String            // Hash SHA-256 du document au moment de la signature
+  signatureHash   String            // Hash de la signature
+
+  // Métadonnées de traçabilité
+  ipAddress       String?
+  userAgent       String?
+  geoLocation     String?           // Localisation approximative (pays, ville)
+
+  // Consentement explicite
+  consentText     String            @default("Je certifie avoir lu et approuvé ce document")
+  consentAccepted Boolean           @default(true)
+
+  // Certificat de signature (PDF généré)
+  certificateUrl  String?           // URL du certificat stocké
+
+  // Metadata
+  createdAt       DateTime          @default(now())
+
+  @@unique([documentId]) // Un seul enregistrement par document
+  @@index([signataireEmail])
+  @@index([signedAt])
+}
+
+// ===========================================
+// SCORM - Learning Management System
+// ===========================================
+
+enum SCORMVersion {
+  SCORM_1_2     // Version 1.2 (la plus répandue)
+  SCORM_2004    // Version 2004
+}
+
+enum SCORMPackageStatus {
+  UPLOADING     // En cours d'upload
+  PROCESSING    // En cours de traitement
+  VALID         // Valide et prêt à l'emploi
+  ERROR         // Erreur lors du traitement
+  ARCHIVED      // Archivé
+}
+
+enum SCORMLessonStatus {
+  NOT_ATTEMPTED  // Pas commencé
+  INCOMPLETE     // En cours
+  COMPLETED      // Terminé
+  PASSED         // Réussi
+  FAILED         // Échoué
+  BROWSED        // Consulté
+}
+
+// Package SCORM importé
+model SCORMPackage {
+  id                String              @id @default(cuid())
+
+  // Infos du package
+  titre             String              // Nom du module SCORM
+  description       String?             // Description
+  version           SCORMVersion        @default(SCORM_1_2)
+
+  // Statut
+  status            SCORMPackageStatus  @default(UPLOADING)
+  errorMessage      String?             // Message d'erreur si status=ERROR
+
+  // Manifest info (parsé depuis imsmanifest.xml)
+  manifestData      Json?               // Données complètes du manifest
+  launchUrl         String?             // URL de lancement (ex: "index.html")
+  masteryScore      Float?              // Score minimum pour réussite (0-100)
+
+  // Stockage
+  storagePath       String              // Chemin dans Supabase Storage
+  originalFileName  String              // Nom du fichier original
+  fileSize          Int                 // Taille en bytes
+
+  // Lien optionnel avec formation/module
+  formationId       String?
+  formation         Formation?          @relation(fields: [formationId], references: [id], onDelete: SetNull)
+
+  moduleId          String?
+
+  // Multi-tenant
+  organizationId    String
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Créateur
+  uploadedBy        String              // User ID
+
+  // Compteurs
+  usageCount        Int                 @default(0) // Nombre de fois utilisé dans des sessions
+
+  // Metadata
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  trackingData      SCORMTracking[]
+
+  @@index([organizationId])
+  @@index([formationId])
+  @@index([status])
+}
+
+// Données de suivi SCORM par apprenant
+model SCORMTracking {
+  id                String              @id @default(cuid())
+
+  // Package SCORM
+  packageId         String
+  package           SCORMPackage        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  // Apprenant
+  apprenantId       String
+  apprenant         Apprenant           @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Inscription LMS liée (optionnel)
+  inscriptionId     String?
+  inscription       LMSInscription?     @relation(fields: [inscriptionId], references: [id], onDelete: SetNull)
+
+  // Données CMI complètes (JSON pour flexibilité)
+  cmiData           Json                @default("{}")
+
+  // Champs clés extraits pour requêtes rapides
+  lessonStatus      SCORMLessonStatus   @default(NOT_ATTEMPTED)
+  completionStatus  String?             // SCORM 2004: completed, incomplete, not attempted, unknown
+  successStatus     String?             // SCORM 2004: passed, failed, unknown
+
+  // Score
+  scoreRaw          Float?              // Score brut
+  scoreMin          Float?              // Score minimum possible
+  scoreMax          Float?              // Score maximum possible
+  scoreScaled       Float?              // Score normalisé (-1 à 1 pour SCORM 2004)
+
+  // Temps
+  totalTime         String?             // Format ISO 8601 ou SCORM
+  sessionTime       String?             // Temps de la session actuelle
+
+  // Bookmark/Suspend
+  suspendData       String?             @db.Text  // Données de reprise (max 64KB SCORM 2004)
+  lessonLocation    String?             // Bookmark de position
+  entry             String?             // "ab-initio", "resume", ""
+  exit              String?             // "time-out", "suspend", "logout", ""
+
+  // Tentatives
+  attemptNumber     Int                 @default(1)
+
+  // Interactions (pour analyse détaillée)
+  interactions      Json?               // Array des interactions SCORM
+
+  // Objectifs (SCORM 2004)
+  objectives        Json?               // Array des objectifs
+
+  // Timestamps
+  firstAccessAt     DateTime            @default(now())
+  lastAccessAt      DateTime            @default(now())
+  completedAt       DateTime?
+
+  // Multi-tenant
+  organizationId    String
+
+  @@unique([packageId, apprenantId, attemptNumber])
+  @@index([packageId])
+  @@index([apprenantId])
+  @@index([inscriptionId])
+  @@index([organizationId])
+  @@index([lessonStatus])
 }

@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { useTheme } from "@/context/ThemeContext";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -22,6 +22,13 @@ import {
   MapPin,
   Landmark,
   ChevronDown,
+  Calendar,
+  TrendingUp,
+  GraduationCap,
+  Video,
+  Bot,
+  ClipboardCheck,
+  FileSignature,
 } from "lucide-react";
 
 
@@ -58,6 +65,47 @@ const mainNavItems: NavItem[] = [
     icon: <FileBox size={20} strokeWidth={1.5} />,
     name: "Mes fichiers",
     path: "/automate/files",
+  },
+  {
+    icon: <Calendar size={20} strokeWidth={1.5} />,
+    name: "Sessions",
+    subItems: [
+      {
+        icon: <Calendar size={18} strokeWidth={1.5} />,
+        name: "Calendrier",
+        path: "/automate/calendrier",
+      },
+      {
+        icon: <ClipboardCheck size={18} strokeWidth={1.5} />,
+        name: "Émargement",
+        path: "/automate/calendrier?tab=emargement",
+      },
+      {
+        icon: <FileSignature size={18} strokeWidth={1.5} />,
+        name: "Signatures",
+        path: "/automate/signatures",
+      },
+    ],
+  },
+  {
+    icon: <TrendingUp size={20} strokeWidth={1.5} />,
+    name: "CRM Pipeline",
+    path: "/automate/crm",
+  },
+  {
+    icon: <GraduationCap size={20} strokeWidth={1.5} />,
+    name: "LMS",
+    path: "/automate/lms",
+  },
+  {
+    icon: <Video size={20} strokeWidth={1.5} />,
+    name: "Classe virtuelle",
+    path: "/automate/classe-virtuelle",
+  },
+  {
+    icon: <Bot size={20} strokeWidth={1.5} />,
+    name: "Agent Qualiopi",
+    path: "/automate/agent-qualiopi",
   },
   {
     icon: <Database size={20} strokeWidth={1.5} />,
@@ -121,6 +169,7 @@ const AutomateSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
@@ -139,11 +188,42 @@ const AutomateSidebar: React.FC = () => {
     }
   };
 
-  const isActive = (path: string) => isActiveOrChild(path, pathname);
+  // Fonction améliorée pour gérer les query strings (ex: ?tab=emargement)
+  const isActive = (path: string) => {
+    // Séparer le chemin et les query params
+    const [basePath, queryString] = path.split("?");
+
+    // Si le pathname ne correspond pas au basePath, ce n'est pas actif
+    if (!isActiveOrChild(basePath, pathname)) {
+      return false;
+    }
+
+    // Si le lien a des query params, vérifier s'ils correspondent
+    if (queryString) {
+      const params = new URLSearchParams(queryString);
+      for (const [key, value] of params.entries()) {
+        if (searchParams.get(key) !== value) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Pour le calendrier sans tab, vérifier qu'on n'a pas ?tab=emargement
+    if (basePath === "/automate/calendrier" && !queryString) {
+      const tab = searchParams.get("tab");
+      return !tab || tab === "calendrier";
+    }
+
+    return true;
+  };
 
   // Vérifier si un sous-menu contient la page active
   const isSubMenuActive = (subItems: SubNavItem[]) => {
-    return subItems.some((item) => pathname.startsWith(item.path));
+    return subItems.some((item) => {
+      const [basePath] = item.path.split("?");
+      return pathname.startsWith(basePath);
+    });
   };
 
   // Toggle sous-menu

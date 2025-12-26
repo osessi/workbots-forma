@@ -138,12 +138,28 @@ export interface SessionFormateurs {
   coformateurs: Intervenant[];
 }
 
+// Document généré dans le wizard
+export interface GeneratedDocument {
+  id: string;
+  type: string;
+  titre: string;
+  clientId?: string;
+  clientName?: string;
+  apprenantId?: string;
+  apprenantName?: string;
+  renderedContent: string;
+  jsonContent?: string;
+  savedToDrive?: boolean;
+  entrepriseId?: string;
+}
+
 // État complet du wizard
 export interface WizardData {
   clients: SessionClient[];
   tarifs: SessionTarif[];
   lieu: SessionLieu;
   formateurs: SessionFormateurs;
+  generatedDocs?: GeneratedDocument[];
 }
 
 // Props du formation (venant de la fiche pédagogique)

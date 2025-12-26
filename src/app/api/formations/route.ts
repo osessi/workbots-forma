@@ -108,9 +108,21 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET - Lister les formations de l'utilisateur
-export async function GET() {
+// GET - Lister les formations de l'utilisateur avec pagination, filtres et tri
+export async function GET(request: NextRequest) {
   try {
+    // Récupérer les paramètres de requête
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const search = searchParams.get("search") || "";
+    const status = searchParams.get("status") || ""; // BROUILLON, EN_COURS, TERMINEE, ARCHIVEE
+    const sortBy = searchParams.get("sortBy") || "createdAt"; // createdAt, titre, status
+    const sortOrder = searchParams.get("sortOrder") || "desc"; // asc, desc
+    const showArchived = searchParams.get("showArchived") === "true";
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+
     // Authentification
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -149,11 +161,59 @@ export async function GET() {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
 
-    // Récupérer les formations de l'organisation
+    // Construire les conditions de filtrage
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {
+      organizationId: user.organizationId,
+    };
+
+    // Filtre archivage
+    if (!showArchived) {
+      where.isArchived = false;
+    }
+
+    // Filtre par statut
+    if (status && status !== "all") {
+      where.status = status;
+    }
+
+    // Filtre par recherche texte
+    if (search) {
+      where.OR = [
+        { titre: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    // Filtre par date
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        where.createdAt.lte = new Date(dateTo);
+      }
+    }
+
+    // Construire le tri
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orderBy: any = {};
+    if (sortBy === "titre") {
+      orderBy.titre = sortOrder;
+    } else if (sortBy === "status") {
+      orderBy.status = sortOrder;
+    } else {
+      orderBy.createdAt = sortOrder;
+    }
+
+    // Compter le total pour la pagination
+    const total = await prisma.formation.count({ where });
+
+    // Récupérer les formations avec pagination
+    const skip = (page - 1) * limit;
     const formations = await prisma.formation.findMany({
-      where: {
-        organizationId: user.organizationId,
-      },
+      where,
       include: {
         modules: {
           orderBy: { ordre: "asc" },
@@ -172,10 +232,21 @@ export async function GET() {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy,
+      skip,
+      take: limit,
     });
 
-    return NextResponse.json(formations);
+    return NextResponse.json({
+      data: formations,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + formations.length < total,
+      },
+    });
   } catch (error) {
     console.error("Erreur récupération formations:", error);
     return NextResponse.json(

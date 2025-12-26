@@ -26,6 +26,9 @@ import {
   Edit3,
   Save,
   FolderOpen,
+  FileCheck,
+  Rocket,
+  PartyPopper,
 } from "lucide-react";
 import {
   SessionClient,
@@ -55,20 +58,8 @@ const DocumentEditor = dynamic(
   }
 );
 
-// Types pour les documents générés
-interface GeneratedDocument {
-  id: string;
-  type: string;
-  titre: string;
-  clientId?: string;
-  clientName?: string;
-  apprenantId?: string;
-  apprenantName?: string;
-  renderedContent: string;
-  jsonContent?: string; // Contenu JSON TipTap pour l'édition
-  savedToDrive?: boolean; // Si le document a été sauvegardé dans le Drive
-  entrepriseId?: string; // ID de l'entreprise pour l'organisation des dossiers
-}
+// Importer le type GeneratedDocument depuis types
+import { GeneratedDocument } from "./types";
 
 interface StepDocumentsProps {
   clients: SessionClient[];
@@ -76,8 +67,11 @@ interface StepDocumentsProps {
   lieu: SessionLieu;
   formateurs: SessionFormateurs;
   formation: FormationInfo;
+  initialGeneratedDocs?: GeneratedDocument[]; // Documents déjà générés (persistés)
+  onGeneratedDocsChange?: (docs: GeneratedDocument[]) => void; // Callback pour sauvegarder
   onPrev: () => void;
   onGenerate: (selectedDocs: string[]) => Promise<void>;
+  onPublish?: () => void; // Callback optionnel quand on publie
 }
 
 type DocumentType =
@@ -85,6 +79,7 @@ type DocumentType =
   | "contrat"
   | "convocation"
   | "attestation"
+  | "certificat_realisation"
   | "emargement"
   | "facture";
 
@@ -149,6 +144,16 @@ const documentsConfig: DocumentConfig[] = [
     perApprenant: true,
     color: "text-yellow-600 dark:text-yellow-400",
     bgColor: "bg-yellow-50 border-yellow-200 dark:bg-yellow-500/10 dark:border-yellow-500/30",
+  },
+  {
+    id: "certificat_realisation",
+    label: "Certificat de réalisation",
+    description: "Document Qualiopi prouvant la réalisation de la formation (pour les financeurs)",
+    icon: <FileCheck size={20} />,
+    perClient: false,
+    perApprenant: true,
+    color: "text-teal-600 dark:text-teal-400",
+    bgColor: "bg-teal-50 border-teal-200 dark:bg-teal-500/10 dark:border-teal-500/30",
   },
   {
     id: "facture",
@@ -330,10 +335,13 @@ export default function StepDocuments({
   lieu,
   formateurs,
   formation,
+  initialGeneratedDocs = [],
+  onGeneratedDocsChange,
   onPrev,
+  onPublish,
 }: StepDocumentsProps) {
-  // États
-  const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>([]);
+  // États - initialiser avec les documents existants
+  const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>(initialGeneratedDocs);
   const [generatingDocType, setGeneratingDocType] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -361,6 +369,29 @@ export default function StepDocuments({
   // Sauvegarde dans le Drive
   const [isSavingToDrive, setIsSavingToDrive] = useState(false);
   const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0 });
+
+  // Publication de la formation
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Synchroniser avec initialGeneratedDocs quand ils changent (rechargement)
+  useEffect(() => {
+    if (initialGeneratedDocs.length > 0 && generatedDocs.length === 0) {
+      setGeneratedDocs(initialGeneratedDocs);
+    }
+  }, [initialGeneratedDocs]);
+
+  // Notifier le parent quand les documents changent (pour persistence)
+  // On utilise un effet qui surveille generatedDocs et notifie le parent
+  const prevDocsLengthRef = useRef(initialGeneratedDocs.length);
+  useEffect(() => {
+    // Ne notifier que si le nombre de documents a changé (nouveau document généré)
+    if (generatedDocs.length > prevDocsLengthRef.current && onGeneratedDocsChange) {
+      onGeneratedDocsChange(generatedDocs);
+      prevDocsLengthRef.current = generatedDocs.length;
+    }
+  }, [generatedDocs, onGeneratedDocsChange]);
 
   // Calculs pour le récap
   const totalApprenants = clients.reduce((acc, c) => acc + c.apprenants.length, 0);
@@ -811,6 +842,34 @@ export default function StepDocuments({
   // Compter les documents non sauvegardés
   const unsavedDocsCount = generatedDocs.filter(d => !d.savedToDrive).length;
 
+  // Publier la formation
+  const publishFormation = async () => {
+    if (!formation.id) return;
+
+    setIsPublishing(true);
+    try {
+      const response = await fetch(`/api/formations/${formation.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publish: true }),
+      });
+
+      if (response.ok) {
+        setIsPublished(true);
+        setShowSuccessModal(true);
+        onPublish?.();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Erreur lors de la publication");
+      }
+    } catch (err) {
+      console.error("Erreur publication:", err);
+      setError("Erreur lors de la publication de la formation");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   // Vérifier si un document a été généré pour un destinataire
   const isDocGenerated = (docType: DocumentType, targetId: string) => {
     return generatedDocs.some(
@@ -1100,57 +1159,88 @@ export default function StepDocuments({
           Retour
         </button>
 
-        {generatedDocs.length > 0 && (
-          <div className="flex items-center gap-3">
-            {/* Bouton Sauvegarder dans le Drive */}
-            {formation.id && unsavedDocsCount > 0 && (
+        <div className="flex items-center gap-3">
+          {generatedDocs.length > 0 && (
+            <>
+              {/* Bouton Sauvegarder dans le Drive */}
+              {formation.id && unsavedDocsCount > 0 && (
+                <button
+                  onClick={saveAllToDrive}
+                  disabled={isSavingToDrive}
+                  className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-green-500 rounded-xl hover:bg-green-600 transition-colors disabled:opacity-50"
+                >
+                  {isSavingToDrive ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Sauvegarde {saveProgress.current}/{saveProgress.total}...
+                    </>
+                  ) : (
+                    <>
+                      <FolderOpen size={18} />
+                      Sauvegarder dans le Drive ({unsavedDocsCount})
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Indicateur si tous sauvegardés */}
+              {formation.id && unsavedDocsCount === 0 && generatedDocs.length > 0 && (
+                <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-xl dark:bg-green-500/20 dark:text-green-400">
+                  <Save size={16} />
+                  Tous sauvegardés
+                </span>
+              )}
+
+              {/* Bouton Télécharger PDF */}
               <button
-                onClick={saveAllToDrive}
-                disabled={isSavingToDrive}
-                className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-green-500 rounded-xl hover:bg-green-600 transition-colors disabled:opacity-50"
+                onClick={downloadAllAsPDF}
+                disabled={isDownloadingAll}
+                className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
               >
-                {isSavingToDrive ? (
+                {isDownloadingAll ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Sauvegarde {saveProgress.current}/{saveProgress.total}...
+                    Téléchargement {downloadProgress.current}/{downloadProgress.total}...
                   </>
                 ) : (
                   <>
-                    <FolderOpen size={18} />
-                    Sauvegarder dans le Drive ({unsavedDocsCount})
+                    <Download size={18} />
+                    Télécharger tous les PDF
                   </>
                 )}
               </button>
-            )}
+            </>
+          )}
 
-            {/* Indicateur si tous sauvegardés */}
-            {formation.id && unsavedDocsCount === 0 && generatedDocs.length > 0 && (
-              <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-xl dark:bg-green-500/20 dark:text-green-400">
-                <Save size={16} />
-                Tous sauvegardés
-              </span>
-            )}
-
-            {/* Bouton Télécharger PDF */}
+          {/* Bouton Publier la formation */}
+          {formation.id && !isPublished && (
             <button
-              onClick={downloadAllAsPDF}
-              disabled={isDownloadingAll}
-              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-colors disabled:opacity-50"
+              onClick={publishFormation}
+              disabled={isPublishing}
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-xl hover:from-brand-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              {isDownloadingAll ? (
+              {isPublishing ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
-                  Téléchargement {downloadProgress.current}/{downloadProgress.total}...
+                  Publication...
                 </>
               ) : (
                 <>
-                  <Download size={18} />
-                  Télécharger tous les PDF
+                  <Rocket size={18} />
+                  Publier la formation
                 </>
               )}
             </button>
-          </div>
-        )}
+          )}
+
+          {/* Badge Formation publiée */}
+          {isPublished && (
+            <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
+              <CheckCircle2 size={16} />
+              Formation publiée
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Modal de sélection des destinataires */}
@@ -1484,6 +1574,45 @@ export default function StepDocuments({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de succès après publication */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md p-8 text-center animate-in fade-in zoom-in duration-300">
+            {/* Confetti effect */}
+            <div className="relative">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-6xl animate-bounce">
+                🎉
+              </div>
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
+                <PartyPopper size={40} className="text-white" />
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Formation publiée !
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Votre formation <span className="font-semibold text-brand-600">{formation.titre}</span> est maintenant disponible et prête à accueillir des apprenants.
+            </p>
+
+            <div className="space-y-3">
+              <a
+                href="/automate/formations"
+                className="block w-full py-3 px-4 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-xl hover:from-brand-600 hover:to-purple-600 transition-all"
+              >
+                Voir mes formations
+              </a>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="block w-full py-3 px-4 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+              >
+                Continuer à éditer
+              </button>
+            </div>
           </div>
         </div>
       )}

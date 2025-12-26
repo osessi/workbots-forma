@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAutomate } from "@/context/AutomateContext";
@@ -10,6 +10,57 @@ const LoaderIcon = () => (
   <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24" fill="none">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+);
+
+// Icon Filter
+const FilterIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.25 4.5H15.75M4.5 9H13.5M6.75 13.5H11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Icon Sort
+const SortIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 6L6 3M6 3L9 6M6 3V15M15 12L12 15M12 15L9 12M12 15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Icon Archive
+const ArchiveIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.25 6V14.25C2.25 15.0784 2.92157 15.75 3.75 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V6M7.5 9H10.5M1.5 2.25H16.5V6H1.5V2.25Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Icon Chevron Down
+const ChevronDownIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Icon Trash
+const TrashIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 4H14M5.333 4V2.667C5.333 2.298 5.632 2 6 2H10C10.368 2 10.667 2.298 10.667 2.667V4M6.667 7.333V11.333M9.333 7.333V11.333M12.667 4V13.333C12.667 13.702 12.368 14 12 14H4C3.632 14 3.333 13.702 3.333 13.333V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Icon More (3 dots)
+const MoreIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="3" r="1.5" fill="currentColor"/>
+    <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+    <circle cx="8" cy="13" r="1.5" fill="currentColor"/>
+  </svg>
+);
+
+// Icon Warning
+const WarningIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 9V13M12 17H12.01M4.93 19H19.07C20.14 19 20.86 17.87 20.32 16.95L13.25 4.67C12.71 3.75 11.29 3.75 10.75 4.67L3.68 16.95C3.14 17.87 3.86 19 4.93 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -68,19 +119,49 @@ const KanbanIcon = () => (
 );
 
 type ViewMode = "grid" | "kanban";
+type SortField = "createdAt" | "titre" | "status";
+type SortOrder = "asc" | "desc";
+type StatusFilter = "all" | "brouillon" | "en_cours" | "complete";
 
 export default function MesFormationsPage() {
-  const { formations, updateFormation, isLoadingFormations, refreshFormations } = useAutomate();
+  const { formations, updateFormation, deleteFormation, isLoadingFormations, refreshFormations } = useAutomate();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
+  // Filtres et tri
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [showArchived, setShowArchived] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Modal de confirmation de suppression
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; formationId: string | null; formationTitle: string }>({
+    isOpen: false,
+    formationId: null,
+    formationTitle: "",
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Menu d'actions ouvert
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   // Rafraîchir les formations au montage
   useEffect(() => {
     refreshFormations();
   }, [refreshFormations]);
+
+  // Fermer le menu au clic extérieur
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    if (openMenuId) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [openMenuId]);
 
   const handleStartEdit = (id: string, currentTitle: string) => {
     setEditingId(id);
@@ -106,9 +187,108 @@ export default function MesFormationsPage() {
     }
   };
 
-  const filteredFormations = formations.filter((formation) =>
-    formation.titre.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Archiver/Désarchiver une formation
+  const handleArchive = async (id: string, currentlyArchived: boolean) => {
+    try {
+      await fetch(`/api/formations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isArchived: !currentlyArchived }),
+      });
+      refreshFormations();
+    } catch (error) {
+      console.error("Erreur lors de l'archivage:", error);
+    }
+    setOpenMenuId(null);
+  };
+
+  // Publier/Dépublier une formation dans le LMS
+  const handlePublish = async (id: string) => {
+    try {
+      await fetch(`/api/formations/${id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      refreshFormations();
+    } catch (error) {
+      console.error("Erreur lors de la publication:", error);
+    }
+    setOpenMenuId(null);
+  };
+
+  // Ouvrir la modal de confirmation de suppression
+  const openDeleteModal = (id: string, title: string) => {
+    setDeleteModal({ isOpen: true, formationId: id, formationTitle: title });
+    setOpenMenuId(null);
+  };
+
+  // Confirmer la suppression
+  const handleConfirmDelete = async () => {
+    if (!deleteModal.formationId) return;
+    setIsDeleting(true);
+    try {
+      await deleteFormation(deleteModal.formationId);
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+    } finally {
+      setIsDeleting(false);
+      setDeleteModal({ isOpen: false, formationId: null, formationTitle: "" });
+    }
+  };
+
+  // Fonction de filtrage et tri
+  const filteredFormations = useCallback(() => {
+    let result = [...formations];
+
+    // Filtre par recherche texte
+    if (searchQuery) {
+      result = result.filter((formation) =>
+        formation.titre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        formation.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filtre par statut
+    if (statusFilter !== "all") {
+      result = result.filter((formation) => formation.status === statusFilter.toLowerCase());
+    }
+
+    // Filtre archivés (on cache les archivés par défaut)
+    // Note: Le champ isArchived n'est pas encore dans le type Formation du context
+    // mais sera utilisé quand on ajoutera l'archivage
+
+    // Tri
+    result.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === "titre") {
+        comparison = a.titre.localeCompare(b.titre);
+      } else if (sortField === "status") {
+        comparison = a.status.localeCompare(b.status);
+      } else {
+        // createdAt - on utilise dateCreation (string format)
+        comparison = a.dateCreation.localeCompare(b.dateCreation);
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return result;
+  }, [formations, searchQuery, statusFilter, sortField, sortOrder])();
+
+  // Labels pour les statuts
+  const statusLabels: Record<StatusFilter, string> = {
+    all: "Tous les statuts",
+    brouillon: "Brouillon",
+    en_cours: "En cours",
+    complete: "Terminée",
+  };
+
+  // Labels pour le tri
+  const sortLabels: Record<SortField, string> = {
+    createdAt: "Date de création",
+    titre: "Titre",
+    status: "Statut",
+  };
 
   return (
     <div className="space-y-6">
@@ -132,46 +312,153 @@ export default function MesFormationsPage() {
           </Link>
         </div>
 
-        {/* Barre de recherche + Toggle vue */}
-        <div className="mt-6 flex items-center justify-between gap-4">
-          <div className="relative max-w-md flex-1">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-              <SearchIcon />
-            </span>
-            <input
-              type="text"
-              placeholder="Rechercher une formation..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 transition-all"
-            />
+        {/* Barre de recherche + Filtres + Toggle vue */}
+        <div className="mt-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="relative max-w-md flex-1">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <SearchIcon />
+              </span>
+              <input
+                type="text"
+                placeholder="Rechercher une formation..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 transition-all"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Bouton Filtres */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border transition-all ${
+                  showFilters || statusFilter !== "all"
+                    ? "bg-brand-50 border-brand-200 text-brand-700 dark:bg-brand-500/10 dark:border-brand-500/30 dark:text-brand-400"
+                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                }`}
+              >
+                <FilterIcon />
+                <span className="hidden sm:inline">Filtres</span>
+                {statusFilter !== "all" && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-brand-500 text-white rounded-full">1</span>
+                )}
+              </button>
+
+              {/* Toggle Vue Grille / Kanban */}
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                    viewMode === "grid"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <GridIcon />
+                  <span className="hidden sm:inline">Grille</span>
+                </button>
+                <button
+                  onClick={() => setViewMode("kanban")}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                    viewMode === "kanban"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <KanbanIcon />
+                  <span className="hidden sm:inline">Pipeline</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Toggle Vue Grille / Kanban */}
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
-                viewMode === "grid"
-                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              <GridIcon />
-              <span className="hidden sm:inline">Grille</span>
-            </button>
-            <button
-              onClick={() => setViewMode("kanban")}
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all ${
-                viewMode === "kanban"
-                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              <KanbanIcon />
-              <span className="hidden sm:inline">Pipeline</span>
-            </button>
-          </div>
+          {/* Panel de filtres avancés */}
+          {showFilters && (
+            <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+              {/* Filtre par statut */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 dark:text-gray-400">Statut :</label>
+                <div className="relative">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                    className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white cursor-pointer"
+                  >
+                    {Object.entries(statusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
+              </div>
+
+              {/* Tri */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 dark:text-gray-400">Trier par :</label>
+                <div className="relative">
+                  <select
+                    value={sortField}
+                    onChange={(e) => setSortField(e.target.value as SortField)}
+                    className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-700 dark:text-white cursor-pointer"
+                  >
+                    {Object.entries(sortLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                    <ChevronDownIcon />
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-600"
+                  title={sortOrder === "asc" ? "Croissant" : "Décroissant"}
+                >
+                  <SortIcon />
+                </button>
+              </div>
+
+              {/* Afficher archivés */}
+              <label className="flex items-center gap-2 cursor-pointer ml-auto">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                  <ArchiveIcon />
+                  Afficher archivés
+                </span>
+              </label>
+
+              {/* Reset filtres */}
+              {(statusFilter !== "all" || sortField !== "createdAt" || sortOrder !== "desc") && (
+                <button
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setSortField("createdAt");
+                    setSortOrder("desc");
+                  }}
+                  className="text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Indicateur de résultats */}
+          {(searchQuery || statusFilter !== "all") && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {filteredFormations.length} formation{filteredFormations.length > 1 ? "s" : ""} trouvée{filteredFormations.length > 1 ? "s" : ""}
+              {searchQuery && <span> pour &quot;{searchQuery}&quot;</span>}
+              {statusFilter !== "all" && <span> avec le statut &quot;{statusLabels[statusFilter]}&quot;</span>}
+            </p>
+          )}
         </div>
       </div>
 
@@ -210,16 +497,78 @@ export default function MesFormationsPage() {
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
               />
               {/* Badge status */}
-              {formation.status === "en_cours" && (
-                <span className="absolute top-3 right-3 px-2.5 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full shadow-sm">
-                  En cours
-                </span>
-              )}
-              {formation.status === "brouillon" && (
-                <span className="absolute top-3 right-3 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full shadow-sm">
-                  Brouillon
-                </span>
-              )}
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                {formation.isPublished ? (
+                  <span className="px-2.5 py-1 text-xs font-medium bg-green-500 text-white rounded-full shadow-sm flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 8L6 12L14 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Publiée
+                  </span>
+                ) : (
+                  <>
+                    {formation.status === "en_cours" && (
+                      <span className="px-2.5 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full shadow-sm">
+                        En cours
+                      </span>
+                    )}
+                    {formation.status === "brouillon" && (
+                      <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full shadow-sm">
+                        Brouillon
+                      </span>
+                    )}
+                    {formation.status === "complete" && (
+                      <span className="px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full shadow-sm">
+                        Terminée
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Menu d'actions */}
+              <div className="absolute top-3 left-3">
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(openMenuId === formation.id ? null : formation.id);
+                    }}
+                    className="p-2 bg-white/90 hover:bg-white text-gray-600 hover:text-gray-900 rounded-lg shadow-sm transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <MoreIcon />
+                  </button>
+
+                  {/* Dropdown menu */}
+                  {openMenuId === formation.id && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-800 dark:border-gray-700">
+                      <button
+                        onClick={() => handlePublish(formation.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 1V11M8 1L4 5M8 1L12 5M2 14H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        {formation.isPublished ? "Dépublier du LMS" : "Publier dans le LMS"}
+                      </button>
+                      <button
+                        onClick={() => handleArchive(formation.id, false)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      >
+                        <ArchiveIcon />
+                        Archiver
+                      </button>
+                      <button
+                        onClick={() => openDeleteModal(formation.id, formation.titre)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                      >
+                        <TrashIcon />
+                        Supprimer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Contenu */}
@@ -316,6 +665,65 @@ export default function MesFormationsPage() {
                 </Link>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {deleteModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => !isDeleting && setDeleteModal({ isOpen: false, formationId: null, formationTitle: "" })}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 animate-in fade-in zoom-in-95 duration-200">
+            {/* Icône d'avertissement */}
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400">
+              <WarningIcon />
+            </div>
+
+            {/* Titre */}
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-2">
+              Supprimer cette formation ?
+            </h3>
+
+            {/* Description */}
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-6">
+              Vous êtes sur le point de supprimer définitivement la formation
+              <span className="font-medium text-gray-900 dark:text-white"> &quot;{deleteModal.formationTitle}&quot;</span>.
+              Cette action est irréversible et supprimera également tous les documents, slides et fichiers associés.
+            </p>
+
+            {/* Boutons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModal({ isOpen: false, formationId: null, formationTitle: "" })}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <LoaderIcon />
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon />
+                    Supprimer
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

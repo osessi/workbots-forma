@@ -47,7 +47,7 @@ async function authenticateUser() {
   return user;
 }
 
-// GET - Récupérer le contenu du fichier
+// GET - Récupérer le contenu du fichier ou du document de signature
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -60,7 +60,7 @@ export async function GET(
 
     const { id } = await params;
 
-    // Vérifier que le fichier appartient à l'organisation
+    // D'abord chercher dans les fichiers
     const file = await prisma.file.findFirst({
       where: {
         id,
@@ -71,19 +71,71 @@ export async function GET(
       },
     });
 
-    if (!file) {
-      return NextResponse.json({ error: "Fichier non trouvé" }, { status: 404 });
+    if (file) {
+      // Retourner le contenu du fichier
+      const content = file.fileContent?.content || null;
+      return NextResponse.json({
+        id: file.id,
+        name: file.name,
+        content,
+        mimeType: file.mimeType,
+        type: "file",
+      });
     }
 
-    // Retourner le contenu s'il existe
-    const content = file.fileContent?.content || null;
-
-    return NextResponse.json({
-      id: file.id,
-      name: file.name,
-      content,
-      mimeType: file.mimeType,
+    // Ensuite chercher dans les documents de signature
+    const signatureDoc = await prisma.signatureDocument.findFirst({
+      where: {
+        id,
+        organizationId: user.organizationId,
+      },
     });
+
+    if (signatureDoc) {
+      // Utiliser le contenu signé s'il existe, sinon le contenu original
+      const content = signatureDoc.signedContenuHtml || signatureDoc.contenuHtml;
+      return NextResponse.json({
+        id: signatureDoc.id,
+        name: signatureDoc.titre,
+        content,
+        mimeType: "text/html",
+        type: "signature",
+        status: signatureDoc.status,
+      });
+    }
+
+    // Ensuite chercher dans les documents de session (générés par wizard)
+    const sessionDoc = await prisma.sessionDocument.findFirst({
+      where: {
+        id,
+        session: {
+          formation: {
+            organizationId: user.organizationId,
+          },
+        },
+      },
+    });
+
+    if (sessionDoc) {
+      // Le contenu est stocké comme JSON avec html et json
+      const contentData = sessionDoc.content as { html?: string; json?: string } | null;
+      const content = contentData?.html || null;
+
+      // Nettoyer le nom du fichier (retirer .html)
+      let name = sessionDoc.fileName || `Document ${sessionDoc.type}`;
+      name = name.replace(/\.html$/i, "");
+
+      return NextResponse.json({
+        id: sessionDoc.id,
+        name,
+        content,
+        mimeType: "text/html",
+        type: "session",
+        status: sessionDoc.status,
+      });
+    }
+
+    return NextResponse.json({ error: "Document non trouvé" }, { status: 404 });
   } catch (error) {
     console.error("Erreur récupération contenu fichier:", error);
     return NextResponse.json(
@@ -93,7 +145,7 @@ export async function GET(
   }
 }
 
-// PUT - Mettre à jour le contenu du fichier
+// PUT - Mettre à jour le contenu du fichier ou du document de session
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -112,7 +164,7 @@ export async function PUT(
       return NextResponse.json({ error: "Contenu requis" }, { status: 400 });
     }
 
-    // Vérifier que le fichier appartient à l'organisation
+    // D'abord chercher dans les fichiers
     const file = await prisma.file.findFirst({
       where: {
         id,
@@ -120,38 +172,72 @@ export async function PUT(
       },
     });
 
-    if (!file) {
-      return NextResponse.json({ error: "Fichier non trouvé" }, { status: 404 });
+    if (file) {
+      // Créer ou mettre à jour le contenu du fichier
+      const fileContent = await prisma.fileContent.upsert({
+        where: { fileId: id },
+        update: {
+          content,
+          updatedAt: new Date(),
+        },
+        create: {
+          fileId: id,
+          content,
+        },
+      });
+
+      // Mettre à jour la taille du fichier
+      await prisma.file.update({
+        where: { id },
+        data: {
+          size: Buffer.byteLength(content, "utf-8"),
+          updatedAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        fileId: id,
+        contentId: fileContent.id,
+        message: "Contenu mis à jour",
+      });
     }
 
-    // Créer ou mettre à jour le contenu
-    const fileContent = await prisma.fileContent.upsert({
-      where: { fileId: id },
-      update: {
-        content,
-        updatedAt: new Date(),
-      },
-      create: {
-        fileId: id,
-        content,
-      },
-    });
-
-    // Mettre à jour la taille du fichier
-    await prisma.file.update({
-      where: { id },
-      data: {
-        size: Buffer.byteLength(content, "utf-8"),
-        updatedAt: new Date(),
+    // Ensuite chercher dans les documents de session
+    const sessionDoc = await prisma.sessionDocument.findFirst({
+      where: {
+        id,
+        session: {
+          formation: {
+            organizationId: user.organizationId,
+          },
+        },
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      fileId: id,
-      contentId: fileContent.id,
-      message: "Contenu mis à jour",
-    });
+    if (sessionDoc) {
+      // Mettre à jour le contenu du document de session
+      const existingContent = (sessionDoc.content as { html?: string; json?: string } | null) || {};
+
+      await prisma.sessionDocument.update({
+        where: { id },
+        data: {
+          content: {
+            ...existingContent,
+            html: content,
+          },
+          updatedAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        documentId: id,
+        message: "Document de session mis à jour",
+      });
+    }
+
+    return NextResponse.json({ error: "Document non trouvé" }, { status: 404 });
   } catch (error) {
     console.error("Erreur mise à jour contenu fichier:", error);
     return NextResponse.json(

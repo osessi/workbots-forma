@@ -37,6 +37,20 @@ const KeyIcon = () => (
   </svg>
 );
 
+const IntegrationsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M7.5 2.5V5.83333M12.5 2.5V5.83333M7.5 14.1667V17.5M12.5 14.1667V17.5M2.5 7.5H5.83333M2.5 12.5H5.83333M14.1667 7.5H17.5M14.1667 12.5H17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <rect x="5.83333" y="5.83333" width="8.33333" height="8.33333" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+);
+
+const EmailTemplateIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.33333 4.16667C3.33333 3.24619 4.07953 2.5 5 2.5H15C15.9205 2.5 16.6667 3.24619 16.6667 4.16667V15.8333C16.6667 16.7538 15.9205 17.5 15 17.5H5C4.07953 17.5 3.33333 16.7538 3.33333 15.8333V4.16667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M3.33333 6.66667L10 10.8333L16.6667 6.66667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const SettingsIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -99,6 +113,8 @@ const navItems: NavItem[] = [
   { id: "organizations", label: "Organisations", href: "/admin/organizations", icon: <OrganizationIcon /> },
   { id: "users", label: "Utilisateurs", href: "/admin/users", icon: <UsersIcon /> },
   { id: "templates", label: "Templates", href: "/admin/templates", icon: <TemplateIcon /> },
+  { id: "email-templates", label: "Templates Email", href: "/admin/email-templates", icon: <EmailTemplateIcon /> },
+  { id: "integrations", label: "Integrations", href: "/admin/integrations", icon: <IntegrationsIcon /> },
   { id: "ai-prompts", label: "Prompts IA", href: "/admin/ai-prompts", icon: <AIIcon /> },
   { id: "api-keys", label: "Cles API", href: "/admin/api-keys", icon: <KeyIcon /> },
   { id: "settings", label: "Configuration", href: "/admin/settings", icon: <SettingsIcon /> },

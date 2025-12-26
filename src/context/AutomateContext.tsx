@@ -103,6 +103,9 @@ export interface Formation {
     duree?: number;
   }>;
   documentsCount?: number;
+  // LMS
+  isPublished?: boolean;
+  publishedAt?: string;
 }
 
 interface AutomateContextType {
@@ -317,10 +320,12 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const fetchFormations = useCallback(async () => {
     try {
       setIsLoadingFormations(true);
-      const response = await fetch("/api/formations");
+      const response = await fetch("/api/formations?limit=100");
 
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        // Support both old format (array) and new format ({ data: [], pagination: {} })
+        const data = Array.isArray(result) ? result : result.data;
 
         // Convertir les formations de l'API vers le format frontend
         const formattedFormations: Formation[] = data.map((f: {

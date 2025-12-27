@@ -39,18 +39,18 @@ export const AI_CONFIGS = {
     maxTokens: 6144,
     temperature: 0.5,
   },
-  // Test de positionnement
+  // Test de positionnement - besoin de beaucoup de tokens pour 20 questions
   positionnement: {
     provider: "anthropic" as AIProvider,
     model: "claude-sonnet-4-20250514",
-    maxTokens: 4096,
+    maxTokens: 8192,
     temperature: 0.5,
   },
-  // Evaluation finale
+  // Evaluation finale - besoin de beaucoup de tokens pour 20 questions
   evaluation: {
     provider: "anthropic" as AIProvider,
     model: "claude-sonnet-4-20250514",
-    maxTokens: 4096,
+    maxTokens: 8192,
     temperature: 0.5,
   },
   // Reformulation/amelioration de texte

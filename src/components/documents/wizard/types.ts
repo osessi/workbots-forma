@@ -171,6 +171,9 @@ export interface FormationInfo {
   tarifParticulier: number;
   dureeHeures: number;
   dureeJours: number;
+  // Session-specific data (when creating from an existing session)
+  sessionId?: string;
+  sessionReference?: string;
 }
 
 // Initialisation des données

@@ -304,7 +304,7 @@ export default function MesFormationsPage() {
             </p>
           </div>
           <Link
-            href="/automate/create"
+            href="/automate/import"
             className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:scale-[0.98] transition-all shadow-sm hover:shadow-md whitespace-nowrap"
           >
             <PlusIcon />
@@ -541,10 +541,22 @@ export default function MesFormationsPage() {
 
                   {/* Dropdown menu */}
                   {openMenuId === formation.id && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-800 dark:border-gray-700">
+                    <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-800 dark:border-gray-700">
+                      {/* Créer une session */}
+                      <Link
+                        href={`/automate/sessions?create=true&formationId=${formation.id}`}
+                        onClick={() => setOpenMenuId(null)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                        Créer une session
+                      </Link>
+                      <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
                       <button
                         onClick={() => handlePublish(formation.id)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M8 1V11M8 1L4 5M8 1L12 5M2 14H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -558,6 +570,7 @@ export default function MesFormationsPage() {
                         <ArchiveIcon />
                         Archiver
                       </button>
+                      <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
                       <button
                         onClick={() => openDeleteModal(formation.id, formation.titre)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
@@ -623,12 +636,22 @@ export default function MesFormationsPage() {
                   </div>
                 )}
               </div>
-              <Link
-                href={`/automate/create?id=${formation.id}`}
-                className="inline-flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 active:scale-[0.98] transition-all shadow-sm hover:shadow-md"
-              >
-                Éditer
-              </Link>
+              <div className="flex gap-2">
+                <Link
+                  href={`/automate/create?id=${formation.id}`}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 active:scale-[0.98] transition-all dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                >
+                  <EditIcon />
+                  Éditer
+                </Link>
+                <Link
+                  href={`/automate/sessions?create=true&formationId=${formation.id}`}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 active:scale-[0.98] transition-all shadow-sm hover:shadow-md"
+                >
+                  <PlusIcon />
+                  Session
+                </Link>
+              </div>
             </div>
           </div>
         ))}
@@ -727,6 +750,7 @@ export default function MesFormationsPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

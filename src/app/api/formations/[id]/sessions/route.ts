@@ -120,7 +120,32 @@ export async function GET(
       },
     });
 
-    // 3. Transformer les DocumentSession au format attendu par le frontend
+    // 3. Récupérer les nouvelles sessions (Session - nouveau modèle)
+    const trainingSessions = await prisma.session.findMany({
+      where: {
+        formationId: id,
+        organizationId: user.organizationId,
+      },
+      include: {
+        journees: {
+          orderBy: { ordre: "asc" },
+        },
+        clients: {
+          include: {
+            entreprise: true,
+            participants: {
+              include: {
+                apprenant: true,
+              },
+            },
+          },
+        },
+        formateur: true,
+        lieu: true,
+      },
+    });
+
+    // 4. Transformer les DocumentSession au format attendu par le frontend
     const documentSessionsFormatted = documentSessions.map((ds) => {
       // Extraire tous les participants de tous les clients
       const participants = ds.clients.flatMap((client) =>
@@ -153,13 +178,68 @@ export async function GET(
             }
           : null,
         isDocumentSession: true,
+        sessionType: "document",
       };
     });
 
-    // 4. Combiner les deux types de sessions
+    // 5. Transformer les nouvelles sessions (Session) au format attendu
+    const trainingSessionsFormatted = trainingSessions.map((ts) => {
+      // Extraire tous les participants de tous les clients
+      const participants = ts.clients.flatMap((client) =>
+        client.participants.map((p) => ({
+          id: p.apprenant.id,
+          firstName: p.apprenant.prenom,
+          lastName: p.apprenant.nom,
+          email: p.apprenant.email,
+        }))
+      );
+
+      // Calculer les dates de début/fin depuis les journées
+      const sortedJournees = [...ts.journees].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      const dateDebut = sortedJournees[0]?.date || new Date();
+      const dateFin = sortedJournees[sortedJournees.length - 1]?.date || dateDebut;
+
+      // Récupérer le nom du client principal
+      const clientPrincipal = ts.clients[0];
+      const clientName = clientPrincipal?.entreprise?.raisonSociale ||
+        (clientPrincipal?.contactNom && clientPrincipal?.contactPrenom
+          ? `${clientPrincipal.contactPrenom} ${clientPrincipal.contactNom}`
+          : null);
+
+      return {
+        id: ts.id,
+        reference: ts.reference,
+        nom: ts.nom,
+        status: ts.status,
+        modalite: ts.modalite,
+        dateDebut: dateDebut.toISOString(),
+        dateFin: dateFin.toISOString(),
+        participants,
+        participantsCount: participants.length,
+        formateur: ts.formateur
+          ? {
+              id: ts.formateur.id,
+              firstName: ts.formateur.prenom,
+              lastName: ts.formateur.nom,
+              email: ts.formateur.email,
+            }
+          : null,
+        lieu: ts.lieu,
+        clientName,
+        journeesCount: ts.journees.length,
+        isDocumentSession: false,
+        sessionType: "training",
+        createdAt: ts.createdAt,
+      };
+    });
+
+    // 6. Combiner tous les types de sessions
     const allSessions = [
-      ...formationSessions.map((s) => ({ ...s, isDocumentSession: false })),
+      ...formationSessions.map((s) => ({ ...s, isDocumentSession: false, sessionType: "legacy" })),
       ...documentSessionsFormatted,
+      ...trainingSessionsFormatted,
     ];
 
     return NextResponse.json({

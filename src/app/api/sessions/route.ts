@@ -76,8 +76,8 @@ export async function GET(request: NextRequest) {
       sessionWhere.formationId = formationId;
     }
 
-    // Récupérer les sessions avec leurs journées
-    const sessions = await prisma.documentSession.findMany({
+    // 1. Récupérer les sessions documentaires (ancien modèle)
+    const documentSessions = await prisma.documentSession.findMany({
       where: sessionWhere,
       include: {
         formation: {
@@ -132,11 +132,68 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Transformer les données pour le calendrier
-    // Chaque journée devient un événement
-    const calendarEvents = sessions.flatMap((session) => {
+    // 2. Récupérer les nouvelles sessions (nouveau modèle Session)
+    const trainingSessions = await prisma.session.findMany({
+      where: sessionWhere,
+      include: {
+        formation: {
+          select: {
+            id: true,
+            titre: true,
+          },
+        },
+        lieu: {
+          select: {
+            id: true,
+            nom: true,
+            typeLieu: true,
+            lieuFormation: true,
+          },
+        },
+        formateur: {
+          select: {
+            id: true,
+            nom: true,
+            prenom: true,
+          },
+        },
+        journees: {
+          where: Object.keys(journeeWhere).length > 0 ? {
+            date: journeeWhere.date
+          } : undefined,
+          orderBy: { date: "asc" },
+        },
+        clients: {
+          include: {
+            entreprise: {
+              select: {
+                id: true,
+                raisonSociale: true,
+              },
+            },
+            participants: {
+              include: {
+                apprenant: {
+                  select: {
+                    id: true,
+                    nom: true,
+                    prenom: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // 3. Transformer les DocumentSession pour le calendrier
+    const documentCalendarEvents = documentSessions.flatMap((session) => {
       return session.journees.map((journee) => ({
-        id: `${session.id}-${journee.id}`,
+        id: `doc-${session.id}-${journee.id}`,
         sessionId: session.id,
         journeeId: journee.id,
         title: session.formation.titre,
@@ -159,17 +216,56 @@ export async function GET(request: NextRequest) {
           entreprise: c.entreprise,
           participantsCount: c.participants.length,
         })),
+        sessionType: "document" as const,
       }));
     });
 
+    // 4. Transformer les Session (nouveau modèle) pour le calendrier
+    const trainingCalendarEvents = trainingSessions.flatMap((session) => {
+      return session.journees.map((journee) => ({
+        id: `train-${session.id}-${journee.id}`,
+        sessionId: session.id,
+        journeeId: journee.id,
+        title: session.formation.titre,
+        start: journee.date,
+        heureDebutMatin: journee.heureDebutMatin,
+        heureFinMatin: journee.heureFinMatin,
+        heureDebutAprem: journee.heureDebutAprem,
+        heureFinAprem: journee.heureFinAprem,
+        modalite: session.modalite,
+        lieu: session.lieu,
+        formateur: session.formateur,
+        status: session.status,
+        reference: session.reference,
+        nom: session.nom,
+        participantsCount: session.clients.reduce(
+          (acc, client) => acc + client.participants.length,
+          0
+        ),
+        clients: session.clients.map((c) => ({
+          id: c.id,
+          typeClient: c.typeClient,
+          entreprise: c.entreprise,
+          participantsCount: c.participants.length,
+        })),
+        sessionType: "training" as const,
+      }));
+    });
+
+    // 5. Fusionner tous les événements
+    const calendarEvents = [...documentCalendarEvents, ...trainingCalendarEvents]
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
     return NextResponse.json({
-      sessions,
+      sessions: [...documentSessions, ...trainingSessions],
       calendarEvents,
     });
   } catch (error) {
     console.error("Erreur récupération sessions:", error);
+    // Retourner plus de détails en dev
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return NextResponse.json(
-      { error: "Erreur lors de la récupération des sessions" },
+      { error: "Erreur lors de la récupération des sessions", details: errorMessage },
       { status: 500 }
     );
   }

@@ -20,6 +20,18 @@ interface QCMData {
   questions: QCMQuestion[];
 }
 
+// Type d'évaluation par module: QCM ou Atelier
+type ModuleEvaluationType = "qcm" | "atelier";
+
+interface AtelierData {
+  titre: string;
+  description: string;
+  objectifs: string[];
+  instructions: string[];
+  dureeEstimee: string;
+  critereEvaluation: string[];
+}
+
 interface EvaluationData {
   titre: string;
   description: string;
@@ -36,6 +48,8 @@ export interface EvaluationsDataSaved {
   positionnement: EvaluationData | null;
   evaluationFinale: EvaluationData | null;
   qcmByModule: Record<string, QCMData | null>;
+  atelierByModule: Record<string, AtelierData | null>;
+  evaluationTypeByModule: Record<string, ModuleEvaluationType>;
 }
 
 interface StepEvaluationsProps {
@@ -468,6 +482,8 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   const [positionnement, setPositionnement] = useState<EvaluationData | null>(initialData?.positionnement || null);
   const [evaluationFinale, setEvaluationFinale] = useState<EvaluationData | null>(initialData?.evaluationFinale || null);
   const [qcmByModule, setQcmByModule] = useState<Record<string, QCMData | null>>(initialData?.qcmByModule || {});
+  const [atelierByModule, setAtelierByModule] = useState<Record<string, AtelierData | null>>(initialData?.atelierByModule || {});
+  const [evaluationTypeByModule, setEvaluationTypeByModule] = useState<Record<string, ModuleEvaluationType>>(initialData?.evaluationTypeByModule || {});
 
   // Notifier le parent quand les données changent
   useEffect(() => {
@@ -476,15 +492,18 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         positionnement,
         evaluationFinale,
         qcmByModule,
+        atelierByModule,
+        evaluationTypeByModule,
       });
     }
-  }, [positionnement, evaluationFinale, qcmByModule, onDataChange]);
+  }, [positionnement, evaluationFinale, qcmByModule, atelierByModule, evaluationTypeByModule, onDataChange]);
 
   // Etats de chargement
   const [generatingPositionnement, setGeneratingPositionnement] = useState(false);
   const [generatingEvaluation, setGeneratingEvaluation] = useState(false);
   const [generatingQCM, setGeneratingQCM] = useState<Record<string, boolean>>({});
-  const [generatingAllQCM, setGeneratingAllQCM] = useState(false);
+  const [generatingAtelier, setGeneratingAtelier] = useState<Record<string, boolean>>({});
+  const [generatingAllEvaluations, setGeneratingAllEvaluations] = useState(false);
 
   // Etat pour les questions QCM expandees (moduleId -> questionIndex[])
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, number[]>>({});
@@ -818,16 +837,85 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     }
   }, [modules, formationObjectifs]);
 
-  // Generer tous les QCM
-  const handleGenerateAllQCM = useCallback(async () => {
-    setGeneratingAllQCM(true);
+  // Generer un atelier pour un module
+  const handleGenerateAtelier = useCallback(async (moduleId: string) => {
+    const module = modules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    setGeneratingAtelier(prev => ({ ...prev, [moduleId]: true }));
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+      const response = await fetch("/api/ai/generate-atelier", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+        },
+        body: JSON.stringify({
+          moduleTitre: module.titre,
+          moduleContenu: module.contenu,
+          formationTitre,
+          objectifs: formationObjectifs,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erreur HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        setAtelierByModule(prev => ({
+          ...prev,
+          [moduleId]: {
+            titre: `Atelier - ${module.titre}`,
+            description: data.data.description || "",
+            objectifs: data.data.objectifs || [],
+            instructions: data.data.instructions || [],
+            dureeEstimee: data.data.dureeEstimee || "30 minutes",
+            critereEvaluation: data.data.critereEvaluation || [],
+          },
+        }));
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error("Erreur generation atelier:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      if (errorMessage.includes("abort")) {
+        alert(`Timeout: La generation de l'atelier a pris trop de temps. Reessayez.`);
+      } else {
+        alert(`Erreur lors de la generation de l'atelier: ${errorMessage}`);
+      }
+    } finally {
+      setGeneratingAtelier(prev => ({ ...prev, [moduleId]: false }));
+    }
+  }, [modules, formationTitre, formationObjectifs]);
+
+  // Changer le type d'évaluation pour un module
+  const handleChangeEvaluationType = useCallback((moduleId: string, type: ModuleEvaluationType) => {
+    setEvaluationTypeByModule(prev => ({ ...prev, [moduleId]: type }));
+  }, []);
+
+  // Generer toutes les évaluations (QCM ou Atelier selon le type choisi)
+  const handleGenerateAllEvaluations = useCallback(async () => {
+    setGeneratingAllEvaluations(true);
     for (const module of modules) {
-      if (!qcmByModule[module.id]) {
+      const evalType = evaluationTypeByModule[module.id] || "qcm";
+      if (evalType === "qcm" && !qcmByModule[module.id]) {
         await handleGenerateQCM(module.id);
+      } else if (evalType === "atelier" && !atelierByModule[module.id]) {
+        await handleGenerateAtelier(module.id);
       }
     }
-    setGeneratingAllQCM(false);
-  }, [modules, qcmByModule, handleGenerateQCM]);
+    setGeneratingAllEvaluations(false);
+  }, [modules, evaluationTypeByModule, qcmByModule, atelierByModule, handleGenerateQCM, handleGenerateAtelier]);
 
   // Telecharger un QCM individuel
   const handleDownloadQCM = useCallback((module: Module, qcm: QCMData) => {
@@ -1031,6 +1119,91 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     }
   }, [modules, qcmByModule, formationTitre]);
 
+  // Telecharger un atelier individuel
+  const handleDownloadAtelier = useCallback((module: Module, atelier: AtelierData) => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${atelier.titre}</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+          }
+          h1 { color: #1a1a2e; font-size: 22px; margin-bottom: 8px; border-bottom: 3px solid #f59e0b; padding-bottom: 10px; }
+          .module-title { color: #64748b; font-size: 14px; margin-bottom: 20px; }
+          .duree { display: inline-block; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 20px; }
+          .description { background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 14px; color: #475569; }
+          .section { margin-bottom: 25px; }
+          .section h3 { font-size: 16px; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+          .section ul { margin: 0; padding-left: 20px; }
+          .section li { font-size: 14px; color: #475569; margin-bottom: 8px; }
+          .objectifs { background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; border-radius: 0 8px 8px 0; }
+          .instructions { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 0 8px 8px 0; }
+          .criteres { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; border-radius: 0 8px 8px 0; }
+          @media print {
+            body { padding: 20px; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>${atelier.titre}</h1>
+        <p class="module-title">${module.titre}</p>
+        <span class="duree">⏱ ${atelier.dureeEstimee}</span>
+
+        <div class="description">
+          ${atelier.description}
+        </div>
+
+        <div class="section">
+          <h3>🎯 Objectifs de l'atelier</h3>
+          <div class="objectifs">
+            <ul>
+              ${atelier.objectifs.map(obj => `<li>${obj}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>📋 Instructions</h3>
+          <div class="instructions">
+            <ol style="padding-left: 20px; margin: 0;">
+              ${atelier.instructions.map(inst => `<li style="margin-bottom: 10px;">${inst}</li>`).join('')}
+            </ol>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>✅ Critères d'évaluation</h3>
+          <div class="criteres">
+            <ul>
+              ${atelier.critereEvaluation.map(crit => `<li>${crit}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+    } else {
+      alert("Veuillez autoriser les popups pour telecharger le PDF");
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Test de positionnement et Evaluation finale */}
@@ -1076,100 +1249,127 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </div>
       </div>
 
-      {/* QCM par module */}
+      {/* Évaluations par module (QCM ou Atelier) */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              QCM par module
+              Évaluations par module
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Generez des QCM pour chaque module de la formation
+              Choisissez QCM ou Atelier pour chaque module de la formation
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {Object.values(qcmByModule).some(qcm => qcm !== null) && (
-              <button
-                onClick={handleDownloadAllQCM}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors dark:bg-green-900/20 dark:text-green-400"
-              >
-                <DownloadIcon />
-                Telecharger tous les QCM
-              </button>
+          <button
+            onClick={handleGenerateAllEvaluations}
+            disabled={generatingAllEvaluations}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-lg hover:from-brand-600 hover:to-purple-600 transition-all shadow-md disabled:opacity-50"
+          >
+            {generatingAllEvaluations ? (
+              <>
+                <SpinnerIcon />
+                Generation en cours...
+              </>
+            ) : (
+              <>
+                <SparklesIcon />
+                Generer toutes les evaluations
+              </>
             )}
-            <button
-              onClick={handleGenerateAllQCM}
-              disabled={generatingAllQCM}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-lg hover:from-brand-600 hover:to-purple-600 transition-all shadow-md disabled:opacity-50"
-            >
-              {generatingAllQCM ? (
-                <>
-                  <SpinnerIcon />
-                  Generation en cours...
-                </>
-              ) : (
-                <>
-                  <SparklesIcon />
-                  Generer tous les QCM
-                </>
-              )}
-            </button>
-          </div>
+          </button>
         </div>
 
         <div className="space-y-6">
           {modules.map((module) => {
+            const evalType = evaluationTypeByModule[module.id] || "qcm";
             const qcm = qcmByModule[module.id];
-            const isGenerating = generatingQCM[module.id] || false;
+            const atelier = atelierByModule[module.id];
+            const isGeneratingQCM = generatingQCM[module.id] || false;
+            const isGeneratingAtelier = generatingAtelier[module.id] || false;
+            const hasGenerated = evalType === "qcm" ? !!qcm : !!atelier;
 
             return (
               <div key={module.id} className="border-b border-gray-200 dark:border-gray-700 pb-6 last:border-b-0 last:pb-0">
-                {/* Titre du module */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                  <h4 className="text-base font-semibold text-gray-900 dark:text-white">
-                    {module.titre}
-                  </h4>
-                  {qcm ? (
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                        <CheckCircleIcon />
-                        {qcm.questions.length} questions
-                      </span>
+                {/* Header du module avec choix du type */}
+                <div className="flex flex-col gap-4 mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">
+                      {module.titre}
+                    </h4>
+
+                    {/* Sélecteur QCM / Atelier */}
+                    <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                       <button
-                        onClick={() => handleDownloadQCM(module, qcm)}
-                        className="p-2 text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                        title="Telecharger le QCM"
+                        onClick={() => handleChangeEvaluationType(module.id, "qcm")}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                          evalType === "qcm"
+                            ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-sm"
+                            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        }`}
                       >
-                        <DownloadIcon />
+                        QCM
                       </button>
                       <button
-                        onClick={() => handleGenerateQCM(module.id)}
-                        disabled={isGenerating}
-                        className="p-2 text-gray-500 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-50"
-                        title="Regenerer le QCM"
+                        onClick={() => handleChangeEvaluationType(module.id, "atelier")}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                          evalType === "atelier"
+                            ? "bg-white dark:bg-gray-700 text-amber-600 dark:text-amber-400 shadow-sm"
+                            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        }`}
                       >
-                        {isGenerating ? <SpinnerIcon /> : <RefreshIcon />}
+                        Atelier
                       </button>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => handleGenerateQCM(module.id)}
-                      disabled={isGenerating}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:text-brand-400 whitespace-nowrap disabled:opacity-50"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <SpinnerIcon />
-                          Generation...
-                        </>
-                      ) : (
-                        <>
-                          <SparklesIcon />
-                          Generer le QCM
-                        </>
-                      )}
-                    </button>
-                  )}
+                  </div>
+
+                  {/* Bouton de génération */}
+                  <div className="flex items-center justify-end gap-2">
+                    {hasGenerated ? (
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                          <CheckCircleIcon />
+                          {evalType === "qcm" ? `${qcm?.questions.length} questions` : "Atelier généré"}
+                        </span>
+                        <button
+                          onClick={() => evalType === "qcm" && qcm ? handleDownloadQCM(module, qcm) : atelier && handleDownloadAtelier(module, atelier)}
+                          className="p-2 text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                          title="Télécharger"
+                        >
+                          <DownloadIcon />
+                        </button>
+                        <button
+                          onClick={() => evalType === "qcm" ? handleGenerateQCM(module.id) : handleGenerateAtelier(module.id)}
+                          disabled={isGeneratingQCM || isGeneratingAtelier}
+                          className="p-2 text-gray-500 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-50"
+                          title="Régénérer"
+                        >
+                          {(isGeneratingQCM || isGeneratingAtelier) ? <SpinnerIcon /> : <RefreshIcon />}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => evalType === "qcm" ? handleGenerateQCM(module.id) : handleGenerateAtelier(module.id)}
+                        disabled={isGeneratingQCM || isGeneratingAtelier}
+                        className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 ${
+                          evalType === "qcm"
+                            ? "text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-400"
+                            : "text-amber-600 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400"
+                        }`}
+                      >
+                        {(isGeneratingQCM || isGeneratingAtelier) ? (
+                          <>
+                            <SpinnerIcon />
+                            Génération...
+                          </>
+                        ) : (
+                          <>
+                            <SparklesIcon />
+                            Générer {evalType === "qcm" ? "le QCM" : "l'Atelier"}
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Contenu du module */}
@@ -1184,18 +1384,18 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-gray-400 italic">Contenu non defini</p>
+                    <p className="text-sm text-gray-400 italic">Contenu non défini</p>
                   )}
                 </div>
 
-                {/* Apercu QCM si genere */}
-                {qcm && (
+                {/* Aperçu QCM si généré et type = qcm */}
+                {evalType === "qcm" && qcm && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-900/10 dark:to-purple-900/10 rounded-lg border border-brand-200 dark:border-brand-800">
                     <h5 className="text-sm font-medium text-brand-700 dark:text-brand-300 mb-3">
                       Questions du QCM ({qcm.questions.length})
                     </h5>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                      Cliquez sur une question pour voir les options de reponse
+                      Cliquez sur une question pour voir les options de réponse
                     </p>
                     <div className="space-y-2">
                       {qcm.questions.map((q, i) => (
@@ -1207,6 +1407,70 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                           onToggle={() => toggleQuestion(module.id, i)}
                         />
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Aperçu Atelier si généré et type = atelier */}
+                {evalType === "atelier" && atelier && (
+                  <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                        {atelier.titre}
+                      </h5>
+                      <span className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-full">
+                        ⏱ {atelier.dureeEstimee}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      {atelier.description}
+                    </p>
+
+                    {/* Objectifs */}
+                    <div className="mb-3">
+                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">🎯 Objectifs</h6>
+                      <ul className="space-y-1">
+                        {atelier.objectifs.slice(0, 3).map((obj, i) => (
+                          <li key={i} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-2">
+                            <span className="text-green-500">✓</span>
+                            {obj}
+                          </li>
+                        ))}
+                        {atelier.objectifs.length > 3 && (
+                          <li className="text-xs text-gray-400 italic">+{atelier.objectifs.length - 3} autres objectifs...</li>
+                        )}
+                      </ul>
+                    </div>
+
+                    {/* Instructions */}
+                    <div className="mb-3">
+                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">📋 Instructions</h6>
+                      <ol className="space-y-1 list-decimal list-inside">
+                        {atelier.instructions.slice(0, 3).map((inst, i) => (
+                          <li key={i} className="text-xs text-gray-600 dark:text-gray-400">
+                            {inst}
+                          </li>
+                        ))}
+                        {atelier.instructions.length > 3 && (
+                          <li className="text-xs text-gray-400 italic list-none ml-4">+{atelier.instructions.length - 3} autres étapes...</li>
+                        )}
+                      </ol>
+                    </div>
+
+                    {/* Critères d'évaluation */}
+                    <div>
+                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">✅ Critères d'évaluation</h6>
+                      <ul className="space-y-1">
+                        {atelier.critereEvaluation.slice(0, 2).map((crit, i) => (
+                          <li key={i} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-2">
+                            <span className="text-amber-500">•</span>
+                            {crit}
+                          </li>
+                        ))}
+                        {atelier.critereEvaluation.length > 2 && (
+                          <li className="text-xs text-gray-400 italic ml-4">+{atelier.critereEvaluation.length - 2} autres critères...</li>
+                        )}
+                      </ul>
                     </div>
                   </div>
                 )}

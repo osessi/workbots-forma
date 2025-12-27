@@ -9,6 +9,20 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 
+// Générer une référence de session unique
+function generateSessionReference(formationTitre: string, year: number, count: number): string {
+  // Prendre les 4 premières lettres du titre en majuscules (sans accents)
+  const prefix = formationTitre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z]/g, "")
+    .substring(0, 4)
+    .toUpperCase();
+
+  // Format: XXXX-2025-001
+  return `${prefix || "FORM"}-${year}-${String(count).padStart(3, "0")}`;
+}
+
 // POST - Créer une nouvelle formation
 export async function POST(request: NextRequest) {
   try {
@@ -52,11 +66,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { titre, description, fichePedagogique, modules } = body;
+    const { titre, description, fichePedagogique, modules, creationMode, contexteData } = body;
 
     if (!titre) {
       return NextResponse.json({ error: "Le titre est requis" }, { status: 400 });
     }
+
+    // Valider le mode de création
+    const validModes = ["AI", "MANUAL", "IMPORT"];
+    const mode = validModes.includes(creationMode) ? creationMode : "AI";
 
     // Créer la formation avec ses modules dans une transaction
     const formation = await prisma.$transaction(async (tx) => {
@@ -66,6 +84,8 @@ export async function POST(request: NextRequest) {
           titre,
           description: description || null,
           fichePedagogique: fichePedagogique || {},
+          contexteData: contexteData || null,
+          creationMode: mode,
           userId: user.id,
           organizationId: user.organizationId!,
           modules: modules && modules.length > 0 ? {
@@ -92,6 +112,21 @@ export async function POST(request: NextRequest) {
           organizationId: user.organizationId!,
           formationId: newFormation.id, // Lier le dossier à la formation
           folderType: "formation",
+        },
+      });
+
+      // 3. Créer automatiquement une session initiale (Session 1)
+      const currentYear = new Date().getFullYear();
+      const reference = generateSessionReference(titre, currentYear, 1);
+
+      await tx.session.create({
+        data: {
+          reference,
+          nom: "Session 1",
+          formationId: newFormation.id,
+          organizationId: user.organizationId!,
+          status: "BROUILLON",
+          modalite: "PRESENTIEL",
         },
       });
 

@@ -19,14 +19,56 @@ import StepFormateurs from "./StepFormateurs";
 import StepDocuments from "./StepDocuments";
 import { Loader2 } from "lucide-react";
 
+// Données initiales de session (pré-remplissage depuis TrainingSession)
+export interface InitialSessionData {
+  lieu?: {
+    modalite: "PRESENTIEL" | "DISTANCIEL" | "MIXTE";
+    lieuId: string | null;
+    lieu?: {
+      id: string;
+      nom: string;
+      typeLieu: string;
+      lieuFormation?: string;
+      codePostal?: string | null;
+      ville?: string | null;
+    } | null;
+    adresseLibre: string;
+    lienConnexion: string;
+    journees: Array<{
+      id: string;
+      date: string;
+      horaireMatin: string;
+      horaireApresMidi: string;
+    }>;
+  };
+  formateurs?: {
+    formateurPrincipalId: string | null;
+    formateurPrincipal?: {
+      id: string;
+      nom: string;
+      prenom: string;
+      email?: string | null;
+    } | null;
+    coformateursIds: string[];
+    coformateurs: Array<{
+      id: string;
+      nom: string;
+      prenom: string;
+      email?: string | null;
+    }>;
+  };
+}
+
 interface DocumentsWizardProps {
   formation: FormationInfo;
+  initialSessionData?: InitialSessionData;
   onComplete?: (data: WizardData, selectedDocs: string[]) => Promise<void>;
   onCancel?: () => void;
 }
 
 export default function DocumentsWizard({
   formation,
+  initialSessionData,
   onComplete,
 }: DocumentsWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>("clients");
@@ -41,13 +83,24 @@ export default function DocumentsWizard({
   // Charger les données existantes au montage
   useEffect(() => {
     const loadExistingSession = async () => {
-      if (!formation.id) {
+      // Déterminer l'URL de l'API en fonction du type de session
+      const hasTrainingSession = !!formation.sessionId;
+
+      if (!formation.id && !formation.sessionId) {
+        // Si pas de formation.id ni de sessionId mais des données initiales, les utiliser
+        if (initialSessionData) {
+          applyInitialSessionData();
+        }
         setIsLoading(false);
         return;
       }
 
       try {
-        const res = await fetch(`/api/document-sessions?formationId=${formation.id}`);
+        // Utiliser trainingSessionId si disponible (nouveau système), sinon formationId (ancien)
+        const apiUrl = hasTrainingSession
+          ? `/api/document-sessions?trainingSessionId=${formation.sessionId}`
+          : `/api/document-sessions?formationId=${formation.id}`;
+        const res = await fetch(apiUrl);
         if (res.ok) {
           const result = await res.json();
           if (result.session) {
@@ -75,35 +128,129 @@ export default function DocumentsWizard({
             setCompletedSteps(completed);
 
             console.log("Session chargée:", result.session.sessionId);
+          } else if (initialSessionData) {
+            // Pas de session existante, appliquer les données initiales
+            applyInitialSessionData();
           }
+        } else if (initialSessionData) {
+          // Erreur API, appliquer les données initiales
+          applyInitialSessionData();
         }
       } catch (error) {
         console.error("Erreur chargement session:", error);
+        // En cas d'erreur, appliquer les données initiales si disponibles
+        if (initialSessionData) {
+          applyInitialSessionData();
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
+    // Fonction pour appliquer les données initiales de la TrainingSession
+    const applyInitialSessionData = () => {
+      if (!initialSessionData) return;
+
+      const newData: WizardData = { ...initialWizardData };
+      const completed: WizardStep[] = [];
+
+      // Pré-remplir le lieu et les journées
+      if (initialSessionData.lieu) {
+        newData.lieu = {
+          modalite: initialSessionData.lieu.modalite,
+          lieuId: initialSessionData.lieu.lieuId,
+          lieu: initialSessionData.lieu.lieu ? {
+            id: initialSessionData.lieu.lieu.id,
+            nom: initialSessionData.lieu.lieu.nom,
+            typeLieu: initialSessionData.lieu.lieu.typeLieu as "PRESENTIEL" | "VISIOCONFERENCE",
+            lieuFormation: initialSessionData.lieu.lieu.lieuFormation || "",
+            codePostal: initialSessionData.lieu.lieu.codePostal || null,
+            ville: initialSessionData.lieu.lieu.ville || null,
+            infosPratiques: null,
+            capacite: null,
+          } : undefined,
+          adresseLibre: initialSessionData.lieu.adresseLibre || "",
+          lienConnexion: initialSessionData.lieu.lienConnexion || "",
+          journees: initialSessionData.lieu.journees.length > 0
+            ? initialSessionData.lieu.journees
+            : initialWizardData.lieu.journees,
+        };
+
+        // Si on a des journées avec des dates, marquer l'étape comme complétée
+        if (initialSessionData.lieu.journees.some(j => j.date)) {
+          completed.push("lieu");
+        }
+      }
+
+      // Pré-remplir les formateurs
+      if (initialSessionData.formateurs) {
+        newData.formateurs = {
+          formateurPrincipalId: initialSessionData.formateurs.formateurPrincipalId,
+          formateurPrincipal: initialSessionData.formateurs.formateurPrincipal ? {
+            id: initialSessionData.formateurs.formateurPrincipal.id,
+            nom: initialSessionData.formateurs.formateurPrincipal.nom,
+            prenom: initialSessionData.formateurs.formateurPrincipal.prenom,
+            email: initialSessionData.formateurs.formateurPrincipal.email || null,
+            telephone: null,
+            fonction: null,
+            specialites: [],
+          } : undefined,
+          coformateursIds: initialSessionData.formateurs.coformateursIds || [],
+          coformateurs: (initialSessionData.formateurs.coformateurs || []).map(cf => ({
+            id: cf.id,
+            nom: cf.nom,
+            prenom: cf.prenom,
+            email: cf.email || null,
+            telephone: null,
+            fonction: null,
+            specialites: [],
+          })),
+        };
+
+        // Si on a un formateur principal, marquer l'étape comme complétée
+        if (initialSessionData.formateurs.formateurPrincipalId) {
+          completed.push("formateurs");
+        }
+      }
+
+      setData(newData);
+      setCompletedSteps(completed);
+      console.log("Données initiales de session appliquées");
+    };
+
     loadExistingSession();
-  }, [formation.id]);
+  }, [formation.id, formation.sessionId, initialSessionData]);
 
   // Sauvegarder automatiquement les données (debounced)
   const saveSession = useCallback(async (currentData: WizardData) => {
-    if (!formation.id) return;
+    // Vérifier qu'on a au moins un identifiant valide
+    if (!formation.id && !formation.sessionId) return;
 
     setIsSaving(true);
     try {
+      // Construire le payload selon le type de session
+      const hasTrainingSession = !!formation.sessionId;
+      const payload = hasTrainingSession
+        ? {
+            trainingSessionId: formation.sessionId,
+            clients: currentData.clients,
+            tarifs: currentData.tarifs,
+            lieu: currentData.lieu,
+            formateurs: currentData.formateurs,
+          }
+        : {
+            formationId: formation.id,
+            sessionId,
+            clients: currentData.clients,
+            tarifs: currentData.tarifs,
+            lieu: currentData.lieu,
+            formateurs: currentData.formateurs,
+          };
+
       const res = await fetch("/api/document-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          formationId: formation.id,
-          sessionId,
-          clients: currentData.clients,
-          tarifs: currentData.tarifs,
-          lieu: currentData.lieu,
-          formateurs: currentData.formateurs,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -118,7 +265,7 @@ export default function DocumentsWizard({
     } finally {
       setIsSaving(false);
     }
-  }, [formation.id, sessionId]);
+  }, [formation.id, formation.sessionId, sessionId]);
 
   // Debounce la sauvegarde
   const debouncedSave = useCallback((currentData: WizardData) => {
@@ -198,22 +345,36 @@ export default function DocumentsWizard({
   const handleGeneratedDocsChange = useCallback((docs: GeneratedDocument[]) => {
     setGeneratedDocs(docs);
     // Sauvegarder immédiatement les documents générés
-    if (formation.id && sessionId) {
+    const hasTrainingSession = !!formation.sessionId;
+    const canSave = hasTrainingSession ? !!formation.sessionId : (formation.id && sessionId);
+
+    if (canSave) {
+      const payload = hasTrainingSession
+        ? {
+            trainingSessionId: formation.sessionId,
+            clients: data.clients,
+            tarifs: data.tarifs,
+            lieu: data.lieu,
+            formateurs: data.formateurs,
+            generatedDocs: docs,
+          }
+        : {
+            formationId: formation.id,
+            sessionId,
+            clients: data.clients,
+            tarifs: data.tarifs,
+            lieu: data.lieu,
+            formateurs: data.formateurs,
+            generatedDocs: docs,
+          };
+
       fetch("/api/document-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          formationId: formation.id,
-          sessionId,
-          clients: data.clients,
-          tarifs: data.tarifs,
-          lieu: data.lieu,
-          formateurs: data.formateurs,
-          generatedDocs: docs,
-        }),
+        body: JSON.stringify(payload),
       }).catch(console.error);
     }
-  }, [formation.id, sessionId, data]);
+  }, [formation.id, formation.sessionId, sessionId, data]);
 
   // Callback pour la génération (appelé depuis StepDocuments si nécessaire)
   const handleGenerate = async (selectedDocs: string[]) => {

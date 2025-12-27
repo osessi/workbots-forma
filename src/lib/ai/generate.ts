@@ -18,21 +18,25 @@ import {
   TestPositionnementSchema,
   EvaluationFinaleSchema,
   ReformulationSchema,
+  AtelierSchema,
   generateFichePedagogiquePrompt,
   generateQCMPrompt,
   generatePositionnementPrompt,
   generateEvaluationPrompt,
   generateReformulationPrompt,
+  generateAtelierPrompt,
   type FichePedagogiqueInput,
   type QCMInput,
   type PositionnementInput,
   type EvaluationInput,
   type ReformulationInput,
+  type AtelierInput,
   type FichePedagogique,
   type QCM,
   type TestPositionnement,
   type EvaluationFinale,
   type Reformulation,
+  type Atelier,
 } from "./prompts";
 
 // ===========================================
@@ -380,6 +384,20 @@ export async function generateReformulation(
     prompt,
     ReformulationSchema,
     AI_CONFIGS.reformulation,
+    options
+  );
+}
+
+export async function generateAtelier(
+  input: AtelierInput,
+  options?: GenerationOptions
+): Promise<GenerationResult<Atelier>> {
+  const prompt = generateAtelierPrompt(input);
+  return generateWithAI(
+    SYSTEM_PROMPTS.atelier,
+    prompt,
+    AtelierSchema,
+    AI_CONFIGS.qcm, // Utilise la meme config que QCM
     options
   );
 }

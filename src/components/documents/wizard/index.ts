@@ -1,5 +1,6 @@
 // Export principal du wizard
 export { default as DocumentsWizard } from "./DocumentsWizard";
+export type { InitialSessionData } from "./DocumentsWizard";
 
 // Export des composants individuels
 export { default as WizardStepper } from "./WizardStepper";

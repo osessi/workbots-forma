@@ -98,6 +98,18 @@ export const ReformulationSchema = z.object({
   suggestions: z.array(z.string()).optional(),
 });
 
+// Schema pour un atelier pratique de module
+export const AtelierSchema = z.object({
+  titre: z.string().min(1),
+  description: z.string().min(1),
+  objectifs: z.array(z.string()).min(2).max(8),
+  instructions: z.array(z.string()).min(3).max(15),
+  dureeEstimee: z.string(),
+  critereEvaluation: z.array(z.string()).min(2).max(8),
+  materielNecessaire: z.array(z.string()).optional(),
+  conseilsAnimateur: z.string().optional(),
+});
+
 // ===========================================
 // PROMPTS SYSTEM
 // ===========================================
@@ -274,6 +286,34 @@ Regles pour la reformulation:
 - Utilise un vocabulaire professionnel adapte
 - Corrige les erreurs grammaticales et orthographiques
 - Rends le texte plus engageant pour les apprenants
+
+Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
+
+  atelier: `Tu es un expert en ingenierie pedagogique specialise dans la creation d'ateliers pratiques pour la formation professionnelle.
+Tu dois creer des ateliers pratiques engageants qui permettent aux apprenants de mettre en application les concepts appris.
+
+STRUCTURE D'UN ATELIER:
+1. Un titre clair et descriptif
+2. Une description concise expliquant le but de l'atelier
+3. Des objectifs pedagogiques precis (ce que l'apprenant saura faire apres l'atelier)
+4. Des instructions etape par etape claires et detaillees
+5. Une duree estimee realiste
+6. Des criteres d'evaluation objectifs et mesurables
+
+REGLES IMPORTANTES:
+- L'atelier doit etre directement lie au contenu du module
+- Les instructions doivent etre progressives et detaillees
+- L'atelier doit favoriser la mise en pratique concrete
+- Les criteres d'evaluation doivent etre clairs et verifiables
+- La duree doit etre realiste (entre 15 et 45 minutes)
+
+TYPES D'ATELIERS POSSIBLES:
+- Etude de cas pratique
+- Mise en situation professionnelle
+- Exercice pratique guide
+- Travail collaboratif en groupe
+- Simulation de scenario reel
+- Creation ou production d'un livrable
 
 Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 };
@@ -569,6 +609,50 @@ Schema JSON attendu:
 ${JSON.stringify(ReformulationSchema.shape, null, 2)}`;
 }
 
+export interface AtelierInput {
+  moduleTitre: string;
+  moduleContenu: string[];
+  formationTitre: string;
+  objectifs: string[];
+}
+
+export function generateAtelierPrompt(input: AtelierInput): string {
+  return `Cree un atelier pratique pour ce module de formation:
+
+FORMATION: ${input.formationTitre}
+MODULE: ${input.moduleTitre}
+
+CONTENU DU MODULE:
+${input.moduleContenu.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+
+OBJECTIFS PEDAGOGIQUES DE LA FORMATION:
+${input.objectifs.map((o, i) => `${i + 1}. ${o}`).join('\n')}
+
+L'atelier doit:
+1. Permettre de mettre en pratique les concepts du module
+2. Etre realisable en 20-40 minutes
+3. Avoir des instructions claires et detaillees
+4. Proposer des criteres d'evaluation objectifs
+5. Favoriser l'apprentissage actif et concret
+
+LIMITES IMPORTANTES:
+- objectifs: entre 2 et 8 elements maximum
+- instructions: entre 3 et 15 etapes maximum
+- critereEvaluation: entre 2 et 8 elements maximum
+
+Schema JSON attendu:
+{
+  "titre": "string - titre de l'atelier",
+  "description": "string - description de 2-3 phrases",
+  "objectifs": ["objectif1", "objectif2", "objectif3"] (2 a 8 elements),
+  "instructions": ["etape1", "etape2", "etape3", "..."] (3 a 15 etapes),
+  "dureeEstimee": "30 minutes",
+  "critereEvaluation": ["critere1", "critere2", "..."] (2 a 8 elements),
+  "materielNecessaire": ["materiel1", "materiel2"] (optionnel),
+  "conseilsAnimateur": "string" (optionnel)
+}`;
+}
+
 // ===========================================
 // TYPES EXPORTES
 // ===========================================
@@ -580,4 +664,5 @@ export type QuestionTest = z.infer<typeof QuestionTestSchema>;
 export type TestPositionnement = z.infer<typeof TestPositionnementSchema>;
 export type EvaluationFinale = z.infer<typeof EvaluationFinaleSchema>;
 export type Reformulation = z.infer<typeof ReformulationSchema>;
+export type Atelier = z.infer<typeof AtelierSchema>;
 export type Module = z.infer<typeof ModuleSchema>;

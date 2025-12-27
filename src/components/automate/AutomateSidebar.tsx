@@ -54,7 +54,7 @@ const mainNavItems: NavItem[] = [
   {
     icon: <PlusCircle size={20} strokeWidth={1.5} />,
     name: "Créer une formation",
-    path: "/automate/create",
+    path: "/automate/import",
   },
   {
     icon: <FolderOpen size={20} strokeWidth={1.5} />,
@@ -70,6 +70,11 @@ const mainNavItems: NavItem[] = [
     icon: <Calendar size={20} strokeWidth={1.5} />,
     name: "Sessions",
     subItems: [
+      {
+        icon: <Users size={18} strokeWidth={1.5} />,
+        name: "Gestion sessions",
+        path: "/automate/sessions",
+      },
       {
         icon: <Calendar size={18} strokeWidth={1.5} />,
         name: "Calendrier",

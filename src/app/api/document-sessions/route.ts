@@ -6,7 +6,195 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
-import { ApprenantStatus, SessionModalite } from "@prisma/client";
+import { ApprenantStatus, SessionModalite, DocumentType } from "@prisma/client";
+
+// Interface pour les données du wizard
+interface WizardClient {
+  id: string;
+  type: string;
+  entrepriseId?: string;
+  apprenants?: Array<{ id: string }>;
+}
+
+interface WizardTarif {
+  clientId: string;
+  tarifHT?: number;
+  financements?: Array<{
+    financeurId: string;
+    montant: number;
+  }>;
+}
+
+interface WizardLieu {
+  modalite?: string;
+  lieuId?: string | null;
+  adresseLibre?: string;
+  lienConnexion?: string;
+  journees?: Array<{
+    id: string;
+    date: string;
+    horaireMatin?: string;
+    horaireApresMidi?: string;
+  }>;
+}
+
+interface WizardFormateurs {
+  formateurPrincipalId?: string | null;
+  coformateursIds?: string[];
+}
+
+interface WizardGeneratedDoc {
+  id?: string;
+  type: string;
+  titre: string;
+  clientId?: string;
+  apprenantId?: string;
+  entrepriseId?: string;
+  renderedContent: string;
+  jsonContent?: string;
+  savedToDrive?: boolean;
+}
+
+// Fonction pour sauvegarder vers le nouveau système Session
+async function handleTrainingSessionSave(
+  organizationId: string,
+  trainingSessionId: string,
+  clients: WizardClient[] | undefined,
+  tarifs: WizardTarif[] | undefined,
+  lieu: WizardLieu | undefined,
+  formateurs: WizardFormateurs | undefined,
+  generatedDocs: WizardGeneratedDoc[] | undefined
+) {
+  try {
+    // Vérifier que la session existe et appartient à l'organisation
+    const session = await prisma.session.findFirst({
+      where: {
+        id: trainingSessionId,
+        organizationId,
+      },
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Session non trouvée" }, { status: 404 });
+    }
+
+    // Supprimer les anciennes données clients (les documents sont gérés séparément)
+    await prisma.sessionClientNew.deleteMany({ where: { sessionId: trainingSessionId } });
+
+    // Créer les clients avec leurs participants et financements
+    if (clients && clients.length > 0) {
+      for (const client of clients) {
+        const typeClientMap: Record<string, ApprenantStatus> = {
+          ENTREPRISE: "SALARIE",
+          INDEPENDANT: "INDEPENDANT",
+          PARTICULIER: "PARTICULIER",
+        };
+
+        const tarif = tarifs?.find((t) => t.clientId === client.id);
+
+        const sessionClient = await prisma.sessionClientNew.create({
+          data: {
+            sessionId: trainingSessionId,
+            typeClient: typeClientMap[client.type] || "PARTICULIER",
+            entrepriseId: client.entrepriseId || null,
+            tarifHT: tarif?.tarifHT || null,
+          },
+        });
+
+        // Créer les participants
+        if (client.apprenants && client.apprenants.length > 0) {
+          for (const apprenant of client.apprenants) {
+            await prisma.sessionParticipantNew.create({
+              data: {
+                clientId: sessionClient.id,
+                apprenantId: apprenant.id,
+              },
+            });
+          }
+        }
+
+        // Créer les financements
+        if (tarif?.financements && tarif.financements.length > 0) {
+          for (const financement of tarif.financements) {
+            if (financement.financeurId && financement.montant > 0) {
+              await prisma.sessionFinancementNew.create({
+                data: {
+                  clientId: sessionClient.id,
+                  financeurId: financement.financeurId,
+                  montantFinanceHT: financement.montant,
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Créer/Mettre à jour les documents générés
+    if (generatedDocs && generatedDocs.length > 0) {
+      const docTypeMap: Record<string, DocumentType> = {
+        convention: "CONVENTION",
+        contrat: "CONTRAT_FORMATION",
+        convocation: "CONVOCATION",
+        attestation: "ATTESTATION_FIN",
+        certificat_realisation: "CERTIFICAT",
+        emargement: "ATTESTATION_PRESENCE",
+        facture: "FACTURE",
+      };
+
+      for (const doc of generatedDocs) {
+        const documentType = docTypeMap[doc.type] || ("AUTRE" as DocumentType);
+
+        // Chercher un document existant
+        const existingDoc = await prisma.sessionDocumentNew.findFirst({
+          where: {
+            sessionId: trainingSessionId,
+            type: documentType,
+            clientId: doc.clientId || null,
+            participantId: doc.apprenantId || null,
+          },
+        });
+
+        if (existingDoc) {
+          await prisma.sessionDocumentNew.update({
+            where: { id: existingDoc.id },
+            data: {
+              content: { html: doc.renderedContent, json: doc.jsonContent },
+              titre: doc.titre,
+              isGenerated: true,
+              generatedAt: new Date(),
+            },
+          });
+        } else {
+          await prisma.sessionDocumentNew.create({
+            data: {
+              sessionId: trainingSessionId,
+              type: documentType,
+              clientId: doc.clientId || null,
+              participantId: doc.apprenantId || null,
+              titre: doc.titre,
+              content: { html: doc.renderedContent, json: doc.jsonContent },
+              isGenerated: true,
+              generatedAt: new Date(),
+            },
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      sessionId: trainingSessionId,
+      message: "Session mise à jour",
+    });
+  } catch (error) {
+    console.error("Erreur sauvegarde session:", error);
+    return NextResponse.json(
+      { error: "Erreur lors de la sauvegarde de la session" },
+      { status: 500 }
+    );
+  }
+}
 
 // POST - Créer ou mettre à jour une session documentaire
 export async function POST(request: NextRequest) {
@@ -50,13 +238,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       formationId,
-      sessionId, // Si fourni, on met à jour
+      sessionId, // Si fourni, on met à jour (ancien système DocumentSession)
+      trainingSessionId, // Si fourni, utiliser le nouveau système Session
       clients,
       tarifs,
       lieu,
       formateurs,
       generatedDocs,
     } = body;
+
+    // Si trainingSessionId est fourni, utiliser le nouveau système Session
+    if (trainingSessionId) {
+      return await handleTrainingSessionSave(
+        user.organizationId!,
+        trainingSessionId,
+        clients,
+        tarifs,
+        lieu,
+        formateurs,
+        generatedDocs
+      );
+    }
 
     if (!formationId) {
       return NextResponse.json({ error: "formationId requis" }, { status: 400 });
@@ -212,7 +414,7 @@ export async function POST(request: NextRequest) {
           contrat: "CONTRAT_FORMATION",
           convocation: "CONVOCATION",
           attestation: "ATTESTATION_FIN",
-          certificat_realisation: "CERTIFICAT_REALISATION",
+          certificat_realisation: "CERTIFICAT",
           emargement: "ATTESTATION_PRESENCE",
           facture: "FACTURE",
         };
@@ -310,15 +512,125 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const formationId = searchParams.get("formationId");
+    const trainingSessionId = searchParams.get("trainingSessionId");
 
-    if (!formationId) {
-      return NextResponse.json({ error: "formationId requis" }, { status: 400 });
+    if (!formationId && !trainingSessionId) {
+      return NextResponse.json({ error: "formationId ou trainingSessionId requis" }, { status: 400 });
     }
 
     // Récupérer la session avec toutes ses relations
+    // Si trainingSessionId est fourni, on cherche par cet ID dans la table Session (nouveau système)
+    // Sinon, on cherche par formationId dans DocumentSession (ancien système)
+
+    if (trainingSessionId) {
+      // Nouveau système: utiliser la table Session directement
+      const trainingSession = await prisma.session.findFirst({
+        where: {
+          id: trainingSessionId,
+          organizationId: user.organizationId,
+        },
+        include: {
+          lieu: true,
+          formateur: true,
+          journees: {
+            orderBy: { ordre: "asc" },
+          },
+          coFormateurs: {
+            include: { intervenant: true },
+          },
+          clients: {
+            include: {
+              entreprise: true,
+              participants: {
+                include: { apprenant: true },
+              },
+              financements: {
+                include: { financeur: true },
+              },
+            },
+          },
+          documentsGeneres: true,
+        },
+      });
+
+      if (!trainingSession) {
+        return NextResponse.json({ session: null });
+      }
+
+      // Transformer les données pour le format attendu par le wizard
+      const wizardData = {
+        sessionId: trainingSession.id,
+        isTrainingSession: true, // Marqueur pour différencier du système DocumentSession
+        clients: trainingSession.clients.map((c) => ({
+          id: c.id,
+          type: c.typeClient === "SALARIE" ? "ENTREPRISE" : c.typeClient,
+          entrepriseId: c.entrepriseId,
+          entreprise: c.entreprise ? {
+            id: c.entreprise.id,
+            raisonSociale: c.entreprise.raisonSociale,
+            siret: c.entreprise.siret,
+          } : null,
+          apprenant: c.participants.length === 1 && c.typeClient !== "SALARIE" ? {
+            id: c.participants[0].apprenant.id,
+            nom: c.participants[0].apprenant.nom,
+            prenom: c.participants[0].apprenant.prenom,
+            email: c.participants[0].apprenant.email,
+          } : null,
+          apprenants: c.participants.map((p) => ({
+            id: p.apprenant.id,
+            nom: p.apprenant.nom,
+            prenom: p.apprenant.prenom,
+            email: p.apprenant.email,
+          })),
+        })),
+        tarifs: trainingSession.clients.map((c) => ({
+          clientId: c.id,
+          tarifHT: c.tarifHT || 0,
+          financeurId: c.financements[0]?.financeurId || null,
+          montantFinance: c.financements[0]?.montantFinanceHT || 0,
+          resteACharge: (c.tarifHT || 0) - (c.financements[0]?.montantFinanceHT || 0),
+        })),
+        lieu: {
+          modalite: trainingSession.modalite,
+          lieuId: trainingSession.lieuId,
+          lieu: trainingSession.lieu,
+          adresseLibre: trainingSession.lieuTexteLibre || "",
+          lienConnexion: trainingSession.lienConnexion || "",
+          journees: trainingSession.journees.map((j) => ({
+            id: j.id,
+            date: j.date.toISOString().split("T")[0],
+            horaireMatin: j.heureDebutMatin && j.heureFinMatin ? `${j.heureDebutMatin} - ${j.heureFinMatin}` : "09:00 - 12:30",
+            horaireApresMidi: j.heureDebutAprem && j.heureFinAprem ? `${j.heureDebutAprem} - ${j.heureFinAprem}` : "14:00 - 17:30",
+          })),
+        },
+        formateurs: {
+          formateurPrincipalId: trainingSession.formateurId,
+          formateurPrincipal: trainingSession.formateur,
+          coformateursIds: trainingSession.coFormateurs.map((cf) => cf.intervenantId),
+          coformateurs: trainingSession.coFormateurs.map((cf) => cf.intervenant),
+        },
+        generatedDocs: trainingSession.documentsGeneres.map((d) => {
+          const content = d.content as { html?: string; json?: string } | null;
+          return {
+            id: d.id,
+            type: d.type.toLowerCase(),
+            titre: d.titre || `Document ${d.type}`,
+            clientId: d.clientId,
+            apprenantId: d.participantId, // Mapping participantId -> apprenantId pour compatibilité
+            renderedContent: content?.html || "",
+            jsonContent: content?.json,
+            savedToDrive: d.isGenerated, // Utiliser isGenerated au lieu de status
+          };
+        }),
+      };
+
+      return NextResponse.json({ session: wizardData });
+    }
+
+    // Ancien système: DocumentSession
     const session = await prisma.documentSession.findFirst({
       where: {
-        formationId,
+        formationId: formationId!,
         organizationId: user.organizationId,
       },
       include: {

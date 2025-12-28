@@ -217,30 +217,39 @@ export const StepContexte: React.FC<StepContexteProps> = ({
           {/* Informations tarifaires */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Informations tarifaires
+              Tarifs <span className="text-xs text-amber-600 font-normal">(recommandé pour le catalogue public)</span>
             </label>
             <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Montant facturé à une entreprise (en HT)"
-                value={data.tarifEntreprise || ""}
-                onChange={(e) => handleChange("tarifEntreprise", e.target.value)}
-                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
-              />
-              <input
-                type="text"
-                placeholder="Montant facturé à un indépendant (en HT)"
-                value={data.tarifIndependant || ""}
-                onChange={(e) => handleChange("tarifIndependant", e.target.value)}
-                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
-              />
-              <input
-                type="text"
-                placeholder="Montant facturé à un particulier (en TTC)"
-                value={data.tarifParticulier || ""}
-                onChange={(e) => handleChange("tarifParticulier", e.target.value)}
-                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
-              />
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Entreprise (HT)</label>
+                <input
+                  type="text"
+                  placeholder="Montant facturé à une entreprise"
+                  value={data.tarifEntreprise || ""}
+                  onChange={(e) => handleChange("tarifEntreprise", e.target.value)}
+                  className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Indépendant (HT)</label>
+                <input
+                  type="text"
+                  placeholder="Montant facturé à un indépendant"
+                  value={data.tarifIndependant || ""}
+                  onChange={(e) => handleChange("tarifIndependant", e.target.value)}
+                  className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Particulier (TTC)</label>
+                <input
+                  type="text"
+                  placeholder="Montant facturé à un particulier"
+                  value={data.tarifParticulier || ""}
+                  onChange={(e) => handleChange("tarifParticulier", e.target.value)}
+                  className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+                />
+              </div>
             </div>
           </div>
         </div>

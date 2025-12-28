@@ -57,9 +57,12 @@ enum FinanceurType {
 }
 
 enum SessionModalite {
-  PRESENTIEL
-  DISTANCIEL
-  MIXTE
+  PRESENTIEL          // Formation en présentiel
+  DISTANCIEL          // Formation à distance synchrone
+  MIXTE               // Combinaison présentiel et distanciel
+  E_LEARNING          // Formation en ligne asynchrone
+  SITUATION_TRAVAIL   // Formation en situation de travail (AFEST)
+  STAGE               // Stage pratique
 }
 
 enum SessionStatus {
@@ -219,6 +222,20 @@ model Organization {
   // SCORM LMS
   scormPackages     SCORMPackage[]
 
+  // Qualiopi - Pré-inscriptions
+  preInscriptions   PreInscription[]
+
+  // Qualiopi - Champs catalogue public (Indicateur 1)
+  catalogueActif    Boolean          @default(false) // Catalogue public activé
+  categorieOF       String?          // Catégorie de l'OF
+  certifications    String[]         // Certifications (Qualiopi, etc.)
+  mentionsLegalesCatalogue String?   @db.Text // Mentions légales spécifiques au catalogue
+  certificatQualiopiUrl String?      // URL du certificat Qualiopi (PDF uploadé)
+  categorieQualiopi     String?      // Catégorie Qualiopi (ex: "Actions de formation")
+
+  // Notifications
+  notifications     Notification[]
+
   @@index([slug])
   @@index([customDomain])
 }
@@ -258,6 +275,7 @@ model User {
   aiGenerationLogs  AIGenerationLog[]
   templateVersions  TemplateVersion[] @relation("TemplateVersionCreator")
   opportunites      CRMOpportunite[]
+  notifications     Notification[]
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -332,6 +350,29 @@ model Formation {
   opportunites      CRMOpportunite[]
   lmsInscriptions   LMSInscription[]
   scormPackages     SCORMPackage[]
+
+  // Qualiopi - Pré-inscriptions et Indicateurs
+  preInscriptions   PreInscription[]
+  indicateurs       FormationIndicateurs?
+
+  // Qualiopi - Indicateur 3 : Formation certifiante
+  isCertifiante     Boolean          @default(false)
+  numeroFicheRS     String?          // Numéro de fiche RS (ex: RS6563)
+  referentielRSUrl  String?          // URL du fichier référentiel uploadé
+  lienFranceCompetences String?      // Lien vers la fiche France Compétences
+
+  // Qualiopi - Catalogue public
+  estPublieCatalogue Boolean         @default(false) // Visible dans le catalogue public
+  tarifAffiche       Float?          // Tarif affiché dans le catalogue
+  publicVise         String?         @db.Text // Public visé
+  prerequis          String?         @db.Text // Prérequis
+  accessibiliteHandicap String?      @db.Text // Informations accessibilité handicap
+  delaiAcces         String?         // Délai d'accès (ex: "2 semaines")
+  modalitesEvaluation String?        @db.Text // Modalités d'évaluation
+
+  // CPF - Éligibilité
+  estEligibleCPF     Boolean         @default(false) // Éligible au CPF
+  codeFinancementCPF String?         // Code de financement CPF
 
   @@index([organizationId])
   @@index([userId])
@@ -1138,6 +1179,13 @@ model Apprenant {
   // Nouveau système de sessions
   sessionParticipationsNew SessionParticipantNew[] @relation("SessionParticipantApprenant")
   evaluationResultats      EvaluationResultat[]    @relation("EvaluationResultatApprenant")
+
+  // Qualiopi - Pré-inscriptions converties
+  preInscriptions   PreInscription[]
+
+  // Authentification apprenant (Magic Code)
+  authCodes         ApprenantAuthCode[]
+  inviteTokens      ApprenantInviteToken[]
 
   @@index([organizationId])
   @@index([entrepriseId])
@@ -2496,6 +2544,154 @@ model SignatureDocumentNew {
 }
 
 // ===========================================
+// QUALIOPI - INDICATEUR 1 : CATALOGUE PUBLIC & PRÉ-INSCRIPTION
+// ===========================================
+
+enum SituationProfessionnelle {
+  SALARIE
+  INDEPENDANT
+  PARTICULIER
+  DEMANDEUR_EMPLOI
+  ETUDIANT
+  RETRAITE
+  AUTRE
+}
+
+enum ModeFinancement {
+  ENTREPRISE
+  OPCO
+  CPF
+  FRANCE_TRAVAIL
+  PERSONNEL
+  MIXTE
+  AUTRE
+}
+
+enum PreInscriptionStatut {
+  NOUVELLE
+  EN_TRAITEMENT
+  ACCEPTEE
+  REFUSEE
+  ANNULEE
+}
+
+// Pré-inscription depuis le catalogue public
+model PreInscription {
+  id                    String                    @id @default(cuid())
+
+  // Organisation cible
+  organizationId        String
+  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Formation demandée
+  formationId           String
+  formation             Formation                 @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // ===========================================
+  // PARTIE 1 : ANALYSE DU BESOIN (Qualiopi IND 1 & 4)
+  // ===========================================
+  objectifsProfessionnels String?                 @db.Text // Objectifs professionnels recherchés
+  contexte                String?                 @db.Text // Contexte de la demande
+  experiencePrealable     String?                 @db.Text // Expérience préalable dans le domaine
+  attentesSpecifiques     String?                 @db.Text // Attentes spécifiques
+  contraintes             String?                 @db.Text // Contraintes (horaires, lieu, etc.)
+
+  // ===========================================
+  // PARTIE 2 : FICHE DE RENSEIGNEMENTS
+  // ===========================================
+  // Identité
+  civilite              String?                   // M., Mme
+  nom                   String
+  prenom                String
+  dateNaissance         DateTime?
+  lieuNaissance         String?
+
+  // Coordonnées
+  email                 String
+  telephone             String?
+  adresse               String?
+  codePostal            String?
+  ville                 String?
+  pays                  String                    @default("France")
+
+  // Situation professionnelle
+  situationProfessionnelle SituationProfessionnelle?
+  entreprise               String?                // Nom de l'entreprise (si salarié)
+  poste                    String?                // Poste actuel
+  siret                    String?                // SIRET (si indépendant)
+
+  // ===========================================
+  // HANDICAP (OBLIGATOIRE QUALIOPI)
+  // ===========================================
+  situationHandicap     Boolean                   @default(false)
+  besoinsAmenagements   String?                   @db.Text // Aménagements spécifiques nécessaires
+
+  // ===========================================
+  // FINANCEMENT
+  // ===========================================
+  modeFinancement       ModeFinancement?
+  financeurNom          String?                   // Nom du financeur si OPCO ou autre
+  commentaireFinancement String?                  @db.Text
+
+  // ===========================================
+  // GESTION
+  // ===========================================
+  statut                PreInscriptionStatut      @default(NOUVELLE)
+  noteInterne           String?                   @db.Text // Notes internes de l'OF
+  motifRefus            String?                   @db.Text // Motif si refus
+
+  // Conversion en apprenant
+  apprenantId           String?                   // Si converti en apprenant
+  apprenant             Apprenant?                @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+
+  // Metadata
+  sourceUrl             String?                   // URL source de la pré-inscription
+  ipAddress             String?                   // IP pour traçabilité
+  userAgent             String?                   // User agent
+
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  traiteeAt             DateTime?                 // Date de traitement
+  traiteePar            String?                   // User ID qui a traité
+
+  @@index([organizationId])
+  @@index([formationId])
+  @@index([statut])
+  @@index([email])
+  @@index([createdAt])
+}
+
+// ===========================================
+// QUALIOPI - INDICATEUR 2 : INDICATEURS DE RÉSULTATS
+// ===========================================
+
+model FormationIndicateurs {
+  id                    String                    @id @default(cuid())
+
+  // Formation
+  formationId           String                    @unique
+  formation             Formation                 @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Indicateurs calculés
+  tauxSatisfaction      Float?                    // Taux de satisfaction (%) depuis éval à chaud
+  nombreAvis            Int                       @default(0)
+  nombreStagiaires      Int                       @default(0)
+  tauxReussite          Float?                    // Taux de réussite évaluation finale (%)
+  tauxCertification     Float?                    // Taux d'obtention certification (si certifiante)
+  tauxAbandon           Float?                    // Taux d'abandon (%)
+
+  // Période de calcul
+  annee                 Int?                      // Année de référence (N-1)
+  dernierCalcul         DateTime?
+
+  // Metadata
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([formationId])
+}
+
+// ===========================================
 // ÉVALUATIONS (Persistées)
 // ===========================================
 
@@ -2585,4 +2781,200 @@ model EvaluationResultat {
   @@index([evaluationId])
   @@index([apprenantId])
   @@index([sessionId])
+}
+
+// ===========================================
+// EMAILS ENVOYÉS (Traçabilité Qualiopi)
+// ===========================================
+// Stockage permanent de tous les emails envoyés pour audit Qualiopi
+
+enum SentEmailType {
+  VERIFICATION_CODE        // Code de vérification (signature, etc.)
+  SIGNATURE_INVITATION     // Invitation à signer un document
+  INVITATION_APPRENANT     // Invitation espace apprenant
+  PRE_INSCRIPTION          // Confirmation pré-inscription
+  NOTIFICATION_ADMIN       // Notification aux administrateurs
+  CONVOCATION              // Convocation à une session
+  ATTESTATION              // Envoi d'attestation
+  CONVENTION               // Envoi de convention
+  DOCUMENT                 // Envoi de document générique
+  RAPPEL                   // Rappel (session, signature, etc.)
+  OTHER                    // Autre type d'email
+}
+
+enum SentEmailStatus {
+  SENT                     // Envoyé avec succès
+  DELIVERED                // Délivré (si webhook Resend configuré)
+  OPENED                   // Ouvert (si tracking activé)
+  CLICKED                  // Lien cliqué
+  BOUNCED                  // Rebond (adresse invalide)
+  FAILED                   // Échec d'envoi
+}
+
+model SentEmail {
+  id              String          @id @default(cuid())
+
+  // Organisation (multi-tenant)
+  organizationId  String
+
+  // Destinataire(s)
+  toEmail         String          // Email principal du destinataire
+  toName          String?         // Nom du destinataire
+  ccEmails        String[]        // Emails en copie
+  bccEmails       String[]        // Emails en copie cachée
+
+  // Contenu
+  subject         String          // Sujet de l'email
+  htmlContent     String          @db.Text  // Contenu HTML complet
+  textContent     String?         @db.Text  // Contenu texte (optionnel)
+
+  // Type et statut
+  type            SentEmailType   @default(OTHER)
+  status          SentEmailStatus @default(SENT)
+
+  // Métadonnées de tracking (Resend)
+  resendId        String?         // ID Resend pour suivi
+  deliveredAt     DateTime?       // Date de délivrance
+  openedAt        DateTime?       // Date d'ouverture
+  clickedAt       DateTime?       // Date du premier clic
+
+  // Références vers les entités liées (optionnel)
+  apprenantId     String?         // Si lié à un apprenant
+  sessionId       String?         // Si lié à une session
+  formationId     String?         // Si lié à une formation
+  preInscriptionId String?        // Si lié à une pré-inscription
+  signatureDocumentId String?     // Si lié à un document de signature
+
+  // Pièces jointes (stockées comme JSON)
+  attachments     Json?           // [{filename, size, contentType}]
+
+  // Expéditeur (pour audit)
+  sentByUserId    String?         // User qui a déclenché l'envoi (si applicable)
+  sentBySystem    Boolean         @default(false)  // true si envoi automatique
+
+  // Metadata technique
+  ipAddress       String?         // IP de l'utilisateur qui a déclenché
+  userAgent       String?         // User agent
+
+  // Erreur (si FAILED ou BOUNCED)
+  errorMessage    String?
+
+  // Timestamps
+  sentAt          DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+
+  @@index([organizationId])
+  @@index([toEmail])
+  @@index([type])
+  @@index([status])
+  @@index([sentAt])
+  @@index([apprenantId])
+  @@index([sessionId])
+  @@index([formationId])
+  @@index([preInscriptionId])
+}
+
+// ===========================================
+// NOTIFICATIONS
+// ===========================================
+// Système de notifications internes
+
+enum NotificationType {
+  PRE_INSCRIPTION      // Nouvelle pré-inscription reçue
+  INSCRIPTION          // Inscription validée
+  SESSION_RAPPEL       // Rappel de session à venir
+  FORMATION_MODIFIEE   // Formation modifiée
+  DOCUMENT_GENERE      // Document généré
+  EVALUATION_COMPLETE  // Évaluation complétée par un apprenant
+  PAIEMENT_RECU        // Paiement reçu
+  SYSTEME              // Notification système
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+
+  // Organisation (multi-tenant)
+  organizationId  String
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Destinataire
+  userId          String?          // null = notification pour tous les admins de l'org
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Contenu
+  type            NotificationType
+  titre           String
+  message         String           @db.Text
+
+  // Lien vers la ressource concernée
+  resourceType    String?          // "preInscription", "formation", "session", "apprenant", etc.
+  resourceId      String?
+  actionUrl       String?          // URL vers la page concernée
+
+  // Statut
+  isRead          Boolean          @default(false)
+  readAt          DateTime?
+
+  // Metadata
+  metadata        Json?            // Données supplémentaires
+  createdAt       DateTime         @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ===========================================
+// AUTHENTIFICATION APPRENANT (Magic Code OTP)
+// ===========================================
+// Codes de connexion temporaires pour les apprenants
+
+model ApprenantAuthCode {
+  id              String    @id @default(cuid())
+
+  // Apprenant concerné
+  apprenantId     String
+  apprenant       Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Code de vérification
+  code            String    // Code à 6 chiffres
+
+  // Validité
+  expiresAt       DateTime  // Expiration (10 minutes)
+  usedAt          DateTime? // Date d'utilisation (null si pas encore utilisé)
+
+  // Sécurité
+  attempts        Int       @default(0) // Nombre de tentatives
+  ipAddress       String?   // IP de la demande
+  userAgent       String?   // User agent
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+
+  @@index([apprenantId])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+// Token de première connexion (envoyé dans l'email d'invitation)
+model ApprenantInviteToken {
+  id              String    @id @default(cuid())
+
+  // Apprenant concerné
+  apprenantId     String
+  apprenant       Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Token unique
+  token           String    @unique
+
+  // Validité
+  expiresAt       DateTime  // Expiration (48h)
+  usedAt          DateTime? // Date d'utilisation
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+
+  @@index([apprenantId])
+  @@index([token])
 }

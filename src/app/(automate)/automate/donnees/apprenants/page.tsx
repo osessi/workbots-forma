@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Users,
   Plus,
@@ -13,6 +14,7 @@ import {
   Loader2,
   Briefcase,
   User,
+  Eye,
 } from "lucide-react";
 
 interface Entreprise {
@@ -300,6 +302,13 @@ export default function ApprenantsPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-1 ml-2">
+                  <Link
+                    href={`/automate/apprenants/${apprenant.id}`}
+                    className="p-2 text-gray-400 hover:text-green-500 hover:bg-green-50 rounded-lg transition-colors dark:hover:bg-green-500/10"
+                    title="Voir le dossier"
+                  >
+                    <Eye size={16} />
+                  </Link>
                   <button
                     onClick={() => openModal(apprenant)}
                     className="p-2 text-gray-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors dark:hover:bg-brand-500/10"

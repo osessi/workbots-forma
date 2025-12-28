@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAutomate } from "@/context/AutomateContext";
 import KanbanBoard from "@/components/formations/KanbanBoard";
+import { FormationBadges } from "@/components/catalogue/FormationBadges";
 
 // Icon Loader
 const LoaderIcon = () => (
@@ -213,6 +214,21 @@ export default function MesFormationsPage() {
       refreshFormations();
     } catch (error) {
       console.error("Erreur lors de la publication:", error);
+    }
+    setOpenMenuId(null);
+  };
+
+  // Publier/Dépublier une formation dans le catalogue public
+  const handlePublishToCatalogue = async (id: string, currentlyPublished: boolean) => {
+    try {
+      await fetch(`/api/formations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estPublieCatalogue: !currentlyPublished }),
+      });
+      refreshFormations();
+    } catch (error) {
+      console.error("Erreur lors de la publication au catalogue:", error);
     }
     setOpenMenuId(null);
   };
@@ -498,6 +514,15 @@ export default function MesFormationsPage() {
               />
               {/* Badge status */}
               <div className="absolute top-3 right-3 flex items-center gap-2">
+                {/* Badge Catalogue */}
+                {formation.estPublieCatalogue && (
+                  <span className="px-2.5 py-1 text-xs font-medium bg-blue-600 text-white rounded-full shadow-sm flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 3C2 2.44772 2.44772 2 3 2H6L7.5 4H13C13.5523 4 14 4.44772 14 5V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Catalogue
+                  </span>
+                )}
                 {formation.isPublished ? (
                   <span className="px-2.5 py-1 text-xs font-medium bg-green-500 text-white rounded-full shadow-sm flex items-center gap-1">
                     <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -564,6 +589,16 @@ export default function MesFormationsPage() {
                         {formation.isPublished ? "Dépublier du LMS" : "Publier dans le LMS"}
                       </button>
                       <button
+                        onClick={() => handlePublishToCatalogue(formation.id, formation.estPublieCatalogue || false)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2 3C2 2.44772 2.44772 2 3 2H6L7.5 4H13C13.5523 4 14 4.44772 14 5V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M8 7V11M6 9H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        {formation.estPublieCatalogue ? "Retirer du catalogue" : "Publier au catalogue"}
+                      </button>
+                      <button
                         onClick={() => handleArchive(formation.id, false)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                       >
@@ -586,6 +621,24 @@ export default function MesFormationsPage() {
 
             {/* Contenu */}
             <div className="p-4">
+              {/* Badges */}
+              <div className="mb-3">
+                <FormationBadges
+                  formation={{
+                    modalites: formation.modalites || [],
+                    dureeHeures: formation.dureeHeures || 0,
+                    dureeJours: formation.dureeJours,
+                    isCertifiante: formation.isCertifiante || false,
+                    numeroFicheRS: formation.numeroFicheRS,
+                    estEligibleCPF: formation.estEligibleCPF,
+                    accessibiliteHandicap: formation.accessibiliteHandicap,
+                    indicateurs: formation.indicateurs,
+                    nombreModules: formation.nombreModules || formation.modules?.length || 0,
+                  }}
+                  size="sm"
+                />
+              </div>
+
               <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                 Nom de la formation
               </label>

@@ -151,6 +151,9 @@ export async function PATCH(
     if (body.slidesData !== undefined) updateData.slidesData = body.slidesData;
     if (body.slidesGenerated !== undefined) updateData.slidesGenerated = body.slidesGenerated;
 
+    // Publication catalogue public
+    if (body.estPublieCatalogue !== undefined) updateData.estPublieCatalogue = body.estPublieCatalogue;
+
     const updatedFormation = await prisma.formation.update({
       where: { id },
       data: updateData,

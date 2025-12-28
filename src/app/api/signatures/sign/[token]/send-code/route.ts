@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
+import { sendEmail, generateSignatureVerificationCodeEmail } from "@/lib/services/email";
 
 // Générer un code à 6 chiffres
 function generateCode(): string {
@@ -21,9 +22,20 @@ export async function POST(
     const body = await request.json();
     const { method = "email" } = body; // "email" ou "sms"
 
-    // Récupérer le document
+    // Récupérer le document avec l'organisation
     const document = await prisma.signatureDocument.findUnique({
       where: { token },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            nomCommercial: true,
+            logo: true,
+            primaryColor: true,
+          },
+        },
+      },
     });
 
     if (!document) {
@@ -105,6 +117,8 @@ export async function POST(
     });
 
     // Envoyer le code selon la méthode
+    const orgName = document.organization?.nomCommercial || document.organization?.name || "Organisme";
+
     if (method === "sms" && document.destinataireTel) {
       // TODO: Intégrer un service SMS (Twilio, etc.)
       console.log(`[SIGNATURE] Code SMS ${code} envoyé à ${document.destinataireTel}`);
@@ -118,24 +132,24 @@ export async function POST(
       });
       */
     } else {
-      // Envoi par email
+      // Envoi par email avec template
       console.log(`[SIGNATURE] Code Email ${code} envoyé à ${document.destinataireEmail}`);
 
-      // TODO: Intégrer l'envoi d'email
-      // En production, utiliser Resend, SendGrid, etc.
-      /*
+      const emailContent = generateSignatureVerificationCodeEmail({
+        destinataireNom: document.destinataireNom,
+        documentTitre: document.titre,
+        code,
+        organizationName: orgName,
+        organizationLogo: document.organization?.logo,
+        primaryColor: document.organization?.primaryColor || undefined,
+      });
+
       await sendEmail({
         to: document.destinataireEmail,
-        subject: `Code de vérification pour signature - ${document.titre}`,
-        html: `
-          <p>Bonjour ${document.destinataireNom},</p>
-          <p>Votre code de vérification pour signer le document "${document.titre}" est:</p>
-          <h2 style="font-size: 32px; letter-spacing: 5px; text-align: center;">${code}</h2>
-          <p>Ce code expire dans 5 minutes.</p>
-          <p>Si vous n'avez pas demandé ce code, veuillez ignorer cet email.</p>
-        `,
-      });
-      */
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text,
+      }, document.organizationId);
     }
 
     // Masquer partiellement l'info de destination

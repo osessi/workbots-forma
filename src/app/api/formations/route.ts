@@ -261,6 +261,18 @@ export async function GET(request: NextRequest) {
             email: true,
           },
         },
+        trainingSessions: {
+          select: {
+            modalite: true,
+          },
+        },
+        indicateurs: {
+          select: {
+            tauxSatisfaction: true,
+            nombreAvis: true,
+            nombreStagiaires: true,
+          },
+        },
         _count: {
           select: {
             documents: true,
@@ -272,8 +284,38 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
+    // Calculer les données supplémentaires pour chaque formation
+    const formationsWithExtras = formations.map((f) => {
+      // Calculer la durée totale en heures depuis les modules
+      const totalMinutes = f.modules.reduce((sum, m) => sum + (m.duree || 0), 0);
+      const dureeHeures = Math.ceil(totalMinutes / 60) || 0;
+      const dureeJours = Math.ceil(dureeHeures / 7) || 0;
+
+      // Extraire les modalités uniques depuis les sessions
+      // LOGIQUE: Si au moins une session est MIXTE, la formation est MIXTE
+      // Si sessions en présentiel ET distanciel, c'est aussi MIXTE
+      const modalitesSet = new Set(f.trainingSessions.map(s => s.modalite));
+      const hasPresen = modalitesSet.has("PRESENTIEL");
+      const hasDistan = modalitesSet.has("DISTANCIEL");
+      const hasMixte = modalitesSet.has("MIXTE");
+
+      let modalites: string[] = [];
+      if (hasMixte || (hasPresen && hasDistan)) {
+        modalites = ["MIXTE"];
+      } else {
+        modalites = [...modalitesSet];
+      }
+
+      return {
+        ...f,
+        dureeHeures,
+        dureeJours,
+        modalites,
+      };
+    });
+
     return NextResponse.json({
-      data: formations,
+      data: formationsWithExtras,
       pagination: {
         page,
         limit,

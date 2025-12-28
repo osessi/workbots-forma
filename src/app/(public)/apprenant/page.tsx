@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   GraduationCap,
   Mail,
   ArrowRight,
+  ArrowLeft,
   BookOpen,
   CheckCircle,
   Clock,
@@ -15,8 +16,11 @@ import {
   Loader2,
   AlertCircle,
   LogOut,
+  KeyRound,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 
 // =====================================
 // TYPES
@@ -112,71 +116,58 @@ const formatDuration = (minutes: number) => {
 // MAIN COMPONENT
 // =====================================
 
-export default function ApprenantPortal() {
+function ApprenantPortalContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   // State
-  const [step, setStep] = useState<"login" | "dashboard">("login");
+  const [step, setStep] = useState<"email" | "code" | "dashboard">("email");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [apprenant, setApprenant] = useState<Apprenant | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [inscriptions, setInscriptions] = useState<Inscription[]>([]);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [devCode, setDevCode] = useState<string | null>(null);
 
-  // Check for existing token on mount
+  // Refs pour les inputs du code
+  const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Check for existing token or magic link on mount
   useEffect(() => {
+    // Check for magic link token in URL
+    const urlToken = searchParams.get("token");
+    if (urlToken) {
+      validateMagicToken(urlToken);
+      return;
+    }
+
+    // Check for saved session token
     const savedToken = localStorage.getItem("apprenant_token");
     if (savedToken) {
       validateToken(savedToken);
     }
-  }, []);
+  }, [searchParams]);
 
-  // Validate token and load data
-  const validateToken = async (tokenToValidate: string) => {
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  // Validate magic link token (first connection)
+  const validateMagicToken = async (magicToken: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/apprenant/auth?token=${tokenToValidate}`);
+      const res = await fetch(`/api/apprenant/verify-token?token=${magicToken}`);
       if (res.ok) {
         const data = await res.json();
-        setToken(tokenToValidate);
-        setApprenant(data.apprenant);
-        setOrganization(data.organization);
-        setInscriptions(data.inscriptions);
-        setStep("dashboard");
-        localStorage.setItem("apprenant_token", tokenToValidate);
-      } else {
-        localStorage.removeItem("apprenant_token");
-        setStep("login");
-      }
-    } catch {
-      localStorage.removeItem("apprenant_token");
-      setStep("login");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Login handler
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) {
-      setError("Veuillez entrer votre email");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/apprenant/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
         setToken(data.token);
         setApprenant(data.apprenant);
         setOrganization(data.organization);
@@ -184,13 +175,159 @@ export default function ApprenantPortal() {
         // Load full data
         await validateToken(data.token);
       } else {
-        setError(data.error || "Erreur de connexion");
+        const data = await res.json();
+        setError(data.error || "Lien invalide ou expiré");
+        setStep("email");
       }
     } catch {
-      setError("Erreur lors de la connexion");
+      setError("Erreur lors de la vérification du lien");
+      setStep("email");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Validate session token
+  const validateToken = async (tokenToValidate: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/apprenant/auth?token=${tokenToValidate}`);
+      if (res.ok) {
+        // Token valide - rediriger vers le nouveau dashboard
+        localStorage.setItem("apprenant_token", tokenToValidate);
+        // Utiliser window.location pour forcer un rechargement complet
+        window.location.href = "/apprenant/suivi";
+      } else {
+        localStorage.removeItem("apprenant_token");
+        setStep("email");
+        setLoading(false);
+      }
+    } catch {
+      localStorage.removeItem("apprenant_token");
+      setStep("email");
+      setLoading(false);
+    }
+  };
+
+  // Send OTP code
+  const handleSendCode = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!email.trim()) {
+      setError("Veuillez entrer votre email");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch("/api/apprenant/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setSuccessMessage("Code envoyé ! Vérifiez votre boîte mail.");
+        setStep("code");
+        setResendCooldown(60);
+        setCode(["", "", "", "", "", ""]);
+        // En dev, stocker le code pour affichage
+        if (data.devCode) {
+          setDevCode(data.devCode);
+        }
+        // Focus first input
+        setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
+      } else {
+        setError(data.error || "Erreur lors de l'envoi du code");
+      }
+    } catch {
+      setError("Erreur lors de l'envoi du code");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle code input
+  const handleCodeChange = (index: number, value: string) => {
+    // Only allow digits
+    const digit = value.replace(/\D/g, "").slice(-1);
+
+    const newCode = [...code];
+    newCode[index] = digit;
+    setCode(newCode);
+
+    // Auto-focus next input
+    if (digit && index < 5) {
+      codeInputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-submit when complete
+    if (digit && index === 5) {
+      const fullCode = newCode.join("");
+      if (fullCode.length === 6) {
+        verifyCode(fullCode);
+      }
+    }
+  };
+
+  // Handle paste
+  const handleCodePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pastedData.length === 6) {
+      const newCode = pastedData.split("");
+      setCode(newCode);
+      verifyCode(pastedData);
+    }
+  };
+
+  // Handle backspace
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Verify OTP code
+  const verifyCode = async (codeToVerify: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/apprenant/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), code: codeToVerify }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        // Stocker le token et rediriger directement
+        localStorage.setItem("apprenant_token", data.token);
+        // Utiliser window.location pour forcer un rechargement complet
+        // Cela permet au nouveau contexte de lire le token depuis localStorage
+        window.location.href = "/apprenant/suivi";
+      } else {
+        setError(data.error || "Code invalide");
+        setCode(["", "", "", "", "", ""]);
+        codeInputRefs.current[0]?.focus();
+        setLoading(false);
+      }
+    } catch {
+      setError("Erreur lors de la vérification");
+      setLoading(false);
+    }
+  };
+
+  // Resend code
+  const handleResendCode = () => {
+    if (resendCooldown > 0) return;
+    handleSendCode();
   };
 
   // Logout handler
@@ -200,12 +337,25 @@ export default function ApprenantPortal() {
     setApprenant(null);
     setOrganization(null);
     setInscriptions([]);
-    setStep("login");
+    setStep("email");
     setEmail("");
+    setCode(["", "", "", "", "", ""]);
+    setError(null);
+    setSuccessMessage(null);
+    setDevCode(null);
   };
 
-  // Loading state
-  if (loading && step === "login") {
+  // Go back to email step
+  const handleBackToEmail = () => {
+    setStep("email");
+    setError(null);
+    setSuccessMessage(null);
+    setCode(["", "", "", "", "", ""]);
+    setDevCode(null);
+  };
+
+  // Loading state initial
+  if (loading && step === "email" && !error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
         <div className="text-center">
@@ -217,10 +367,10 @@ export default function ApprenantPortal() {
   }
 
   // =====================================
-  // LOGIN VIEW
+  // EMAIL STEP
   // =====================================
 
-  if (step === "login") {
+  if (step === "email") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
         <motion.div
@@ -241,7 +391,7 @@ export default function ApprenantPortal() {
 
           {/* Login Form */}
           <div className="bg-white rounded-3xl shadow-xl p-8">
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={handleSendCode} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Adresse email
@@ -255,20 +405,24 @@ export default function ApprenantPortal() {
                     placeholder="votre.email@exemple.com"
                     className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                     required
+                    autoFocus
                   />
                 </div>
               </div>
 
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2 p-3 bg-red-50 rounded-xl text-red-600"
-                >
-                  <AlertCircle size={18} />
-                  <p className="text-sm">{error}</p>
-                </motion.div>
-              )}
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex items-center gap-2 p-3 bg-red-50 rounded-xl text-red-600"
+                  >
+                    <AlertCircle size={18} />
+                    <p className="text-sm">{error}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <button
                 type="submit"
@@ -278,11 +432,11 @@ export default function ApprenantPortal() {
                 {loading ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Connexion...
+                    Envoi en cours...
                   </>
                 ) : (
                   <>
-                    Accéder à mes formations
+                    Recevoir un code de connexion
                     <ArrowRight size={18} />
                   </>
                 )}
@@ -292,6 +446,134 @@ export default function ApprenantPortal() {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Utilisez l&apos;email associé à votre compte apprenant
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // =====================================
+  // CODE VERIFICATION STEP
+  // =====================================
+
+  if (step === "code") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-4">
+              <KeyRound className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Vérification</h1>
+            <p className="text-gray-600 mt-2">
+              Entrez le code à 6 chiffres envoyé à
+            </p>
+            <p className="text-indigo-600 font-medium">{email}</p>
+          </div>
+
+          {/* Code Form */}
+          <div className="bg-white rounded-3xl shadow-xl p-8">
+            <div className="space-y-6">
+              {/* Success message */}
+              <AnimatePresence mode="wait">
+                {successMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex items-center gap-2 p-3 bg-green-50 rounded-xl text-green-600"
+                  >
+                    <CheckCircle size={18} />
+                    <p className="text-sm">{successMessage}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Dev code display */}
+              {devCode && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                  <p className="text-xs text-amber-600 mb-1">Mode développement - Code :</p>
+                  <p className="text-2xl font-mono font-bold text-amber-700 tracking-widest text-center">
+                    {devCode}
+                  </p>
+                </div>
+              )}
+
+              {/* Code inputs */}
+              <div className="flex justify-center gap-2">
+                {code.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => { codeInputRefs.current[index] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleCodeChange(index, e.target.value)}
+                    onKeyDown={(e) => handleCodeKeyDown(index, e)}
+                    onPaste={handleCodePaste}
+                    className="w-12 h-14 text-center text-2xl font-bold bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                    disabled={loading}
+                  />
+                ))}
+              </div>
+
+              {/* Error message */}
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex items-center gap-2 p-3 bg-red-50 rounded-xl text-red-600"
+                  >
+                    <AlertCircle size={18} />
+                    <p className="text-sm">{error}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Loading indicator */}
+              {loading && (
+                <div className="flex items-center justify-center gap-2 text-indigo-600">
+                  <Loader2 size={18} className="animate-spin" />
+                  <p className="text-sm">Vérification...</p>
+                </div>
+              )}
+
+              {/* Resend code */}
+              <div className="text-center">
+                <p className="text-sm text-gray-500 mb-2">
+                  Vous n&apos;avez pas reçu le code ?
+                </p>
+                <button
+                  onClick={handleResendCode}
+                  disabled={resendCooldown > 0 || loading}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  <RefreshCw size={16} className={resendCooldown > 0 ? "" : "group-hover:rotate-180 transition-transform"} />
+                  {resendCooldown > 0 ? `Renvoyer dans ${resendCooldown}s` : "Renvoyer le code"}
+                </button>
+              </div>
+
+              {/* Back button */}
+              <button
+                onClick={handleBackToEmail}
+                className="w-full flex items-center justify-center gap-2 py-3 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft size={18} />
+                Modifier l&apos;email
+              </button>
+            </div>
+          </div>
+
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Le code expire dans 10 minutes
           </p>
         </motion.div>
       </div>
@@ -589,5 +871,25 @@ export default function ApprenantPortal() {
         )}
       </main>
     </div>
+  );
+}
+
+// Composant wrapper avec Suspense pour useSearchParams
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="text-center">
+        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mx-auto mb-4" />
+        <p className="text-gray-600">Chargement...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function ApprenantPortal() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ApprenantPortalContent />
+    </Suspense>
   );
 }

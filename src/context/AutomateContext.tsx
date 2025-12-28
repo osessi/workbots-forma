@@ -106,6 +106,25 @@ export interface Formation {
   // LMS
   isPublished?: boolean;
   publishedAt?: string;
+  // Catalogue public
+  estPublieCatalogue?: boolean;
+  // Badges - Qualiopi
+  isCertifiante?: boolean;
+  numeroFicheRS?: string | null;
+  estEligibleCPF?: boolean;
+  accessibiliteHandicap?: string | null;
+  // Durée et modalités
+  dureeHeures?: number;
+  dureeJours?: number;
+  modalites?: string[];
+  // Indicateurs
+  indicateurs?: {
+    tauxSatisfaction: number | null;
+    nombreAvis: number;
+    nombreStagiaires: number;
+  } | null;
+  // Nombre de modules
+  nombreModules?: number;
 }
 
 interface AutomateContextType {
@@ -344,6 +363,22 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }>;
           createdAt: string;
           _count?: { documents: number };
+          isPublished?: boolean;
+          publishedAt?: string;
+          estPublieCatalogue?: boolean;
+          // Nouveaux champs pour badges
+          isCertifiante?: boolean;
+          numeroFicheRS?: string | null;
+          estEligibleCPF?: boolean;
+          accessibiliteHandicap?: string | null;
+          dureeHeures?: number;
+          dureeJours?: number;
+          modalites?: string[];
+          indicateurs?: {
+            tauxSatisfaction: number | null;
+            nombreAvis: number;
+            nombreStagiaires: number;
+          } | null;
         }) => ({
           id: f.id,
           titre: f.titre,
@@ -354,6 +389,19 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           fichePedagogique: f.fichePedagogique,
           modules: f.modules,
           documentsCount: f._count?.documents || 0,
+          isPublished: f.isPublished,
+          publishedAt: f.publishedAt,
+          estPublieCatalogue: f.estPublieCatalogue,
+          // Badges
+          isCertifiante: f.isCertifiante,
+          numeroFicheRS: f.numeroFicheRS,
+          estEligibleCPF: f.estEligibleCPF,
+          accessibiliteHandicap: f.accessibiliteHandicap,
+          dureeHeures: f.dureeHeures,
+          dureeJours: f.dureeJours,
+          modalites: f.modalites,
+          indicateurs: f.indicateurs,
+          nombreModules: f.modules?.length || 0,
         }));
 
         setFormations(formattedFormations);

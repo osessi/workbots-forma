@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { sendEmail, generateDocumentSendEmail } from "@/lib/services/email";
 
 // POST - Envoyer un document par email
 export async function POST(request: NextRequest) {
@@ -42,7 +43,17 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { supabaseId: supabaseUser.id },
-      include: { organization: true },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            nomCommercial: true,
+            logo: true,
+            primaryColor: true,
+          },
+        },
+      },
     });
 
     if (!user || !user.organizationId) {
@@ -125,50 +136,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Intégrer un service d'email (Resend, SendGrid, etc.)
-    // Pour l'instant, on simule l'envoi
+    // Envoyer l'email avec le document
     console.log(`[DOCUMENT] Envoi email à ${email}`);
     console.log(`[DOCUMENT] Sujet: ${subject || `Document: ${documentInfo.titre}`}`);
     console.log(`[DOCUMENT] Message: ${message || "(aucun message personnalisé)"}`);
     console.log(`[DOCUMENT] Document: ${documentInfo.titre} (${documentInfo.type})`);
 
-    /*
-    // Exemple d'implémentation avec Resend
-    import { Resend } from 'resend';
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const orgName = user.organization?.nomCommercial || user.organization?.name || "Organisme de formation";
 
-    await resend.emails.send({
-      from: `${user.organization?.name || 'Automate Forma'} <noreply@automate-forma.com>`,
-      to: email,
-      subject: subject || `Document: ${documentInfo.titre}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          ${user.organization?.logo ? `<img src="${user.organization.logo}" alt="Logo" style="max-height: 60px; margin-bottom: 20px;">` : ''}
-
-          <h1 style="color: #1e3a5f; font-size: 24px; margin-bottom: 20px;">
-            ${subject || `Document: ${documentInfo.titre}`}
-          </h1>
-
-          ${message ? `<div style="white-space: pre-wrap; margin-bottom: 30px;">${message}</div>` : ''}
-
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin: 0 0 10px 0; color: #333;">📄 ${documentInfo.titre}</h3>
-            <p style="margin: 0; color: #666; font-size: 14px;">Type: ${documentInfo.type}</p>
-          </div>
-
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #666; font-size: 12px; margin: 0;">
-              Cet email a été envoyé par ${user.organization?.name || 'Automate Forma'}.
-            </p>
-          </div>
-        </div>
-      `,
-      attachments: content ? [{
-        filename: `${documentInfo.titre}.pdf`,
-        content: Buffer.from(content, 'base64'),
-      }] : undefined,
+    const emailContent = generateDocumentSendEmail({
+      documentTitre: documentInfo.titre,
+      documentType: documentInfo.type,
+      customSubject: subject,
+      customMessage: message,
+      organizationName: orgName,
+      organizationLogo: user.organization?.logo,
+      primaryColor: user.organization?.primaryColor || undefined,
     });
-    */
+
+    // Préparer les pièces jointes si contenu fourni
+    const attachments = content ? [{
+      filename: `${documentInfo.titre}.pdf`,
+      content: Buffer.from(content, "base64"),
+      contentType: "application/pdf",
+    }] : undefined;
+
+    await sendEmail({
+      to: email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
+      attachments,
+    }, user.organizationId);
 
     // Mettre à jour le statut du document si c'est un SessionDocument
     if (sessionDoc) {

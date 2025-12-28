@@ -6,7 +6,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase";
 import UserAvatar from "@/components/ui/avatar/UserAvatar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Bell, Mail, Send, HelpCircle } from "lucide-react";
 
 const AutomateHeader: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -14,12 +15,72 @@ const AutomateHeader: React.FC = () => {
   const [localSearchQuery, setLocalSearchQuery] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMac, setIsMac] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [sentEmailsCount, setSentEmailsCount] = useState(0);
+  const [devEmailsCount, setDevEmailsCount] = useState(0);
+  const [isDev, setIsDev] = useState(false);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { user, formations, searchQuery, setSearchQuery } = useAutomate();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Fetch notification count
+  const fetchNotificationCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications?limit=1");
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadNotifications(data.pagination?.unread || 0);
+      }
+    } catch (error) {
+      console.error("Erreur chargement notifications:", error);
+    }
+  }, []);
+
+  // Fetch sent emails count (from database)
+  const fetchSentEmailsCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/emails?limit=1");
+      const data = await res.json();
+      setSentEmailsCount(data.stats?.total || 0);
+    } catch (error) {
+      // Silently ignore - this is just for the counter
+      setSentEmailsCount(0);
+    }
+  }, []);
+
+  // Fetch dev emails count (dev mode only)
+  const fetchDevEmailsCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dev/emails");
+      if (res.ok) {
+        const data = await res.json();
+        setDevEmailsCount(data.emails?.length || 0);
+        setIsDev(true);
+      } else if (res.status === 403) {
+        setIsDev(false);
+      }
+    } catch (error) {
+      setIsDev(false);
+    }
+  }, []);
+
+  // Load counts on mount and periodically
+  useEffect(() => {
+    fetchNotificationCount();
+    fetchSentEmailsCount();
+    fetchDevEmailsCount();
+
+    const interval = setInterval(() => {
+      fetchNotificationCount();
+      fetchSentEmailsCount();
+      fetchDevEmailsCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchNotificationCount, fetchSentEmailsCount, fetchDevEmailsCount]);
 
   // Filter formations based on local search query
   const searchResults = localSearchQuery.length > 0
@@ -187,13 +248,21 @@ const AutomateHeader: React.FC = () => {
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all"
             >
-              <UserAvatar
-                src={user.avatarUrl}
-                seed={user.email}
-                alt={`${user.prenom} ${user.nom}`}
-                size="medium"
-                className="ring-2 ring-transparent hover:ring-brand-100 dark:hover:ring-brand-500/20 transition-all"
-              />
+              <div className="relative">
+                <UserAvatar
+                  src={user.avatarUrl}
+                  seed={user.email}
+                  alt={`${user.prenom} ${user.nom}`}
+                  size="medium"
+                  className="ring-2 ring-transparent hover:ring-brand-100 dark:hover:ring-brand-500/20 transition-all"
+                />
+                {/* Badge notification - uniquement les notifications non lues */}
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full shadow-sm">
+                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                  </span>
+                )}
+              </div>
               <span className="hidden text-sm font-medium text-gray-700 dark:text-gray-200 lg:block">
                 {user.prenom}
               </span>
@@ -208,12 +277,53 @@ const AutomateHeader: React.FC = () => {
             </button>
 
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg dark:border-gray-700 dark:bg-gray-800 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg dark:border-gray-700 dark:bg-gray-800 animate-in fade-in slide-in-from-top-2 duration-200">
                 <a href="/automate/account" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
-                  Mon profil
+                  Mon compte
                 </a>
                 <a href="/automate/billing" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
                   Facturation
+                </a>
+                <hr className="my-1.5 border-gray-100 dark:border-gray-700" />
+                <a href="/automate/notifications" className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                  <span className="flex items-center gap-2">
+                    <Bell className="w-4 h-4" />
+                    Notifications
+                  </span>
+                  {unreadNotifications > 0 && (
+                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                    </span>
+                  )}
+                </a>
+                <a href="/automate/emails" className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                  <span className="flex items-center gap-2">
+                    <Send className="w-4 h-4" />
+                    Emails envoyés
+                  </span>
+                  {sentEmailsCount > 0 && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      {sentEmailsCount}
+                    </span>
+                  )}
+                </a>
+                {isDev && (
+                  <a href="/automate/dev/emails" className="flex items-center justify-between px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 transition-colors">
+                    <span className="flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      Dev Emails (mémoire)
+                    </span>
+                    {devEmailsCount > 0 && (
+                      <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-xs font-bold rounded-full">
+                        {devEmailsCount > 99 ? "99+" : devEmailsCount}
+                      </span>
+                    )}
+                  </a>
+                )}
+                <hr className="my-1.5 border-gray-100 dark:border-gray-700" />
+                <a href="/automate/faq" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                  <HelpCircle className="w-4 h-4" />
+                  FAQ
                 </a>
                 <hr className="my-1.5 border-gray-100 dark:border-gray-700" />
                 <button

@@ -1,20 +1,16 @@
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { useTheme } from "@/context/ThemeContext";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
   LayoutDashboard,
   PlusCircle,
   FolderOpen,
   FileBox,
-  User,
   Settings,
-  HelpCircle,
-  LogOut,
   Database,
   Building2,
   Users,
@@ -29,7 +25,11 @@ import {
   Bot,
   ClipboardCheck,
   FileSignature,
+  Globe,
+  UserPlus,
+  BookOpen,
 } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 
 type SubNavItem = {
@@ -98,6 +98,22 @@ const mainNavItems: NavItem[] = [
     path: "/automate/crm",
   },
   {
+    icon: <Globe size={20} strokeWidth={1.5} />,
+    name: "Catalogue",
+    subItems: [
+      {
+        icon: <BookOpen size={18} strokeWidth={1.5} />,
+        name: "Mon catalogue",
+        path: "/automate/catalogue",
+      },
+      {
+        icon: <UserPlus size={18} strokeWidth={1.5} />,
+        name: "Pré-inscriptions",
+        path: "/automate/pre-inscriptions",
+      },
+    ],
+  },
+  {
     icon: <GraduationCap size={20} strokeWidth={1.5} />,
     name: "LMS",
     path: "/automate/lms",
@@ -154,44 +170,18 @@ const isActiveOrChild = (path: string, pathname: string) => {
 
 const bottomNavItems: NavItem[] = [
   {
-    icon: <User size={20} strokeWidth={1.5} />,
-    name: "Mon compte",
-    path: "/automate/account",
-  },
-  {
     icon: <Settings size={20} strokeWidth={1.5} />,
     name: "Paramètres",
     path: "/automate/settings",
-  },
-  {
-    icon: <HelpCircle size={20} strokeWidth={1.5} />,
-    name: "FAQ",
-    path: "/automate/faq",
   },
 ];
 
 const AutomateSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { theme } = useTheme();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
-
-  const handleSignOut = async () => {
-    setIsLoggingOut(true);
-    try {
-      const supabase = getSupabaseBrowserClient();
-      await supabase.auth.signOut();
-      router.push("/signin");
-      router.refresh();
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
+  const [openSubMenu, setOpenSubMenu] = React.useState<string | null>(null);
 
   // Fonction améliorée pour gérer les query strings (ex: ?tab=emargement)
   const isActive = (path: string) => {
@@ -383,25 +373,11 @@ const AutomateSidebar: React.FC = () => {
         {/* Navigation bas */}
         <nav className="mt-auto pb-6">
           <ul className="flex flex-col gap-2">
-            {bottomNavItems.map((nav) => renderNavItem(nav, false))}
-            <li className="mt-2">
-              <button
-                onClick={handleSignOut}
-                disabled={isLoggingOut}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border w-full transition-all duration-200 text-gray-600 border-gray-200 bg-gray-50/50 hover:bg-red-50 hover:border-red-200 hover:text-red-600 dark:text-gray-300 dark:border-gray-700 dark:bg-gray-800/30 dark:hover:bg-red-900/20 dark:hover:border-red-800 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  !isExpanded && !isHovered && !isMobileOpen ? "lg:justify-center lg:px-3" : ""
-                }`}
-              >
-                <span className="text-gray-500 dark:text-gray-400 group-hover:text-red-500">
-                  <LogOut size={20} strokeWidth={1.5} />
-                </span>
-                {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className="text-sm font-medium">
-                    {isLoggingOut ? "Déconnexion..." : "Se déconnecter"}
-                  </span>
-                )}
-              </button>
+            {/* Notifications */}
+            <li>
+              <NotificationBell isExpanded={isExpanded || isHovered || isMobileOpen} />
             </li>
+            {bottomNavItems.map((nav) => renderNavItem(nav, false))}
           </ul>
         </nav>
       </div>

@@ -166,10 +166,18 @@ function CreateFormationContent() {
           payload.titre = dataToSave.ficheData.titre;
           payload.description = dataToSave.ficheData.description;
           payload.image = dataToSave.ficheData.imageUrl;
+
+          // Récupérer les tarifs depuis contexteData (valeurs brutes)
+          const ctx = dataToSave.contexteData || contexteData;
+
           payload.fichePedagogique = {
             ...dataToSave.ficheData,
-            ...(dataToSave.contexteData || contexteData),
+            ...ctx,
             objectifGeneral: dataToSave.ficheData.description,
+            // Sauvegarder les tarifs formatés ET les valeurs brutes pour éviter la perte
+            tarifEntrepriseFormate: dataToSave.ficheData.tarifEntreprise,
+            tarifIndependantFormate: dataToSave.ficheData.tarifIndependant,
+            tarifParticulierFormate: dataToSave.ficheData.tarifParticulier,
           };
         }
 
@@ -291,6 +299,28 @@ function CreateFormationContent() {
         }
 
         // Restaurer les données de la fiche pédagogique
+        // Les tarifs peuvent être stockés sous différents noms (tarifEntreprise, tarifEntrepriseFormate)
+        // ou dans contexteData, donc on vérifie toutes les sources
+        const getTarif = (field: string, formateField: string): string => {
+          // Priorité 1: Valeur formatée dans la fiche (ex: "1500 € HT")
+          if (fiche[formateField]) return String(fiche[formateField]);
+          // Priorité 2: Valeur simple dans la fiche
+          if (fiche[field]) {
+            const val = String(fiche[field]);
+            // Si c'est déjà formaté, retourner tel quel
+            if (val.includes("€")) return val;
+            // Sinon formater
+            return field.includes("Particulier") ? `${val} € TTC` : `${val} € HT`;
+          }
+          // Priorité 3: Valeur dans contexteData sauvegardé
+          if (savedContexte && savedContexte[field]) {
+            const val = String(savedContexte[field]);
+            if (val.includes("€")) return val;
+            return field.includes("Particulier") ? `${val} € TTC` : `${val} € HT`;
+          }
+          return "";
+        };
+
         setFicheData({
           titre: formation.titre || "",
           description: fiche.objectifGeneral as string || "",
@@ -299,9 +329,9 @@ function CreateFormationContent() {
           typeFormation: fiche.typeFormation as string || "",
           duree: fiche.duree as string || "",
           nombreParticipants: String(fiche.nombreParticipants || ""),
-          tarifEntreprise: fiche.tarifEntrepriseFormate as string || "",
-          tarifIndependant: fiche.tarifIndependantFormate as string || "",
-          tarifParticulier: fiche.tarifParticulierFormate as string || "",
+          tarifEntreprise: getTarif("tarifEntreprise", "tarifEntrepriseFormate"),
+          tarifIndependant: getTarif("tarifIndependant", "tarifIndependantFormate"),
+          tarifParticulier: getTarif("tarifParticulier", "tarifParticulierFormate"),
           accessibilite: fiche.accessibilite as string || initialFicheData.accessibilite,
           prerequis: fiche.prerequis as string || "",
           publicVise: fiche.publicVise as string || "",
@@ -364,10 +394,15 @@ function CreateFormationContent() {
       const payload = {
         titre,
         description: fiche.description,
+        contexteData: contexteData, // Sauvegarder aussi contexteData séparément
         fichePedagogique: {
           ...fiche,
           ...contexteData,
           objectifGeneral: fiche.description,
+          // Sauvegarder les tarifs formatés ET les valeurs brutes pour éviter la perte
+          tarifEntrepriseFormate: fiche.tarifEntreprise,
+          tarifIndependantFormate: fiche.tarifIndependant,
+          tarifParticulierFormate: fiche.tarifParticulier,
         },
         modules: mods.map((m, i) => ({
           titre: m.titre,

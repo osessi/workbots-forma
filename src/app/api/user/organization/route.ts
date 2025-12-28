@@ -200,3 +200,96 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
+// PATCH - Mise à jour partielle de l'organisation (ex: toggle catalogue)
+export async function PATCH(request: NextRequest) {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore
+            }
+          },
+        },
+      }
+    );
+
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+
+    if (!supabaseUser) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { supabaseId: supabaseUser.id },
+      select: { organizationId: true },
+    });
+
+    if (!user || !user.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    const body = await request.json();
+    console.log("[PATCH organization] Body reçu:", body);
+    console.log("[PATCH organization] Organization ID:", user.organizationId);
+
+    // Construire l'objet de mise à jour avec seulement les champs fournis
+    const updateData: Record<string, unknown> = {};
+
+    if (typeof body.catalogueActif === "boolean") {
+      updateData.catalogueActif = body.catalogueActif;
+    }
+
+    if (typeof body.primaryColor === "string") {
+      updateData.primaryColor = body.primaryColor;
+    }
+
+    // Nouveaux champs Qualiopi
+    if (typeof body.certificatQualiopiUrl === "string") {
+      updateData.certificatQualiopiUrl = body.certificatQualiopiUrl;
+    }
+
+    if (typeof body.categorieQualiopi === "string") {
+      updateData.categorieQualiopi = body.categorieQualiopi || null;
+    }
+
+    console.log("[PATCH organization] Update data:", updateData);
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: "Aucune donnée à mettre à jour" },
+        { status: 400 }
+      );
+    }
+
+    const organization = await prisma.organization.update({
+      where: { id: user.organizationId },
+      data: updateData,
+    });
+
+    console.log("[PATCH organization] Mise à jour réussie:", organization.catalogueActif);
+
+    return NextResponse.json({
+      success: true,
+      organization,
+    });
+  } catch (error) {
+    console.error("Erreur PATCH organization:", error);
+    return NextResponse.json(
+      { error: "Erreur lors de la mise à jour" },
+      { status: 500 }
+    );
+  }
+}

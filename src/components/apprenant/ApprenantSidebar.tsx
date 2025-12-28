@@ -1,0 +1,390 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useApprenantPortal } from "@/context/ApprenantPortalContext";
+import {
+  Home,
+  BarChart3,
+  BookOpen,
+  Users,
+  PenLine,
+  Star,
+  FileText,
+  Info,
+  Calendar,
+  UserCircle,
+  X,
+  Send,
+  Loader2,
+  MessageCircle,
+} from "lucide-react";
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  badge?: number;
+  section?: "main" | "secondary";
+}
+
+interface ApprenantSidebarProps {
+  isMobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function ApprenantSidebar({
+  isMobileOpen,
+  onClose,
+}: ApprenantSidebarProps) {
+  const pathname = usePathname();
+  const { dashboardStats, apprenant, organization, token } = useApprenantPortal();
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactSubject, setContactSubject] = useState("question");
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageSent, setMessageSent] = useState(false);
+
+  const handleSendMessage = async () => {
+    if (!contactMessage.trim() || !token) return;
+
+    setSendingMessage(true);
+    try {
+      const res = await fetch("/api/apprenant/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          subject: contactSubject,
+          message: contactMessage,
+        }),
+      });
+
+      if (res.ok) {
+        setMessageSent(true);
+        setContactMessage("");
+        setTimeout(() => {
+          setShowContactModal(false);
+          setMessageSent(false);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Erreur envoi message:", error);
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const navItems: NavItem[] = [
+    // Section principale
+    {
+      name: "Accueil",
+      href: "/apprenant/accueil",
+      icon: Home,
+      section: "main",
+    },
+    {
+      name: "Suivi pédagogique",
+      href: "/apprenant/suivi",
+      icon: BarChart3,
+      section: "main",
+    },
+    {
+      name: "Programme",
+      href: "/apprenant/programme",
+      icon: BookOpen,
+      section: "main",
+    },
+    {
+      name: "Apprenants",
+      href: "/apprenant/groupe",
+      icon: Users,
+      section: "main",
+    },
+    {
+      name: "Émargements",
+      href: "/apprenant/emargements",
+      icon: PenLine,
+      badge: dashboardStats?.emargementsEnAttente || 0,
+      section: "main",
+    },
+    {
+      name: "Évaluations",
+      href: "/apprenant/evaluations",
+      icon: Star,
+      badge: dashboardStats?.evaluationsEnAttente || 0,
+      section: "main",
+    },
+    {
+      name: "Documents",
+      href: "/apprenant/documents",
+      icon: FileText,
+      badge: dashboardStats?.documentsDisponibles || 0,
+      section: "main",
+    },
+    {
+      name: "À propos",
+      href: "/apprenant/a-propos",
+      icon: Info,
+      section: "main",
+    },
+    // Section secondaire
+    {
+      name: "Calendrier",
+      href: "/apprenant/calendrier",
+      icon: Calendar,
+      section: "secondary",
+    },
+    {
+      name: "Intervenants",
+      href: "/apprenant/intervenants",
+      icon: UserCircle,
+      section: "secondary",
+    },
+  ];
+
+  const mainNavItems = navItems.filter((item) => item.section === "main");
+  const secondaryNavItems = navItems.filter((item) => item.section === "secondary");
+
+  const isActive = (href: string) => {
+    if (href === "/apprenant/accueil") {
+      return pathname === "/apprenant/accueil";
+    }
+    return pathname.startsWith(href);
+  };
+
+  const NavLink = ({ item }: { item: NavItem }) => {
+    const active = isActive(item.href);
+    const Icon = item.icon;
+
+    return (
+      <Link
+        href={item.href}
+        onClick={onClose}
+        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+          active
+            ? "bg-brand-500 text-white shadow-md shadow-brand-500/25"
+            : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+        }`}
+      >
+        <Icon
+          className={`w-5 h-5 flex-shrink-0 ${
+            active
+              ? "text-white"
+              : "text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+          }`}
+        />
+        <span className="flex-1 text-sm font-medium">{item.name}</span>
+        {item.badge !== undefined && item.badge > 0 && (
+          <span
+            className={`min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold rounded-full ${
+              active
+                ? "bg-white/20 text-white"
+                : "bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400"
+            }`}
+          >
+            {item.badge > 99 ? "99+" : item.badge}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full">
+      {/* Navigation principale */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {/* Section principale */}
+        <div className="space-y-1">
+          {mainNavItems.map((item) => (
+            <NavLink key={item.href} item={item} />
+          ))}
+        </div>
+
+        {/* Séparateur */}
+        <div className="pt-4 pb-2">
+          <div className="border-t border-gray-200 dark:border-gray-700" />
+        </div>
+
+        {/* Section secondaire */}
+        <div className="space-y-1">
+          <p className="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+            Ressources
+          </p>
+          {secondaryNavItems.map((item) => (
+            <NavLink key={item.href} item={item} />
+          ))}
+        </div>
+      </nav>
+
+      {/* Footer sidebar - Aide */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="bg-gradient-to-br from-brand-50 to-brand-100 dark:from-brand-500/10 dark:to-brand-600/10 rounded-xl p-4">
+          <p className="text-sm font-medium text-brand-900 dark:text-brand-100 mb-1">
+            Besoin d&apos;aide ?
+          </p>
+          <p className="text-xs text-brand-700 dark:text-brand-300 mb-3">
+            Contactez votre formateur ou notre équipe support.
+          </p>
+          <button
+            onClick={() => setShowContactModal(true)}
+            className="inline-flex items-center gap-2 text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Nous contacter
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Modal de contact
+  const contactModal = showContactModal && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={() => !sendingMessage && setShowContactModal(false)}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Contacter le support
+          </h3>
+          <button
+            onClick={() => !sendingMessage && setShowContactModal(false)}
+            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 space-y-4">
+          {messageSent ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Send className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Message envoyé !
+              </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Nous vous répondrons dans les plus brefs délais.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Info apprenant */}
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  De la part de
+                </p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {apprenant?.prenom} {apprenant?.nom}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {apprenant?.email}
+                </p>
+              </div>
+
+              {/* Sujet */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Sujet
+                </label>
+                <select
+                  value={contactSubject}
+                  onChange={(e) => setContactSubject(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                >
+                  <option value="question">Question générale</option>
+                  <option value="technique">Problème technique</option>
+                  <option value="formation">Question sur ma formation</option>
+                  <option value="document">Demande de document</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Message
+                </label>
+                <textarea
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  placeholder="Décrivez votre demande..."
+                  rows={4}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 resize-none"
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {!messageSent && (
+          <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setShowContactModal(false)}
+              disabled={sendingMessage}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSendMessage}
+              disabled={!contactMessage.trim() || sendingMessage}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              {sendingMessage ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Envoi...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Envoyer
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Sidebar Desktop */}
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:pt-16 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
+        {sidebarContent}
+      </aside>
+
+      {/* Sidebar Mobile - Overlay */}
+      {isMobileOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            onClick={onClose}
+          />
+
+          {/* Sidebar mobile */}
+          <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-900 lg:hidden animate-in slide-in-from-left duration-300">
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+
+      {/* Modal de contact */}
+      {contactModal}
+    </>
+  );
+}

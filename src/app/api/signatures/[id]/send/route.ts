@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { sendEmail, generateSignatureInvitationEmail } from "@/lib/services/email";
 
 // POST - Envoyer le document pour signature
 export async function POST(
@@ -59,8 +60,11 @@ export async function POST(
       include: {
         organization: {
           select: {
+            id: true,
             name: true,
+            nomCommercial: true,
             logo: true,
+            primaryColor: true,
           },
         },
       },
@@ -99,50 +103,30 @@ export async function POST(
     // Générer l'URL de signature
     const signatureUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:4000"}/signer/${document.token}`;
 
-    // TODO: Envoyer l'email au destinataire
+    // Envoyer l'email d'invitation au destinataire
     console.log(`[SIGNATURE] Envoi email à ${document.destinataireEmail}`);
     console.log(`[SIGNATURE] URL de signature: ${signatureUrl}`);
 
-    /*
+    const orgName = document.organization?.nomCommercial || document.organization?.name || "Organisme de formation";
+
+    const emailContent = generateSignatureInvitationEmail({
+      destinataireNom: document.destinataireNom,
+      destinataireEmail: document.destinataireEmail,
+      documentTitre: document.titre,
+      documentType: document.documentType,
+      signatureUrl,
+      expiresAt: document.expiresAt,
+      organizationName: orgName,
+      organizationLogo: document.organization?.logo,
+      primaryColor: document.organization?.primaryColor || undefined,
+    });
+
     await sendEmail({
       to: document.destinataireEmail,
-      subject: `Document à signer : ${document.titre}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          ${document.organization?.logo ? `<img src="${document.organization.logo}" alt="Logo" style="max-height: 60px; margin-bottom: 20px;">` : ""}
-
-          <h1 style="color: #1e3a5f; font-size: 24px;">Document à signer</h1>
-
-          <p>Bonjour ${document.destinataireNom},</p>
-
-          <p>${document.organization?.name || "Un organisme de formation"} vous invite à signer le document suivant :</p>
-
-          <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="margin: 0 0 10px 0; color: #333;">${document.titre}</h2>
-            <p style="margin: 0; color: #666;">Type : ${document.documentType}</p>
-          </div>
-
-          <p>Ce document expire le <strong>${document.expiresAt?.toLocaleDateString("fr-FR")}</strong>.</p>
-
-          <a href="${signatureUrl}" style="display: inline-block; background: #1e3a5f; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0;">
-            Signer le document
-          </a>
-
-          <p style="color: #666; font-size: 14px;">
-            Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
-            <a href="${signatureUrl}">${signatureUrl}</a>
-          </p>
-
-          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-
-          <p style="color: #999; font-size: 12px;">
-            Cet email a été envoyé par ${document.organization?.name || "l'organisme de formation"}.
-            Si vous n'êtes pas le destinataire prévu, veuillez ignorer cet email.
-          </p>
-        </div>
-      `,
-    });
-    */
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
+    }, document.organizationId);
 
     // Mettre à jour le document
     await prisma.signatureDocument.update({

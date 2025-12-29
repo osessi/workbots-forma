@@ -4,6 +4,8 @@ import { useAutomate } from "@/context/AutomateContext";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import OrganigrammeTab from "@/components/automate/settings/OrganigrammeTab";
+import ProceduresTab from "@/components/automate/settings/ProceduresTab";
 
 // Icons
 const BuildingIcon = () => (
@@ -41,17 +43,38 @@ const CreditCardIcon = () => (
   </svg>
 );
 
+const OrganigrammeIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 2.5V6.66667M10 6.66667H5.83333M10 6.66667H14.1667M5.83333 6.66667V8.33333M5.83333 6.66667H2.5C2.5 6.66667 2.5 8.33333 2.5 8.33333V10.8333C2.5 11.2936 2.8731 11.6667 3.33333 11.6667H8.33333C8.79357 11.6667 9.16667 11.2936 9.16667 10.8333V8.33333C9.16667 7.8731 8.79357 7.5 8.33333 7.5H3.33333C2.8731 7.5 2.5 7.8731 2.5 8.33333M14.1667 6.66667V8.33333M14.1667 6.66667H17.5C17.5 6.66667 17.5 8.33333 17.5 8.33333V10.8333C17.5 11.2936 17.1269 11.6667 16.6667 11.6667H11.6667C11.2064 11.6667 10.8333 11.2936 10.8333 10.8333V8.33333C10.8333 7.8731 11.2064 7.5 11.6667 7.5H16.6667C17.1269 7.5 17.5 7.8731 17.5 8.33333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <rect x="7.5" y="1.66667" width="5" height="3.33333" rx="0.833333" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M5.83333 11.6667V13.3333M14.1667 11.6667V13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <rect x="3.33333" y="13.3333" width="5" height="4.16667" rx="0.833333" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="11.6667" y="13.3333" width="5" height="4.16667" rx="0.833333" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+);
+
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M13.3333 4L6 11.3333L2.66667 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
+// Icon for procedures
+const ProceduresIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6.66667 2.5H4.16667C3.24619 2.5 2.5 3.24619 2.5 4.16667V15.8333C2.5 16.7538 3.24619 17.5 4.16667 17.5H15.8333C16.7538 17.5 17.5 16.7538 17.5 15.8333V4.16667C17.5 3.24619 16.7538 2.5 15.8333 2.5H13.3333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M6.66667 2.5H13.3333V5C13.3333 5.46024 12.9602 5.83333 12.5 5.83333H7.5C7.03976 5.83333 6.66667 5.46024 6.66667 5V2.5Z" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M6.66667 10H13.3333M6.66667 13.3333H10.8333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
 // Tabs
-type TabType = "organisme" | "members" | "branding" | "billing";
+type TabType = "organisme" | "organigramme" | "procedures" | "members" | "branding" | "billing";
 
 const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
   { id: "organisme", label: "Organisme de formation", icon: <BuildingIcon /> },
+  { id: "organigramme", label: "Organigramme", icon: <OrganigrammeIcon /> },
+  { id: "procedures", label: "Procédures Qualité", icon: <ProceduresIcon /> },
   { id: "members", label: "Membres", icon: <UsersIcon /> },
   { id: "branding", label: "Marque blanche", icon: <PaletteIcon /> },
   { id: "billing", label: "Facturation", icon: <CreditCardIcon /> },
@@ -785,6 +808,12 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+
+          {/* Organigramme Tab */}
+          {activeTab === "organigramme" && <OrganigrammeTab />}
+
+          {/* Procedures Tab */}
+          {activeTab === "procedures" && <ProceduresTab />}
 
           {/* Members Tab */}
           {activeTab === "members" && (

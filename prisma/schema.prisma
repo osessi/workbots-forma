@@ -57,33 +57,33 @@ enum FinanceurType {
 }
 
 enum SessionModalite {
-  PRESENTIEL          // Formation en présentiel
-  DISTANCIEL          // Formation à distance synchrone
-  MIXTE               // Combinaison présentiel et distanciel
-  E_LEARNING          // Formation en ligne asynchrone
-  SITUATION_TRAVAIL   // Formation en situation de travail (AFEST)
-  STAGE               // Stage pratique
+  PRESENTIEL // Formation en présentiel
+  DISTANCIEL // Formation à distance synchrone
+  MIXTE // Combinaison présentiel et distanciel
+  E_LEARNING // Formation en ligne asynchrone
+  SITUATION_TRAVAIL // Formation en situation de travail (AFEST)
+  STAGE // Stage pratique
 }
 
 enum SessionStatus {
-  BROUILLON      // Session créée mais pas finalisée
-  PLANIFIEE      // Session planifiée, en attente de démarrage
-  EN_COURS       // Session en cours de réalisation
-  TERMINEE       // Session terminée
-  ANNULEE        // Session annulée
+  BROUILLON // Session créée mais pas finalisée
+  PLANIFIEE // Session planifiée, en attente de démarrage
+  EN_COURS // Session en cours de réalisation
+  TERMINEE // Session terminée
+  ANNULEE // Session annulée
 }
 
 enum EvaluationType {
-  POSITIONNEMENT   // Test de positionnement (avant formation)
-  FINALE           // Évaluation finale (fin de formation)
-  QCM_MODULE       // QCM par module
-  ATELIER_MODULE   // Atelier pratique par module
+  POSITIONNEMENT // Test de positionnement (avant formation)
+  FINALE // Évaluation finale (fin de formation)
+  QCM_MODULE // QCM par module
+  ATELIER_MODULE // Atelier pratique par module
 }
 
 enum CreationMode {
-  AI              // Création avec IA
-  MANUAL          // Création manuelle (sans IA)
-  IMPORT          // Import d'une formation existante
+  AI // Création avec IA
+  MANUAL // Création manuelle (sans IA)
+  IMPORT // Import d'une formation existante
 }
 
 enum TypeLieu {
@@ -130,7 +130,29 @@ enum DocumentType {
   EVALUATION_ENTREPRISE
   EVALUATION_FINANCEUR
   FEUILLE_EMARGEMENT
+  // Procédures Qualiopi IND 26
+  PROCEDURE_ACCUEIL
+  PROCEDURE_RECLAMATIONS
+  PROCEDURE_EVALUATION
+  PROCEDURE_SOUS_TRAITANCE
+  PROCEDURE_VEILLE
+  PROCEDURE_ACCESSIBILITE
+  PROCEDURE_SUIVI_STAGIAIRES
+  PROCEDURE_GESTION_COMPETENCES
   AUTRE
+}
+
+// Types de procédures Qualiopi IND 26
+enum ProcedureType {
+  ACCUEIL // Procédure d'accueil des stagiaires
+  RECLAMATIONS // Procédure de gestion des réclamations
+  EVALUATION // Procédure d'évaluation
+  SOUS_TRAITANCE // Procédure de sous-traitance
+  VEILLE // Procédure de veille
+  ACCESSIBILITE // Procédure d'accessibilité handicap
+  SUIVI_STAGIAIRES // Procédure de suivi des stagiaires
+  GESTION_COMPETENCES // Procédure de gestion des compétences
+  PERSONNALISEE // Procédure personnalisée
 }
 
 enum TemplateCategory {
@@ -144,107 +166,127 @@ enum TemplateCategory {
 // ===========================================
 
 model Organization {
-  id                String   @id @default(cuid())
-  name              String
-  slug              String   @unique
-  plan              Plan     @default(FREE)
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+  plan Plan   @default(FREE)
 
   // Infos entreprise
-  nomCommercial     String?  // Nom commercial de l'organisme
-  siret             String?
-  villeRcs          String?  // Ville d'immatriculation au RCS
-  numeroFormateur   String?  // N° déclaration d'activité DREETS
-  prefectureRegion  String?  // Région d'acquisition du numéro de déclaration
-  adresse           String?
-  codePostal        String?
-  ville             String?
-  telephone         String?
-  email             String?  // Email de contact de l'organisme
-  siteWeb           String?  // Site web de l'organisme
+  nomCommercial    String? // Nom commercial de l'organisme
+  siret            String?
+  villeRcs         String? // Ville d'immatriculation au RCS
+  numeroFormateur  String? // N° déclaration d'activité DREETS
+  prefectureRegion String? // Région d'acquisition du numéro de déclaration
+  adresse          String?
+  codePostal       String?
+  ville            String?
+  telephone        String?
+  email            String? // Email de contact de l'organisme
+  siteWeb          String? // Site web de l'organisme
 
   // Représentant légal
-  representantLegal String?  // DEPRECATED - Ancien champ nom complet
-  representantNom   String?  // Nom du représentant légal
-  representantPrenom String? // Prénom du représentant légal
+  representantLegal    String? // DEPRECATED - Ancien champ nom complet
+  representantNom      String? // Nom du représentant légal
+  representantPrenom   String? // Prénom du représentant légal
   representantFonction String? // Fonction du représentant légal (ex: Gérant, PDG)
 
   // White-label & Visuels
-  logo              String?  // Logo de l'organisme
-  signature         String?  // URL de l'image de signature du responsable
-  cachet            String?  // URL du cachet de l'entreprise
-  primaryColor      String   @default("#4277FF")
-  secondaryColor    String?
-  customDomain      String?  @unique
+  logo           String? // Logo de l'organisme
+  signature      String? // URL de l'image de signature du responsable
+  cachet         String? // URL du cachet de l'entreprise
+  primaryColor   String  @default("#4277FF")
+  secondaryColor String?
+  customDomain   String? @unique
 
   // Limites selon plan
-  maxFormateurs     Int      @default(1)
-  maxFormations     Int      @default(5)
-  maxStorageGb      Int      @default(1)
+  maxFormateurs Int @default(1)
+  maxFormations Int @default(5)
+  maxStorageGb  Int @default(1)
 
   // Stripe
-  stripeCustomerId  String?  @unique
+  stripeCustomerId     String? @unique
   stripeSubscriptionId String?
 
   // APIs externes (clés optionnelles par organisation)
-  gammaApiKey       String?  // Clé API Gamma pour génération slides
+  gammaApiKey String? // Clé API Gamma pour génération slides
 
   // Metadata
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  users             User[]
-  formations        Formation[]
-  files             File[]
-  templates         Template[]
-  apiKeys           ApiKey[]
-  serviceApiKeys    ServiceApiKey[]
-  auditLogs         AuditLog[]
-  aiPrompts         AIPrompt[]
-  aiGenerationLogs  AIGenerationLog[]
-  reusableBlocks    ReusableBlock[]
-  customVariables   CustomVariable[]
+  users            User[]
+  formations       Formation[]
+  files            File[]
+  templates        Template[]
+  apiKeys          ApiKey[]
+  serviceApiKeys   ServiceApiKey[]
+  auditLogs        AuditLog[]
+  aiPrompts        AIPrompt[]
+  aiGenerationLogs AIGenerationLog[]
+  reusableBlocks   ReusableBlock[]
+  customVariables  CustomVariable[]
 
   // BDD - Mes données
-  entreprises       Entreprise[]
-  apprenants        Apprenant[]
-  intervenants      Intervenant[]
-  lieuxFormation    LieuFormation[]
-  financeurs        Financeur[]
+  entreprises    Entreprise[]
+  apprenants     Apprenant[]
+  intervenants   Intervenant[]
+  lieuxFormation LieuFormation[]
+  financeurs     Financeur[]
 
   // Sessions documentaires (ancien système)
-  documentSessions  DocumentSession[]
+  documentSessions DocumentSession[]
 
   // Sessions (nouveau système)
-  sessions          Session[]
+  sessions Session[]
 
   // CRM
-  opportunites      CRMOpportunite[]
+  opportunites CRMOpportunite[]
 
   // Signature électronique
   signatureDocuments SignatureDocument[]
 
   // SCORM LMS
-  scormPackages     SCORMPackage[]
+  scormPackages SCORMPackage[]
 
   // Qualiopi - Pré-inscriptions
-  preInscriptions   PreInscription[]
+  preInscriptions PreInscription[]
 
   // Qualiopi - Champs catalogue public (Indicateur 1)
-  catalogueActif    Boolean          @default(false) // Catalogue public activé
-  categorieOF       String?          // Catégorie de l'OF
-  certifications    String[]         // Certifications (Qualiopi, etc.)
-  mentionsLegalesCatalogue String?   @db.Text // Mentions légales spécifiques au catalogue
-  certificatQualiopiUrl String?      // URL du certificat Qualiopi (PDF uploadé)
-  categorieQualiopi     String?      // Catégorie Qualiopi (ex: "Actions de formation")
+  catalogueActif           Boolean  @default(false) // Catalogue public activé
+  categorieOF              String? // Catégorie de l'OF
+  certifications           String[] // Certifications (Qualiopi, etc.)
+  mentionsLegalesCatalogue String?  @db.Text // Mentions légales spécifiques au catalogue
+  certificatQualiopiUrl    String? // URL du certificat Qualiopi (PDF uploadé)
+  categorieQualiopi        String? // Catégorie Qualiopi (ex: "Actions de formation")
 
   // Notifications
-  notifications     Notification[]
+  notifications Notification[]
 
   // Évaluations de satisfaction (Qualiopi IND 2)
   evaluationsSatisfaction EvaluationSatisfaction[]
   evaluationsIntervenant  EvaluationIntervenant[]
+
+  // Organigramme (Qualiopi IND 9)
+  organigrammePostes OrganigrammePoste[]
+
+  // Qualiopi IND 17 - Fiches mission intervenants
+  fichesMission FicheMissionIntervenant[]
+
+  // Qualiopi IND 23, 24, 25 - Veille réglementaire
+  veilleSources         VeilleSource[]
+  veilleArticleLectures VeilleArticleLecture[]
+  veilleConversations   VeilleConversation[]
+
+  // Qualiopi IND 26 - Procédures qualité
+  procedures Procedure[]
+
+  // Qualiopi IND 31 - Réclamations
+  reclamations Reclamation[]
+
+  // Qualiopi IND 32 - Améliorations
+  ameliorations ActionAmelioration[]
 
   @@index([slug])
   @@index([customDomain])
@@ -255,37 +297,44 @@ model Organization {
 // ===========================================
 
 model User {
-  id              String    @id @default(cuid())
-  supabaseId      String    @unique  // ID Supabase Auth (remplace clerkId)
-  email           String    @unique
-  firstName       String?
-  lastName        String?
-  phone           String?
-  avatar          String?
-  role            UserRole  @default(FORMATEUR)
+  id         String   @id @default(cuid())
+  supabaseId String   @unique // ID Supabase Auth (remplace clerkId)
+  email      String   @unique
+  firstName  String?
+  lastName   String?
+  phone      String?
+  avatar     String?
+  role       UserRole @default(FORMATEUR)
 
   // Multi-tenant
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Super Admin uniquement
-  isSuperAdmin    Boolean   @default(false)
+  isSuperAdmin Boolean @default(false)
 
   // Metadata
-  isActive        Boolean   @default(true)
-  lastLoginAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  formations        Formation[]
-  files             File[]
-  sessions          FormationSession[]
-  auditLogs         AuditLog[]
-  aiGenerationLogs  AIGenerationLog[]
-  templateVersions  TemplateVersion[] @relation("TemplateVersionCreator")
-  opportunites      CRMOpportunite[]
-  notifications     Notification[]
+  formations       Formation[]
+  files            File[]
+  sessions         FormationSession[]
+  auditLogs        AuditLog[]
+  aiGenerationLogs AIGenerationLog[]
+  templateVersions TemplateVersion[]  @relation("TemplateVersionCreator")
+  opportunites     CRMOpportunite[]
+  notifications    Notification[]
+
+  // Qualiopi IND 5 - Notes créées
+  apprenantNotes ApprenantNote[] @relation("ApprenantNoteCreatedBy")
+
+  // Qualiopi IND 23, 24, 25 - Veille réglementaire
+  veilleArticleLectures VeilleArticleLecture[]
+  veilleConversations   VeilleConversation[]
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -297,92 +346,99 @@ model User {
 // ===========================================
 
 model Formation {
-  id              String          @id @default(cuid())
-  titre           String
-  description     String?         @db.Text
-  image           String?
-  status          FormationStatus @default(BROUILLON)
+  id          String          @id @default(cuid())
+  titre       String
+  description String?         @db.Text
+  image       String?
+  status      FormationStatus @default(BROUILLON)
 
   // Mode de création (avec/sans IA, import)
-  creationMode    CreationMode    @default(AI)
+  creationMode CreationMode @default(AI)
 
   // Multi-tenant
-  organizationId  String
-  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Créateur
-  userId          String
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Étape courante du wizard (persistance navigation)
-  currentStep     String          @default("contexte") // contexte, fiche, slides, evaluations
-  completedSteps  String[]        @default([])
+  currentStep    String   @default("contexte") // contexte, fiche, slides, evaluations
+  completedSteps String[] @default([])
 
   // Données du contexte (étape 1)
-  contexteData    Json?
+  contexteData Json?
 
   // Fiche pédagogique (JSON) - étape 2
   fichePedagogique Json?
 
   // Slides générés (Gamma) - étape 3
   slidesGenerated   Boolean   @default(false)
-  slidesData        Json?     // URLs et infos des slides par module
+  slidesData        Json? // URLs et infos des slides par module
   slidesGeneratedAt DateTime?
 
   // Évaluations générées (JSON) - étape 4 - DEPRECATED: Migrer vers Evaluation model
-  evaluationsData   Json?     // QCMs, positionnement, évaluations finales
+  evaluationsData Json? // QCMs, positionnement, évaluations finales
 
   // Documents générés (JSON) - DEPRECATED: Maintenant géré dans Session
-  documentsData     Json?     // Documents générés dans le wizard (conventions, contrats, etc.)
+  documentsData Json? // Documents générés dans le wizard (conventions, contrats, etc.)
 
   // Statistiques dénormalisées (calculées)
-  totalSessions     Int       @default(0)
-  totalApprenants   Int       @default(0)
-  lastSessionDate   DateTime?
+  totalSessions   Int       @default(0)
+  totalApprenants Int       @default(0)
+  lastSessionDate DateTime?
 
   // Metadata
-  isArchived      Boolean         @default(false)
-  isPublished     Boolean         @default(false)  // Publié dans le LMS
-  publishedAt     DateTime?       // Date de publication
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  isArchived  Boolean   @default(false)
+  isPublished Boolean   @default(false) // Publié dans le LMS
+  publishedAt DateTime? // Date de publication
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  modules           Module[]
-  evaluations       Evaluation[]    // NEW: Évaluations persistées
-  documents         Document[]
-  sessions          FormationSession[]  // Legacy - à supprimer
-  trainingSessions  Session[]       // NEW: Sessions de formation
-  files             File[]
-  documentSessions  DocumentSession[]  // Legacy - migrer vers Session
-  folder            Folder?          @relation("FormationFolder")
-  slideGenerations  SlideGeneration[]
-  opportunites      CRMOpportunite[]
-  lmsInscriptions   LMSInscription[]
-  scormPackages     SCORMPackage[]
+  modules          Module[]
+  evaluations      Evaluation[] // NEW: Évaluations persistées
+  documents        Document[]
+  sessions         FormationSession[] // Legacy - à supprimer
+  trainingSessions Session[] // NEW: Sessions de formation
+  files            File[]
+  documentSessions DocumentSession[] // Legacy - migrer vers Session
+  folder           Folder?            @relation("FormationFolder")
+  slideGenerations SlideGeneration[]
+  opportunites     CRMOpportunite[]
+  lmsInscriptions  LMSInscription[]
+  scormPackages    SCORMPackage[]
 
   // Qualiopi - Pré-inscriptions et Indicateurs
-  preInscriptions   PreInscription[]
-  indicateurs       FormationIndicateurs?
+  preInscriptions PreInscription[]
+  indicateurs     FormationIndicateurs?
+
+  // Qualiopi IND 17 - Fiches mission intervenants
+  fichesMission FicheMissionIntervenant[] @relation("FicheMissionFormation")
 
   // Qualiopi - Indicateur 3 : Formation certifiante
-  isCertifiante     Boolean          @default(false)
-  numeroFicheRS     String?          // Numéro de fiche RS (ex: RS6563)
-  referentielRSUrl  String?          // URL du fichier référentiel uploadé
-  lienFranceCompetences String?      // Lien vers la fiche France Compétences
+  isCertifiante         Boolean @default(false)
+  numeroFicheRS         String? // Numéro de fiche RS (ex: RS6563)
+  referentielRSUrl      String? // URL du fichier référentiel uploadé
+  lienFranceCompetences String? // Lien vers la fiche France Compétences
 
   // Qualiopi - Catalogue public
-  estPublieCatalogue Boolean         @default(false) // Visible dans le catalogue public
-  tarifAffiche       Float?          // Tarif affiché dans le catalogue
-  publicVise         String?         @db.Text // Public visé
-  prerequis          String?         @db.Text // Prérequis
-  accessibiliteHandicap String?      @db.Text // Informations accessibilité handicap
-  delaiAcces         String?         // Délai d'accès (ex: "2 semaines")
-  modalitesEvaluation String?        @db.Text // Modalités d'évaluation
+  estPublieCatalogue    Boolean @default(false) // Visible dans le catalogue public
+  tarifAffiche          Float? // Tarif affiché dans le catalogue
+  publicVise            String? @db.Text // Public visé
+  prerequis             String? @db.Text // Prérequis
+  accessibiliteHandicap String? @db.Text // Informations accessibilité handicap
+  delaiAcces            String? // Délai d'accès (ex: "2 semaines")
+  modalitesEvaluation   String? @db.Text // Modalités d'évaluation
 
   // CPF - Éligibilité
-  estEligibleCPF     Boolean         @default(false) // Éligible au CPF
-  codeFinancementCPF String?         // Code de financement CPF
+  estEligibleCPF     Boolean @default(false) // Éligible au CPF
+  codeFinancementCPF String? // Code de financement CPF
+
+  // Qualiopi IND 31 & 32 - Réclamations et Améliorations
+  reclamations  Reclamation[]
+  ameliorations ActionAmelioration[]
 
   @@index([organizationId])
   @@index([userId])
@@ -391,28 +447,32 @@ model Formation {
 }
 
 model Module {
-  id              String    @id @default(cuid())
-  titre           String
-  description     String?   @db.Text
-  ordre           Int       @default(0)
-  duree           Int?      // en minutes
+  id          String  @id @default(cuid())
+  titre       String
+  description String? @db.Text
+  ordre       Int     @default(0)
+  duree       Int? // en minutes
+
+  // Qualiopi IND 10 - Module 0 mise à niveau
+  isModuleZero Boolean @default(false) // Module de mise à niveau (non comptabilisé dans durée totale)
 
   // Parent
-  formationId     String
-  formation       Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Contenu (JSON pour flexibilité)
-  contenu         Json?
+  contenu Json?
 
   // Metadata
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations LMS
   lmsProgressions LMSProgressionModule[]
 
   @@index([formationId])
   @@index([ordre])
+  @@index([isModuleZero])
 }
 
 // ===========================================
@@ -420,41 +480,41 @@ model Module {
 // ===========================================
 
 model SlideGeneration {
-  id                  String                @id @default(cuid())
+  id String @id @default(cuid())
 
   // Formation parent
-  formationId         String
-  formation           Formation             @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Statut global
-  status              SlideGenerationStatus @default(PENDING)
-  progress            Int                   @default(0) // 0-100
+  status   SlideGenerationStatus @default(PENDING)
+  progress Int                   @default(0) // 0-100
 
   // Phase actuelle
-  currentPhase        String?               // enrichment, generation, finalizing
-  currentModuleIndex  Int                   @default(0)
-  currentModuleName   String?
+  currentPhase       String? // enrichment, generation, finalizing
+  currentModuleIndex Int     @default(0)
+  currentModuleName  String?
 
   // Options utilisées
-  themeId             String?
-  themeName           String?
-  tone                String?
-  cardsPerModule      Int                   @default(10)
+  themeId        String?
+  themeName      String?
+  tone           String?
+  cardsPerModule Int     @default(10)
 
   // Erreur éventuelle
-  errorMessage        String?
+  errorMessage String?
 
   // Résultats par module
-  moduleResults       Json?                 // Array des résultats de chaque module
+  moduleResults Json? // Array des résultats de chaque module
 
   // Utilisateur qui a lancé
-  userId              String
+  userId String
 
   // Metadata
-  startedAt           DateTime              @default(now())
-  completedAt         DateTime?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([formationId])
   @@index([userId])
@@ -466,31 +526,31 @@ model SlideGeneration {
 // ===========================================
 
 model Document {
-  id              String        @id @default(cuid())
-  type            DocumentType
-  titre           String
+  id    String       @id @default(cuid())
+  type  DocumentType
+  titre String
 
   // Contenu WYSIWYG (TipTap JSON)
-  content         Json?
+  content Json?
 
   // Fichier généré
-  fileUrl         String?
-  fileSize        Int?
+  fileUrl  String?
+  fileSize Int?
 
   // Parent
-  formationId     String
-  formation       Formation     @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Template utilisé
-  templateId      String?
-  template        Template?     @relation(fields: [templateId], references: [id])
+  templateId String?
+  template   Template? @relation(fields: [templateId], references: [id])
 
   // Metadata
-  version         Int           @default(1)
-  isGenerated     Boolean       @default(false)
-  generatedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  version     Int       @default(1)
+  isGenerated Boolean   @default(false)
+  generatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([formationId])
   @@index([type])
@@ -501,36 +561,37 @@ model Document {
 // ===========================================
 
 model Template {
-  id              String           @id @default(cuid())
-  name            String
-  description     String?
-  category        TemplateCategory
-  documentType    DocumentType?
+  id           String           @id @default(cuid())
+  name         String
+  description  String?
+  category     TemplateCategory
+  documentType DocumentType?
 
   // Contenu WYSIWYG (TipTap JSON)
-  content         Json
+  content       Json
   // Header du document (logo, coordonnees, etc.)
-  headerContent   Json?
+  headerContent Json?
   // Footer du document (mentions legales, pagination, etc.)
-  footerContent   Json?
+  footerContent Json?
 
   // Variables disponibles (ex: ["formation.titre", "formateur.nom"])
-  variables       String[]
+  variables String[]
 
   // Multi-tenant (null = template système)
-  organizationId  String?
-  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Template système (disponible pour tous)
-  isSystem        Boolean          @default(false)
+  isSystem Boolean @default(false)
 
   // Metadata
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  documents       Document[]
+  documents  Document[]
+  procedures Procedure[]
 
   @@index([organizationId])
   @@index([category])
@@ -542,39 +603,39 @@ model Template {
 // ===========================================
 
 model File {
-  id              String       @id @default(cuid())
-  name            String
-  originalName    String
-  mimeType        String
-  size            Int          // en bytes
-  category        FileCategory
+  id           String       @id @default(cuid())
+  name         String
+  originalName String
+  mimeType     String
+  size         Int // en bytes
+  category     FileCategory
 
   // Stockage Supabase
-  storagePath     String
-  publicUrl       String?
+  storagePath String
+  publicUrl   String?
 
   // Multi-tenant
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Uploader
-  userId          String
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Lien optionnel avec formation
-  formationId     String?
-  formation       Formation?   @relation(fields: [formationId], references: [id], onDelete: SetNull)
+  formationId String?
+  formation   Formation? @relation(fields: [formationId], references: [id], onDelete: SetNull)
 
   // Dossier virtuel
-  folderId        String?
-  folder          Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folderId String?
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   // Contenu du fichier (pour les documents HTML éditables)
-  fileContent     FileContent?
+  fileContent FileContent?
 
   // Metadata
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([organizationId])
   @@index([userId])
@@ -593,39 +654,39 @@ model FileContent {
 }
 
 model Folder {
-  id              String   @id @default(cuid())
-  name            String
-  color           String   @default("#4277FF")
+  id    String @id @default(cuid())
+  name  String
+  color String @default("#4277FF")
 
   // Parent folder (pour hiérarchie)
-  parentId        String?
-  parent          Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children        Folder[] @relation("FolderHierarchy")
+  parentId String?
+  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderHierarchy")
 
   // Lien avec formation (dossier racine de la formation)
-  formationId     String?  @unique
-  formation       Formation? @relation("FormationFolder", fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String?    @unique
+  formation   Formation? @relation("FormationFolder", fields: [formationId], references: [id], onDelete: Cascade)
 
   // Lien avec entreprise (sous-dossier entreprise dans une formation)
-  entrepriseId    String?
-  entreprise      Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+  entrepriseId String?
+  entreprise   Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
 
   // Lien avec apprenant (sous-dossier apprenant)
-  apprenantId     String?
-  apprenant       Apprenant? @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+  apprenantId String?
+  apprenant   Apprenant? @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
 
   // Type de dossier pour faciliter le filtrage
-  folderType      String   @default("general") // formation, entreprise, apprenant, general
+  folderType String @default("general") // formation, entreprise, apprenant, general
 
   // Multi-tenant
-  organizationId  String
+  organizationId String
 
   // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  files           File[]
+  files File[]
 
   @@index([organizationId])
   @@index([parentId])
@@ -640,34 +701,34 @@ model Folder {
 // ===========================================
 
 model FormationSession {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Parent
-  formationId     String
-  formation       Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Formateur assigné
-  formateurId     String
-  formateur       User      @relation(fields: [formateurId], references: [id])
+  formateurId String
+  formateur   User   @relation(fields: [formateurId], references: [id])
 
   // Dates
-  dateDebut       DateTime
-  dateFin         DateTime
+  dateDebut DateTime
+  dateFin   DateTime
 
   // Lieu
-  lieu            String?
-  isDistanciel    Boolean   @default(false)
-  lienVisio       String?
+  lieu         String?
+  isDistanciel Boolean @default(false)
+  lienVisio    String?
 
   // Participants
-  maxParticipants Int       @default(10)
+  maxParticipants Int @default(10)
 
   // Metadata
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  participants    Participant[]
+  participants Participant[]
 
   @@index([formationId])
   @@index([formateurId])
@@ -675,25 +736,25 @@ model FormationSession {
 }
 
 model Participant {
-  id              String            @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session
-  sessionId       String
-  session         FormationSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   FormationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Infos participant
-  email           String
-  firstName       String
-  lastName        String
-  company         String?
+  email     String
+  firstName String
+  lastName  String
+  company   String?
 
   // Statut
-  hasConfirmed    Boolean           @default(false)
-  hasAttended     Boolean           @default(false)
+  hasConfirmed Boolean @default(false)
+  hasAttended  Boolean @default(false)
 
   // Metadata
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([sessionId])
   @@index([email])
@@ -704,25 +765,25 @@ model Participant {
 // ===========================================
 
 model ApiKey {
-  id              String       @id @default(cuid())
-  name            String
-  key             String       @unique
+  id   String @id @default(cuid())
+  name String
+  key  String @unique
 
   // Multi-tenant
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Permissions (JSON array de scopes)
-  scopes          String[]
+  scopes String[]
 
   // Limites
-  rateLimit       Int          @default(1000) // requêtes par heure
+  rateLimit Int @default(1000) // requêtes par heure
 
   // Metadata
-  lastUsedAt      DateTime?
-  expiresAt       DateTime?
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
 
   @@index([key])
   @@index([organizationId])
@@ -733,21 +794,21 @@ model ApiKey {
 // ===========================================
 
 model ServiceApiKey {
-  id              String        @id @default(cuid())
-  name            String        // Nom pour identification
-  provider        String        // ANTHROPIC, OPENAI, GAMMA, SUPABASE, RESEND
-  encryptedKey    String        // Clé chiffrée
+  id           String @id @default(cuid())
+  name         String // Nom pour identification
+  provider     String // ANTHROPIC, OPENAI, GAMMA, SUPABASE, RESEND
+  encryptedKey String // Clé chiffrée
 
   // Global ou par organisation
-  isGlobal        Boolean       @default(false)
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isGlobal       Boolean       @default(false)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  isActive        Boolean       @default(true)
-  lastUsedAt      DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([provider])
   @@index([organizationId])
@@ -760,7 +821,7 @@ model ServiceApiKey {
 
 model GlobalSettings {
   id        String   @id @default(cuid())
-  data      Json     // Stockage flexible des paramètres
+  data      Json // Stockage flexible des paramètres
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -770,30 +831,30 @@ model GlobalSettings {
 // ===========================================
 
 model AuditLog {
-  id              String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Action
-  action          String       // CREATE, UPDATE, DELETE, LOGIN, etc.
-  entity          String       // Formation, Document, etc.
-  entityId        String?
+  action   String // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity   String // Formation, Document, etc.
+  entityId String?
 
   // Détails (JSON)
-  details         Json?
+  details Json?
 
   // Qui
-  userId          String?
-  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // Multi-tenant
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // IP & metadata
-  ipAddress       String?
-  userAgent       String?
+  ipAddress String?
+  userAgent String?
 
   // Timestamp
-  createdAt       DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   @@index([organizationId])
   @@index([userId])
@@ -814,24 +875,24 @@ enum InvitationStatus {
 }
 
 model Invitation {
-  id              String           @id @default(cuid())
-  email           String
-  role            UserRole         @default(FORMATEUR)
-  status          InvitationStatus @default(PENDING)
-  token           String           @unique
+  id     String           @id @default(cuid())
+  email  String
+  role   UserRole         @default(FORMATEUR)
+  status InvitationStatus @default(PENDING)
+  token  String           @unique
 
   // Multi-tenant
-  organizationId  String
+  organizationId String
 
   // Qui a invité
-  invitedById     String
+  invitedById String
 
   // Expiration (7 jours par défaut)
-  expiresAt       DateTime
+  expiresAt DateTime
 
   // Metadata
-  createdAt       DateTime         @default(now())
-  acceptedAt      DateTime?
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
 
   @@index([organizationId])
   @@index([email])
@@ -844,13 +905,13 @@ model Invitation {
 // ===========================================
 
 model GlobalConfig {
-  id              String   @id @default(cuid())
-  key             String   @unique
-  value           Json
-  description     String?
+  id          String  @id @default(cuid())
+  key         String  @unique
+  value       Json
+  description String?
 
   // Metadata
-  updatedAt       DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
   @@index([key])
 }
@@ -875,20 +936,23 @@ enum AIPromptType {
   POSITIONNEMENT
   EVALUATION_FINALE
   REFORMULATION
+  MODULE_ZERO // Qualiopi IND 10 - Module 0 mise à niveau
+  FICHE_ADAPTABILITE // Qualiopi IND 10 - Fiche d'adaptabilité du parcours
+  CORRELATION_OBJECTIFS // Qualiopi IND 11 - Corrélation objectifs/évaluation finale
   CUSTOM
 }
 
 model AIPrompt {
-  id              String       @id @default(cuid())
-  name            String
-  description     String?
-  type            AIPromptType
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  type        AIPromptType
 
   // Prompt system (instructions pour l'IA)
-  systemPrompt    String       @db.Text
+  systemPrompt String @db.Text
 
   // Prompt utilisateur (template avec variables)
-  userPromptTemplate String    @db.Text
+  userPromptTemplate String @db.Text
 
   // Variables requises pour ce prompt (ex: ["formation.titre", "modules"])
   requiredVariables String[]
@@ -897,31 +961,31 @@ model AIPrompt {
   optionalVariables String[]
 
   // Configuration IA
-  model           String       @default("claude-sonnet-4-20250514")
-  temperature     Float        @default(0.7)
-  maxTokens       Int          @default(4096)
+  model       String @default("claude-sonnet-4-20250514")
+  temperature Float  @default(0.7)
+  maxTokens   Int    @default(4096)
 
   // Schema de sortie attendu (JSON Schema pour validation)
-  outputSchema    Json?
+  outputSchema Json?
 
   // Template TipTap pour formater la sortie (optionnel)
-  outputTemplate  Json?
+  outputTemplate Json?
 
   // Prompt systeme (global uniquement)
-  isSystem        Boolean      @default(false)
+  isSystem Boolean @default(false)
 
   // Multi-tenant (null = global)
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Relation avec les logs
-  generationLogs  AIGenerationLog[]
+  generationLogs AIGenerationLog[]
 
   // Metadata
-  isActive        Boolean      @default(true)
-  version         Int          @default(1)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  isActive  Boolean  @default(true)
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([type, organizationId])
   @@index([type])
@@ -934,31 +998,31 @@ model AIPrompt {
 // ===========================================
 
 model ReusableBlock {
-  id              String       @id @default(cuid())
-  name            String
-  description     String?
+  id          String  @id @default(cuid())
+  name        String
+  description String?
 
   // Contenu WYSIWYG (TipTap JSON)
-  content         Json
+  content Json
 
   // Categorie pour organisation
-  category        String       @default("general") // mentions_legales, cgv, signature, header, footer, general
+  category String @default("general") // mentions_legales, cgv, signature, header, footer, general
 
   // Tags pour recherche
-  tags            String[]
+  tags String[]
 
   // Multi-tenant (null = bloc systeme)
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Bloc systeme (disponible pour tous)
-  isSystem        Boolean      @default(false)
+  isSystem Boolean @default(false)
 
   // Metadata
-  isActive        Boolean      @default(true)
-  usageCount      Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  isActive   Boolean  @default(true)
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([organizationId])
   @@index([category])
@@ -971,28 +1035,28 @@ model ReusableBlock {
 // ===========================================
 
 model TemplateVersion {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Template parent
-  templateId      String
+  templateId String
 
   // Numero de version
-  version         Int
+  version Int
 
   // Contenu au moment de la version
-  content         Json
-  headerContent   Json?
-  footerContent   Json?
+  content       Json
+  headerContent Json?
+  footerContent Json?
 
   // Commentaire de version (optionnel)
-  changeNote      String?
+  changeNote String?
 
   // Qui a cree cette version
-  createdById     String?
-  createdBy       User?     @relation("TemplateVersionCreator", fields: [createdById], references: [id])
+  createdById String?
+  createdBy   User?   @relation("TemplateVersionCreator", fields: [createdById], references: [id])
 
   // Metadata
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([templateId, version])
   @@index([templateId])
@@ -1005,34 +1069,34 @@ model TemplateVersion {
 // ===========================================
 
 model CustomVariable {
-  id              String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Identifiant de la variable (ex: "organisation.certification_qualiopi")
-  variableId      String
+  variableId String
 
   // Nom affiche
-  label           String
+  label String
 
   // Description
-  description     String?
+  description String?
 
   // Categorie
-  category        String       @default("organisation")
+  category String @default("organisation")
 
   // Valeur par defaut
-  defaultValue    String?
+  defaultValue String?
 
   // Type de donnee (text, number, date, boolean, image)
-  dataType        String       @default("text")
+  dataType String @default("text")
 
   // Multi-tenant
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([organizationId, variableId])
   @@index([organizationId])
@@ -1044,40 +1108,40 @@ model CustomVariable {
 // ===========================================
 
 model AIGenerationLog {
-  id              String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Quel prompt a ete utilise
-  promptId        String?
-  prompt          AIPrompt?    @relation(fields: [promptId], references: [id], onDelete: SetNull)
-  promptType      AIPromptType
+  promptId   String?
+  prompt     AIPrompt?    @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  promptType AIPromptType
 
   // Qui a genere
-  userId          String
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   // Input/Output
-  inputContext    Json         // Contexte envoye a l'IA
-  outputContent   Json?        // Contenu genere
-  outputRaw       String?      @db.Text // Reponse brute de l'IA
+  inputContext  Json // Contexte envoye a l'IA
+  outputContent Json? // Contenu genere
+  outputRaw     String? @db.Text // Reponse brute de l'IA
 
   // Metriques
-  tokensPrompt    Int          @default(0)
-  tokensCompletion Int         @default(0)
-  tokensTotal     Int          @default(0)
-  durationMs      Int          @default(0)
+  tokensPrompt     Int @default(0)
+  tokensCompletion Int @default(0)
+  tokensTotal      Int @default(0)
+  durationMs       Int @default(0)
 
   // Statut
-  status          String       @default("pending") // pending, success, error
-  errorMessage    String?
+  status       String  @default("pending") // pending, success, error
+  errorMessage String?
 
   // Provider utilise
-  provider        String?      // anthropic, openai
-  model           String?
+  provider String? // anthropic, openai
+  model    String?
 
   // Metadata
-  createdAt       DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([organizationId])
@@ -1092,44 +1156,44 @@ model AIGenerationLog {
 
 // Entreprises clientes de l'OF
 model Entreprise {
-  id                String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Infos principales
-  raisonSociale     String
-  siret             String?
-  tvaIntracom       String?
+  raisonSociale String
+  siret         String?
+  tvaIntracom   String?
 
   // Représentant légal
-  contactCivilite   String?         // Civilité du représentant (M., Mme)
-  contactNom        String?
-  contactPrenom     String?
-  contactFonction   String?         // Fonction du représentant légal
-  contactEmail      String?
-  contactTelephone  String?
+  contactCivilite  String? // Civilité du représentant (M., Mme)
+  contactNom       String?
+  contactPrenom    String?
+  contactFonction  String? // Fonction du représentant légal
+  contactEmail     String?
+  contactTelephone String?
 
   // Adresse
-  adresse           String?
-  codePostal        String?
-  ville             String?
-  pays              String       @default("France")
+  adresse    String?
+  codePostal String?
+  ville      String?
+  pays       String  @default("France")
 
   // Notes internes
-  notes             String?      @db.Text
+  notes String? @db.Text
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  isActive          Boolean      @default(true)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  apprenants        Apprenant[]
-  sessionClients    SessionClient[]
-  folders           Folder[]
-  opportunites      CRMOpportunite[]
+  apprenants         Apprenant[]
+  sessionClients     SessionClient[]
+  folders            Folder[]
+  opportunites       CRMOpportunite[]
   signatureDocuments SignatureDocument[]
 
   // Nouveau système de sessions
@@ -1142,63 +1206,67 @@ model Entreprise {
 
 // Apprenants / Participants
 model Apprenant {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Infos personnelles
-  nom               String
-  prenom            String
-  email             String
-  telephone         String?
+  nom       String
+  prenom    String
+  email     String
+  telephone String?
 
   // Infos indépendant (si statut = INDEPENDANT)
-  raisonSociale     String?         // Raison sociale de l'apprenant indépendant
-  siret             String?         // Numéro SIRET de l'apprenant indépendant
+  raisonSociale String? // Raison sociale de l'apprenant indépendant
+  siret         String? // Numéro SIRET de l'apprenant indépendant
 
   // Adresse
-  adresse           String?
-  codePostal        String?
-  ville             String?
-  pays              String       @default("France")
+  adresse    String?
+  codePostal String?
+  ville      String?
+  pays       String  @default("France")
 
   // Statut
-  statut            ApprenantStatus @default(PARTICULIER)
+  statut ApprenantStatus @default(PARTICULIER)
 
   // Si salarié, entreprise rattachée
-  entrepriseId      String?
-  entreprise        Entreprise?     @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+  entrepriseId String?
+  entreprise   Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
 
   // Notes internes
-  notes             String?         @db.Text
+  notes String? @db.Text
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  isActive          Boolean         @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   sessionParticipants SessionParticipant[]
-  folders           Folder[]
-  lmsInscriptions   LMSInscription[]
-  signatureDocuments SignatureDocument[]
-  scormTrackings    SCORMTracking[]
+  folders             Folder[]
+  lmsInscriptions     LMSInscription[]
+  signatureDocuments  SignatureDocument[]
+  scormTrackings      SCORMTracking[]
 
   // Nouveau système de sessions
   sessionParticipationsNew SessionParticipantNew[] @relation("SessionParticipantApprenant")
   evaluationResultats      EvaluationResultat[]    @relation("EvaluationResultatApprenant")
 
   // Qualiopi - Pré-inscriptions converties
-  preInscriptions   PreInscription[]
+  preInscriptions PreInscription[]
 
   // Authentification apprenant (Magic Code)
-  authCodes         ApprenantAuthCode[]
-  inviteTokens      ApprenantInviteToken[]
+  authCodes    ApprenantAuthCode[]
+  inviteTokens ApprenantInviteToken[]
 
   // Évaluations de satisfaction (Qualiopi IND 2)
   evaluationsSatisfaction EvaluationSatisfaction[] @relation("EvaluationSatisfactionApprenant")
+
+  // Qualiopi IND 5 - Historique des notes internes
+  notesHistory ApprenantNote[]
+  reclamations Reclamation[]
 
   @@index([organizationId])
   @@index([entrepriseId])
@@ -1206,51 +1274,94 @@ model Apprenant {
   @@index([email])
 }
 
+// Qualiopi IND 5 - Historique des notes internes pour les apprenants
+model ApprenantNote {
+  id String @id @default(cuid())
+
+  // Apprenant parent
+  apprenantId String
+  apprenant   Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Contenu de la note
+  content String @db.Text
+
+  // Qui a ajouté cette note
+  createdById String?
+  createdBy   User?   @relation("ApprenantNoteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@index([apprenantId])
+  @@index([createdAt])
+  @@index([createdById])
+}
+
 // Intervenants / Formateurs
 model Intervenant {
-  id                String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Infos personnelles
-  nom               String
-  prenom            String
-  email             String?
-  telephone         String?
+  nom       String
+  prenom    String
+  email     String?
+  telephone String?
+
+  // Photo de profil (Qualiopi IND 17)
+  photoUrl String?
 
   // Fonction / spécialité
-  fonction          String?
-  specialites       String[]
+  fonction    String?
+  specialites String[]
+
+  // Qualiopi IND 17 - Compétences et qualifications
+  cv               String? // URL du CV téléchargé
+  biographie       String? @db.Text // Biographie professionnelle
+  anneesExperience Int? // Années d'expérience
+
+  // Numéro de déclaration d'activité (pour formateurs indépendants)
+  numeroDeclarationActivite String?
 
   // Structure (si externe)
-  structure         String?
-  structureSiret    String?
+  structure      String?
+  structureSiret String?
 
   // Notes internes
-  notes             String?      @db.Text
+  notes String? @db.Text
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  isActive          Boolean      @default(true)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  sessionsFormateur    DocumentSession[]  @relation("SessionFormateur")
+  sessionsFormateur    DocumentSession[]     @relation("SessionFormateur")
   sessionsCoFormateur  SessionCoFormateur[]
   signaturesEmargement SignatureEmargement[]
 
   // Nouveau système de sessions
-  sessionsFormateurNew     Session[]               @relation("SessionFormateurPrincipal")
-  sessionsCoFormateurNew   SessionCoFormateurNew[] @relation("SessionCoFormateurIntervenant")
-  signaturesEmargementNew  SignatureEmargementNew[] @relation("SignatureEmargementFormateur")
+  sessionsFormateurNew    Session[]                @relation("SessionFormateurPrincipal")
+  sessionsCoFormateurNew  SessionCoFormateurNew[]  @relation("SessionCoFormateurIntervenant")
+  signaturesEmargementNew SignatureEmargementNew[] @relation("SignatureEmargementFormateur")
 
   // Auth codes pour connexion OTP
-  authCodes                IntervenantAuthCode[]
+  authCodes IntervenantAuthCode[]
 
   // Évaluations intervenant (Qualiopi IND 2)
-  evaluationsIntervenant   EvaluationIntervenant[] @relation("EvaluationIntervenantIntervenant")
+  evaluationsIntervenant EvaluationIntervenant[] @relation("EvaluationIntervenantIntervenant")
+
+  // Organigramme (Qualiopi IND 9)
+  organigrammePostes OrganigrammePoste[] @relation("OrganigrammeIntervenant")
+
+  // Diplômes et certifications (Qualiopi IND 17)
+  diplomes IntervenantDiplome[]
+
+  // Fiches mission (Qualiopi IND 17)
+  fichesMission FicheMissionIntervenant[]
 
   @@index([organizationId])
   @@index([nom])
@@ -1259,72 +1370,177 @@ model Intervenant {
 
 // Lieux de formation
 model LieuFormation {
-  id                String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Type de lieu
-  typeLieu          TypeLieu     @default(PRESENTIEL)
+  typeLieu TypeLieu @default(PRESENTIEL)
 
   // Infos lieu
-  nom               String       // Nom du lieu de formation
-  lieuFormation     String       // Adresse OU lien de visio selon typeLieu
-  codePostal        String?
-  ville             String?
+  nom           String // Nom du lieu de formation
+  lieuFormation String // Adresse OU lien de visio selon typeLieu
+  codePostal    String?
+  ville         String?
 
   // Infos pratiques
-  infosPratiques    String?      @db.Text  // Code porte, étage, etc.
+  infosPratiques String? @db.Text // Code porte, étage, etc.
 
   // Capacité (seulement pour présentiel)
-  capacite          Int?
+  capacite Int?
+
+  // ===========================================
+  // Checklist conformité lieu (Qualiopi IND 17)
+  // ===========================================
+  // Surface et aménagement
+  checkSurfaceAdaptee Boolean @default(false) // Surface adaptée au nombre d'apprenants
+  checkErpConforme    Boolean @default(false) // Conformité ERP (Établissement Recevant du Public)
+
+  // Conditions de travail
+  checkVentilation Boolean @default(false) // Ventilation/climatisation adaptée
+  checkEclairage   Boolean @default(false) // Éclairage suffisant
+  checkSanitaires  Boolean @default(false) // Sanitaires accessibles
+
+  // Accessibilité
+  checkAccessibiliteHandicap Boolean @default(false) // Accessibilité PMR
+
+  // Équipements techniques
+  checkWifi            Boolean @default(false) // WiFi disponible
+  checkVideoprojecteur Boolean @default(false) // Vidéoprojecteur ou écran
+  checkMobilier        Boolean @default(false) // Mobilier adapté (tables, chaises)
+  checkEquipements     Boolean @default(false) // Équipements spécifiques selon formation
+  checkFournitures     Boolean @default(false) // Fournitures pédagogiques
+
+  // Notes sur la conformité
+  notesConformite String? @db.Text
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  isActive          Boolean      @default(true)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  sessions          DocumentSession[]
+  sessions DocumentSession[]
 
   // Nouveau système de sessions
-  sessionsNew       Session[] @relation("SessionLieu")
+  sessionsNew Session[] @relation("SessionLieu")
 
   @@index([organizationId])
   @@index([nom])
 }
 
-// Financeurs (OPCO et autres)
-model Financeur {
-  id                String        @id @default(cuid())
+// ===========================================
+// QUALIOPI IND 17 - MOBILISATION DES INTERVENANTS
+// ===========================================
 
-  // Infos
-  nom               String
-  type              FinanceurType @default(OPCO)
+// Diplômes et certifications des intervenants
+model IntervenantDiplome {
+  id String @id @default(cuid())
 
-  // Contact (facultatif)
-  email             String?
-  telephone         String?
+  // Intervenant
+  intervenantId String
+  intervenant   Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
 
-  // Adresse
-  adresse           String?
-  codePostal        String?
-  ville             String?
-  pays              String        @default("France")
-  siteWeb           String?
-
-  // Notes
-  notes             String?       @db.Text
-
-  // Multi-tenant
-  organizationId    String
-  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Informations du diplôme
+  intitule       String // Titre du diplôme ou certification
+  organisme      String? // Organisme délivrant le diplôme
+  anneeObtention Int? // Année d'obtention
+  niveau         String? // Niveau (Bac, Bac+2, Bac+5, etc.)
+  fichierUrl     String? // URL du fichier justificatif
 
   // Metadata
-  isActive          Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([intervenantId])
+}
+
+// Fiche mission intervenant (pour chaque session)
+model FicheMissionIntervenant {
+  id String @id @default(cuid())
+
+  // Intervenant concerné
+  intervenantId String
+  intervenant   Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+
+  // Session concernée
+  sessionId String
+  session   Session @relation("FicheMissionSession", fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Formation (pour faciliter les requêtes)
+  formationId String
+  formation   Formation @relation("FicheMissionFormation", fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Contenu de la mission
+  objectifsMission  String? @db.Text // Objectifs spécifiques de la mission
+  publicVise        String? // Public visé
+  dureeIntervention Int? // Durée en minutes
+  moyensUtilises    String? @db.Text // Moyens pédagogiques et techniques
+
+  // Signature
+  signatureIntervenant   String? // Signature base64
+  dateSignature          DateTime?
+  signatureOrganisme     String? // Signature de l'organisme
+  dateSignatureOrganisme DateTime?
+
+  // Statut
+  status FicheMissionStatus @default(DRAFT)
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([intervenantId, sessionId])
+  @@index([intervenantId])
+  @@index([sessionId])
+  @@index([formationId])
+  @@index([organizationId])
+}
+
+enum FicheMissionStatus {
+  DRAFT // Brouillon
+  SENT // Envoyée à l'intervenant
+  SIGNED_INTERVENANT // Signée par l'intervenant
+  SIGNED_BOTH // Signée par les deux parties
+  CANCELLED // Annulée
+}
+
+// Financeurs (OPCO et autres)
+model Financeur {
+  id String @id @default(cuid())
+
+  // Infos
+  nom  String
+  type FinanceurType @default(OPCO)
+
+  // Contact (facultatif)
+  email     String?
+  telephone String?
+
+  // Adresse
+  adresse    String?
+  codePostal String?
+  ville      String?
+  pays       String  @default("France")
+  siteWeb    String?
+
+  // Notes
+  notes String? @db.Text
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   clientFinancements SessionClientFinancement[]
@@ -1343,47 +1559,47 @@ model Financeur {
 
 // Session documentaire liée à une formation
 model DocumentSession {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Formation parent
-  formationId       String
-  formation         Formation       @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Étape 3 - Modalité et lieu
-  modalite          SessionModalite @default(PRESENTIEL)
+  modalite SessionModalite @default(PRESENTIEL)
 
   // Si présentiel
-  lieuId            String?
-  lieu              LieuFormation?  @relation(fields: [lieuId], references: [id], onDelete: SetNull)
-  lieuTexteLibre    String?         // Si lieu non enregistré
+  lieuId         String?
+  lieu           LieuFormation? @relation(fields: [lieuId], references: [id], onDelete: SetNull)
+  lieuTexteLibre String? // Si lieu non enregistré
 
   // Si distanciel
-  lienConnexion     String?
-  plateformeVisio   String?         // Zoom, Google Meet, Teams, etc.
+  lienConnexion   String?
+  plateformeVisio String? // Zoom, Google Meet, Teams, etc.
 
   // Étape 4 - Formateur principal
-  formateurId       String?
-  formateur         Intervenant?    @relation("SessionFormateur", fields: [formateurId], references: [id], onDelete: SetNull)
+  formateurId String?
+  formateur   Intervenant? @relation("SessionFormateur", fields: [formateurId], references: [id], onDelete: SetNull)
 
   // Notes internes
-  notes             String?         @db.Text
+  notes String? @db.Text
 
   // Statut
-  status            String          @default("brouillon")  // brouillon, en_cours, termine
+  status String @default("brouillon") // brouillon, en_cours, termine
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  clients           SessionClient[]
-  journees          SessionJournee[]
-  coFormateurs      SessionCoFormateur[]
-  documentsGeneres  SessionDocument[]
+  clients            SessionClient[]
+  journees           SessionJournee[]
+  coFormateurs       SessionCoFormateur[]
+  documentsGeneres   SessionDocument[]
   signatureDocuments SignatureDocument[]
 
   // Évaluations de satisfaction (Qualiopi IND 2)
@@ -1397,27 +1613,27 @@ model DocumentSession {
 
 // Journées de formation (Étape 3)
 model SessionJournee {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Ordre
-  ordre             Int             @default(1)
+  ordre Int @default(1)
 
   // Date
-  date              DateTime
+  date DateTime
 
   // Horaires
-  heureDebutMatin   String?         // "09:00"
-  heureFinMatin     String?         // "12:30"
-  heureDebutAprem   String?         // "14:00"
-  heureFinAprem     String?         // "17:30"
+  heureDebutMatin String? // "09:00"
+  heureFinMatin   String? // "12:30"
+  heureDebutAprem String? // "14:00"
+  heureFinAprem   String? // "17:30"
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   feuillesEmargement FeuilleEmargement[]
@@ -1428,18 +1644,18 @@ model SessionJournee {
 
 // Co-formateurs (Étape 4)
 model SessionCoFormateur {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Intervenant
-  intervenantId     String
-  intervenant       Intervenant     @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+  intervenantId String
+  intervenant   Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
 
   // Metadata
-  createdAt         DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([sessionId, intervenantId])
   @@index([sessionId])
@@ -1447,30 +1663,30 @@ model SessionCoFormateur {
 
 // Clients de la session (Étape 1)
 model SessionClient {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Type de client
-  typeClient        ApprenantStatus // ENTREPRISE (mapped to SALARIE), INDEPENDANT, PARTICULIER
+  typeClient ApprenantStatus // ENTREPRISE (mapped to SALARIE), INDEPENDANT, PARTICULIER
 
   // Si entreprise
-  entrepriseId      String?
-  entreprise        Entreprise?     @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+  entrepriseId String?
+  entreprise   Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
 
   // Étape 2 - Tarifs
-  tarifHT           Float?          // Tarif appliqué
-  tarifTTC          Float?
+  tarifHT  Float? // Tarif appliqué
+  tarifTTC Float?
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  participants      SessionParticipant[]
-  financements      SessionClientFinancement[]
+  participants SessionParticipant[]
+  financements SessionClientFinancement[]
 
   @@index([sessionId])
   @@index([entrepriseId])
@@ -1478,26 +1694,26 @@ model SessionClient {
 
 // Financement d'un client (Étape 2)
 model SessionClientFinancement {
-  id                String        @id @default(cuid())
+  id String @id @default(cuid())
 
   // Client parent
-  clientId          String
-  client            SessionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+  client   SessionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   // Financeur
-  financeurId       String
-  financeur         Financeur     @relation(fields: [financeurId], references: [id], onDelete: Cascade)
+  financeurId String
+  financeur   Financeur @relation(fields: [financeurId], references: [id], onDelete: Cascade)
 
   // Montants
-  montantFinanceHT  Float         @default(0)
+  montantFinanceHT  Float  @default(0)
   montantFinanceTTC Float?
 
   // Notes
-  notes             String?
+  notes String?
 
   // Metadata
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([clientId, financeurId])
   @@index([clientId])
@@ -1506,26 +1722,31 @@ model SessionClientFinancement {
 
 // Participants à la session (liés à un client)
 model SessionParticipant {
-  id                String        @id @default(cuid())
+  id String @id @default(cuid())
 
   // Client parent
-  clientId          String
-  client            SessionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+  client   SessionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   // Apprenant
-  apprenantId       String
-  apprenant         Apprenant     @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Statut de participation
-  estConfirme       Boolean       @default(false)
-  aAssiste          Boolean       @default(false)
+  estConfirme Boolean @default(false)
+  aAssiste    Boolean @default(false)
+
+  // Qualiopi IND 3 - Suivi certification (si formation certifiante)
+  certificationObtenue Boolean   @default(false)
+  dateCertification    DateTime?
+  numeroCertificat     String?
 
   // Metadata
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  signatures        SignatureEmargement[]
+  signatures SignatureEmargement[]
 
   @@unique([clientId, apprenantId])
   @@index([clientId])
@@ -1534,32 +1755,32 @@ model SessionParticipant {
 
 // Documents générés pour la session (Étape 5)
 model SessionDocument {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Type de document
-  type              DocumentType
+  type DocumentType
 
   // Pour qui (optionnel)
-  clientId          String?         // Si document par client (convention)
-  apprenantId       String?         // Si document par apprenant (convocation, attestation)
+  clientId    String? // Si document par client (convention)
+  apprenantId String? // Si document par apprenant (convocation, attestation)
 
   // Contenu généré
-  content           Json?
-  fileUrl           String?
-  fileName          String?
+  content  Json?
+  fileUrl  String?
+  fileName String?
 
   // Statut
-  status            String          @default("pending")  // pending, generated, sent
+  status String @default("pending") // pending, generated, sent
 
   // Metadata
-  generatedAt       DateTime?
-  sentAt            DateTime?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  generatedAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([sessionId])
   @@index([type])
@@ -1572,27 +1793,27 @@ model SessionDocument {
 
 // Feuille d'émargement pour une journée de session
 model FeuilleEmargement {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Journée de session parent
-  journeeId         String
-  journee           SessionJournee  @relation(fields: [journeeId], references: [id], onDelete: Cascade)
+  journeeId String
+  journee   SessionJournee @relation(fields: [journeeId], references: [id], onDelete: Cascade)
 
   // Token unique pour le QR code (sécurité)
-  token             String          @unique @default(cuid())
+  token String @unique @default(cuid())
 
   // QR Code expiré ?
-  expiresAt         DateTime?
+  expiresAt DateTime?
 
   // Statut
-  status            String          @default("active")  // active, closed, expired
+  status String @default("active") // active, closed, expired
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  signatures        SignatureEmargement[]
+  signatures SignatureEmargement[]
 
   @@index([journeeId])
   @@index([token])
@@ -1601,42 +1822,42 @@ model FeuilleEmargement {
 
 // Signature d'un participant OU formateur sur une feuille
 model SignatureEmargement {
-  id                String            @id @default(cuid())
+  id String @id @default(cuid())
 
   // Feuille parent
-  feuilleId         String
-  feuille           FeuilleEmargement @relation(fields: [feuilleId], references: [id], onDelete: Cascade)
+  feuilleId String
+  feuille   FeuilleEmargement @relation(fields: [feuilleId], references: [id], onDelete: Cascade)
 
   // Type de signataire
-  signataire        String            @default("participant") // "participant" ou "formateur"
+  signataire String @default("participant") // "participant" ou "formateur"
 
   // Participant (si signataire = participant)
-  participantId     String?
-  participant       SessionParticipant? @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participantId String?
+  participant   SessionParticipant? @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   // Formateur/Intervenant (si signataire = formateur)
-  intervenantId     String?
-  intervenant       Intervenant? @relation(fields: [intervenantId], references: [id], onDelete: SetNull)
+  intervenantId String?
+  intervenant   Intervenant? @relation(fields: [intervenantId], references: [id], onDelete: SetNull)
 
   // Période (matin ou après-midi)
-  periode           String            // "matin", "apres_midi"
+  periode String // "matin", "apres_midi"
 
   // Signature (base64 ou URL si stockée)
-  signatureData     String?           @db.Text  // Signature manuscrite en base64
+  signatureData String? @db.Text // Signature manuscrite en base64
 
   // Horodatage précis de la signature
-  signedAt          DateTime          @default(now())
+  signedAt DateTime @default(now())
 
   // IP et User-Agent pour traçabilité
-  ipAddress         String?
-  userAgent         String?
+  ipAddress String?
+  userAgent String?
 
   // Géolocalisation (optionnel)
-  latitude          Float?
-  longitude         Float?
+  latitude  Float?
+  longitude Float?
 
   // Metadata
-  createdAt         DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([feuilleId, participantId, periode])
   @@unique([feuilleId, intervenantId, periode])
@@ -1651,13 +1872,13 @@ model SignatureEmargement {
 // ===========================================
 
 enum CRMStage {
-  ENTRANT            // Nouveau prospect entrant
-  DISCUSSION         // En discussion avec le prospect
-  DEVIS              // Devis envoyé
-  CONVENTION         // Convention en cours
-  FACTURE            // Facturé
-  GAGNE              // Affaire gagnée
-  PERDU              // Affaire perdue
+  ENTRANT // Nouveau prospect entrant
+  DISCUSSION // En discussion avec le prospect
+  DEVIS // Devis envoyé
+  CONVENTION // Convention en cours
+  FACTURE // Facturé
+  GAGNE // Affaire gagnée
+  PERDU // Affaire perdue
 }
 
 enum CRMSource {
@@ -1672,62 +1893,62 @@ enum CRMSource {
 
 // Opportunité commerciale (Lead/Deal)
 model CRMOpportunite {
-  id                String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Infos de base
-  titre             String       // Ex: "Formation Excel - Société ABC"
-  description       String?      @db.Text
+  titre       String // Ex: "Formation Excel - Société ABC"
+  description String? @db.Text
 
   // Étape du pipeline
-  stage             CRMStage     @default(ENTRANT)
-  ordre             Int          @default(0)  // Ordre dans la colonne
+  stage CRMStage @default(ENTRANT)
+  ordre Int      @default(0) // Ordre dans la colonne
 
   // Valeur et probabilité
-  montantHT         Float?
-  probabilite       Int          @default(50)  // 0-100%
+  montantHT   Float?
+  probabilite Int    @default(50) // 0-100%
 
   // Source
-  source            CRMSource    @default(AUTRE)
+  source CRMSource @default(AUTRE)
 
   // Contact principal
-  contactNom        String?
-  contactEmail      String?
-  contactTelephone  String?
-  contactFonction   String?
+  contactNom       String?
+  contactEmail     String?
+  contactTelephone String?
+  contactFonction  String?
 
   // Entreprise liée (optionnel)
-  entrepriseId      String?
-  entreprise        Entreprise?  @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+  entrepriseId String?
+  entreprise   Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
 
   // Formation liée (optionnel)
-  formationId       String?
-  formation         Formation?   @relation(fields: [formationId], references: [id], onDelete: SetNull)
+  formationId String?
+  formation   Formation? @relation(fields: [formationId], references: [id], onDelete: SetNull)
 
   // Dates importantes
-  dateRelance       DateTime?    // Prochaine relance prévue
-  dateCloturePrevu  DateTime?    // Date de clôture prévue
+  dateRelance      DateTime? // Prochaine relance prévue
+  dateCloturePrevu DateTime? // Date de clôture prévue
 
   // Notes et activité
-  notes             String?      @db.Text
-  dernierContact    DateTime?
+  notes          String?   @db.Text
+  dernierContact DateTime?
 
   // Raison de perte (si stage = PERDU)
-  raisonPerte       String?
+  raisonPerte String?
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Créateur
-  userId            String
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Metadata
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  activites         CRMActivite[]
+  activites CRMActivite[]
 
   @@index([organizationId])
   @@index([userId])
@@ -1738,27 +1959,27 @@ model CRMOpportunite {
 
 // Activités liées à une opportunité
 model CRMActivite {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Opportunité parent
-  opportuniteId     String
-  opportunite       CRMOpportunite  @relation(fields: [opportuniteId], references: [id], onDelete: Cascade)
+  opportuniteId String
+  opportunite   CRMOpportunite @relation(fields: [opportuniteId], references: [id], onDelete: Cascade)
 
   // Type d'activité
-  type              String          // appel, email, reunion, note, relance
+  type String // appel, email, reunion, note, relance
 
   // Contenu
-  titre             String
-  description       String?         @db.Text
+  titre       String
+  description String? @db.Text
 
   // Date de l'activité
-  date              DateTime        @default(now())
+  date DateTime @default(now())
 
   // Fait ou à faire
-  estFait           Boolean         @default(true)
+  estFait Boolean @default(true)
 
   // Metadata
-  createdAt         DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@index([opportuniteId])
   @@index([date])
@@ -1776,38 +1997,38 @@ enum LMSStatut {
 
 // Inscription d'un apprenant à une formation (parcours LMS)
 model LMSInscription {
-  id                String       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Formation
-  formationId       String
-  formation         Formation    @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Apprenant
-  apprenantId       String
-  apprenant         Apprenant    @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Progression globale
-  progression       Int          @default(0)  // 0-100%
-  statut            LMSStatut    @default(NON_COMMENCE)
+  progression Int       @default(0) // 0-100%
+  statut      LMSStatut @default(NON_COMMENCE)
 
   // Dates
-  dateInscription   DateTime     @default(now())
-  dateDebut         DateTime?    // Première activité
-  dateFin           DateTime?    // Complétion
+  dateInscription DateTime  @default(now())
+  dateDebut       DateTime? // Première activité
+  dateFin         DateTime? // Complétion
 
   // Temps passé (en minutes)
-  tempsTotal        Int          @default(0)
+  tempsTotal Int @default(0)
 
   // Notes/Résultats
-  noteFinale        Float?       // Note moyenne ou finale
-  certificatGenere  Boolean      @default(false)
+  noteFinale       Float? // Note moyenne ou finale
+  certificatGenere Boolean @default(false)
 
   // Multi-tenant
-  organizationId    String
+  organizationId String
 
   // Metadata
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   progressionModules LMSProgressionModule[]
@@ -1822,34 +2043,34 @@ model LMSInscription {
 
 // Progression par module
 model LMSProgressionModule {
-  id                String         @id @default(cuid())
+  id String @id @default(cuid())
 
   // Inscription parent
-  inscriptionId     String
-  inscription       LMSInscription @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
+  inscriptionId String
+  inscription   LMSInscription @relation(fields: [inscriptionId], references: [id], onDelete: Cascade)
 
   // Module
-  moduleId          String
-  module            Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   // Progression
-  progression       Int            @default(0)  // 0-100%
-  statut            LMSStatut      @default(NON_COMMENCE)
+  progression Int       @default(0) // 0-100%
+  statut      LMSStatut @default(NON_COMMENCE)
 
   // Temps passé (en minutes)
-  tempsPasse        Int            @default(0)
+  tempsPasse Int @default(0)
 
   // Dates
-  dateDebut         DateTime?
-  dateFin           DateTime?
+  dateDebut DateTime?
+  dateFin   DateTime?
 
   // Évaluations
-  scoreQuiz         Float?
-  tentativesQuiz    Int            @default(0)
+  scoreQuiz      Float?
+  tentativesQuiz Int    @default(0)
 
   // Metadata
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([inscriptionId, moduleId])
   @@index([inscriptionId])
@@ -1861,57 +2082,57 @@ model LMSProgressionModule {
 // ===========================================
 
 enum VirtualRoomStatus {
-  SCHEDULED     // Programmée
-  ACTIVE        // En cours
-  ENDED         // Terminée
+  SCHEDULED // Programmée
+  ACTIVE // En cours
+  ENDED // Terminée
 }
 
 // Salle de classe virtuelle
 model VirtualRoom {
-  id                String            @id @default(cuid())
+  id String @id @default(cuid())
 
   // Infos de base
-  titre             String            // Ex: "Session Module 1 - Excel Avancé"
-  description       String?
+  titre       String // Ex: "Session Module 1 - Excel Avancé"
+  description String?
 
   // Session liée (optionnel)
-  sessionId         String?
+  sessionId String?
 
   // Formateur hôte
-  hosteNom          String?
-  hosteEmail        String?
+  hosteNom   String?
+  hosteEmail String?
 
   // Configuration de la salle
-  roomId            String            @unique @default(cuid())  // ID unique pour MiroTalk
-  password          String?           // Mot de passe optionnel
+  roomId   String  @unique @default(cuid()) // ID unique pour MiroTalk
+  password String? // Mot de passe optionnel
 
   // Dates
-  dateDebut         DateTime
-  dateFin           DateTime?
-  dureeMinutes      Int               @default(60)
+  dateDebut    DateTime
+  dateFin      DateTime?
+  dureeMinutes Int       @default(60)
 
   // Statut
-  status            VirtualRoomStatus @default(SCHEDULED)
+  status VirtualRoomStatus @default(SCHEDULED)
 
   // Configuration MiroTalk
-  maxParticipants   Int               @default(50)
-  enregistrement    Boolean           @default(false)
-  chatActif         Boolean           @default(true)
-  ecranPartageActif Boolean           @default(true)
+  maxParticipants   Int     @default(50)
+  enregistrement    Boolean @default(false)
+  chatActif         Boolean @default(true)
+  ecranPartageActif Boolean @default(true)
 
   // Statistiques post-session
   nombreParticipants Int?
-  dureeTotale        Int?             // Minutes effectives
+  dureeTotale        Int? // Minutes effectives
 
   // Multi-tenant
-  organizationId    String
+  organizationId String
 
   // Créateur
-  userId            String
+  userId String
 
   // Metadata
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([organizationId])
   @@index([userId])
@@ -1925,67 +2146,67 @@ model VirtualRoom {
 // ===========================================
 
 enum SignatureDocumentStatus {
-  DRAFT              // Brouillon, pas encore envoyé
-  PENDING_SIGNATURE  // En attente de signature
-  SIGNED             // Signé
-  EXPIRED            // Expiré (délai dépassé)
-  CANCELLED          // Annulé
+  DRAFT // Brouillon, pas encore envoyé
+  PENDING_SIGNATURE // En attente de signature
+  SIGNED // Signé
+  EXPIRED // Expiré (délai dépassé)
+  CANCELLED // Annulé
 }
 
 enum SignatureAuthMethod {
-  EMAIL_ONLY         // Simple validation email
-  EMAIL_SMS          // Double auth : email + SMS
-  EMAIL_CODE         // Email + code à 6 chiffres
+  EMAIL_ONLY // Simple validation email
+  EMAIL_SMS // Double auth : email + SMS
+  EMAIL_CODE // Email + code à 6 chiffres
 }
 
 // Document à faire signer
 model SignatureDocument {
-  id                String                  @id @default(cuid())
+  id String @id @default(cuid())
 
   // Lien vers le document source (template rendu)
-  titre             String                  // Ex: "Convention de formation - Jean Dupont"
-  documentType      DocumentType            // Type de document
-  contenuHtml       String                  @db.Text // Contenu HTML du document
-  signedContenuHtml String?                 @db.Text // Contenu HTML avec signature intégrée (après signature)
+  titre             String // Ex: "Convention de formation - Jean Dupont"
+  documentType      DocumentType // Type de document
+  contenuHtml       String       @db.Text // Contenu HTML du document
+  signedContenuHtml String?      @db.Text // Contenu HTML avec signature intégrée (après signature)
 
   // Destinataire
   destinataireNom   String
   destinataireEmail String
-  destinataireTel   String?                 // Pour double auth SMS
+  destinataireTel   String? // Pour double auth SMS
 
   // Lien optionnel vers apprenant ou entreprise
-  apprenantId       String?
-  apprenant         Apprenant?              @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
-  entrepriseId      String?
-  entreprise        Entreprise?             @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
+  apprenantId  String?
+  apprenant    Apprenant?  @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+  entrepriseId String?
+  entreprise   Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
 
   // Session de formation liée (optionnel)
-  sessionId         String?
-  session           DocumentSession?        @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionId String?
+  session   DocumentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   // Configuration de signature
-  authMethod        SignatureAuthMethod     @default(EMAIL_SMS)
-  expiresAt         DateTime?               // Date d'expiration
-  status            SignatureDocumentStatus @default(DRAFT)
+  authMethod SignatureAuthMethod     @default(EMAIL_SMS)
+  expiresAt  DateTime? // Date d'expiration
+  status     SignatureDocumentStatus @default(DRAFT)
 
   // Token unique pour accès signature (lien sécurisé)
-  token             String                  @unique @default(cuid())
+  token String @unique @default(cuid())
 
   // Envoi
-  sentAt            DateTime?               // Date d'envoi
-  sentBy            String?                 // ID de l'utilisateur qui a envoyé
+  sentAt DateTime? // Date d'envoi
+  sentBy String? // ID de l'utilisateur qui a envoyé
 
   // Relances
-  lastReminderAt    DateTime?
-  reminderCount     Int                     @default(0)
+  lastReminderAt DateTime?
+  reminderCount  Int       @default(0)
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   signatures        SignatureRecord[]
@@ -2002,22 +2223,22 @@ model SignatureDocument {
 
 // Code de vérification pour double authentification
 model SignatureVerificationCode {
-  id              String            @id @default(cuid())
+  id String @id @default(cuid())
 
-  documentId      String
-  document        SignatureDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+  document   SignatureDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   // Code
-  code            String            // Code à 6 chiffres
-  method          String            // "sms" ou "email"
-  expiresAt       DateTime          // Expiration (5 min)
-  usedAt          DateTime?         // Date d'utilisation
+  code      String // Code à 6 chiffres
+  method    String // "sms" ou "email"
+  expiresAt DateTime // Expiration (5 min)
+  usedAt    DateTime? // Date d'utilisation
 
   // Tentatives
-  attempts        Int               @default(0)
+  attempts Int @default(0)
 
   // Metadata
-  createdAt       DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@index([documentId])
   @@index([code])
@@ -2025,42 +2246,42 @@ model SignatureVerificationCode {
 
 // Enregistrement de signature (preuve légale)
 model SignatureRecord {
-  id              String            @id @default(cuid())
+  id String @id @default(cuid())
 
-  documentId      String
-  document        SignatureDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+  document   SignatureDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   // Identification du signataire
   signataireName  String
   signataireEmail String
 
   // Signature manuscrite
-  signatureData   String            @db.Text  // Image base64 de la signature
+  signatureData String @db.Text // Image base64 de la signature
 
   // Authentification effectuée
-  authMethod      SignatureAuthMethod
+  authMethod SignatureAuthMethod
 
   // Horodatage certifié
-  signedAt        DateTime          @default(now())
+  signedAt DateTime @default(now())
 
   // Preuve d'intégrité
-  documentHash    String            // Hash SHA-256 du document au moment de la signature
-  signatureHash   String            // Hash de la signature
+  documentHash  String // Hash SHA-256 du document au moment de la signature
+  signatureHash String // Hash de la signature
 
   // Métadonnées de traçabilité
-  ipAddress       String?
-  userAgent       String?
-  geoLocation     String?           // Localisation approximative (pays, ville)
+  ipAddress   String?
+  userAgent   String?
+  geoLocation String? // Localisation approximative (pays, ville)
 
   // Consentement explicite
-  consentText     String            @default("Je certifie avoir lu et approuvé ce document")
-  consentAccepted Boolean           @default(true)
+  consentText     String  @default("Je certifie avoir lu et approuvé ce document")
+  consentAccepted Boolean @default(true)
 
   // Certificat de signature (PDF généré)
-  certificateUrl  String?           // URL du certificat stocké
+  certificateUrl String? // URL du certificat stocké
 
   // Metadata
-  createdAt       DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([documentId]) // Un seul enregistrement par document
   @@index([signataireEmail])
@@ -2072,72 +2293,72 @@ model SignatureRecord {
 // ===========================================
 
 enum SCORMVersion {
-  SCORM_1_2     // Version 1.2 (la plus répandue)
-  SCORM_2004    // Version 2004
+  SCORM_1_2 // Version 1.2 (la plus répandue)
+  SCORM_2004 // Version 2004
 }
 
 enum SCORMPackageStatus {
-  UPLOADING     // En cours d'upload
-  PROCESSING    // En cours de traitement
-  VALID         // Valide et prêt à l'emploi
-  ERROR         // Erreur lors du traitement
-  ARCHIVED      // Archivé
+  UPLOADING // En cours d'upload
+  PROCESSING // En cours de traitement
+  VALID // Valide et prêt à l'emploi
+  ERROR // Erreur lors du traitement
+  ARCHIVED // Archivé
 }
 
 enum SCORMLessonStatus {
-  NOT_ATTEMPTED  // Pas commencé
-  INCOMPLETE     // En cours
-  COMPLETED      // Terminé
-  PASSED         // Réussi
-  FAILED         // Échoué
-  BROWSED        // Consulté
+  NOT_ATTEMPTED // Pas commencé
+  INCOMPLETE // En cours
+  COMPLETED // Terminé
+  PASSED // Réussi
+  FAILED // Échoué
+  BROWSED // Consulté
 }
 
 // Package SCORM importé
 model SCORMPackage {
-  id                String              @id @default(cuid())
+  id String @id @default(cuid())
 
   // Infos du package
-  titre             String              // Nom du module SCORM
-  description       String?             // Description
-  version           SCORMVersion        @default(SCORM_1_2)
+  titre       String // Nom du module SCORM
+  description String? // Description
+  version     SCORMVersion @default(SCORM_1_2)
 
   // Statut
-  status            SCORMPackageStatus  @default(UPLOADING)
-  errorMessage      String?             // Message d'erreur si status=ERROR
+  status       SCORMPackageStatus @default(UPLOADING)
+  errorMessage String? // Message d'erreur si status=ERROR
 
   // Manifest info (parsé depuis imsmanifest.xml)
-  manifestData      Json?               // Données complètes du manifest
-  launchUrl         String?             // URL de lancement (ex: "index.html")
-  masteryScore      Float?              // Score minimum pour réussite (0-100)
+  manifestData Json? // Données complètes du manifest
+  launchUrl    String? // URL de lancement (ex: "index.html")
+  masteryScore Float? // Score minimum pour réussite (0-100)
 
   // Stockage
-  storagePath       String              // Chemin dans Supabase Storage
-  originalFileName  String              // Nom du fichier original
-  fileSize          Int                 // Taille en bytes
+  storagePath      String // Chemin dans Supabase Storage
+  originalFileName String // Nom du fichier original
+  fileSize         Int // Taille en bytes
 
   // Lien optionnel avec formation/module
-  formationId       String?
-  formation         Formation?          @relation(fields: [formationId], references: [id], onDelete: SetNull)
+  formationId String?
+  formation   Formation? @relation(fields: [formationId], references: [id], onDelete: SetNull)
 
-  moduleId          String?
+  moduleId String?
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Créateur
-  uploadedBy        String              // User ID
+  uploadedBy String // User ID
 
   // Compteurs
-  usageCount        Int                 @default(0) // Nombre de fois utilisé dans des sessions
+  usageCount Int @default(0) // Nombre de fois utilisé dans des sessions
 
   // Metadata
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  trackingData      SCORMTracking[]
+  trackingData SCORMTracking[]
 
   @@index([organizationId])
   @@index([formationId])
@@ -2146,60 +2367,60 @@ model SCORMPackage {
 
 // Données de suivi SCORM par apprenant
 model SCORMTracking {
-  id                String              @id @default(cuid())
+  id String @id @default(cuid())
 
   // Package SCORM
-  packageId         String
-  package           SCORMPackage        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  packageId String
+  package   SCORMPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
   // Apprenant
-  apprenantId       String
-  apprenant         Apprenant           @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Inscription LMS liée (optionnel)
-  inscriptionId     String?
-  inscription       LMSInscription?     @relation(fields: [inscriptionId], references: [id], onDelete: SetNull)
+  inscriptionId String?
+  inscription   LMSInscription? @relation(fields: [inscriptionId], references: [id], onDelete: SetNull)
 
   // Données CMI complètes (JSON pour flexibilité)
-  cmiData           Json                @default("{}")
+  cmiData Json @default("{}")
 
   // Champs clés extraits pour requêtes rapides
-  lessonStatus      SCORMLessonStatus   @default(NOT_ATTEMPTED)
-  completionStatus  String?             // SCORM 2004: completed, incomplete, not attempted, unknown
-  successStatus     String?             // SCORM 2004: passed, failed, unknown
+  lessonStatus     SCORMLessonStatus @default(NOT_ATTEMPTED)
+  completionStatus String? // SCORM 2004: completed, incomplete, not attempted, unknown
+  successStatus    String? // SCORM 2004: passed, failed, unknown
 
   // Score
-  scoreRaw          Float?              // Score brut
-  scoreMin          Float?              // Score minimum possible
-  scoreMax          Float?              // Score maximum possible
-  scoreScaled       Float?              // Score normalisé (-1 à 1 pour SCORM 2004)
+  scoreRaw    Float? // Score brut
+  scoreMin    Float? // Score minimum possible
+  scoreMax    Float? // Score maximum possible
+  scoreScaled Float? // Score normalisé (-1 à 1 pour SCORM 2004)
 
   // Temps
-  totalTime         String?             // Format ISO 8601 ou SCORM
-  sessionTime       String?             // Temps de la session actuelle
+  totalTime   String? // Format ISO 8601 ou SCORM
+  sessionTime String? // Temps de la session actuelle
 
   // Bookmark/Suspend
-  suspendData       String?             @db.Text  // Données de reprise (max 64KB SCORM 2004)
-  lessonLocation    String?             // Bookmark de position
-  entry             String?             // "ab-initio", "resume", ""
-  exit              String?             // "time-out", "suspend", "logout", ""
+  suspendData    String? @db.Text // Données de reprise (max 64KB SCORM 2004)
+  lessonLocation String? // Bookmark de position
+  entry          String? // "ab-initio", "resume", ""
+  exit           String? // "time-out", "suspend", "logout", ""
 
   // Tentatives
-  attemptNumber     Int                 @default(1)
+  attemptNumber Int @default(1)
 
   // Interactions (pour analyse détaillée)
-  interactions      Json?               // Array des interactions SCORM
+  interactions Json? // Array des interactions SCORM
 
   // Objectifs (SCORM 2004)
-  objectives        Json?               // Array des objectifs
+  objectives Json? // Array des objectifs
 
   // Timestamps
-  firstAccessAt     DateTime            @default(now())
-  lastAccessAt      DateTime            @default(now())
-  completedAt       DateTime?
+  firstAccessAt DateTime  @default(now())
+  lastAccessAt  DateTime  @default(now())
+  completedAt   DateTime?
 
   // Multi-tenant
-  organizationId    String
+  organizationId String
 
   @@unique([packageId, apprenantId, attemptNumber])
   @@index([packageId])
@@ -2215,56 +2436,64 @@ model SCORMTracking {
 
 // Session de formation (instance d'une formation)
 model Session {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Référence unique lisible (ex: "NEURO-2025-001")
-  reference         String          @unique
-  nom               String?         // Nom personnalisé optionnel (ex: "Session Janvier - Entreprise ABC")
+  reference String  @unique
+  nom       String? // Nom personnalisé optionnel (ex: "Session Janvier - Entreprise ABC")
 
   // Formation parent (base pédagogique)
-  formationId       String
-  formation         Formation       @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Statut de la session
-  status            SessionStatus   @default(BROUILLON)
+  status SessionStatus @default(BROUILLON)
 
   // Modalité et lieu
-  modalite          SessionModalite @default(PRESENTIEL)
+  modalite SessionModalite @default(PRESENTIEL)
 
   // Si présentiel
-  lieuId            String?
-  lieu              LieuFormation?  @relation("SessionLieu", fields: [lieuId], references: [id], onDelete: SetNull)
-  lieuTexteLibre    String?         // Si lieu non enregistré
+  lieuId         String?
+  lieu           LieuFormation? @relation("SessionLieu", fields: [lieuId], references: [id], onDelete: SetNull)
+  lieuTexteLibre String? // Si lieu non enregistré
 
   // Si distanciel
-  lienConnexion     String?
-  plateformeVisio   String?         // Zoom, Google Meet, Teams, etc.
+  lienConnexion   String?
+  plateformeVisio String? // Zoom, Google Meet, Teams, etc.
 
   // Formateur principal
-  formateurId       String?
-  formateur         Intervenant?    @relation("SessionFormateurPrincipal", fields: [formateurId], references: [id], onDelete: SetNull)
+  formateurId String?
+  formateur   Intervenant? @relation("SessionFormateurPrincipal", fields: [formateurId], references: [id], onDelete: SetNull)
 
   // Tarification globale de la session (optionnel)
-  tarifParDefautHT  Float?          // Tarif par défaut HT
-  tauxTVA           Float           @default(20)  // Taux de TVA en %
+  tarifParDefautHT Float? // Tarif par défaut HT
+  tauxTVA          Float  @default(20) // Taux de TVA en %
 
   // Notes internes
-  notes             String?         @db.Text
+  notes String? @db.Text
+
+  // Qualiopi IND 3 - Certification par session
+  // Si true, cette session délivre des certifications
+  // Si false, pas de certification pour cette session (même si formation certifiante)
+  // Par défaut null = hérite du paramètre isCertifiante de la formation
+  delivreCertification Boolean?
 
   // Multi-tenant
-  organizationId    String
-  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  journees          SessionJourneeNew[]     // Journées de formation
-  clients           SessionClientNew[]      // Clients de la session
-  coFormateurs      SessionCoFormateurNew[] // Co-formateurs
-  documentsGeneres  SessionDocumentNew[]    // Documents générés
-  signatures        SignatureDocumentNew[]  // Documents de signature
+  journees         SessionJourneeNew[] // Journées de formation
+  clients          SessionClientNew[] // Clients de la session
+  coFormateurs     SessionCoFormateurNew[] // Co-formateurs
+  documentsGeneres SessionDocumentNew[] // Documents générés
+  signatures       SignatureDocumentNew[] // Documents de signature
+  fichesMission    FicheMissionIntervenant[] @relation("FicheMissionSession") // Fiches mission (Qualiopi IND 17)
+  reclamations     Reclamation[]
 
   @@index([formationId])
   @@index([organizationId])
@@ -2274,30 +2503,30 @@ model Session {
 
 // Journées de formation (NEW)
 model SessionJourneeNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Ordre
-  ordre             Int             @default(1)
+  ordre Int @default(1)
 
   // Date
-  date              DateTime
+  date DateTime
 
   // Horaires
-  heureDebutMatin   String?         // "09:00"
-  heureFinMatin     String?         // "12:30"
-  heureDebutAprem   String?         // "14:00"
-  heureFinAprem     String?         // "17:30"
+  heureDebutMatin String? // "09:00"
+  heureFinMatin   String? // "12:30"
+  heureDebutAprem String? // "14:00"
+  heureFinAprem   String? // "17:30"
 
   // Lieu spécifique (si différent de la session)
-  lieuSpecifique    String?
+  lieuSpecifique String?
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   feuillesEmargement FeuilleEmargementNew[]
@@ -2308,37 +2537,37 @@ model SessionJourneeNew {
 
 // Clients de la session (NEW)
 model SessionClientNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Type de client
-  typeClient        ApprenantStatus // SALARIE (entreprise), INDEPENDANT, PARTICULIER
+  typeClient ApprenantStatus // SALARIE (entreprise), INDEPENDANT, PARTICULIER
 
   // Si entreprise
-  entrepriseId      String?
-  entreprise        Entreprise?     @relation("SessionClientEntreprise", fields: [entrepriseId], references: [id], onDelete: SetNull)
+  entrepriseId String?
+  entreprise   Entreprise? @relation("SessionClientEntreprise", fields: [entrepriseId], references: [id], onDelete: SetNull)
 
   // Si indépendant/particulier (contact direct)
-  contactNom        String?
-  contactPrenom     String?
-  contactEmail      String?
-  contactTelephone  String?
+  contactNom       String?
+  contactPrenom    String?
+  contactEmail     String?
+  contactTelephone String?
 
   // Tarifs appliqués
-  tarifHT           Float?
-  tarifTTC          Float?
-  tauxTVA           Float           @default(20)
+  tarifHT  Float?
+  tarifTTC Float?
+  tauxTVA  Float  @default(20)
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  participants      SessionParticipantNew[]
-  financements      SessionFinancementNew[]
+  participants SessionParticipantNew[]
+  financements SessionFinancementNew[]
 
   @@index([sessionId])
   @@index([entrepriseId])
@@ -2346,29 +2575,29 @@ model SessionClientNew {
 
 // Financement d'un client (NEW)
 model SessionFinancementNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Client parent
-  clientId          String
-  client            SessionClientNew @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+  client   SessionClientNew @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   // Financeur
-  financeurId       String
-  financeur         Financeur       @relation("SessionFinanceur", fields: [financeurId], references: [id], onDelete: Cascade)
+  financeurId String
+  financeur   Financeur @relation("SessionFinanceur", fields: [financeurId], references: [id], onDelete: Cascade)
 
   // Montants
-  montantFinanceHT  Float           @default(0)
+  montantFinanceHT  Float  @default(0)
   montantFinanceTTC Float?
 
   // Référence dossier
-  referenceDossier  String?
+  referenceDossier String?
 
   // Notes
-  notes             String?
+  notes String?
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([clientId, financeurId])
   @@index([clientId])
@@ -2377,30 +2606,35 @@ model SessionFinancementNew {
 
 // Participants à la session (NEW)
 model SessionParticipantNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Client parent
-  clientId          String
-  client            SessionClientNew @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+  client   SessionClientNew @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   // Apprenant
-  apprenantId       String
-  apprenant         Apprenant       @relation("SessionParticipantApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation("SessionParticipantApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Statut de participation
-  estConfirme       Boolean         @default(false)
-  aAssiste          Boolean         @default(false)
-  dateConfirmation  DateTime?
+  estConfirme      Boolean   @default(false)
+  aAssiste         Boolean   @default(false)
+  dateConfirmation DateTime?
+
+  // Qualiopi IND 3 - Suivi certification (si formation certifiante)
+  certificationObtenue Boolean   @default(false)
+  dateCertification    DateTime?
+  numeroCertificat     String?
 
   // Notes sur le participant
-  notes             String?
+  notes String?
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  signatures        SignatureEmargementNew[]
+  signatures SignatureEmargementNew[]
 
   @@unique([clientId, apprenantId])
   @@index([clientId])
@@ -2409,21 +2643,21 @@ model SessionParticipantNew {
 
 // Co-formateurs de la session (NEW)
 model SessionCoFormateurNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Intervenant
-  intervenantId     String
-  intervenant       Intervenant     @relation("SessionCoFormateurIntervenant", fields: [intervenantId], references: [id], onDelete: Cascade)
+  intervenantId String
+  intervenant   Intervenant @relation("SessionCoFormateurIntervenant", fields: [intervenantId], references: [id], onDelete: Cascade)
 
   // Rôle/Spécialité
-  role              String?         // Ex: "Expert technique", "Coach"
+  role String? // Ex: "Expert technique", "Coach"
 
   // Metadata
-  createdAt         DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([sessionId, intervenantId])
   @@index([sessionId])
@@ -2431,31 +2665,31 @@ model SessionCoFormateurNew {
 
 // Documents générés pour la session (NEW)
 model SessionDocumentNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Type de document
-  type              DocumentType
+  type DocumentType
 
   // Pour qui (optionnel)
-  clientId          String?         // Si document pour un client spécifique
-  participantId     String?         // Si document pour un participant spécifique
+  clientId      String? // Si document pour un client spécifique
+  participantId String? // Si document pour un participant spécifique
 
   // Contenu
-  titre             String
-  content           Json?           // Contenu TipTap JSON
-  fileUrl           String?         // URL du fichier généré (PDF)
+  titre   String
+  content Json? // Contenu TipTap JSON
+  fileUrl String? // URL du fichier généré (PDF)
 
   // Statut
-  isGenerated       Boolean         @default(false)
-  generatedAt       DateTime?
+  isGenerated Boolean   @default(false)
+  generatedAt DateTime?
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([sessionId])
   @@index([type])
@@ -2463,29 +2697,29 @@ model SessionDocumentNew {
 
 // Feuilles d'émargement (NEW)
 model FeuilleEmargementNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Journée parent
-  journeeId         String
-  journee           SessionJourneeNew @relation(fields: [journeeId], references: [id], onDelete: Cascade)
+  journeeId String
+  journee   SessionJourneeNew @relation(fields: [journeeId], references: [id], onDelete: Cascade)
 
   // Token unique pour QR code / lien
-  token             String          @unique @default(cuid())
+  token String @unique @default(cuid())
 
   // Statut
-  isActive          Boolean         @default(true)
-  expiresAt         DateTime?
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
 
   // PDF généré
-  pdfUrl            String?
-  pdfGeneratedAt    DateTime?
+  pdfUrl         String?
+  pdfGeneratedAt DateTime?
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  signatures        SignatureEmargementNew[]
+  signatures SignatureEmargementNew[]
 
   @@index([journeeId])
   @@index([token])
@@ -2493,37 +2727,37 @@ model FeuilleEmargementNew {
 
 // Signatures d'émargement (NEW)
 model SignatureEmargementNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Feuille d'émargement
-  feuilleId         String
-  feuille           FeuilleEmargementNew @relation(fields: [feuilleId], references: [id], onDelete: Cascade)
+  feuilleId String
+  feuille   FeuilleEmargementNew @relation(fields: [feuilleId], references: [id], onDelete: Cascade)
 
   // Participant (si apprenant)
-  participantId     String?
-  participant       SessionParticipantNew? @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participantId String?
+  participant   SessionParticipantNew? @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   // Formateur (si formateur)
-  formateurId       String?
-  formateur         Intervenant?    @relation("SignatureEmargementFormateur", fields: [formateurId], references: [id], onDelete: SetNull)
+  formateurId String?
+  formateur   Intervenant? @relation("SignatureEmargementFormateur", fields: [formateurId], references: [id], onDelete: SetNull)
 
   // Type de signataire
-  typeSignataire    String          // "apprenant" ou "formateur"
+  typeSignataire String // "apprenant" ou "formateur"
 
   // Période
-  periode           String          // "matin" ou "aprem"
+  periode String // "matin" ou "aprem"
 
   // Signature
-  signatureData     String?         @db.Text  // Image base64 de la signature
-  signedAt          DateTime        @default(now())
+  signatureData String?  @db.Text // Image base64 de la signature
+  signedAt      DateTime @default(now())
 
   // Localisation (optionnel)
-  latitude          Float?
-  longitude         Float?
-  ipAddress         String?
+  latitude  Float?
+  longitude Float?
+  ipAddress String?
 
   // Metadata
-  createdAt         DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([feuilleId, participantId, periode])
   @@unique([feuilleId, formateurId, periode])
@@ -2534,34 +2768,34 @@ model SignatureEmargementNew {
 
 // Documents de signature électronique (NEW)
 model SignatureDocumentNew {
-  id                String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Session parent
-  sessionId         String
-  session           Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Document à signer
-  documentId        String?         // Référence au SessionDocumentNew
-  documentType      DocumentType    // Type de document (CONVENTION, CONTRAT, etc.)
-  titre             String
+  documentId   String? // Référence au SessionDocumentNew
+  documentType DocumentType // Type de document (CONVENTION, CONTRAT, etc.)
+  titre        String
 
   // Fichier
-  fileUrl           String          // URL du document PDF à signer
+  fileUrl String // URL du document PDF à signer
 
   // Signataires
-  signataires       Json            // Array de {email, nom, role, status, signedAt}
+  signataires Json // Array de {email, nom, role, status, signedAt}
 
   // Statut global
-  status            String          @default("draft") // draft, pending, partial, completed, cancelled
-  completedAt       DateTime?
+  status      String    @default("draft") // draft, pending, partial, completed, cancelled
+  completedAt DateTime?
 
   // Intégration signature électronique (Yousign, DocuSign, etc.)
-  externalId        String?         // ID chez le provider de signature
-  externalProvider  String?         // "yousign", "docusign", "internal"
+  externalId       String? // ID chez le provider de signature
+  externalProvider String? // "yousign", "docusign", "internal"
 
   // Metadata
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([sessionId])
   @@index([status])
@@ -2601,82 +2835,82 @@ enum PreInscriptionStatut {
 
 // Pré-inscription depuis le catalogue public
 model PreInscription {
-  id                    String                    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Organisation cible
-  organizationId        String
-  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Formation demandée
-  formationId           String
-  formation             Formation                 @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // ===========================================
   // PARTIE 1 : ANALYSE DU BESOIN (Qualiopi IND 1 & 4)
   // ===========================================
-  objectifsProfessionnels String?                 @db.Text // Objectifs professionnels recherchés
-  contexte                String?                 @db.Text // Contexte de la demande
-  experiencePrealable     String?                 @db.Text // Expérience préalable dans le domaine
-  attentesSpecifiques     String?                 @db.Text // Attentes spécifiques
-  contraintes             String?                 @db.Text // Contraintes (horaires, lieu, etc.)
+  objectifsProfessionnels String? @db.Text // Objectifs professionnels recherchés
+  contexte                String? @db.Text // Contexte de la demande
+  experiencePrealable     String? @db.Text // Expérience préalable dans le domaine
+  attentesSpecifiques     String? @db.Text // Attentes spécifiques
+  contraintes             String? @db.Text // Contraintes (horaires, lieu, etc.)
 
   // ===========================================
   // PARTIE 2 : FICHE DE RENSEIGNEMENTS
   // ===========================================
   // Identité
-  civilite              String?                   // M., Mme
-  nom                   String
-  prenom                String
-  dateNaissance         DateTime?
-  lieuNaissance         String?
+  civilite      String? // M., Mme
+  nom           String
+  prenom        String
+  dateNaissance DateTime?
+  lieuNaissance String?
 
   // Coordonnées
-  email                 String
-  telephone             String?
-  adresse               String?
-  codePostal            String?
-  ville                 String?
-  pays                  String                    @default("France")
+  email      String
+  telephone  String?
+  adresse    String?
+  codePostal String?
+  ville      String?
+  pays       String  @default("France")
 
   // Situation professionnelle
   situationProfessionnelle SituationProfessionnelle?
-  entreprise               String?                // Nom de l'entreprise (si salarié)
-  poste                    String?                // Poste actuel
-  siret                    String?                // SIRET (si indépendant)
+  entreprise               String? // Nom de l'entreprise (si salarié)
+  poste                    String? // Poste actuel
+  siret                    String? // SIRET (si indépendant)
 
   // ===========================================
   // HANDICAP (OBLIGATOIRE QUALIOPI)
   // ===========================================
-  situationHandicap     Boolean                   @default(false)
-  besoinsAmenagements   String?                   @db.Text // Aménagements spécifiques nécessaires
+  situationHandicap   Boolean @default(false)
+  besoinsAmenagements String? @db.Text // Aménagements spécifiques nécessaires
 
   // ===========================================
   // FINANCEMENT
   // ===========================================
-  modeFinancement       ModeFinancement?
-  financeurNom          String?                   // Nom du financeur si OPCO ou autre
-  commentaireFinancement String?                  @db.Text
+  modeFinancement        ModeFinancement?
+  financeurNom           String? // Nom du financeur si OPCO ou autre
+  commentaireFinancement String?          @db.Text
 
   // ===========================================
   // GESTION
   // ===========================================
-  statut                PreInscriptionStatut      @default(NOUVELLE)
-  noteInterne           String?                   @db.Text // Notes internes de l'OF
-  motifRefus            String?                   @db.Text // Motif si refus
+  statut      PreInscriptionStatut @default(NOUVELLE)
+  noteInterne String?              @db.Text // Notes internes de l'OF
+  motifRefus  String?              @db.Text // Motif si refus
 
   // Conversion en apprenant
-  apprenantId           String?                   // Si converti en apprenant
-  apprenant             Apprenant?                @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+  apprenantId String? // Si converti en apprenant
+  apprenant   Apprenant? @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
 
   // Metadata
-  sourceUrl             String?                   // URL source de la pré-inscription
-  ipAddress             String?                   // IP pour traçabilité
-  userAgent             String?                   // User agent
+  sourceUrl String? // URL source de la pré-inscription
+  ipAddress String? // IP pour traçabilité
+  userAgent String? // User agent
 
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  traiteeAt             DateTime?                 // Date de traitement
-  traiteePar            String?                   // User ID qui a traité
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  traiteeAt  DateTime? // Date de traitement
+  traiteePar String? // User ID qui a traité
 
   @@index([organizationId])
   @@index([formationId])
@@ -2690,27 +2924,27 @@ model PreInscription {
 // ===========================================
 
 model FormationIndicateurs {
-  id                    String                    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Formation
-  formationId           String                    @unique
-  formation             Formation                 @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String    @unique
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Indicateurs calculés
-  tauxSatisfaction      Float?                    // Taux de satisfaction (%) depuis éval à chaud
-  nombreAvis            Int                       @default(0)
-  nombreStagiaires      Int                       @default(0)
-  tauxReussite          Float?                    // Taux de réussite évaluation finale (%)
-  tauxCertification     Float?                    // Taux d'obtention certification (si certifiante)
-  tauxAbandon           Float?                    // Taux d'abandon (%)
+  tauxSatisfaction  Float? // Taux de satisfaction (%) depuis éval à chaud
+  nombreAvis        Int    @default(0)
+  nombreStagiaires  Int    @default(0)
+  tauxReussite      Float? // Taux de réussite évaluation finale (%)
+  tauxCertification Float? // Taux d'obtention certification (si certifiante)
+  tauxAbandon       Float? // Taux d'abandon (%)
 
   // Période de calcul
-  annee                 Int?                      // Année de référence (N-1)
-  dernierCalcul         DateTime?
+  annee         Int? // Année de référence (N-1)
+  dernierCalcul DateTime?
 
   // Metadata
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([formationId])
 }
@@ -2720,45 +2954,45 @@ model FormationIndicateurs {
 // ===========================================
 
 model Evaluation {
-  id              String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Formation parent
-  formationId     String
-  formation       Formation       @relation(fields: [formationId], references: [id], onDelete: Cascade)
+  formationId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
 
   // Type d'évaluation
-  type            EvaluationType
+  type EvaluationType
 
   // Module associé (si QCM_MODULE ou ATELIER_MODULE)
-  moduleId        String?
+  moduleId String?
 
   // Contenu
-  titre           String
-  description     String?         @db.Text
-  dureeEstimee    Int?            // Durée estimée en minutes
+  titre        String
+  description  String? @db.Text
+  dureeEstimee Int? // Durée estimée en minutes
 
   // Questions/Contenu (JSON pour flexibilité)
   // Pour QCM: Array de {question, options[], correctAnswer, explication?}
   // Pour Atelier: {consignes, objectifs[], materiel[], livrables[]}
-  contenu         Json
+  contenu Json
 
   // Paramètres
-  scoreMinimum    Float?          // Score minimum pour validation (%)
-  nombreQuestions Int?            // Nombre de questions à afficher (si random)
-  tempsLimite     Int?            // Temps limite en minutes (optionnel)
-  melangerQuestions Boolean       @default(false)
-  melangerReponses  Boolean       @default(false)
+  scoreMinimum      Float? // Score minimum pour validation (%)
+  nombreQuestions   Int? // Nombre de questions à afficher (si random)
+  tempsLimite       Int? // Temps limite en minutes (optionnel)
+  melangerQuestions Boolean @default(false)
+  melangerReponses  Boolean @default(false)
 
   // Ordre d'affichage
-  ordre           Int             @default(0)
+  ordre Int @default(0)
 
   // Metadata
-  isActive        Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  resultats       EvaluationResultat[]
+  resultats EvaluationResultat[]
 
   @@index([formationId])
   @@index([type])
@@ -2767,39 +3001,39 @@ model Evaluation {
 
 // Résultats d'évaluation par apprenant
 model EvaluationResultat {
-  id              String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Évaluation
-  evaluationId    String
-  evaluation      Evaluation      @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  evaluationId String
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
   // Apprenant
-  apprenantId     String
-  apprenant       Apprenant       @relation("EvaluationResultatApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation("EvaluationResultatApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Session (contexte de passage)
-  sessionId       String?
+  sessionId String?
 
   // Résultats
-  score           Float?          // Score obtenu (%)
-  reponses        Json?           // Détail des réponses
-  tempsPassé      Int?            // Temps passé en secondes
+  score       Float? // Score obtenu (%)
+  reponses    Json? // Détail des réponses
+  tempsPassé Int? // Temps passé en secondes
 
   // Statut
-  status          String          @default("en_cours") // en_cours, termine, valide, echoue
-  startedAt       DateTime        @default(now())
-  completedAt     DateTime?
+  status      String    @default("en_cours") // en_cours, termine, valide, echoue
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
 
   // Tentative
-  tentative       Int             @default(1)
+  tentative Int @default(1)
 
   // Feedback formateur (optionnel)
-  feedbackFormateur String?       @db.Text
-  noteFormateur     Float?        // Note manuelle du formateur
+  feedbackFormateur String? @db.Text
+  noteFormateur     Float? // Note manuelle du formateur
 
   // Metadata
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([evaluationId, apprenantId, tentative])
   @@index([evaluationId])
@@ -2813,79 +3047,80 @@ model EvaluationResultat {
 // Stockage permanent de tous les emails envoyés pour audit Qualiopi
 
 enum SentEmailType {
-  VERIFICATION_CODE        // Code de vérification (signature, etc.)
-  SIGNATURE_INVITATION     // Invitation à signer un document
-  INVITATION_APPRENANT     // Invitation espace apprenant
-  PRE_INSCRIPTION          // Confirmation pré-inscription
-  NOTIFICATION_ADMIN       // Notification aux administrateurs
-  CONVOCATION              // Convocation à une session
-  ATTESTATION              // Envoi d'attestation
-  CONVENTION               // Envoi de convention
-  DOCUMENT                 // Envoi de document générique
-  RAPPEL                   // Rappel (session, signature, etc.)
-  OTHER                    // Autre type d'email
+  VERIFICATION_CODE // Code de vérification (signature, etc.)
+  SIGNATURE_INVITATION // Invitation à signer un document
+  INVITATION_APPRENANT // Invitation espace apprenant
+  PRE_INSCRIPTION // Confirmation pré-inscription
+  NOTIFICATION_ADMIN // Notification aux administrateurs
+  CONVOCATION // Convocation à une session
+  ATTESTATION // Envoi d'attestation
+  CONVENTION // Envoi de convention
+  DOCUMENT // Envoi de document générique
+  RAPPEL // Rappel (session, signature, etc.)
+  ADAPTATION_PARCOURS // Qualiopi IND 10 - Fiche d'adaptabilité du parcours
+  OTHER // Autre type d'email
 }
 
 enum SentEmailStatus {
-  SENT                     // Envoyé avec succès
-  DELIVERED                // Délivré (si webhook Resend configuré)
-  OPENED                   // Ouvert (si tracking activé)
-  CLICKED                  // Lien cliqué
-  BOUNCED                  // Rebond (adresse invalide)
-  FAILED                   // Échec d'envoi
+  SENT // Envoyé avec succès
+  DELIVERED // Délivré (si webhook Resend configuré)
+  OPENED // Ouvert (si tracking activé)
+  CLICKED // Lien cliqué
+  BOUNCED // Rebond (adresse invalide)
+  FAILED // Échec d'envoi
 }
 
 model SentEmail {
-  id              String          @id @default(cuid())
+  id String @id @default(cuid())
 
   // Organisation (multi-tenant)
-  organizationId  String
+  organizationId String
 
   // Destinataire(s)
-  toEmail         String          // Email principal du destinataire
-  toName          String?         // Nom du destinataire
-  ccEmails        String[]        // Emails en copie
-  bccEmails       String[]        // Emails en copie cachée
+  toEmail   String // Email principal du destinataire
+  toName    String? // Nom du destinataire
+  ccEmails  String[] // Emails en copie
+  bccEmails String[] // Emails en copie cachée
 
   // Contenu
-  subject         String          // Sujet de l'email
-  htmlContent     String          @db.Text  // Contenu HTML complet
-  textContent     String?         @db.Text  // Contenu texte (optionnel)
+  subject     String // Sujet de l'email
+  htmlContent String  @db.Text // Contenu HTML complet
+  textContent String? @db.Text // Contenu texte (optionnel)
 
   // Type et statut
-  type            SentEmailType   @default(OTHER)
-  status          SentEmailStatus @default(SENT)
+  type   SentEmailType   @default(OTHER)
+  status SentEmailStatus @default(SENT)
 
   // Métadonnées de tracking (Resend)
-  resendId        String?         // ID Resend pour suivi
-  deliveredAt     DateTime?       // Date de délivrance
-  openedAt        DateTime?       // Date d'ouverture
-  clickedAt       DateTime?       // Date du premier clic
+  resendId    String? // ID Resend pour suivi
+  deliveredAt DateTime? // Date de délivrance
+  openedAt    DateTime? // Date d'ouverture
+  clickedAt   DateTime? // Date du premier clic
 
   // Références vers les entités liées (optionnel)
-  apprenantId     String?         // Si lié à un apprenant
-  sessionId       String?         // Si lié à une session
-  formationId     String?         // Si lié à une formation
-  preInscriptionId String?        // Si lié à une pré-inscription
-  signatureDocumentId String?     // Si lié à un document de signature
+  apprenantId         String? // Si lié à un apprenant
+  sessionId           String? // Si lié à une session
+  formationId         String? // Si lié à une formation
+  preInscriptionId    String? // Si lié à une pré-inscription
+  signatureDocumentId String? // Si lié à un document de signature
 
   // Pièces jointes (stockées comme JSON)
-  attachments     Json?           // [{filename, size, contentType}]
+  attachments Json? // [{filename, size, contentType}]
 
   // Expéditeur (pour audit)
-  sentByUserId    String?         // User qui a déclenché l'envoi (si applicable)
-  sentBySystem    Boolean         @default(false)  // true si envoi automatique
+  sentByUserId String? // User qui a déclenché l'envoi (si applicable)
+  sentBySystem Boolean @default(false) // true si envoi automatique
 
   // Metadata technique
-  ipAddress       String?         // IP de l'utilisateur qui a déclenché
-  userAgent       String?         // User agent
+  ipAddress String? // IP de l'utilisateur qui a déclenché
+  userAgent String? // User agent
 
   // Erreur (si FAILED ou BOUNCED)
-  errorMessage    String?
+  errorMessage String?
 
   // Timestamps
-  sentAt          DateTime        @default(now())
-  createdAt       DateTime        @default(now())
+  sentAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([organizationId])
   @@index([toEmail])
@@ -2904,44 +3139,44 @@ model SentEmail {
 // Système de notifications internes
 
 enum NotificationType {
-  PRE_INSCRIPTION      // Nouvelle pré-inscription reçue
-  INSCRIPTION          // Inscription validée
-  SESSION_RAPPEL       // Rappel de session à venir
-  FORMATION_MODIFIEE   // Formation modifiée
-  DOCUMENT_GENERE      // Document généré
-  EVALUATION_COMPLETE  // Évaluation complétée par un apprenant
-  PAIEMENT_RECU        // Paiement reçu
-  SYSTEME              // Notification système
+  PRE_INSCRIPTION // Nouvelle pré-inscription reçue
+  INSCRIPTION // Inscription validée
+  SESSION_RAPPEL // Rappel de session à venir
+  FORMATION_MODIFIEE // Formation modifiée
+  DOCUMENT_GENERE // Document généré
+  EVALUATION_COMPLETE // Évaluation complétée par un apprenant
+  PAIEMENT_RECU // Paiement reçu
+  SYSTEME // Notification système
 }
 
 model Notification {
-  id              String           @id @default(cuid())
+  id String @id @default(cuid())
 
   // Organisation (multi-tenant)
-  organizationId  String
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Destinataire
-  userId          String?          // null = notification pour tous les admins de l'org
-  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String? // null = notification pour tous les admins de l'org
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Contenu
-  type            NotificationType
-  titre           String
-  message         String           @db.Text
+  type    NotificationType
+  titre   String
+  message String           @db.Text
 
   // Lien vers la ressource concernée
-  resourceType    String?          // "preInscription", "formation", "session", "apprenant", etc.
-  resourceId      String?
-  actionUrl       String?          // URL vers la page concernée
+  resourceType String? // "preInscription", "formation", "session", "apprenant", etc.
+  resourceId   String?
+  actionUrl    String? // URL vers la page concernée
 
   // Statut
-  isRead          Boolean          @default(false)
-  readAt          DateTime?
+  isRead Boolean   @default(false)
+  readAt DateTime?
 
   // Metadata
-  metadata        Json?            // Données supplémentaires
-  createdAt       DateTime         @default(now())
+  metadata  Json? // Données supplémentaires
+  createdAt DateTime @default(now())
 
   @@index([organizationId])
   @@index([userId])
@@ -2955,26 +3190,26 @@ model Notification {
 // Codes de connexion temporaires pour les apprenants
 
 model ApprenantAuthCode {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Apprenant concerné
-  apprenantId     String
-  apprenant       Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Code de vérification
-  code            String    // Code à 6 chiffres
+  code String // Code à 6 chiffres
 
   // Validité
-  expiresAt       DateTime  // Expiration (10 minutes)
-  usedAt          DateTime? // Date d'utilisation (null si pas encore utilisé)
+  expiresAt DateTime // Expiration (10 minutes)
+  usedAt    DateTime? // Date d'utilisation (null si pas encore utilisé)
 
   // Sécurité
-  attempts        Int       @default(0) // Nombre de tentatives
-  ipAddress       String?   // IP de la demande
-  userAgent       String?   // User agent
+  attempts  Int     @default(0) // Nombre de tentatives
+  ipAddress String? // IP de la demande
+  userAgent String? // User agent
 
   // Timestamps
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([apprenantId])
   @@index([code])
@@ -2983,21 +3218,21 @@ model ApprenantAuthCode {
 
 // Token de première connexion (envoyé dans l'email d'invitation)
 model ApprenantInviteToken {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Apprenant concerné
-  apprenantId     String
-  apprenant       Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Token unique
-  token           String    @unique
+  token String @unique
 
   // Validité
-  expiresAt       DateTime  // Expiration (48h)
-  usedAt          DateTime? // Date d'utilisation
+  expiresAt DateTime // Expiration (48h)
+  usedAt    DateTime? // Date d'utilisation
 
   // Timestamps
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([apprenantId])
   @@index([token])
@@ -3005,26 +3240,26 @@ model ApprenantInviteToken {
 
 // Code OTP pour connexion intervenant
 model IntervenantAuthCode {
-  id              String      @id @default(cuid())
+  id String @id @default(cuid())
 
   // Intervenant concerné
-  intervenantId   String
-  intervenant     Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+  intervenantId String
+  intervenant   Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
 
   // Code de vérification
-  code            String      // Code à 6 chiffres
+  code String // Code à 6 chiffres
 
   // Validité
-  expiresAt       DateTime    // Expiration (10 minutes)
-  usedAt          DateTime?   // Date d'utilisation (null si pas encore utilisé)
+  expiresAt DateTime // Expiration (10 minutes)
+  usedAt    DateTime? // Date d'utilisation (null si pas encore utilisé)
 
   // Sécurité
-  attempts        Int         @default(0) // Nombre de tentatives
-  ipAddress       String?     // IP de la demande
-  userAgent       String?     // User agent
+  attempts  Int     @default(0) // Nombre de tentatives
+  ipAddress String? // IP de la demande
+  userAgent String? // User agent
 
   // Timestamps
-  createdAt       DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   @@index([intervenantId])
   @@index([code])
@@ -3038,54 +3273,54 @@ model IntervenantAuthCode {
 // pour calculer le taux de satisfaction et respecter Qualiopi
 
 enum EvaluationSatisfactionType {
-  CHAUD    // Évaluation à chaud - fin de formation
-  FROID    // Évaluation à froid - 3 mois après
+  CHAUD // Évaluation à chaud - fin de formation
+  FROID // Évaluation à froid - 3 mois après
 }
 
 enum EvaluationSatisfactionStatus {
-  PENDING     // En attente de complétion
+  PENDING // En attente de complétion
   IN_PROGRESS // En cours de remplissage
-  COMPLETED   // Complété
-  EXPIRED     // Expiré
+  COMPLETED // Complété
+  EXPIRED // Expiré
 }
 
 // Demande d'évaluation de satisfaction
 model EvaluationSatisfaction {
-  id                String                       @id @default(cuid())
+  id String @id @default(cuid())
 
   // Organisation (multi-tenant)
-  organizationId    String
-  organization      Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Session de formation liée
-  sessionId         String
-  session           DocumentSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Apprenant concerné
-  apprenantId       String
-  apprenant         Apprenant                    @relation("EvaluationSatisfactionApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
+  apprenantId String
+  apprenant   Apprenant @relation("EvaluationSatisfactionApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
 
   // Type d'évaluation
-  type              EvaluationSatisfactionType
+  type EvaluationSatisfactionType
 
   // Token unique pour accès public (QR code / lien)
-  token             String                       @unique @default(cuid())
+  token String @unique @default(cuid())
 
   // Statut
-  status            EvaluationSatisfactionStatus @default(PENDING)
+  status EvaluationSatisfactionStatus @default(PENDING)
 
   // Dates
-  expiresAt         DateTime?                    // Date d'expiration du lien
-  sentAt            DateTime?                    // Date d'envoi au participant
-  startedAt         DateTime?                    // Date de début de complétion
-  completedAt       DateTime?                    // Date de complétion
+  expiresAt   DateTime? // Date d'expiration du lien
+  sentAt      DateTime? // Date d'envoi au participant
+  startedAt   DateTime? // Date de début de complétion
+  completedAt DateTime? // Date de complétion
 
   // Réponse (stockée dans un modèle séparé)
-  reponse           EvaluationSatisfactionReponse?
+  reponse EvaluationSatisfactionReponse?
 
   // Metadata
-  createdAt         DateTime                     @default(now())
-  updatedAt         DateTime                     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([sessionId, apprenantId, type])
   @@index([organizationId])
@@ -3098,113 +3333,113 @@ model EvaluationSatisfaction {
 
 // Réponses détaillées à l'évaluation de satisfaction
 model EvaluationSatisfactionReponse {
-  id                      String                  @id @default(cuid())
+  id String @id @default(cuid())
 
   // Évaluation parent
-  evaluationId            String                  @unique
-  evaluation              EvaluationSatisfaction  @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  evaluationId String                 @unique
+  evaluation   EvaluationSatisfaction @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
   // ===========================================
   // SECTION 2: PRÉPARATION (Évaluation à chaud uniquement)
   // ===========================================
   // 2.1 Informations reçues avant la formation
-  preparationInfos        Int?                    // Note 0-10
+  preparationInfos     Int? // Note 0-10
   // 2.2 Messages envoyés avant la formation
-  preparationMessages     Int?                    // Note 0-10
+  preparationMessages  Int? // Note 0-10
   // 2.3 Prérequis correspondaient au niveau
-  preparationPrerequis    Int?                    // Note 0-10
+  preparationPrerequis Int? // Note 0-10
 
   // ===========================================
   // SECTION 3: ORGANISATION (Évaluation à chaud uniquement)
   // ===========================================
   // 3.1 Calendrier bien organisé
-  organisationCalendrier  Int?                    // Note 0-10
+  organisationCalendrier Int? // Note 0-10
   // 3.2 Conditions matérielles et techniques
-  organisationConditions  Int?                    // Note 0-10
+  organisationConditions Int? // Note 0-10
 
   // ===========================================
   // SECTION 4: ANIMATION (Évaluation à chaud uniquement)
   // ===========================================
   // 4.1 Explications claires et structurées
-  animationExplications   Int?                    // Note 0-10
+  animationExplications Int? // Note 0-10
   // 4.2 Échanges et participation favorisés
-  animationEchanges       Int?                    // Note 0-10
+  animationEchanges     Int? // Note 0-10
   // 4.3 Ambiance de travail agréable
-  animationAmbiance       Int?                    // Note 0-10
+  animationAmbiance     Int? // Note 0-10
   // 4.4 Rythme adapté
-  animationRythme         Int?                    // Note 0-10
+  animationRythme       Int? // Note 0-10
 
   // ===========================================
   // SECTION 5: CONTENU (Évaluation à chaud uniquement)
   // ===========================================
   // 5.1 Contenu en cohérence avec attentes
-  contenuCoherence        Int?                    // Note 0-10
+  contenuCoherence Int? // Note 0-10
   // 5.2 Notions utiles pour la pratique
-  contenuUtilite          Int?                    // Note 0-10
+  contenuUtilite   Int? // Note 0-10
   // 5.3 Supports clairs et structurés
-  contenuSupports         Int?                    // Note 0-10
+  contenuSupports  Int? // Note 0-10
   // 5.4 Niveau adapté au profil
-  contenuNiveau           Int?                    // Note 0-10
+  contenuNiveau    Int? // Note 0-10
 
   // ===========================================
   // SECTION 6: ATTEINTE DES OBJECTIFS
   // ===========================================
   // Objectifs pédagogiques atteints (0-10)
-  objectifsAtteints       Int?                    // Note 0-10
+  objectifsAtteints Int? // Note 0-10
 
   // ===========================================
   // SECTION 7 (CHAUD) / SECTION 2 (FROID): APPRÉCIATION GLOBALE
   // ===========================================
   // Note globale de satisfaction
-  noteGlobale             Int?                    // Note 0-10
+  noteGlobale Int? // Note 0-10
 
   // ===========================================
   // SECTIONS SPÉCIFIQUES À L'ÉVALUATION À FROID
   // ===========================================
   // 2.2 (Froid) Répondu aux attentes initiales
-  froidAttentesInitiales  Int?                    // Note 0-10
+  froidAttentesInitiales Int? // Note 0-10
 
   // 3.1 (Froid) Compétences utiles acquises
-  froidCompetencesUtiles  Int?                    // Note 0-10
+  froidCompetencesUtiles Int? // Note 0-10
   // 3.2 (Froid) Mise en pratique des acquis
-  froidMiseEnPratique     Int?                    // Note 0-10
+  froidMiseEnPratique    Int? // Note 0-10
   // 3.3 (Froid) Impact positif sur le travail
-  froidImpactTravail      Int?                    // Note 0-10
+  froidImpactTravail     Int? // Note 0-10
 
   // 4.1 (Froid) Contenu encore pertinent
-  froidPertinenceActuelle Int?                    // Note 0-10
+  froidPertinenceActuelle Int? // Note 0-10
   // 4.2 (Froid) Utilité dans les prochains mois
-  froidUtiliteFuture      Int?                    // Note 0-10
+  froidUtiliteFuture      Int? // Note 0-10
 
   // 5 (Froid) Mise en pratique des objectifs pédagogiques
-  froidObjectifsPratique  Int?                    // Note 0-10
+  froidObjectifsPratique Int? // Note 0-10
 
   // 6 (Froid) Recommandation
-  recommandation          Int?                    // Note 0-10
+  recommandation Int? // Note 0-10
 
   // ===========================================
   // SECTION COMMENTAIRES
   // ===========================================
-  suggestions             String?                 @db.Text
+  suggestions String? @db.Text
 
   // ===========================================
   // SCORES CALCULÉS
   // ===========================================
   // Score moyen automatiquement calculé (moyenne de toutes les notes)
-  scoreMoyen              Float?
+  scoreMoyen Float?
 
   // Score de satisfaction (note globale / 10 * 100)
-  tauxSatisfaction        Float?
+  tauxSatisfaction Float?
 
   // ===========================================
   // METADATA TECHNIQUE
   // ===========================================
-  ipAddress               String?
-  userAgent               String?
+  ipAddress String?
+  userAgent String?
 
   // Timestamps
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([evaluationId])
 }
@@ -3215,46 +3450,46 @@ model EvaluationSatisfactionReponse {
 // Évaluation par l'intervenant après chaque session
 
 enum EvaluationIntervenantStatus {
-  PENDING     // En attente de complétion
+  PENDING // En attente de complétion
   IN_PROGRESS // En cours de remplissage
-  COMPLETED   // Complété
-  EXPIRED     // Expiré
+  COMPLETED // Complété
+  EXPIRED // Expiré
 }
 
 // Demande d'évaluation intervenant
 model EvaluationIntervenant {
-  id                String                     @id @default(cuid())
+  id String @id @default(cuid())
 
   // Organisation (multi-tenant)
-  organizationId    String
-  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Session de formation liée
-  sessionId         String
-  session           DocumentSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   // Intervenant concerné
-  intervenantId     String
-  intervenant       Intervenant                @relation("EvaluationIntervenantIntervenant", fields: [intervenantId], references: [id], onDelete: Cascade)
+  intervenantId String
+  intervenant   Intervenant @relation("EvaluationIntervenantIntervenant", fields: [intervenantId], references: [id], onDelete: Cascade)
 
   // Token unique pour accès public (QR code / lien)
-  token             String                     @unique @default(cuid())
+  token String @unique @default(cuid())
 
   // Statut
-  status            EvaluationIntervenantStatus @default(PENDING)
+  status EvaluationIntervenantStatus @default(PENDING)
 
   // Dates
-  expiresAt         DateTime?                  // Date d'expiration du lien
-  sentAt            DateTime?                  // Date d'envoi à l'intervenant
-  startedAt         DateTime?                  // Date de début de complétion
-  completedAt       DateTime?                  // Date de complétion
+  expiresAt   DateTime? // Date d'expiration du lien
+  sentAt      DateTime? // Date d'envoi à l'intervenant
+  startedAt   DateTime? // Date de début de complétion
+  completedAt DateTime? // Date de complétion
 
   // Réponse (stockée dans un modèle séparé)
-  reponse           EvaluationIntervenantReponse?
+  reponse EvaluationIntervenantReponse?
 
   // Metadata
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([sessionId, intervenantId])
   @@index([organizationId])
@@ -3266,63 +3501,550 @@ model EvaluationIntervenant {
 
 // Réponses détaillées à l'évaluation intervenant
 model EvaluationIntervenantReponse {
-  id                      String                  @id @default(cuid())
+  id String @id @default(cuid())
 
   // Évaluation parent
-  evaluationId            String                  @unique
-  evaluation              EvaluationIntervenant   @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  evaluationId String                @unique
+  evaluation   EvaluationIntervenant @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
   // ===========================================
   // SECTION 2: ORGANISATION ET LOGISTIQUE
   // ===========================================
   // 2.1 Conditions matérielles et logistiques adaptées
-  organisationConditions  Int?                    // Note 0-10
+  organisationConditions   Int? // Note 0-10
   // 2.2 Taille du groupe et niveau des participants adaptés
-  organisationGroupe      Int?                    // Note 0-10
+  organisationGroupe       Int? // Note 0-10
   // 2.3 Coordination avec l'organisme satisfaisante
-  organisationCoordination Int?                   // Note 0-10
+  organisationCoordination Int? // Note 0-10
   // 2.4 Supports mis à disposition cohérents
-  organisationSupports    Int?                    // Note 0-10
+  organisationSupports     Int? // Note 0-10
 
   // ===========================================
   // SECTION 3: CONTENU, MÉTHODES ET DYNAMIQUE
   // ===========================================
   // 3.1 Programme et objectifs réalistes et adaptés
-  contenueObjectifs       Int?                    // Note 0-10
+  contenueObjectifs    Int? // Note 0-10
   // 3.2 Méthodes pédagogiques ont bien fonctionné
-  contenuMethodes         Int?                    // Note 0-10
+  contenuMethodes      Int? // Note 0-10
   // 3.3 Niveau de participation et engagement satisfaisant
-  contenuParticipation    Int?                    // Note 0-10
+  contenuParticipation Int? // Note 0-10
 
   // ===========================================
   // SECTION 4: ATTEINTE OBJECTIFS ET RESSENTI
   // ===========================================
   // 4.1 Objectifs pédagogiques atteints par le groupe
-  objectifsAtteints       Int?                    // Note 0-10
+  objectifsAtteints   Int? // Note 0-10
   // 4.2 Valeur ajoutée apportée aux participants
-  valeurAjoutee           Int?                    // Note 0-10
+  valeurAjoutee       Int? // Note 0-10
   // 4.3 Satisfaction globale du déroulement
-  satisfactionGlobale     Int?                    // Note 0-10
+  satisfactionGlobale Int? // Note 0-10
 
   // ===========================================
   // SECTION 5: SUGGESTIONS
   // ===========================================
-  suggestions             String?                 @db.Text
+  suggestions String? @db.Text
 
   // ===========================================
   // SCORES CALCULÉS
   // ===========================================
-  scoreMoyen              Float?
+  scoreMoyen Float?
 
   // ===========================================
   // METADATA TECHNIQUE
   // ===========================================
-  ipAddress               String?
-  userAgent               String?
+  ipAddress String?
+  userAgent String?
 
   // Timestamps
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([evaluationId])
+}
+
+// ===========================================
+// ORGANIGRAMME (Qualiopi IND 9)
+// ===========================================
+// Structure organisationnelle de l'organisme de formation
+// Permet d'afficher les responsables clés (référent handicap, pédagogique, etc.)
+
+enum OrganigrammePosteType {
+  DIRIGEANT // Gérant / Directeur
+  REFERENT_HANDICAP // Référent handicap obligatoire Qualiopi
+  REFERENT_PEDAGOGIQUE // Responsable pédagogique
+  REFERENT_QUALITE // Référent qualité
+  FORMATEUR // Formateur (lié à Intervenant)
+  ADMINISTRATIF // Personnel administratif
+  AUTRE // Autre poste personnalisé
+}
+
+model OrganigrammePoste {
+  id String @id @default(cuid())
+
+  // Type de poste
+  type OrganigrammePosteType @default(AUTRE)
+
+  // Titre du poste (ex: "Directeur Général", "Référent Handicap")
+  titre String
+
+  // Personne occupant le poste
+  nom       String
+  prenom    String
+  email     String?
+  telephone String?
+
+  // Photo de profil (URL vers le fichier uploadé)
+  photo String?
+
+  // Description du rôle / missions
+  description String? @db.Text
+
+  // Lien optionnel vers un intervenant existant
+  intervenantId String?
+  intervenant   Intervenant? @relation("OrganigrammeIntervenant", fields: [intervenantId], references: [id], onDelete: SetNull)
+
+  // Position hiérarchique
+  niveau Int @default(0) // 0 = top, 1 = niveau 2, etc.
+  ordre  Int @default(0) // Ordre dans le même niveau
+
+  // Référence au supérieur hiérarchique (pour l'arbre)
+  parentId String?
+  parent   OrganigrammePoste?  @relation("OrganigrammeHierarchie", fields: [parentId], references: [id], onDelete: SetNull)
+  children OrganigrammePoste[] @relation("OrganigrammeHierarchie")
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Visibilité
+  isVisible Boolean @default(true) // Visible dans l'organigramme public
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([parentId])
+  @@index([intervenantId])
+}
+
+// ===========================================
+// PROCEDURES QUALITE - Qualiopi IND 26
+// ===========================================
+
+model Procedure {
+  id String @id @default(cuid())
+
+  // Type de procédure
+  type ProcedureType
+
+  // Nom personnalisé (si type = PERSONNALISEE)
+  nom         String // Ex: "Procédure d'accueil des stagiaires"
+  description String? @db.Text
+
+  // Contenu de la procédure (format TipTap JSON)
+  content Json?
+
+  // Fichier PDF généré ou uploadé
+  fileUrl  String?
+  fileSize Int?
+
+  // Référence au template utilisé
+  templateId String?
+  template   Template? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  // Versioning
+  version        Int       @default(1)
+  lastModifiedBy String? // userId qui a fait la dernière modification
+  publishedAt    DateTime? // Date de publication officielle
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // État
+  isActive    Boolean @default(true)
+  isPublished Boolean @default(false) // true = visible dans les documents officiels
+
+  // Historique des versions
+  versions ProcedureVersion[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, type]) // Une seule procédure par type par organisation (sauf PERSONNALISEE)
+  @@index([organizationId])
+  @@index([type])
+}
+
+// Historique des versions d'une procédure
+model ProcedureVersion {
+  id String @id @default(cuid())
+
+  // Référence à la procédure
+  procedureId String
+  procedure   Procedure @relation(fields: [procedureId], references: [id], onDelete: Cascade)
+
+  // Contenu de cette version
+  content Json
+  version Int
+
+  // Qui a créé cette version
+  modifiedById   String?
+  modifiedByName String?
+
+  // Notes de modification
+  changeNotes String? @db.Text
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@index([procedureId])
+  @@index([version])
+}
+
+// ===========================================
+// VEILLE REGLEMENTAIRE - Qualiopi IND 23, 24, 25
+// ===========================================
+
+// Types de veille selon Qualiopi
+enum VeilleType {
+  LEGALE // IND 23 - Veille légale et réglementaire
+  METIER // IND 24 - Veille métiers et compétences
+  INNOVATION // IND 24 - Veille innovation pédagogique
+  HANDICAP // IND 25 - Veille handicap et accessibilité
+}
+
+// Statut d'un article de veille
+enum VeilleArticleStatus {
+  NON_LU
+  LU
+  IMPORTANT
+  ARCHIVE
+}
+
+// Source de veille (flux RSS, page web, document)
+model VeilleSource {
+  id String @id @default(cuid())
+
+  // Type de veille concerné
+  type VeilleType
+
+  // Informations de la source
+  nom         String // Ex: "Légifrance - Formation professionnelle"
+  description String? @db.Text
+  url         String // URL du flux RSS ou de la page à scraper
+  logoUrl     String? // Logo de la source
+
+  // Configuration de scraping
+  isRss          Boolean @default(true) // true = flux RSS, false = scraping web
+  scrapeSelector String? // Sélecteur CSS pour le scraping (si isRss = false)
+  scrapeConfig   Json? // Configuration avancée du scraping
+
+  // Fréquence de mise à jour
+  refreshInterval Int       @default(1440) // En minutes (par défaut 24h = 1440 min)
+  lastRefresh     DateTime?
+  nextRefresh     DateTime?
+
+  // État
+  isActive   Boolean @default(true)
+  errorCount Int     @default(0) // Compteur d'erreurs consécutives
+  lastError  String? @db.Text
+
+  // Multi-tenant (null = source globale pour tous)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Articles issus de cette source
+  articles VeilleArticle[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([organizationId])
+  @@index([isActive])
+}
+
+// Article/actualité récupéré depuis une source
+model VeilleArticle {
+  id String @id @default(cuid())
+
+  // Source de l'article
+  sourceId String
+  source   VeilleSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  // Type de veille (copié depuis la source pour faciliter les requêtes)
+  type VeilleType
+
+  // Contenu de l'article
+  titre    String
+  resume   String? @db.Text // Résumé ou extrait
+  contenu  String? @db.Text // Contenu complet (si disponible)
+  url      String // URL de l'article original
+  imageUrl String? // Image de couverture
+
+  // Métadonnées
+  auteur          String?
+  datePublication DateTime
+  tags            String[] @default([])
+
+  // Analyse IA
+  resumeIA       String?  @db.Text // Résumé généré par l'IA
+  pointsCles     String[] @default([]) // Points clés extraits par l'IA
+  impactQualiopi String?  @db.Text // Impact sur la conformité Qualiopi
+
+  // Statut de lecture par organisation
+  lecturesParOrg VeilleArticleLecture[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceId, url]) // Un article unique par source et URL
+  @@index([type])
+  @@index([sourceId])
+  @@index([datePublication])
+}
+
+// Suivi de lecture des articles par organisation
+model VeilleArticleLecture {
+  id String @id @default(cuid())
+
+  // Article concerné
+  articleId String
+  article   VeilleArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  // Organisation qui a lu l'article
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Utilisateur qui a lu/marqué l'article
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Statut
+  status VeilleArticleStatus @default(NON_LU)
+  luAt   DateTime?
+  notes  String?             @db.Text // Notes personnelles
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([articleId, organizationId])
+  @@index([organizationId])
+  @@index([articleId])
+  @@index([status])
+}
+
+// Historique des conversations avec l'agent IA de veille
+model VeilleConversation {
+  id String @id @default(cuid())
+
+  // Type de veille concerné
+  type VeilleType
+
+  // Organisation et utilisateur
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Historique des messages
+  messages Json @default("[]") // [{role: "user"|"assistant", content: string, timestamp: string}]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([type])
+}
+
+// ===========================================
+// RECLAMATIONS - Qualiopi IND 31
+// ===========================================
+// Gestion des réclamations et difficultés rencontrées
+
+enum ReclamationOrigine {
+  EMAIL
+  TELEPHONE
+  COURRIER
+  FORMULAIRE
+  AUTRE
+}
+
+enum ReclamationStatut {
+  NOUVELLE // Réclamation reçue, pas encore traitée
+  EN_ANALYSE // En cours d'analyse
+  EN_COURS // Traitement en cours
+  RESOLUE // Réclamation résolue
+  CLOTUREE // Clôturée définitivement
+}
+
+enum ReclamationCategorie {
+  PEDAGOGIE // Contenu, méthodes pédagogiques
+  ORGANISATION // Planning, logistique
+  ADMINISTRATIF // Documents, facturation
+  TECHNIQUE // Problèmes techniques
+  INTERVENANT // Formateur, animateur
+  ACCESSIBILITE // Handicap, accessibilité
+  AUTRE
+}
+
+model Reclamation {
+  id String @id @default(cuid())
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations de la réclamation
+  dateReclamation DateTime             @default(now())
+  origine         ReclamationOrigine   @default(EMAIL)
+  categorie       ReclamationCategorie @default(AUTRE)
+
+  // Personne qui a émis la réclamation
+  nomPlaignant       String
+  emailPlaignant     String?
+  telephonePlaignant String?
+  typePlaignant      String? // "apprenant", "entreprise", "financeur", "autre"
+
+  // Références optionnelles
+  formationId String?
+  formation   Formation? @relation(fields: [formationId], references: [id], onDelete: SetNull)
+  sessionId   String?
+  session     Session?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  apprenantId String?
+  apprenant   Apprenant? @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+
+  // Contenu de la réclamation
+  objet       String // Sujet court
+  description String @db.Text // Description détaillée du problème
+
+  // Traitement
+  statut             ReclamationStatut @default(NOUVELLE)
+  datePriseEnCompte  DateTime? // Date de prise en compte
+  analyse            String?           @db.Text // Analyse du problème
+  actionsCorrectives String?           @db.Text // Actions correctives mises en place
+  retourClient       String?           @db.Text // Réponse/retour fait au client
+  dateRetourClient   DateTime?
+
+  // Action préventive (lien avec améliorations)
+  actionPreventive String?             @db.Text
+  ameliorationId   String? // Lien vers une action d'amélioration créée
+  amelioration     ActionAmelioration? @relation(fields: [ameliorationId], references: [id], onDelete: SetNull)
+
+  // Suivi
+  responsableId   String? // User responsable du traitement
+  dateResolution  DateTime?
+  delaiTraitement Int? // Délai en jours entre réception et résolution
+
+  // Pièces jointes
+  piecesJointes Json? // [{filename, url, type}]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([statut])
+  @@index([categorie])
+  @@index([dateReclamation])
+  @@index([formationId])
+  @@index([sessionId])
+}
+
+// ===========================================
+// AMELIORATIONS - Qualiopi IND 32
+// ===========================================
+// Plan d'amélioration continue basé sur les appréciations et réclamations
+
+enum AmeliorationOrigine {
+  RECLAMATION // Issue d'une réclamation
+  EVALUATION_SATISFACTION // Issue d'une évaluation de satisfaction
+  EVALUATION_INTERVENANT // Issue d'une évaluation formateur
+  VEILLE // Issue de la veille réglementaire
+  AUDIT // Issue d'un audit interne/externe
+  INITIATIVE // Initiative interne d'amélioration
+  AUTRE
+}
+
+enum AmeliorationStatut {
+  A_FAIRE // Action planifiée
+  EN_COURS // Action en cours de réalisation
+  TERMINEE // Action terminée
+  ANNULEE // Action annulée
+  EN_ATTENTE // En attente (bloquée)
+}
+
+enum AmeliorationPriorite {
+  BASSE
+  MOYENNE
+  HAUTE
+  CRITIQUE
+}
+
+model ActionAmelioration {
+  id String @id @default(cuid())
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Origine de l'amélioration
+  origine        AmeliorationOrigine @default(INITIATIVE)
+  origineDetails String?             @db.Text // Détails sur l'origine (ex: numéro réclamation, commentaire éval...)
+
+  // Contenu de l'action
+  titre       String // Titre court de l'action
+  description String @db.Text // Description détaillée de l'amélioration
+
+  // Domaine concerné
+  domaine String? // Ex: "Pédagogie", "Organisation", "Administration", "Technique"
+
+  // Planification
+  priorite        AmeliorationPriorite @default(MOYENNE)
+  responsableId   String? // User responsable de l'action
+  responsableNom  String? // Nom du responsable (si pas user)
+  dateCreation    DateTime             @default(now())
+  echeance        DateTime? // Date d'échéance prévue
+  dateDebut       DateTime? // Date de début effective
+  dateRealisation DateTime? // Date de réalisation effective
+
+  // Suivi
+  statut     AmeliorationStatut @default(A_FAIRE)
+  avancement Int                @default(0) // Pourcentage d'avancement 0-100
+
+  // Résultats
+  resultat         String? @db.Text // Description du résultat obtenu
+  efficacite       String? @db.Text // Évaluation de l'efficacité de l'action
+  indicateurMesure String? // Indicateur utilisé pour mesurer l'efficacité
+  valeurAvant      String? // Valeur de l'indicateur avant l'action
+  valeurApres      String? // Valeur de l'indicateur après l'action
+
+  // Liens avec d'autres entités
+  reclamations Reclamation[] // Réclamations liées à cette amélioration
+  formationId  String? // Formation concernée (optionnel)
+  formation    Formation?    @relation(fields: [formationId], references: [id], onDelete: SetNull)
+
+  // Commentaires et historique
+  commentaires  Json? // [{date, auteur, contenu}]
+  piecesJointes Json? // [{filename, url, type}]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([statut])
+  @@index([priorite])
+  @@index([origine])
+  @@index([echeance])
+  @@index([formationId])
 }

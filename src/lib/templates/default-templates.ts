@@ -49851,6 +49851,11 @@ export const EVALUATION_FINANCEUR_TEMPLATE: DefaultTemplate = {
 };
 
 // ===========================================
+// IMPORTS DES TEMPLATES DE PROCÉDURES
+// ===========================================
+import { PROCEDURE_TEMPLATES } from "./procedure-templates";
+
+// ===========================================
 // LISTE DE TOUS LES TEMPLATES
 // ===========================================
 export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
@@ -49868,4 +49873,6 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
   EVALUATION_INTERVENANT_TEMPLATE,
   EVALUATION_ENTREPRISE_TEMPLATE,
   EVALUATION_FINANCEUR_TEMPLATE,
+  // Templates de procédures Qualiopi IND 26
+  ...PROCEDURE_TEMPLATES,
 ];

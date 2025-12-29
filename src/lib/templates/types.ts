@@ -512,3 +512,17 @@ export interface RenderOptions {
   outputFormat?: "html" | "json" | "text";
   inlineStyles?: boolean;
 }
+
+/**
+ * Interface pour les templates par défaut
+ */
+export interface DefaultTemplate {
+  name: string;
+  description: string;
+  documentType: string;
+  category: "DOCUMENT" | "EMAIL" | "PDF";
+  content: object;
+  headerContent?: object;
+  footerContent?: object;
+  variables: string[];
+}

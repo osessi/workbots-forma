@@ -4,7 +4,7 @@
 // Templates système pour les procédures Qualiopi IND 26
 // Design épuré, professionnel et conforme aux normes Qualiopi
 
-import { DefaultTemplate } from "./default-templates";
+import { DefaultTemplate } from "./types";
 
 // ===========================================
 // TEMPLATE: PROCÉDURE D'ACCUEIL DES STAGIAIRES

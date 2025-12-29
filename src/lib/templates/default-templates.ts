@@ -5,16 +5,9 @@
 // Design épuré, professionnel et conforme aux normes Qualiopi
 // GÉNÉRÉ LE: 2025-12-28T22:25:40.477Z
 
-export interface DefaultTemplate {
-  name: string;
-  description: string;
-  documentType: string;
-  category: "DOCUMENT" | "EMAIL" | "PDF";
-  content: object;
-  headerContent?: object;
-  footerContent?: object;
-  variables: string[];
-}
+// Import et réexport pour compatibilité
+import type { DefaultTemplate } from "./types";
+export type { DefaultTemplate };
 
 // ===========================================
 // TEMPLATE: PROGRAMME DE FORMATION

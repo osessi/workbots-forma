@@ -63,6 +63,9 @@ const PROMPT_TYPE_LABELS: Record<AIPromptType, string> = {
   POSITIONNEMENT: "Positionnement",
   EVALUATION_FINALE: "Evaluation Finale",
   REFORMULATION: "Reformulation",
+  MODULE_ZERO: "Module 0 Mise à niveau",
+  FICHE_ADAPTABILITE: "Fiche Adaptabilité",
+  CORRELATION_OBJECTIFS: "Corrélation Objectifs/Évaluation",
   CUSTOM: "Personnalise",
 };
 

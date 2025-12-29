@@ -134,7 +134,31 @@ export async function PUT(
       ville,
       infosPratiques,
       capacite,
+      // Checklist conformité Qualiopi IND 17
+      checkSurfaceAdaptee,
+      checkErpConforme,
+      checkVentilation,
+      checkEclairage,
+      checkSanitaires,
+      checkAccessibiliteHandicap,
+      checkWifi,
+      checkVideoprojecteur,
+      checkMobilier,
+      checkEquipements,
+      checkFournitures,
+      notesConformite,
     } = body;
+
+    // Convertir capacite en nombre ou null
+    let parsedCapacite: number | null | undefined = undefined;
+    if (capacite !== undefined) {
+      if (typeLieu === "PRESENTIEL" && capacite !== null && capacite !== "") {
+        const parsed = parseInt(String(capacite), 10);
+        parsedCapacite = !isNaN(parsed) ? parsed : null;
+      } else {
+        parsedCapacite = null;
+      }
+    }
 
     const lieu = await prisma.lieuFormation.update({
       where: { id },
@@ -142,10 +166,23 @@ export async function PUT(
         nom,
         typeLieu: typeLieu || "PRESENTIEL",
         lieuFormation,
-        codePostal: typeLieu === "PRESENTIEL" ? codePostal : null,
-        ville: typeLieu === "PRESENTIEL" ? ville : null,
-        infosPratiques,
-        capacite: typeLieu === "PRESENTIEL" && capacite ? parseInt(capacite) : null,
+        codePostal: typeLieu === "PRESENTIEL" ? (codePostal || null) : null,
+        ville: typeLieu === "PRESENTIEL" ? (ville || null) : null,
+        infosPratiques: infosPratiques || null,
+        capacite: parsedCapacite,
+        // Checklist conformité Qualiopi IND 17
+        checkSurfaceAdaptee: checkSurfaceAdaptee !== undefined ? checkSurfaceAdaptee === true : undefined,
+        checkErpConforme: checkErpConforme !== undefined ? checkErpConforme === true : undefined,
+        checkVentilation: checkVentilation !== undefined ? checkVentilation === true : undefined,
+        checkEclairage: checkEclairage !== undefined ? checkEclairage === true : undefined,
+        checkSanitaires: checkSanitaires !== undefined ? checkSanitaires === true : undefined,
+        checkAccessibiliteHandicap: checkAccessibiliteHandicap !== undefined ? checkAccessibiliteHandicap === true : undefined,
+        checkWifi: checkWifi !== undefined ? checkWifi === true : undefined,
+        checkVideoprojecteur: checkVideoprojecteur !== undefined ? checkVideoprojecteur === true : undefined,
+        checkMobilier: checkMobilier !== undefined ? checkMobilier === true : undefined,
+        checkEquipements: checkEquipements !== undefined ? checkEquipements === true : undefined,
+        checkFournitures: checkFournitures !== undefined ? checkFournitures === true : undefined,
+        notesConformite: notesConformite !== undefined ? (notesConformite || null) : undefined,
       },
     });
 

@@ -15,6 +15,7 @@ import {
   Info,
   Calendar,
   UserCircle,
+  Award,
   X,
   Send,
   Loader2,
@@ -129,7 +130,7 @@ export default function ApprenantSidebar({
       icon: Info,
       section: "main",
     },
-    // Section secondaire
+    // Section secondaire (Ressources)
     {
       name: "Calendrier",
       href: "/apprenant/calendrier",
@@ -140,6 +141,12 @@ export default function ApprenantSidebar({
       name: "Intervenants",
       href: "/apprenant/intervenants",
       icon: UserCircle,
+      section: "secondary",
+    },
+    {
+      name: "Certifications",
+      href: "/apprenant/certifications",
+      icon: Award,
       section: "secondary",
     },
   ];

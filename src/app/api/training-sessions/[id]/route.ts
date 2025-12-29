@@ -73,6 +73,10 @@ export async function GET(
             titre: true,
             image: true,
             fichePedagogique: true,
+            // Qualiopi IND 3 - Certification
+            isCertifiante: true,
+            numeroFicheRS: true,
+            lienFranceCompetences: true,
           },
         },
         lieu: {
@@ -103,7 +107,14 @@ export async function GET(
               },
             },
             participants: {
-              include: {
+              select: {
+                id: true,
+                estConfirme: true,
+                aAssiste: true,
+                // Qualiopi IND 3 - Certification
+                certificationObtenue: true,
+                dateCertification: true,
+                numeroCertificat: true,
                 apprenant: {
                   select: {
                     id: true,
@@ -186,6 +197,8 @@ export async function PATCH(
     if (body.tarifParDefautHT !== undefined) updateData.tarifParDefautHT = body.tarifParDefautHT ? parseFloat(body.tarifParDefautHT) : null;
     if (body.tauxTVA !== undefined) updateData.tauxTVA = parseFloat(body.tauxTVA);
     if (body.notes !== undefined) updateData.notes = body.notes;
+    // Qualiopi IND 3 - Certification par session
+    if (body.delivreCertification !== undefined) updateData.delivreCertification = body.delivreCertification;
 
     // Mettre à jour la session
     const session = await prisma.session.update({

@@ -239,6 +239,38 @@ export function SatisfactionBadge({
   );
 }
 
+// Composant pour afficher le taux de certification (Qualiopi IND 3)
+export function CertificationBadge({
+  tauxCertification,
+  primaryColor = "#4277FF",
+  size = "sm",
+}: {
+  tauxCertification: number | null;
+  primaryColor?: string;
+  size?: "sm" | "md";
+}) {
+  if (!tauxCertification) return null;
+
+  const sizeClasses = {
+    sm: "px-2.5 py-1 text-xs",
+    md: "px-3 py-1.5 text-sm",
+  };
+
+  return (
+    <span
+      className={`
+        inline-flex items-center gap-1.5 rounded-md font-medium
+        bg-emerald-50 text-emerald-700 border border-emerald-200
+        ${sizeClasses[size]}
+      `}
+      title="Taux de certification (certifiés / présentés)"
+    >
+      <Award className={size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4"} />
+      {tauxCertification.toFixed(0)}% certifiés
+    </span>
+  );
+}
+
 // Composant pour afficher les indicateurs de résultats (stagiaires formés, etc.)
 export function FormationIndicateurs({
   indicateurs,
@@ -247,6 +279,7 @@ export function FormationIndicateurs({
 }: {
   indicateurs: {
     tauxSatisfaction: number | null;
+    tauxCertification?: number | null;
     nombreAvis?: number;
     nombreStagiaires?: number;
   } | null;
@@ -272,6 +305,15 @@ export function FormationIndicateurs({
         <SatisfactionBadge
           tauxSatisfaction={indicateurs.tauxSatisfaction}
           nombreAvis={indicateurs.nombreAvis}
+          primaryColor={primaryColor}
+          size={size}
+        />
+      )}
+
+      {/* Taux de certification (Qualiopi IND 3) */}
+      {indicateurs.tauxCertification && (
+        <CertificationBadge
+          tauxCertification={indicateurs.tauxCertification}
           primaryColor={primaryColor}
           size={size}
         />

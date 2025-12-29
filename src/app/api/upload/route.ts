@@ -14,15 +14,19 @@ const STORAGE_BUCKET = "worksbots-forma-stockage";
 // Types de fichiers autorisés
 const ALLOWED_TYPES: Record<string, string[]> = {
   "certificat-qualiopi": ["application/pdf"],
+  "referentiel-rs": ["application/pdf"], // Qualiopi IND 3 - Référentiel RS
   "document": ["application/pdf", "image/jpeg", "image/png", "image/webp"],
   "image": ["image/jpeg", "image/png", "image/webp", "image/gif"],
+  "organigramme-photo": ["image/jpeg", "image/png", "image/webp", "image/gif"], // Qualiopi IND 9
 };
 
 // Tailles maximales par type (en bytes)
 const MAX_SIZES: Record<string, number> = {
   "certificat-qualiopi": 10 * 1024 * 1024, // 10MB
+  "referentiel-rs": 10 * 1024 * 1024, // 10MB - Qualiopi IND 3
   "document": 20 * 1024 * 1024, // 20MB
   "image": 5 * 1024 * 1024, // 5MB
+  "organigramme-photo": 5 * 1024 * 1024, // 5MB - Qualiopi IND 9
 };
 
 // Client admin avec service role (bypass RLS)
@@ -130,6 +134,12 @@ export async function POST(request: NextRequest) {
     switch (type) {
       case "certificat-qualiopi":
         folder = "certificats-qualiopi";
+        break;
+      case "referentiel-rs":
+        folder = "referentiels-rs"; // Qualiopi IND 3
+        break;
+      case "organigramme-photo":
+        folder = "organigramme-photos"; // Qualiopi IND 9
         break;
       case "image":
         folder = "images";

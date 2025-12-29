@@ -25,6 +25,7 @@ interface Module {
   titre: string;
   contenu: string[];
   objectifs?: string[];
+  isModuleZero?: boolean; // Qualiopi IND 10 - Module 0 de mise à niveau
 }
 
 interface SlidesData {
@@ -567,6 +568,8 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
           {modules.map((module, index) => {
             const slideData = getModuleSlideData(module.id);
             const isExpanded = expandedModules.has(module.id);
+            // Calculer le numéro du module (0 pour Module 0, sinon index sans compter Module 0)
+            const moduleNum = module.isModuleZero ? 0 : index - (modules.some(m => m.isModuleZero) ? 1 : 0) + 1;
 
             return (
               <div key={module.id} className="bg-white dark:bg-transparent">
@@ -575,13 +578,24 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
                   onClick={() => toggleModule(module.id)}
                   className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-brand-50 text-brand-600 font-semibold text-sm dark:bg-brand-500/10 dark:text-brand-400">
-                    {index + 1}
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg font-semibold text-sm ${
+                    module.isModuleZero
+                      ? "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
+                      : "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                  }`}>
+                    {moduleNum}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {module.titre}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {module.titre}
+                      </h4>
+                      {module.isModuleZero && (
+                        <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded-full dark:bg-amber-500/20 dark:text-amber-300">
+                          Mise à niveau
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {module.contenu.length} points de contenu
                     </p>

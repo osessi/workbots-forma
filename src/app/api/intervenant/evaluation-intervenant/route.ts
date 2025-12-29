@@ -22,7 +22,7 @@ function decodeIntervenantToken(token: string): { intervenantId: string; organiz
 export async function GET(request: NextRequest) {
   try {
     const token = request.nextUrl.searchParams.get("token");
-    const sessionId = request.nextUrl.searchParams.get("sessionId");
+    // Note: sessionId n'est plus utilisé car on récupère toutes les évaluations de l'intervenant
 
     if (!token) {
       return NextResponse.json({ error: "Token manquant" }, { status: 401 });
@@ -35,21 +35,13 @@ export async function GET(request: NextRequest) {
 
     const { intervenantId } = decoded;
 
-    // Construire le filtre
-    const whereClause: {
-      intervenantId: string;
-      sessionId?: string;
-    } = {
-      intervenantId,
-    };
-
-    if (sessionId) {
-      whereClause.sessionId = sessionId;
-    }
-
-    // Récupérer les évaluations intervenant
+    // Récupérer TOUTES les évaluations de l'intervenant (sans filtre sessionId)
+    // car les sessions du nouveau système (Session) et ancien système (DocumentSession) ont des IDs différents
     const evaluations = await prisma.evaluationIntervenant.findMany({
-      where: whereClause,
+      where: {
+        intervenantId,
+      },
+      distinct: ["id"], // Éviter les doublons
       include: {
         session: {
           include: {

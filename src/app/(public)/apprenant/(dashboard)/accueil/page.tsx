@@ -17,6 +17,9 @@ import {
   ArrowRight,
   GraduationCap,
   Loader2,
+  Award,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 
 // =====================================
@@ -31,6 +34,7 @@ export default function AccueilPage() {
     selectedInscription,
     isLoading,
     dashboardStats,
+    certifications, // Qualiopi IND 3
   } = useApprenantPortal();
 
   if (isLoading) {
@@ -342,6 +346,89 @@ export default function AccueilPage() {
           <p className="text-gray-500 dark:text-gray-400">
             Vous n&apos;êtes inscrit à aucune formation pour le moment.
           </p>
+        </motion.div>
+      )}
+
+      {/* Qualiopi IND 3 - Mes certifications */}
+      {certifications && certifications.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-2xl border border-amber-200 dark:border-amber-800"
+        >
+          <div className="p-5 border-b border-amber-200 dark:border-amber-700 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <Award className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Mes certifications
+              </h2>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {certifications.length} certification{certifications.length > 1 ? "s" : ""} obtenue{certifications.length > 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="divide-y divide-amber-200 dark:divide-amber-700">
+            {certifications.map((cert) => (
+              <div
+                key={cert.id}
+                className="p-4 flex items-center gap-4"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                  <Award className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-gray-900 dark:text-white">
+                    {cert.formationTitre}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
+                    {cert.numeroFicheRS && (
+                      <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs">
+                        {cert.numeroFicheRS}
+                      </span>
+                    )}
+                    {cert.dateCertification && (
+                      <span className="text-gray-500 dark:text-gray-400 text-xs">
+                        Obtenue le {new Date(cert.dateCertification).toLocaleDateString("fr-FR")}
+                      </span>
+                    )}
+                    {cert.numeroCertificat && (
+                      <span className="text-gray-500 dark:text-gray-400 text-xs font-mono">
+                        N° {cert.numeroCertificat}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {cert.lienFranceCompetences && (
+                    <a
+                      href={cert.lienFranceCompetences}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                      title="Voir sur France Compétences"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </a>
+                  )}
+                  {cert.numeroCertificat && (
+                    <a
+                      href={`/api/apprenant/certificate/${cert.id}`}
+                      className="p-2 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                      title="Télécharger le certificat"
+                    >
+                      <Download className="w-5 h-5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </motion.div>
       )}
     </div>

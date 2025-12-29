@@ -154,6 +154,21 @@ export async function PATCH(
     // Publication catalogue public
     if (body.estPublieCatalogue !== undefined) updateData.estPublieCatalogue = body.estPublieCatalogue;
 
+    // Qualiopi IND 3 - Formation certifiante
+    if (body.isCertifiante !== undefined) updateData.isCertifiante = body.isCertifiante;
+    if (body.numeroFicheRS !== undefined) updateData.numeroFicheRS = body.numeroFicheRS;
+    if (body.referentielRSUrl !== undefined) updateData.referentielRSUrl = body.referentielRSUrl;
+    if (body.lienFranceCompetences !== undefined) updateData.lienFranceCompetences = body.lienFranceCompetences;
+
+    // Extraire les champs de certification depuis contexteData si présents
+    if (body.contexteData) {
+      const ctx = body.contexteData;
+      if (ctx.isCertifiante !== undefined) updateData.isCertifiante = Boolean(ctx.isCertifiante);
+      if (ctx.numeroFicheRS) updateData.numeroFicheRS = ctx.numeroFicheRS;
+      if (ctx.referentielRSUrl) updateData.referentielRSUrl = ctx.referentielRSUrl;
+      if (ctx.lienFranceCompetences) updateData.lienFranceCompetences = ctx.lienFranceCompetences;
+    }
+
     const updatedFormation = await prisma.formation.update({
       where: { id },
       data: updateData,

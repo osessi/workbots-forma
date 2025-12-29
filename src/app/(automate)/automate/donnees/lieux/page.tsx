@@ -12,6 +12,9 @@ import {
   Info,
   Video,
   Link as LinkIcon,
+  CheckCircle2,
+  Circle,
+  ClipboardCheck,
 } from "lucide-react";
 
 type TypeLieu = "PRESENTIEL" | "VISIOCONFERENCE";
@@ -25,6 +28,19 @@ interface LieuFormation {
   ville: string | null;
   infosPratiques: string | null;
   capacite: number | null;
+  // Checklist conformité Qualiopi IND 17
+  checkSurfaceAdaptee: boolean;
+  checkErpConforme: boolean;
+  checkVentilation: boolean;
+  checkEclairage: boolean;
+  checkSanitaires: boolean;
+  checkAccessibiliteHandicap: boolean;
+  checkWifi: boolean;
+  checkVideoprojecteur: boolean;
+  checkMobilier: boolean;
+  checkEquipements: boolean;
+  checkFournitures: boolean;
+  notesConformite: string | null;
 }
 
 const typeLabels: Record<TypeLieu, string> = {
@@ -54,6 +70,19 @@ export default function LieuxPage() {
     ville: "",
     infosPratiques: "",
     capacite: "",
+    // Checklist conformité Qualiopi IND 17
+    checkSurfaceAdaptee: false,
+    checkErpConforme: false,
+    checkVentilation: false,
+    checkEclairage: false,
+    checkSanitaires: false,
+    checkAccessibiliteHandicap: false,
+    checkWifi: false,
+    checkVideoprojecteur: false,
+    checkMobilier: false,
+    checkEquipements: false,
+    checkFournitures: false,
+    notesConformite: "",
   });
 
   const fetchLieux = useCallback(async () => {
@@ -83,6 +112,18 @@ export default function LieuxPage() {
       ville: "",
       infosPratiques: "",
       capacite: "",
+      checkSurfaceAdaptee: false,
+      checkErpConforme: false,
+      checkVentilation: false,
+      checkEclairage: false,
+      checkSanitaires: false,
+      checkAccessibiliteHandicap: false,
+      checkWifi: false,
+      checkVideoprojecteur: false,
+      checkMobilier: false,
+      checkEquipements: false,
+      checkFournitures: false,
+      notesConformite: "",
     });
     setEditingLieu(null);
   };
@@ -98,11 +139,44 @@ export default function LieuxPage() {
         ville: lieu.ville || "",
         infosPratiques: lieu.infosPratiques || "",
         capacite: lieu.capacite?.toString() || "",
+        checkSurfaceAdaptee: lieu.checkSurfaceAdaptee || false,
+        checkErpConforme: lieu.checkErpConforme || false,
+        checkVentilation: lieu.checkVentilation || false,
+        checkEclairage: lieu.checkEclairage || false,
+        checkSanitaires: lieu.checkSanitaires || false,
+        checkAccessibiliteHandicap: lieu.checkAccessibiliteHandicap || false,
+        checkWifi: lieu.checkWifi || false,
+        checkVideoprojecteur: lieu.checkVideoprojecteur || false,
+        checkMobilier: lieu.checkMobilier || false,
+        checkEquipements: lieu.checkEquipements || false,
+        checkFournitures: lieu.checkFournitures || false,
+        notesConformite: lieu.notesConformite || "",
       });
     } else {
       resetForm();
     }
     setIsModalOpen(true);
+  };
+
+  // Calculer le score de conformité
+  const getConformityScore = (lieu: LieuFormation) => {
+    if (lieu.typeLieu === "VISIOCONFERENCE") return null;
+    const checks = [
+      lieu.checkSurfaceAdaptee,
+      lieu.checkErpConforme,
+      lieu.checkVentilation,
+      lieu.checkEclairage,
+      lieu.checkSanitaires,
+      lieu.checkAccessibiliteHandicap,
+      lieu.checkWifi,
+      lieu.checkVideoprojecteur,
+      lieu.checkMobilier,
+      lieu.checkEquipements,
+      lieu.checkFournitures,
+    ];
+    const total = checks.length;
+    const checked = checks.filter(Boolean).length;
+    return { checked, total, percentage: Math.round((checked / total) * 100) };
   };
 
   const closeModal = () => {
@@ -302,6 +376,27 @@ export default function LieuxPage() {
                     <span className="text-xs text-gray-500 line-clamp-2">{lieu.infosPratiques}</span>
                   </div>
                 )}
+                {/* Score conformité Qualiopi IND 17 */}
+                {lieu.typeLieu !== "VISIOCONFERENCE" && (() => {
+                  const score = getConformityScore(lieu);
+                  if (!score) return null;
+                  return (
+                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center gap-2">
+                        <ClipboardCheck size={14} className={`flex-shrink-0 ${score.percentage === 100 ? "text-green-500" : score.percentage >= 50 ? "text-amber-500" : "text-red-500"}`} />
+                        <span className="text-xs font-medium">
+                          Conformité: {score.checked}/{score.total} ({score.percentage}%)
+                        </span>
+                      </div>
+                      <div className="mt-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full ${score.percentage === 100 ? "bg-green-500" : score.percentage >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+                          style={{ width: `${score.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}
@@ -311,7 +406,7 @@ export default function LieuxPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingLieu ? "Modifier le lieu" : "Nouveau lieu"}
@@ -447,6 +542,153 @@ export default function LieuxPage() {
                   className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
                 />
               </div>
+
+              {/* Checklist conformité Qualiopi IND 17 - uniquement pour présentiel */}
+              {formData.typeLieu === "PRESENTIEL" && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ClipboardCheck className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      Qualiopi IND 17 - Checklist conformité lieu
+                    </h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Surface et aménagement */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Surface et aménagement</p>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkSurfaceAdaptee}
+                          onChange={(e) => setFormData({ ...formData, checkSurfaceAdaptee: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Surface adaptée au nombre d&apos;apprenants</span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkErpConforme}
+                          onChange={(e) => setFormData({ ...formData, checkErpConforme: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Conformité ERP (Établissement Recevant du Public)</span>
+                      </label>
+                    </div>
+
+                    {/* Conditions de travail */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Conditions de travail</p>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkVentilation}
+                          onChange={(e) => setFormData({ ...formData, checkVentilation: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Ventilation/climatisation adaptée</span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkEclairage}
+                          onChange={(e) => setFormData({ ...formData, checkEclairage: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Éclairage suffisant</span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkSanitaires}
+                          onChange={(e) => setFormData({ ...formData, checkSanitaires: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Sanitaires accessibles</span>
+                      </label>
+                    </div>
+
+                    {/* Accessibilité */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Accessibilité</p>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkAccessibiliteHandicap}
+                          onChange={(e) => setFormData({ ...formData, checkAccessibiliteHandicap: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Accessibilité PMR (handicap)</span>
+                      </label>
+                    </div>
+
+                    {/* Équipements techniques */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Équipements techniques</p>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkWifi}
+                          onChange={(e) => setFormData({ ...formData, checkWifi: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">WiFi disponible</span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkVideoprojecteur}
+                          onChange={(e) => setFormData({ ...formData, checkVideoprojecteur: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Vidéoprojecteur ou écran</span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkMobilier}
+                          onChange={(e) => setFormData({ ...formData, checkMobilier: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Mobilier adapté (tables, chaises)</span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkEquipements}
+                          onChange={(e) => setFormData({ ...formData, checkEquipements: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Équipements spécifiques selon formation</span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.checkFournitures}
+                          onChange={(e) => setFormData({ ...formData, checkFournitures: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Fournitures pédagogiques disponibles</span>
+                      </label>
+                    </div>
+
+                    {/* Notes conformité */}
+                    <div className="pt-2">
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Notes sur la conformité
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={formData.notesConformite}
+                        onChange={(e) => setFormData({ ...formData, notesConformite: e.target.value })}
+                        placeholder="Points d'attention, travaux prévus..."
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">

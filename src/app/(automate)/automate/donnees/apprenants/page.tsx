@@ -15,11 +15,28 @@ import {
   Briefcase,
   User,
   Eye,
+  StickyNote,
+  MessageSquarePlus,
+  Clock,
+  Send,
 } from "lucide-react";
 
 interface Entreprise {
   id: string;
   raisonSociale: string;
+}
+
+// Qualiopi IND 5 - Type pour les notes avec historique
+interface ApprenantNote {
+  id: string;
+  content: string;
+  createdAt: string;
+  createdBy: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }
 
 interface Apprenant {
@@ -62,6 +79,13 @@ export default function ApprenantsPage() {
   const [editingApprenant, setEditingApprenant] = useState<Apprenant | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Qualiopi IND 5 - États pour les notes avec historique
+  const [notes, setNotes] = useState<ApprenantNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [showNoteForm, setShowNoteForm] = useState(false);
 
   const [formData, setFormData] = useState({
     nom: "",
@@ -130,6 +154,49 @@ export default function ApprenantsPage() {
       notes: "",
     });
     setEditingApprenant(null);
+    // Reset notes state
+    setNotes([]);
+    setNewNote("");
+    setShowNoteForm(false);
+  };
+
+  // Qualiopi IND 5 - Charger les notes d'un apprenant
+  const loadNotes = async (apprenantId: string) => {
+    setNotesLoading(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/notes`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(data.notes || []);
+      }
+    } catch (error) {
+      console.error("Erreur chargement notes:", error);
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  // Qualiopi IND 5 - Ajouter une nouvelle note
+  const handleAddNote = async () => {
+    if (!newNote.trim() || addingNote || !editingApprenant) return;
+    setAddingNote(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${editingApprenant.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newNote.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotes((prev) => [data.note, ...prev]);
+        setNewNote("");
+        setShowNoteForm(false);
+      }
+    } catch (error) {
+      console.error("Erreur ajout note:", error);
+    } finally {
+      setAddingNote(false);
+    }
   };
 
   const openModal = (apprenant?: Apprenant) => {
@@ -150,6 +217,8 @@ export default function ApprenantsPage() {
         entrepriseId: apprenant.entrepriseId || "",
         notes: apprenant.notes || "",
       });
+      // Charger les notes de l'apprenant
+      loadNotes(apprenant.id);
     } else {
       resetForm();
     }
@@ -547,18 +616,138 @@ export default function ApprenantsPage() {
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                  Notes internes
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
-                />
-              </div>
+              {/* Qualiopi IND 5 - Notes internes avec historique */}
+              {editingApprenant ? (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <StickyNote className="w-4 h-4 text-amber-500" />
+                      Notes internes
+                      {notes.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium rounded-full">
+                          {notes.length}
+                        </span>
+                      )}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowNoteForm(!showNoteForm)}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                    >
+                      <MessageSquarePlus className="w-3.5 h-3.5" />
+                      Ajouter
+                    </button>
+                  </div>
+
+                  {/* Formulaire d'ajout de note */}
+                  {showNoteForm && (
+                    <div className="mb-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-3">
+                      <textarea
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder="Saisissez votre note interne..."
+                        rows={2}
+                        className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNoteForm(false);
+                            setNewNote("");
+                          }}
+                          className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddNote}
+                          disabled={!newNote.trim() || addingNote}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded transition-colors"
+                        >
+                          {addingNote ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Send className="w-3 h-3" />
+                          )}
+                          Enregistrer
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Liste des notes */}
+                  {notesLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                    </div>
+                  ) : notes.length > 0 ? (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {notes.map((note) => (
+                        <div
+                          key={note.id}
+                          className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/30"
+                        >
+                          <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                            {note.content}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-yellow-200 dark:border-yellow-800/30 text-xs text-gray-500 dark:text-gray-400">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {new Date(note.createdAt).toLocaleDateString("fr-FR", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            {note.createdBy && (
+                              <>
+                                <span className="text-gray-300 dark:text-gray-600">•</span>
+                                <span>
+                                  {note.createdBy.firstName || note.createdBy.email.split("@")[0]}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-400 dark:text-gray-500">
+                      <StickyNote className="w-8 h-8 mx-auto mb-1 opacity-50" />
+                      <p className="text-xs">Aucune note pour cet apprenant</p>
+                      <p className="text-xs mt-0.5">Cliquez sur &quot;Ajouter&quot; pour créer une note</p>
+                    </div>
+                  )}
+
+                  {/* Note héritée (ancien champ) si elle existe */}
+                  {formData.notes && notes.length === 0 && (
+                    <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Note héritée (ancienne version)</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                        {formData.notes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Champ simple pour la création */
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    Notes internes
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Notes internes (optionnel)"
+                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
+                  />
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">

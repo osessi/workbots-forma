@@ -67,6 +67,10 @@ export async function GET(request: NextRequest) {
             titre: true,
             ordre: true,
             duree: true,
+            isModuleZero: true,
+          },
+          where: {
+            isModuleZero: false, // Exclure Module 0 du LMS public (affichage conditionnel séparé)
           },
           orderBy: { ordre: "asc" },
         },

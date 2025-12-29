@@ -29,6 +29,10 @@ import {
   UserPlus,
   BookOpen,
   ClipboardList,
+  Newspaper,
+  Eye,
+  MessageSquareWarning,
+  TrendingUp as TrendingUpIcon,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -133,6 +137,27 @@ const mainNavItems: NavItem[] = [
     icon: <Bot size={20} strokeWidth={1.5} />,
     name: "Agent Qualiopi",
     path: "/automate/agent-qualiopi",
+  },
+  {
+    icon: <Newspaper size={20} strokeWidth={1.5} />,
+    name: "Outils",
+    subItems: [
+      {
+        icon: <Eye size={18} strokeWidth={1.5} />,
+        name: "Veille",
+        path: "/automate/outils/veille",
+      },
+      {
+        icon: <MessageSquareWarning size={18} strokeWidth={1.5} />,
+        name: "Réclamations",
+        path: "/automate/outils/reclamations",
+      },
+      {
+        icon: <TrendingUpIcon size={18} strokeWidth={1.5} />,
+        name: "Améliorations",
+        path: "/automate/outils/ameliorations",
+      },
+    ],
   },
   {
     icon: <Database size={20} strokeWidth={1.5} />,

@@ -233,6 +233,21 @@ export default function MesFormationsPage() {
     setOpenMenuId(null);
   };
 
+  // Qualiopi IND 3 - Marquer/Démarquer comme formation certifiante
+  const handleToggleCertifiante = async (id: string, currentlyCertifiante: boolean) => {
+    try {
+      await fetch(`/api/formations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isCertifiante: !currentlyCertifiante }),
+      });
+      refreshFormations();
+    } catch (error) {
+      console.error("Erreur lors du changement de certification:", error);
+    }
+    setOpenMenuId(null);
+  };
+
   // Ouvrir la modal de confirmation de suppression
   const openDeleteModal = (id: string, title: string) => {
     setDeleteModal({ isOpen: true, formationId: id, formationTitle: title });
@@ -502,10 +517,10 @@ export default function MesFormationsPage() {
         {filteredFormations.map((formation) => (
           <div
             key={formation.id}
-            className="rounded-xl border border-gray-200 bg-white overflow-hidden dark:border-gray-800 dark:bg-white/[0.03] card-hover-glow group"
+            className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] card-hover-glow group relative"
           >
             {/* Image */}
-            <div className="relative aspect-video w-full overflow-hidden">
+            <div className="relative aspect-video w-full overflow-hidden rounded-t-xl">
               <Image
                 src={formation.image}
                 alt={formation.titre}
@@ -551,22 +566,23 @@ export default function MesFormationsPage() {
                 )}
               </div>
 
-              {/* Menu d'actions */}
-              <div className="absolute top-3 left-3">
-                <div className="relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenMenuId(openMenuId === formation.id ? null : formation.id);
-                    }}
-                    className="p-2 bg-white/90 hover:bg-white text-gray-600 hover:text-gray-900 rounded-lg shadow-sm transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <MoreIcon />
-                  </button>
+              {/* Menu d'actions - bouton */}
+              <div className="absolute top-3 left-3 z-10">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuId(openMenuId === formation.id ? null : formation.id);
+                  }}
+                  className="p-2 bg-white/90 hover:bg-white text-gray-600 hover:text-gray-900 rounded-lg shadow-sm transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <MoreIcon />
+                </button>
+              </div>
+            </div>
 
-                  {/* Dropdown menu */}
-                  {openMenuId === formation.id && (
-                    <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-800 dark:border-gray-700">
+            {/* Dropdown menu - positionné au niveau de la carte, pas dans l'image */}
+            {openMenuId === formation.id && (
+              <div className="absolute top-12 left-3 w-52 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[100] dark:bg-gray-800 dark:border-gray-700" style={{ maxHeight: "300px", overflowY: "auto" }}>
                       {/* Créer une session */}
                       <Link
                         href={`/automate/sessions?create=true&formationId=${formation.id}`}
@@ -598,6 +614,21 @@ export default function MesFormationsPage() {
                         </svg>
                         {formation.estPublieCatalogue ? "Retirer du catalogue" : "Publier au catalogue"}
                       </button>
+                      {/* Qualiopi IND 3 - Marquer comme certifiante */}
+                      <button
+                        onClick={() => handleToggleCertifiante(formation.id, formation.isCertifiante || false)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                          formation.isCertifiante
+                            ? "text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                            : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="8" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
+                          <path d="M5 8L3.5 14L8 12L12.5 14L11 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        {formation.isCertifiante ? "Retirer certification" : "Marquer certifiante"}
+                      </button>
                       <button
                         onClick={() => handleArchive(formation.id, false)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -615,9 +646,6 @@ export default function MesFormationsPage() {
                       </button>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
 
             {/* Contenu */}
             <div className="p-4">

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   UserCheck,
   Plus,
@@ -12,7 +12,25 @@ import {
   Building2,
   Loader2,
   Tag,
+  Upload,
+  GraduationCap,
+  FileText,
+  Clock,
+  Award,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+import Image from "next/image";
+
+interface Diplome {
+  id: string;
+  intitule: string;
+  organisme: string | null;
+  anneeObtention: number | null;
+  niveau: string | null;
+  fichierUrl: string | null;
+}
 
 interface Intervenant {
   id: string;
@@ -25,6 +43,13 @@ interface Intervenant {
   structure: string | null;
   structureSiret: string | null;
   notes: string | null;
+  // Nouveaux champs Qualiopi IND 17
+  photoUrl: string | null;
+  cv: string | null;
+  biographie: string | null;
+  anneesExperience: number | null;
+  numeroDeclarationActivite: string | null;
+  diplomes: Diplome[];
 }
 
 export default function IntervenantsPage() {
@@ -47,7 +72,38 @@ export default function IntervenantsPage() {
     structure: "",
     structureSiret: "",
     notes: "",
+    // Nouveaux champs Qualiopi IND 17
+    photoUrl: "",
+    cv: "",
+    biographie: "",
+    anneesExperience: "",
+    numeroDeclarationActivite: "",
   });
+
+  // État pour les diplômes
+  const [diplomes, setDiplomes] = useState<Diplome[]>([]);
+  const [newDiplome, setNewDiplome] = useState({
+    intitule: "",
+    organisme: "",
+    anneeObtention: "",
+    niveau: "",
+    fichierUrl: "",
+  });
+  const [addingDiplome, setAddingDiplome] = useState(false);
+  const [savingDiplome, setSavingDiplome] = useState(false);
+  const [deletingDiplome, setDeletingDiplome] = useState<string | null>(null);
+
+  // États pour l'upload de fichiers
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingCv, setUploadingCv] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cvInputRef = useRef<HTMLInputElement>(null);
+  // Fichiers sélectionnés pour la création (avant soumission)
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [pendingCvFile, setPendingCvFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const fetchIntervenants = useCallback(async () => {
     try {
@@ -78,9 +134,29 @@ export default function IntervenantsPage() {
       structure: "",
       structureSiret: "",
       notes: "",
+      photoUrl: "",
+      cv: "",
+      biographie: "",
+      anneesExperience: "",
+      numeroDeclarationActivite: "",
     });
     setEditingIntervenant(null);
     setNewSpecialite("");
+    setDiplomes([]);
+    setAddingDiplome(false);
+    setNewDiplome({
+      intitule: "",
+      organisme: "",
+      anneeObtention: "",
+      niveau: "",
+      fichierUrl: "",
+    });
+    // Reset fichiers en attente
+    setPendingPhotoFile(null);
+    setPendingCvFile(null);
+    setPhotoPreview(null);
+    setUploadError(null);
+    setUploadSuccess(null);
   };
 
   const openModal = (intervenant?: Intervenant) => {
@@ -96,16 +172,188 @@ export default function IntervenantsPage() {
         structure: intervenant.structure || "",
         structureSiret: intervenant.structureSiret || "",
         notes: intervenant.notes || "",
+        photoUrl: intervenant.photoUrl || "",
+        cv: intervenant.cv || "",
+        biographie: intervenant.biographie || "",
+        anneesExperience: intervenant.anneesExperience?.toString() || "",
+        numeroDeclarationActivite: intervenant.numeroDeclarationActivite || "",
       });
+      setDiplomes(intervenant.diplomes || []);
     } else {
       resetForm();
     }
     setIsModalOpen(true);
   };
 
+  // Gestion des diplômes
+  const handleAddDiplome = async () => {
+    if (!editingIntervenant || !newDiplome.intitule.trim()) return;
+
+    setSavingDiplome(true);
+    try {
+      const res = await fetch(`/api/donnees/intervenants/${editingIntervenant.id}/diplomes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newDiplome),
+      });
+
+      if (res.ok) {
+        const diplome = await res.json();
+        setDiplomes([...diplomes, diplome]);
+        setNewDiplome({
+          intitule: "",
+          organisme: "",
+          anneeObtention: "",
+          niveau: "",
+          fichierUrl: "",
+        });
+        setAddingDiplome(false);
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de l'ajout du diplôme");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      alert("Erreur lors de l'ajout du diplôme");
+    } finally {
+      setSavingDiplome(false);
+    }
+  };
+
+  const handleDeleteDiplome = async (diplomeId: string) => {
+    if (!editingIntervenant) return;
+    if (!confirm("Supprimer ce diplôme ?")) return;
+
+    setDeletingDiplome(diplomeId);
+    try {
+      const res = await fetch(`/api/donnees/intervenants/${editingIntervenant.id}/diplomes/${diplomeId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setDiplomes(diplomes.filter(d => d.id !== diplomeId));
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la suppression");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      alert("Erreur lors de la suppression");
+    } finally {
+      setDeletingDiplome(null);
+    }
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     resetForm();
+  };
+
+  // Upload de fichier (photo ou CV)
+  const handleFileUpload = async (file: File, type: "photo" | "cv") => {
+    if (!editingIntervenant) return;
+
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    if (type === "photo") {
+      setUploadingPhoto(true);
+    } else {
+      setUploadingCv(true);
+    }
+
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+      uploadFormData.append("type", type);
+
+      const res = await fetch(`/api/donnees/intervenants/${editingIntervenant.id}/upload`, {
+        method: "POST",
+        body: uploadFormData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors de l'upload");
+      }
+
+      // Mettre à jour l'état local
+      if (type === "photo") {
+        setFormData(prev => ({ ...prev, photoUrl: data.url }));
+        setEditingIntervenant({ ...editingIntervenant, photoUrl: data.url });
+      } else {
+        setFormData(prev => ({ ...prev, cv: data.url }));
+        setEditingIntervenant({ ...editingIntervenant, cv: data.url });
+      }
+
+      setUploadSuccess(type === "photo" ? "Photo uploadée avec succès" : "CV uploadé avec succès");
+      setTimeout(() => setUploadSuccess(null), 3000);
+
+      // Rafraîchir la liste
+      fetchIntervenants();
+    } catch (error) {
+      console.error("Erreur upload:", error);
+      setUploadError(error instanceof Error ? error.message : "Erreur lors de l'upload");
+      setTimeout(() => setUploadError(null), 5000);
+    } finally {
+      if (type === "photo") {
+        setUploadingPhoto(false);
+      } else {
+        setUploadingCv(false);
+      }
+    }
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (editingIntervenant) {
+        // Mode édition : upload immédiat
+        handleFileUpload(file, "photo");
+      } else {
+        // Mode création : stocker le fichier pour upload après création
+        setPendingPhotoFile(file);
+        // Créer un preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPhotoPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
+  const handleCvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (editingIntervenant) {
+        // Mode édition : upload immédiat
+        handleFileUpload(file, "cv");
+      } else {
+        // Mode création : stocker le fichier pour upload après création
+        setPendingCvFile(file);
+      }
+    }
+  };
+
+  // Upload fichier pour un intervenant existant ou nouvellement créé
+  const uploadFileForIntervenant = async (intervenantId: string, file: File, type: "photo" | "cv") => {
+    const uploadFormData = new FormData();
+    uploadFormData.append("file", file);
+    uploadFormData.append("type", type);
+
+    const res = await fetch(`/api/donnees/intervenants/${intervenantId}/upload`, {
+      method: "POST",
+      body: uploadFormData,
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || `Erreur lors de l'upload du ${type}`);
+    }
+
+    return await res.json();
   };
 
   const addSpecialite = () => {
@@ -128,6 +376,7 @@ export default function IntervenantsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setUploadError(null);
 
     try {
       const url = editingIntervenant
@@ -141,16 +390,34 @@ export default function IntervenantsPage() {
         body: JSON.stringify(formData),
       });
 
-      if (res.ok) {
-        closeModal();
-        fetchIntervenants();
-      } else {
+      if (!res.ok) {
         const error = await res.json();
-        alert(error.error || "Erreur lors de l'enregistrement");
+        throw new Error(error.error || "Erreur lors de l'enregistrement");
       }
+
+      const intervenant = await res.json();
+
+      // Si c'est une création et qu'il y a des fichiers en attente, les uploader
+      if (!editingIntervenant && (pendingPhotoFile || pendingCvFile)) {
+        try {
+          if (pendingPhotoFile) {
+            await uploadFileForIntervenant(intervenant.id, pendingPhotoFile, "photo");
+          }
+          if (pendingCvFile) {
+            await uploadFileForIntervenant(intervenant.id, pendingCvFile, "cv");
+          }
+        } catch (uploadErr) {
+          console.error("Erreur upload fichiers:", uploadErr);
+          // L'intervenant est créé, mais l'upload a échoué - on continue quand même
+          setUploadError(uploadErr instanceof Error ? uploadErr.message : "Erreur lors de l'upload des fichiers");
+        }
+      }
+
+      closeModal();
+      fetchIntervenants();
     } catch (error) {
       console.error("Erreur:", error);
-      alert("Erreur lors de l'enregistrement");
+      alert(error instanceof Error ? error.message : "Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
     }
@@ -247,7 +514,24 @@ export default function IntervenantsPage() {
               className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] hover:border-brand-200 dark:hover:border-brand-800 transition-colors"
             >
               <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {/* Photo de profil */}
+                  {intervenant.photoUrl ? (
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700 flex-shrink-0">
+                      <Image
+                        src={intervenant.photoUrl}
+                        alt={`${intervenant.prenom} ${intervenant.nom}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-brand-600 dark:text-brand-400 font-semibold text-lg">
+                        {intervenant.prenom.charAt(0)}{intervenant.nom.charAt(0)}
+                      </span>
+                    </div>
+                  )}
                   <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                     {intervenant.prenom} {intervenant.nom}
                   </h3>
@@ -464,6 +748,323 @@ export default function IntervenantsPage() {
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Qualiopi IND 17 - Profil enrichi */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Award className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Qualiopi IND 17 - Profil intervenant
+                  </h3>
+                </div>
+
+                {/* Messages de succès/erreur pour l'upload */}
+                {uploadSuccess && (
+                  <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 dark:bg-green-500/10 dark:border-green-500/30 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm text-green-700 dark:text-green-300">{uploadSuccess}</span>
+                  </div>
+                )}
+                {uploadError && (
+                  <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 dark:bg-red-500/10 dark:border-red-500/30 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    <span className="text-sm text-red-700 dark:text-red-300">{uploadError}</span>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  {/* Photo et CV - Upload */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Upload Photo */}
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <span className="flex items-center gap-1">
+                          <ImageIcon size={14} />
+                          Photo de profil
+                        </span>
+                      </label>
+                      <div className="space-y-2">
+                        {/* Preview de la photo */}
+                        {(editingIntervenant?.photoUrl || photoPreview) && (
+                          <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={editingIntervenant?.photoUrl || photoPreview || ""}
+                              alt="Photo intervenant"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        {/* Afficher le nom du fichier sélectionné en mode création */}
+                        {!editingIntervenant && pendingPhotoFile && (
+                          <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <CheckCircle2 size={12} />
+                            {pendingPhotoFile.name}
+                          </p>
+                        )}
+                        {/* Input fichier caché */}
+                        <input
+                          ref={photoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          onChange={handlePhotoChange}
+                          className="hidden"
+                        />
+                        {/* Bouton d'upload */}
+                        <button
+                          type="button"
+                          onClick={() => photoInputRef.current?.click()}
+                          disabled={uploadingPhoto}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50 dark:bg-gray-800 dark:text-amber-300 dark:border-amber-500/50 dark:hover:bg-amber-500/10"
+                        >
+                          {uploadingPhoto ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin" />
+                              Upload en cours...
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={16} />
+                              {editingIntervenant?.photoUrl || pendingPhotoFile ? "Changer la photo" : "Sélectionner une photo"}
+                            </>
+                          )}
+                        </button>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          JPG, PNG, WebP ou GIF (max 5 MB)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Upload CV */}
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <span className="flex items-center gap-1">
+                          <FileText size={14} />
+                          CV
+                        </span>
+                      </label>
+                      <div className="space-y-2">
+                        {/* Lien vers le CV existant (mode édition) */}
+                        {editingIntervenant?.cv && (
+                          <a
+                            href={editingIntervenant.cv}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                          >
+                            <FileText size={14} />
+                            Voir le CV actuel
+                          </a>
+                        )}
+                        {/* Afficher le nom du fichier sélectionné en mode création */}
+                        {!editingIntervenant && pendingCvFile && (
+                          <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <CheckCircle2 size={12} />
+                            {pendingCvFile.name}
+                          </p>
+                        )}
+                        {/* Input fichier caché */}
+                        <input
+                          ref={cvInputRef}
+                          type="file"
+                          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          onChange={handleCvChange}
+                          className="hidden"
+                        />
+                        {/* Bouton d'upload */}
+                        <button
+                          type="button"
+                          onClick={() => cvInputRef.current?.click()}
+                          disabled={uploadingCv}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50 dark:bg-gray-800 dark:text-amber-300 dark:border-amber-500/50 dark:hover:bg-amber-500/10"
+                        >
+                          {uploadingCv ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Upload en cours...
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={16} />
+                                {editingIntervenant?.cv || pendingCvFile ? "Changer le CV" : "Sélectionner un CV"}
+                              </>
+                            )}
+                          </button>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            PDF ou Word (max 10 MB)
+                          </p>
+                        </div>
+                    </div>
+                  </div>
+
+                  {/* Expérience et numéro déclaration */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        <span className="flex items-center gap-1">
+                          <Clock size={14} />
+                          Années d&apos;expérience
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.anneesExperience}
+                        onChange={(e) => setFormData({ ...formData, anneesExperience: e.target.value })}
+                        placeholder="5"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        N° déclaration d&apos;activité
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.numeroDeclarationActivite}
+                        onChange={(e) => setFormData({ ...formData, numeroDeclarationActivite: e.target.value })}
+                        placeholder="ex: 11756789012"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Biographie */}
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Biographie professionnelle
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formData.biographie}
+                      onChange={(e) => setFormData({ ...formData, biographie: e.target.value })}
+                      placeholder="Parcours professionnel, domaines d'expertise..."
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
+                    />
+                  </div>
+
+                  {/* Diplômes - uniquement en mode édition */}
+                  {editingIntervenant && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                          <GraduationCap size={14} />
+                          Diplômes et certifications
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setAddingDiplome(true)}
+                          className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400 flex items-center gap-1"
+                        >
+                          <Plus size={14} />
+                          Ajouter
+                        </button>
+                      </div>
+
+                      {/* Liste des diplômes existants */}
+                      {diplomes.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          {diplomes.map((diplome) => (
+                            <div
+                              key={diplome.id}
+                              className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                  {diplome.intitule}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {diplome.organisme && `${diplome.organisme} • `}
+                                  {diplome.anneeObtention && `${diplome.anneeObtention} • `}
+                                  {diplome.niveau}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDiplome(diplome.id)}
+                                disabled={deletingDiplome === diplome.id}
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors dark:hover:bg-red-500/10"
+                              >
+                                {deletingDiplome === diplome.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={14} />
+                                )}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Formulaire ajout diplôme */}
+                      {addingDiplome && (
+                        <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-300 dark:border-amber-500/30 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input
+                              type="text"
+                              value={newDiplome.intitule}
+                              onChange={(e) => setNewDiplome({ ...newDiplome, intitule: e.target.value })}
+                              placeholder="Intitulé du diplôme *"
+                              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            />
+                            <input
+                              type="text"
+                              value={newDiplome.organisme}
+                              onChange={(e) => setNewDiplome({ ...newDiplome, organisme: e.target.value })}
+                              placeholder="Organisme délivrant"
+                              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            />
+                            <input
+                              type="number"
+                              value={newDiplome.anneeObtention}
+                              onChange={(e) => setNewDiplome({ ...newDiplome, anneeObtention: e.target.value })}
+                              placeholder="Année d'obtention"
+                              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            />
+                            <select
+                              value={newDiplome.niveau}
+                              onChange={(e) => setNewDiplome({ ...newDiplome, niveau: e.target.value })}
+                              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            >
+                              <option value="">Niveau</option>
+                              <option value="Bac">Bac</option>
+                              <option value="Bac+2">Bac+2</option>
+                              <option value="Bac+3">Bac+3</option>
+                              <option value="Bac+5">Bac+5</option>
+                              <option value="Bac+8">Bac+8</option>
+                              <option value="Certification">Certification</option>
+                            </select>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAddingDiplome(false)}
+                              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400"
+                            >
+                              Annuler
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAddDiplome}
+                              disabled={savingDiplome || !newDiplome.intitule.trim()}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50"
+                            >
+                              {savingDiplome && <Loader2 size={14} className="animate-spin" />}
+                              Ajouter
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {diplomes.length === 0 && !addingDiplome && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                          Aucun diplôme enregistré
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

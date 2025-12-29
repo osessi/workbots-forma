@@ -242,6 +242,44 @@ export async function GET(request: NextRequest) {
 
     console.log("[API /api/apprenant/auth GET] Apprenant trouvé:", apprenant.email, "- Inscriptions:", apprenant.lmsInscriptions.length);
 
+    // Qualiopi IND 3 - Récupérer les certifications de l'apprenant
+    const certifications = await prisma.sessionParticipantNew.findMany({
+      where: {
+        apprenantId: apprenant.id,
+        certificationObtenue: true,
+      },
+      include: {
+        client: {
+          include: {
+            session: {
+              include: {
+                formation: {
+                  select: {
+                    id: true,
+                    titre: true,
+                    numeroFicheRS: true,
+                    lienFranceCompetences: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Formater les certifications pour l'apprenant
+    const formattedCertifications = certifications.map((cert) => ({
+      id: cert.id,
+      formationId: cert.client.session.formation.id,
+      formationTitre: cert.client.session.formation.titre,
+      numeroFicheRS: cert.client.session.formation.numeroFicheRS,
+      lienFranceCompetences: cert.client.session.formation.lienFranceCompetences,
+      sessionReference: cert.client.session.reference,
+      dateCertification: cert.dateCertification?.toISOString() || null,
+      numeroCertificat: cert.numeroCertificat,
+    }));
+
     return NextResponse.json({
       apprenant: {
         id: apprenant.id,
@@ -274,6 +312,8 @@ export async function GET(request: NextRequest) {
         progressionModules: insc.progressionModules,
       })),
       scormTrackings: apprenant.scormTrackings,
+      // Qualiopi IND 3 - Certifications obtenues
+      certifications: formattedCertifications,
     });
   } catch (error) {
     console.error("[API /api/apprenant/auth GET] Erreur validation token:", error);

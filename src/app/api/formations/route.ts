@@ -76,6 +76,12 @@ export async function POST(request: NextRequest) {
     const validModes = ["AI", "MANUAL", "IMPORT"];
     const mode = validModes.includes(creationMode) ? creationMode : "AI";
 
+    // Extraire les champs de certification depuis contexteData
+    const isCertifiante = contexteData?.isCertifiante || false;
+    const numeroFicheRS = contexteData?.numeroFicheRS || null;
+    const referentielRSUrl = contexteData?.referentielRSUrl || null;
+    const lienFranceCompetences = contexteData?.lienFranceCompetences || null;
+
     // Créer la formation avec ses modules dans une transaction
     const formation = await prisma.$transaction(async (tx) => {
       // 1. Créer la formation
@@ -88,6 +94,11 @@ export async function POST(request: NextRequest) {
           creationMode: mode,
           userId: user.id,
           organizationId: user.organizationId!,
+          // Qualiopi IND 3 - Formation certifiante
+          isCertifiante: Boolean(isCertifiante),
+          numeroFicheRS,
+          referentielRSUrl,
+          lienFranceCompetences,
           modules: modules && modules.length > 0 ? {
             create: modules.map((m: { titre: string; ordre: number; contenu?: object; duree?: number }) => ({
               titre: m.titre,

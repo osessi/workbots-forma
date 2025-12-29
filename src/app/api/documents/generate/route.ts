@@ -150,14 +150,30 @@ export async function POST(request: NextRequest) {
         },
         participants_max: fichePedagogique.participantsMax as number || 12,
       },
-      modules: formation.modules.map((m, index) => ({
-        numero: index + 1,
-        titre: m.titre,
-        duree: m.duree ? `${Math.floor(m.duree / 60)}h${m.duree % 60 > 0 ? (m.duree % 60).toString().padStart(2, '0') : ''}` : "",
-        duree_heures: m.duree || 0,
-        objectifs: (m.contenu as Record<string, unknown>)?.objectifs as string[] || [],
-        contenu: (m.contenu as Record<string, unknown>)?.contenu as string[] || [],
-      })),
+      // Filtrer les modules normaux (exclure Module 0)
+      modules: formation.modules
+        .filter((m) => !m.isModuleZero)
+        .map((m, index) => ({
+          numero: index + 1,
+          titre: m.titre,
+          duree: m.duree ? `${Math.floor(m.duree / 60)}h${m.duree % 60 > 0 ? (m.duree % 60).toString().padStart(2, '0') : ''}` : "",
+          duree_heures: m.duree || 0,
+          objectifs: (m.contenu as Record<string, unknown>)?.objectifs as string[] || [],
+          contenu: (m.contenu as Record<string, unknown>)?.contenu as string[] || [],
+        })),
+      // Module 0 de mise à niveau (Qualiopi IND 10) - non comptabilisé dans la durée
+      module_zero: (() => {
+        const moduleZero = formation.modules.find((m) => m.isModuleZero);
+        if (!moduleZero) return null;
+        return {
+          titre: moduleZero.titre,
+          description: moduleZero.description || "",
+          duree: moduleZero.duree ? `${Math.floor(moduleZero.duree / 60)}h${moduleZero.duree % 60 > 0 ? (moduleZero.duree % 60).toString().padStart(2, '0') : ''}` : "",
+          objectifs: (moduleZero.contenu as Record<string, unknown>)?.prerequisCibles as string[] || [],
+          contenu: (moduleZero.contenu as Record<string, unknown>)?.contenu as Array<{section: string; points: string[]}> || [],
+          note: "Ce module de mise à niveau est proposé aux apprenants dont le score de positionnement est insuffisant. Sa durée n'est pas comptabilisée dans la durée totale de la formation.",
+        };
+      })(),
       organisation: {
         nom: formation.organization.name,
         siret: formation.organization.siret || "",

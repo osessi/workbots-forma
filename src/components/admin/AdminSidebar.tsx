@@ -107,6 +107,14 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
+// Veille Icon
+const VeilleIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16.6667 2.5H3.33333C2.41286 2.5 1.66667 3.24619 1.66667 4.16667V15.8333C1.66667 16.7538 2.41286 17.5 3.33333 17.5H16.6667C17.5871 17.5 18.3333 16.7538 18.3333 15.8333V4.16667C18.3333 3.24619 17.5871 2.5 16.6667 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M5 6.66667H10M5 10H15M5 13.3333H12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 // Main navigation items
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/admin", icon: <DashboardIcon /> },
@@ -115,6 +123,7 @@ const navItems: NavItem[] = [
   { id: "templates", label: "Templates", href: "/admin/templates", icon: <TemplateIcon /> },
   { id: "email-templates", label: "Templates Email", href: "/admin/email-templates", icon: <EmailTemplateIcon /> },
   { id: "integrations", label: "Integrations", href: "/admin/integrations", icon: <IntegrationsIcon /> },
+  { id: "veille", label: "Sources Veille", href: "/admin/veille", icon: <VeilleIcon /> },
   { id: "ai-prompts", label: "Prompts IA", href: "/admin/ai-prompts", icon: <AIIcon /> },
   { id: "api-keys", label: "Cles API", href: "/admin/api-keys", icon: <KeyIcon /> },
   { id: "settings", label: "Configuration", href: "/admin/settings", icon: <SettingsIcon /> },

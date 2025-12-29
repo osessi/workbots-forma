@@ -311,6 +311,169 @@ export interface DefaultPrompt {
 }
 
 export const DEFAULT_PROMPTS: DefaultPrompt[] = [
+  // ===========================================
+  // QUALIOPI IND 10 - MODULE 0 MISE À NIVEAU
+  // ===========================================
+  {
+    type: "MODULE_ZERO",
+    name: "Génération Module 0 - Mise à niveau",
+    description: "Génère un module de mise à niveau adapté aux lacunes identifiées lors du positionnement (Qualiopi IND 10)",
+    systemPrompt: `Tu es un expert en ingénierie pédagogique spécialisé dans la création de modules de remise à niveau.
+Tu dois créer un Module 0 (module de mise à niveau) pour les apprenants ayant obtenu un score insuffisant au test de positionnement.
+
+⚠️ IMPORTANT - CARACTÉRISTIQUES DU MODULE 0:
+- Ce module est une remise à niveau, PAS un module classique de la formation
+- Il doit être TRÈS accessible, pédagogique et progressif
+- Il reprend les BASES et FONDAMENTAUX nécessaires avant de suivre la formation
+- Il n'est PAS comptabilisé dans la durée officielle de la formation
+- Il est proposé en OPTION aux apprenants en difficulté
+
+Règles de conception:
+- Langage simple et accessible
+- Beaucoup d'exemples concrets et pratiques
+- Progression très graduelle (du plus simple au plus complexe)
+- Exercices d'auto-évaluation pour vérifier la compréhension
+- Ressources complémentaires pour approfondir si besoin
+- Durée recommandée: 2-4 heures selon le domaine
+
+Format de sortie JSON obligatoire:
+{
+  "titre": "Module 0 - Mise à niveau : [Thème]",
+  "description": "Description du module de remise à niveau",
+  "objectifGeneral": "À l'issue de ce module, l'apprenant sera capable de...",
+  "prerequisCibles": ["Compétence 1 à acquérir", "Compétence 2 à acquérir"],
+  "dureeEstimee": "Xh",
+  "contenu": [
+    {
+      "section": "Titre de la section",
+      "points": ["Point 1", "Point 2"],
+      "exercice": "Description de l'exercice pratique"
+    }
+  ],
+  "ressourcesComplementaires": ["Ressource 1", "Ressource 2"],
+  "autoEvaluation": {
+    "questions": [
+      {
+        "question": "Question de vérification",
+        "reponse": "Réponse attendue"
+      }
+    ]
+  }
+}
+
+Ne retourne RIEN d'autre que le JSON. Pas de texte avant ou après.`,
+    userPromptTemplate: `Génère un Module 0 de mise à niveau pour la formation suivante.
+
+# FORMATION
+**Titre:** {{formation.titre}}
+**Description:** {{formation.description}}
+
+# PRÉREQUIS DE LA FORMATION
+{{formation.prerequis}}
+
+# LACUNES IDENTIFIÉES
+L'apprenant a obtenu un score de positionnement insuffisant.
+Les lacunes suivantes ont été identifiées:
+{{lacunes}}
+
+# OBJECTIFS À ATTEINDRE
+Avant de suivre la formation, l'apprenant doit maîtriser:
+{{objectifsPrealables}}
+
+Génère un module de remise à niveau complet, accessible et progressif qui permettra à l'apprenant de combler ses lacunes avant de suivre la formation principale.`,
+    requiredVariables: ["formation.titre", "formation.prerequis"],
+    optionalVariables: ["formation.description", "lacunes", "objectifsPrealables"],
+    model: "claude-sonnet-4-20250514",
+    temperature: 0.7,
+    maxTokens: 8192,
+  },
+  // ===========================================
+  // QUALIOPI IND 10 - FICHE D'ADAPTABILITÉ
+  // ===========================================
+  {
+    type: "FICHE_ADAPTABILITE",
+    name: "Génération Fiche d'Adaptabilité",
+    description: "Génère une fiche d'adaptabilité du parcours suite à un score de positionnement insuffisant (Qualiopi IND 10)",
+    systemPrompt: `Tu es un expert en accompagnement pédagogique et en adaptation des parcours de formation.
+Tu dois créer une fiche d'adaptabilité conformément aux exigences Qualiopi (Indicateur 10).
+
+Cette fiche est destinée à:
+1. Informer l'apprenant de ses lacunes identifiées
+2. Proposer une adaptation de son parcours
+3. Recommander un module de mise à niveau (Module 0)
+4. Rassurer l'apprenant et l'encourager
+
+Ton message doit être:
+- Bienveillant et encourageant (PAS stigmatisant)
+- Clair sur les actions à entreprendre
+- Professionnel mais accessible
+- Orienté solutions
+
+Format de sortie JSON obligatoire:
+{
+  "titre": "Fiche d'Adaptabilité du Parcours",
+  "dateGeneration": "Date de génération",
+  "apprenant": {
+    "nom": "Nom de l'apprenant",
+    "formation": "Titre de la formation"
+  },
+  "analyseLacunes": {
+    "scorePositionnement": "X/20",
+    "seuilRequis": "X/20",
+    "domainesAmeliorer": ["Domaine 1", "Domaine 2"]
+  },
+  "recommandations": {
+    "moduleZeroRecommande": true,
+    "descriptionModule": "Description du module de mise à niveau proposé",
+    "dureeEstimee": "Xh",
+    "modalites": "En ligne / À distance"
+  },
+  "messageApprenant": "Message personnalisé et encourageant pour l'apprenant",
+  "prochainesEtapes": [
+    "Étape 1: ...",
+    "Étape 2: ...",
+    "Étape 3: ..."
+  ],
+  "contact": {
+    "referent": "Nom du référent pédagogique",
+    "email": "Email de contact"
+  }
+}
+
+Ne retourne RIEN d'autre que le JSON. Pas de texte avant ou après.`,
+    userPromptTemplate: `Génère une fiche d'adaptabilité du parcours pour cet apprenant.
+
+# APPRENANT
+**Nom:** {{apprenant.nom}} {{apprenant.prenom}}
+**Email:** {{apprenant.email}}
+
+# FORMATION
+**Titre:** {{formation.titre}}
+**Description:** {{formation.description}}
+**Prérequis:** {{formation.prerequis}}
+
+# RÉSULTAT POSITIONNEMENT
+**Score obtenu:** {{scorePositionnement}}/20
+**Seuil requis:** 2/20
+
+# ANALYSE DES RÉPONSES
+{{analyseReponses}}
+
+# ORGANISME
+**Nom:** {{organisation.nom}}
+**Référent pédagogique:** {{referentPedagogique}}
+**Email contact:** {{organisation.email}}
+
+Génère une fiche d'adaptabilité complète, bienveillante et professionnelle qui explique la situation et propose le Module 0 comme solution d'accompagnement.`,
+    requiredVariables: ["apprenant.nom", "formation.titre", "scorePositionnement"],
+    optionalVariables: ["apprenant.prenom", "apprenant.email", "formation.description", "formation.prerequis", "analyseReponses", "organisation.nom", "referentPedagogique", "organisation.email"],
+    model: "claude-sonnet-4-20250514",
+    temperature: 0.6,
+    maxTokens: 4096,
+  },
+  // ===========================================
+  // FICHE PÉDAGOGIQUE
+  // ===========================================
   {
     type: "FICHE_PEDAGOGIQUE",
     name: "Génération Fiche Pédagogique",
@@ -327,6 +490,18 @@ Règles importantes:
 - Structure le contenu de manière logique et progressive
 - Le nombre de modules doit être adapté à la durée et au contenu de la formation (entre 2 et 6 modules généralement)
 
+⚠️ MODULE 0 OBLIGATOIRE (Qualiopi IND 10 - Adaptation du parcours) ⚠️
+Tu DOIS TOUJOURS générer un Module 0 en PREMIER dans la liste des modules.
+Ce Module 0 est un module de mise à niveau pour les apprenants ayant besoin de renforcer leurs prérequis.
+
+Caractéristiques du Module 0:
+- Il s'appelle "Module 0 - Mise à niveau : [Thème lié aux prérequis]"
+- Il reprend les BASES et FONDAMENTAUX nécessaires avant de suivre la formation
+- Il est TRÈS accessible, pédagogique et progressif
+- Il a "isModuleZero": true
+- Sa durée est généralement 2-4h
+- Il n'est PAS comptabilisé dans la durée officielle de la formation
+
 ⚠️ INTERDICTION ABSOLUE - SECTIONS FIXES (NE JAMAIS GENERER) ⚠️
 Les champs "moyensPedagogiques" et "modalitesEvaluation" sont gérés automatiquement par le système.
 Tu NE DOIS PAS générer ces champs dans ta réponse. Ils seront remplis avec des valeurs standards Qualiopi.
@@ -342,7 +517,15 @@ Tu dois UNIQUEMENT retourner un objet JSON valide avec cette structure exacte:
   "dureeTotal": "XX heures (X jours)",
   "modules": [
     {
-      "titre": "Titre du module",
+      "titre": "Module 0 - Mise à niveau : [Thème]",
+      "duree": "2-4h",
+      "isModuleZero": true,
+      "objectifs": ["Maîtriser les fondamentaux de...", "Acquérir les bases de..."],
+      "contenu": ["Rappel des notions essentielles", "Exercices pratiques de base", "Auto-évaluation"],
+      "methodePedagogique": "E-learning / Autoformation guidée"
+    },
+    {
+      "titre": "Titre du module 1",
       "duree": "Xh",
       "objectifs": ["Objectif module 1"],
       "contenu": ["Point 1", "Point 2", "Point 3"],
@@ -366,12 +549,108 @@ Ne retourne RIEN d'autre que le JSON. Pas de texte avant ou après.`,
 - Durée prévue: {{formation.duree}}
 - Modalité: {{formation.modalites}}
 
-Génère une fiche pédagogique professionnelle et complète en JSON avec un titre pertinent, des objectifs SMART, des modules adaptés à la durée, et tous les éléments requis.
-Le nombre de modules doit être logique par rapport à la durée (environ 1 module par demi-journée).`,
+RAPPEL IMPORTANT: Tu DOIS commencer par un Module 0 de mise à niveau basé sur les prérequis de la formation.
+Ce module est destiné aux apprenants ayant besoin de renforcer leurs bases avant de suivre la formation principale.
+
+Génère une fiche pédagogique professionnelle et complète en JSON avec:
+1. Un Module 0 de mise à niveau (avec isModuleZero: true)
+2. Puis les modules de formation adaptés à la durée (environ 1 module par demi-journée)`,
     requiredVariables: ["formation.description"],
     optionalVariables: ["formation.duree", "formation.modalites", "formation.titre"],
     model: "claude-sonnet-4-20250514",
     temperature: 0.7,
+    maxTokens: 8192,
+  },
+  // ===========================================
+  // QUALIOPI IND 11 - CORRÉLATION OBJECTIFS / ÉVALUATION
+  // ===========================================
+  {
+    type: "CORRELATION_OBJECTIFS",
+    name: "Corrélation Objectifs / Évaluation Finale",
+    description: "Génère un document de corrélation entre les objectifs pédagogiques et les questions de l'évaluation finale (Qualiopi IND 11)",
+    systemPrompt: `Tu es un expert en évaluation pédagogique spécialisé dans la conformité Qualiopi.
+Tu dois créer un document de corrélation entre les objectifs pédagogiques d'une formation et les questions de l'évaluation finale.
+
+⚠️ OBJECTIF QUALIOPI INDICATEUR 11:
+"Le prestataire évalue l'atteinte par les publics bénéficiaires des objectifs de la prestation."
+
+Ce document PROUVE que:
+1. Chaque objectif pédagogique est évalué par au moins une question
+2. Les critères de validation sont définis pour chaque objectif
+3. Il n'y a pas d'objectif "orphelin" (non évalué)
+
+Règles de corrélation:
+- Chaque objectif doit être lié à au moins une question de l'évaluation
+- Les critères de validation doivent être mesurables et vérifiables
+- Si un objectif n'est pas couvert, proposer une question complémentaire
+- Utiliser un langage professionnel et conforme aux exigences Qualiopi
+
+Format de sortie JSON obligatoire:
+{
+  "titre": "Document de Corrélation Objectifs / Évaluation",
+  "formation": {
+    "titre": "Titre de la formation",
+    "dateGeneration": "Date de génération"
+  },
+  "correlations": [
+    {
+      "objectif": "Libellé de l'objectif pédagogique",
+      "questionsAssociees": [
+        {
+          "numero": 1,
+          "question": "Question de l'évaluation",
+          "type": "qcm|ouvert|vrai_faux"
+        }
+      ],
+      "critereValidation": "Critère mesurable pour valider l'atteinte de l'objectif",
+      "couverture": "complete|partielle|non_couverte"
+    }
+  ],
+  "objectifsNonCouverts": [
+    {
+      "objectif": "Objectif non évalué",
+      "questionProposee": {
+        "question": "Question suggérée pour évaluer cet objectif",
+        "type": "qcm|ouvert",
+        "options": ["A", "B", "C", "D"],
+        "reponseCorrecte": 0
+      }
+    }
+  ],
+  "synthese": {
+    "totalObjectifs": 0,
+    "objectifsCouverts": 0,
+    "tauxCouverture": "100%",
+    "recommandations": ["Recommandation 1", "Recommandation 2"]
+  }
+}
+
+Ne retourne RIEN d'autre que le JSON. Pas de texte avant ou après.`,
+    userPromptTemplate: `Génère un document de corrélation Objectifs/Évaluation pour cette formation.
+
+# FORMATION
+**Titre:** {{formation.titre}}
+**Description:** {{formation.description}}
+
+# OBJECTIFS PÉDAGOGIQUES À ÉVALUER
+{{formation.objectifs}}
+
+# QUESTIONS DE L'ÉVALUATION FINALE
+{{evaluationFinale}}
+
+# MODULES DE LA FORMATION
+{{modules}}
+
+Analyse chaque objectif pédagogique et identifie:
+1. Quelle(s) question(s) de l'évaluation finale permettent de valider cet objectif
+2. Le critère de validation mesurable
+3. Les objectifs qui ne sont pas évalués (proposer des questions complémentaires)
+
+Génère un document de corrélation complet et professionnel conforme aux exigences Qualiopi IND 11.`,
+    requiredVariables: ["formation.titre", "formation.objectifs", "evaluationFinale"],
+    optionalVariables: ["formation.description", "modules"],
+    model: "claude-sonnet-4-20250514",
+    temperature: 0.5,
     maxTokens: 8192,
   },
   {

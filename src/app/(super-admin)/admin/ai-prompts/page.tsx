@@ -42,6 +42,9 @@ const PROMPT_TYPE_LABELS: Record<AIPromptType, string> = {
   POSITIONNEMENT: "Test de Positionnement",
   EVALUATION_FINALE: "Evaluation Finale",
   REFORMULATION: "Reformulation",
+  MODULE_ZERO: "Module 0 - Mise a niveau",
+  FICHE_ADAPTABILITE: "Fiche d'Adaptabilite",
+  CORRELATION_OBJECTIFS: "Correlation Objectifs/Evaluation",
   CUSTOM: "Personnalise",
 };
 
@@ -62,6 +65,9 @@ const TYPE_COLORS: Record<string, string> = {
   POSITIONNEMENT: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
   EVALUATION_FINALE: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
   REFORMULATION: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
+  MODULE_ZERO: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  FICHE_ADAPTABILITE: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
+  CORRELATION_OBJECTIFS: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   CUSTOM: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
 };
 

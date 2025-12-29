@@ -31,9 +31,20 @@ export async function GET() {
         image: true,
         status: true,
         fichePedagogique: true,
+        // Qualiopi IND 3 - Certification
+        isCertifiante: true,
+        numeroFicheRS: true,
+        lienFranceCompetences: true,
         modules: {
           select: {
             duree: true,
+          },
+        },
+        indicateurs: {
+          select: {
+            tauxCertification: true,
+            tauxSatisfaction: true,
+            nombreAvis: true,
           },
         },
       },
@@ -71,6 +82,15 @@ export async function GET() {
         image: f.image,
         status: f.status,
         dureeHeures,
+        // Qualiopi IND 3 - Certification
+        isCertifiante: f.isCertifiante,
+        numeroFicheRS: f.numeroFicheRS,
+        lienFranceCompetences: f.lienFranceCompetences,
+        indicateurs: f.indicateurs ? {
+          tauxCertification: f.indicateurs.tauxCertification,
+          tauxSatisfaction: f.indicateurs.tauxSatisfaction,
+          nombreAvis: f.indicateurs.nombreAvis,
+        } : null,
       };
     });
 

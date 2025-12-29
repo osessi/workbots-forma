@@ -46,7 +46,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+      console.log("=== API Lieux POST - Body reçu ===");
+      console.log("Body:", JSON.stringify(body, null, 2));
+      console.log("User organizationId:", user.organizationId);
+    } catch (parseError) {
+      console.error("Erreur parsing JSON:", parseError);
+      return NextResponse.json({ error: "Format JSON invalide" }, { status: 400 });
+    }
+
     const {
       nom,
       typeLieu,
@@ -55,6 +65,19 @@ export async function POST(request: NextRequest) {
       ville,
       infosPratiques,
       capacite,
+      // Checklist conformité Qualiopi IND 17
+      checkSurfaceAdaptee,
+      checkErpConforme,
+      checkVentilation,
+      checkEclairage,
+      checkSanitaires,
+      checkAccessibiliteHandicap,
+      checkWifi,
+      checkVideoprojecteur,
+      checkMobilier,
+      checkEquipements,
+      checkFournitures,
+      notesConformite,
     } = body;
 
     if (!nom) {
@@ -65,15 +88,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "L'adresse ou le lien est requis" }, { status: 400 });
     }
 
+    // Convertir capacite en nombre ou null
+    let parsedCapacite: number | null = null;
+    if (typeLieu === "PRESENTIEL" && capacite !== undefined && capacite !== null && capacite !== "") {
+      const parsed = parseInt(String(capacite), 10);
+      if (!isNaN(parsed)) {
+        parsedCapacite = parsed;
+      }
+    }
+
     const lieu = await prisma.lieuFormation.create({
       data: {
         nom,
         typeLieu: typeLieu || "PRESENTIEL",
         lieuFormation,
-        codePostal: typeLieu === "PRESENTIEL" ? codePostal : null,
-        ville: typeLieu === "PRESENTIEL" ? ville : null,
-        infosPratiques,
-        capacite: typeLieu === "PRESENTIEL" && capacite ? parseInt(capacite) : null,
+        codePostal: typeLieu === "PRESENTIEL" ? (codePostal || null) : null,
+        ville: typeLieu === "PRESENTIEL" ? (ville || null) : null,
+        infosPratiques: infosPratiques || null,
+        capacite: parsedCapacite,
+        // Checklist conformité Qualiopi IND 17
+        checkSurfaceAdaptee: checkSurfaceAdaptee === true,
+        checkErpConforme: checkErpConforme === true,
+        checkVentilation: checkVentilation === true,
+        checkEclairage: checkEclairage === true,
+        checkSanitaires: checkSanitaires === true,
+        checkAccessibiliteHandicap: checkAccessibiliteHandicap === true,
+        checkWifi: checkWifi === true,
+        checkVideoprojecteur: checkVideoprojecteur === true,
+        checkMobilier: checkMobilier === true,
+        checkEquipements: checkEquipements === true,
+        checkFournitures: checkFournitures === true,
+        notesConformite: notesConformite || null,
         organizationId: user.organizationId,
       },
     });
@@ -81,8 +126,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(lieu, { status: 201 });
   } catch (error) {
     console.error("Erreur création lieu:", error);
+    // Log plus détaillé
+    if (error instanceof Error) {
+      console.error("Message:", error.message);
+      console.error("Stack:", error.stack);
+    }
     return NextResponse.json(
-      { error: "Erreur lors de la création du lieu" },
+      { error: "Erreur lors de la création du lieu", details: error instanceof Error ? error.message : "Unknown" },
       { status: 500 }
     );
   }

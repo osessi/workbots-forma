@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 
 // Types
 interface FormationData {
@@ -12,6 +12,11 @@ interface FormationData {
   tarifIndependant: string;
   tarifParticulier: string;
   description: string;
+  // Qualiopi IND 3 - Certification
+  isCertifiante: boolean;
+  numeroFicheRS: string;
+  referentielRSUrl: string;
+  lienFranceCompetences: string;
 }
 
 interface StepContexteProps {
@@ -53,6 +58,136 @@ const sessionOptions = [
   { value: "intra", label: "Intra-entreprise" },
   { value: "inter", label: "Inter-entreprises" },
 ];
+
+// Composant d'upload pour le référentiel RS (Qualiopi IND 3)
+function ReferentielRSUpload({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Le fichier est trop volumineux (max 10 MB)");
+      return;
+    }
+
+    if (file.type !== "application/pdf") {
+      setError("Seuls les fichiers PDF sont acceptés");
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "referentiel-rs");
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de l'upload");
+      }
+
+      onChange(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'upload");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [onChange]);
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        Référentiel RS (PDF)
+      </label>
+      <div className="space-y-2">
+        {value ? (
+          <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="flex-1 text-sm text-green-700 dark:text-green-300 truncate">
+              Référentiel uploadé
+            </span>
+            <a
+              href={value}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-green-600 dark:text-green-400 hover:underline"
+            >
+              Voir
+            </a>
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-red-500 hover:text-red-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <label className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors ${
+            isUploading
+              ? "border-brand-400 bg-brand-50 dark:bg-brand-900/10"
+              : "border-gray-300 dark:border-gray-600 cursor-pointer hover:border-brand-400 dark:hover:border-brand-500"
+          }`}>
+            {isUploading ? (
+              <>
+                <SpinnerIcon />
+                <span className="text-sm text-brand-600 dark:text-brand-400 mt-2">
+                  Upload en cours...
+                </span>
+              </>
+            ) : (
+              <>
+                <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Cliquer pour uploader le référentiel PDF
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  PDF uniquement, max 10 MB
+                </span>
+              </>
+            )}
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              className="hidden"
+              disabled={isUploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileUpload(file);
+              }}
+            />
+          </label>
+        )}
+        {error && (
+          <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        Uploadez le référentiel RS pour extraire automatiquement les compétences visées et les aligner avec vos objectifs pédagogiques.
+      </p>
+    </div>
+  );
+}
 
 export const StepContexte: React.FC<StepContexteProps> = ({
   data,
@@ -251,6 +386,75 @@ export const StepContexte: React.FC<StepContexteProps> = ({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Section Certification (Qualiopi IND 3) */}
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 mb-4">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={data.isCertifiante || false}
+                  onChange={(e) => handleChange("isCertifiante", e.target.checked as unknown as string)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 dark:peer-focus:ring-brand-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-500"></div>
+              </label>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Formation certifiante
+              </span>
+              <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full dark:bg-amber-900/30 dark:text-amber-400">
+                Qualiopi IND 3
+              </span>
+            </div>
+
+            {data.isCertifiante && (
+              <div className="space-y-4 pl-2 border-l-2 border-brand-200 dark:border-brand-800">
+                {/* Numéro fiche RS */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Numéro de fiche RS/RNCP
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: RS6563"
+                    value={data.numeroFicheRS || ""}
+                    onChange={(e) => handleChange("numeroFicheRS", e.target.value)}
+                    className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+                  />
+                </div>
+
+                {/* Lien France Compétences */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Lien de la fiche France Compétences
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://www.francecompetences.fr/recherche/rs/RS6563/"
+                    value={data.lienFranceCompetences || ""}
+                    onChange={(e) => handleChange("lienFranceCompetences", e.target.value)}
+                    className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <a
+                      href="https://www.francecompetences.fr/recherche-resultats/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-500 hover:underline"
+                    >
+                      Rechercher sur France Compétences
+                    </a>
+                  </p>
+                </div>
+
+                {/* Upload référentiel RS (PDF) */}
+                <ReferentielRSUpload
+                  value={data.referentielRSUrl || ""}
+                  onChange={(url) => handleChange("referentielRSUrl", url)}
+                />
+              </div>
+            )}
           </div>
         </div>
 

@@ -56,6 +56,18 @@ interface DashboardStats {
   prochainsCréneaux: number;
 }
 
+// Qualiopi IND 3 - Certification obtenue par l'apprenant
+interface Certification {
+  id: string;
+  formationId: string;
+  formationTitre: string;
+  numeroFicheRS: string | null;
+  lienFranceCompetences: string | null;
+  sessionReference: string;
+  dateCertification: string | null;
+  numeroCertificat: string | null;
+}
+
 interface ApprenantPortalContextType {
   // Auth
   token: string | null;
@@ -68,6 +80,7 @@ interface ApprenantPortalContextType {
   inscriptions: LMSInscription[];
   selectedInscription: LMSInscription | null;
   dashboardStats: DashboardStats | null;
+  certifications: Certification[]; // Qualiopi IND 3
 
   // Actions
   login: (token: string) => void;
@@ -100,6 +113,7 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
   const [inscriptions, setInscriptions] = useState<LMSInscription[]>([]);
   const [selectedInscriptionId, setSelectedInscriptionId] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [certifications, setCertifications] = useState<Certification[]>([]); // Qualiopi IND 3
 
   // Computed
   const isAuthenticated = !!token && !!apprenant;
@@ -132,6 +146,7 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
       setApprenant(data.apprenant);
       setOrganization(data.organization);
       setInscriptions(data.inscriptions || []);
+      setCertifications(data.certifications || []); // Qualiopi IND 3
 
       // Sélectionner la première inscription par défaut
       if (data.inscriptions?.length > 0 && !selectedInscriptionId) {
@@ -206,6 +221,7 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
     setInscriptions([]);
     setSelectedInscriptionId(null);
     setDashboardStats(null);
+    setCertifications([]); // Qualiopi IND 3
 
     localStorage.removeItem("apprenant_token");
     localStorage.removeItem("apprenant_selected_inscription");
@@ -240,6 +256,7 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
     inscriptions,
     selectedInscription,
     dashboardStats,
+    certifications, // Qualiopi IND 3
 
     // Actions
     login,

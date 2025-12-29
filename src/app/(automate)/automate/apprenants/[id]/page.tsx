@@ -34,6 +34,8 @@ import {
   XCircle,
   AlertCircle,
   ChevronRight,
+  MessageSquarePlus,
+  StickyNote,
 } from "lucide-react";
 
 // Types
@@ -119,6 +121,19 @@ interface EvaluationResultat {
     titre: string;
     type: string;
   };
+}
+
+// Qualiopi IND 5 - Type pour les notes avec historique
+interface ApprenantNote {
+  id: string;
+  content: string;
+  createdAt: string;
+  createdBy: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }
 
 interface Apprenant {
@@ -221,6 +236,13 @@ export default function ApprenantDetailPage() {
   const [activeTab, setActiveTab] = useState<"info" | "preinscriptions" | "sessions" | "evaluations">("info");
   const [selectedPreInscription, setSelectedPreInscription] = useState<PreInscription | null>(null);
 
+  // Qualiopi IND 5 - États pour les notes avec historique
+  const [notes, setNotes] = useState<ApprenantNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+
   const loadApprenant = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -249,6 +271,53 @@ export default function ApprenantDetailPage() {
   useEffect(() => {
     loadApprenant();
   }, [loadApprenant]);
+
+  // Qualiopi IND 5 - Charger l'historique des notes
+  const loadNotes = useCallback(async () => {
+    if (!apprenantId) return;
+    setNotesLoading(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/notes`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(data.notes || []);
+      }
+    } catch (error) {
+      console.error("Erreur chargement notes:", error);
+    } finally {
+      setNotesLoading(false);
+    }
+  }, [apprenantId]);
+
+  // Charger les notes au montage
+  useEffect(() => {
+    if (apprenantId) {
+      loadNotes();
+    }
+  }, [apprenantId, loadNotes]);
+
+  // Qualiopi IND 5 - Ajouter une nouvelle note
+  const handleAddNote = async () => {
+    if (!newNote.trim() || addingNote) return;
+    setAddingNote(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newNote.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotes((prev) => [data.note, ...prev]);
+        setNewNote("");
+        setShowNoteForm(false);
+      }
+    } catch (error) {
+      console.error("Erreur ajout note:", error);
+    } finally {
+      setAddingNote(false);
+    }
+  };
 
   // Auto-sélectionner la première pré-inscription
   useEffect(() => {
@@ -570,16 +639,129 @@ export default function ApprenantDetailPage() {
                     )}
                   </div>
 
-                  {apprenant.notes && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b dark:border-gray-700 pb-2 mb-4">
+                  {/* Qualiopi IND 5 - Section Notes Internes avec Historique */}
+                  <div>
+                    <div className="flex items-center justify-between border-b dark:border-gray-700 pb-2 mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <StickyNote className="w-5 h-5 text-amber-500" />
                         Notes internes
+                        {notes.length > 0 && (
+                          <span className="ml-2 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium rounded-full">
+                            {notes.length}
+                          </span>
+                        )}
                       </h3>
-                      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800/30">
-                        {apprenant.notes}
-                      </p>
+                      <button
+                        onClick={() => setShowNoteForm(!showNoteForm)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                      >
+                        <MessageSquarePlus className="w-4 h-4" />
+                        Ajouter
+                      </button>
                     </div>
-                  )}
+
+                    {/* Formulaire d'ajout de note */}
+                    <AnimatePresence>
+                      {showNoteForm && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mb-4 overflow-hidden"
+                        >
+                          <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl p-4">
+                            <textarea
+                              value={newNote}
+                              onChange={(e) => setNewNote(e.target.value)}
+                              placeholder="Saisissez votre note interne..."
+                              rows={3}
+                              className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                            />
+                            <div className="flex justify-end gap-2 mt-3">
+                              <button
+                                onClick={() => {
+                                  setShowNoteForm(false);
+                                  setNewNote("");
+                                }}
+                                className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                              >
+                                Annuler
+                              </button>
+                              <button
+                                onClick={handleAddNote}
+                                disabled={!newNote.trim() || addingNote}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg transition-colors"
+                              >
+                                {addingNote ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Send className="w-4 h-4" />
+                                )}
+                                Enregistrer
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Liste des notes */}
+                    {notesLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                      </div>
+                    ) : notes.length > 0 ? (
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                        {notes.map((note) => (
+                          <div
+                            key={note.id}
+                            className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800/30"
+                          >
+                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                              {note.content}
+                            </p>
+                            <div className="flex items-center gap-2 mt-3 pt-2 border-t border-yellow-200 dark:border-yellow-800/30 text-xs text-gray-500 dark:text-gray-400">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>
+                                {new Date(note.createdAt).toLocaleDateString("fr-FR", {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                              {note.createdBy && (
+                                <>
+                                  <span className="text-gray-300 dark:text-gray-600">•</span>
+                                  <span>
+                                    par {note.createdBy.firstName || note.createdBy.email.split("@")[0]}{" "}
+                                    {note.createdBy.lastName || ""}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-400 dark:text-gray-500">
+                        <StickyNote className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Aucune note pour cet apprenant</p>
+                        <p className="text-xs mt-1">Cliquez sur &quot;Ajouter&quot; pour créer une note</p>
+                      </div>
+                    )}
+
+                    {/* Note héritée (ancien champ) si elle existe */}
+                    {apprenant.notes && notes.length === 0 && (
+                      <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Note héritée (ancienne version)</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                          {apprenant.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="text-sm text-gray-500 dark:text-gray-400 pt-4 border-t dark:border-gray-700">
                     <p>Créé le {formatDate(apprenant.createdAt)}</p>

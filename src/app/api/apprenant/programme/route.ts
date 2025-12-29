@@ -66,11 +66,27 @@ export async function GET(request: NextRequest) {
             modules: {
               orderBy: { ordre: "asc" },
             },
+            // Récupérer les évaluations de positionnement pour savoir si Module 0 doit être affiché
+            evaluations: {
+              where: { type: "POSITIONNEMENT" },
+              include: {
+                resultats: {
+                  where: { apprenantId },
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                },
+              },
+            },
           },
         },
         progressionModules: true,
       },
     });
+
+    // Vérifier si l'apprenant a besoin du Module 0 (score positionnement < 10%)
+    const SEUIL_ADAPTATION = 10;
+    const positionnementResultat = inscription?.formation?.evaluations?.[0]?.resultats?.[0];
+    const needsModuleZero = positionnementResultat && positionnementResultat.score !== null && positionnementResultat.score < SEUIL_ADAPTATION;
 
     if (!inscription) {
       return NextResponse.json({
@@ -84,8 +100,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Filtrer les modules selon les besoins de l'apprenant
+    // Module 0 (isModuleZero: true) n'est affiché QUE si le score de positionnement < 10%
+    const modulesFilters = inscription.formation.modules.filter((module) => {
+      // Si c'est un Module 0, ne l'afficher que si l'apprenant en a besoin
+      if (module.isModuleZero) {
+        return needsModuleZero;
+      }
+      // Sinon, afficher tous les modules normaux
+      return true;
+    });
+
     // Calculer la progression par module
-    const modulesAvecProgression = inscription.formation.modules.map((module) => {
+    const modulesAvecProgression = modulesFilters.map((module) => {
       const progression = inscription.progressionModules.find(
         (p) => p.moduleId === module.id
       );
@@ -99,24 +126,29 @@ export async function GET(request: NextRequest) {
         contenu: module.contenu,
         progression: progression?.progression || 0,
         statut: progression?.statut || "NON_COMMENCE",
+        isModuleZero: module.isModuleZero || false,
       };
     });
 
-    // Calculer la progression globale
-    const modulesTermines = modulesAvecProgression.filter(
+    // Calculer la progression globale (exclure Module 0 du calcul de progression)
+    const modulesStandard = modulesAvecProgression.filter((m) => !m.isModuleZero);
+    const modulesTermines = modulesStandard.filter(
       (m) => m.statut === "COMPLETE"
     ).length;
-    const totalModules = modulesAvecProgression.length;
+    const totalModules = modulesStandard.length;
     const progressionGlobale = totalModules > 0
       ? Math.round((modulesTermines / totalModules) * 100)
       : 0;
+
+    // Calculer la durée totale (exclure Module 0)
+    const dureeHeures = modulesStandard.reduce((sum, m) => sum + ((m.duree || 0) / 60), 0);
 
     return NextResponse.json({
       formation: {
         id: inscription.formation.id,
         titre: inscription.formation.titre,
         description: inscription.formation.description,
-        dureeHeures: inscription.formation.modules.reduce((sum, m) => sum + ((m.duree || 0) / 60), 0),
+        dureeHeures,
         objectifsPedagogiques: [],
         modalite: null,
         publicCible: null,

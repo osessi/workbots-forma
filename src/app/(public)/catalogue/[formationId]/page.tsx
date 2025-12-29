@@ -477,6 +477,37 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                     </div>
                   </div>
 
+                  {/* Qualiopi IND 3 - Taux de certification (pour formations certifiantes) */}
+                  {formation.certification?.isCertifiante && (
+                    <div className="mb-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                      <p className="text-sm font-medium text-amber-800 text-center mb-3">
+                        Taux de certification
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-3 bg-amber-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all bg-amber-500"
+                            style={{
+                              width: `${formation.indicateurs?.tauxCertification
+                                ? Math.min(formation.indicateurs.tauxCertification, 100)
+                                : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="text-lg font-bold text-amber-700 whitespace-nowrap">
+                          {formation.indicateurs?.tauxCertification
+                            ? `${formation.indicateurs.tauxCertification.toFixed(0)}%`
+                            : "N/A"}
+                        </span>
+                      </div>
+                      {formation.certification.numeroFicheRS && (
+                        <p className="text-xs text-amber-600 text-center mt-2">
+                          Fiche RS: {formation.certification.numeroFicheRS}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Détails avec badges colorés */}
                   <div className="space-y-4 py-4 border-t border-b">
                     {/* Type de formation - Badge coloré */}

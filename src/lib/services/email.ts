@@ -1695,3 +1695,700 @@ ${data.organizationName} - Espace Intervenant
 
   return { subject, html, text };
 }
+
+// ===========================================
+// EMAIL RAPPEL J-7 AVANT FORMATION - QUALIOPI IND 5
+// ===========================================
+// Envoyé 7 jours avant le début de la formation
+// Avec liens vers documents importants
+
+interface RappelJ7EmailData {
+  prenom: string;
+  nom: string;
+  formationTitre: string;
+  dateDebut: string; // Format lisible "lundi 5 janvier 2025"
+  heureDebut: string; // Ex: "09:00"
+  lieu: string | null; // Lieu ou "À distance"
+  formateur: string | null;
+  organizationName: string;
+  organizationLogo?: string | null;
+  organizationEmail?: string | null;
+  organizationTelephone?: string | null;
+  primaryColor?: string;
+  espaceApprenantUrl: string;
+  // Documents disponibles
+  hasConvocation?: boolean;
+  hasProgramme?: boolean;
+  hasReglement?: boolean;
+  hasCGV?: boolean;
+}
+
+export function generateRappelJ7Email(data: RappelJ7EmailData) {
+  const color = data.primaryColor || "#4277FF";
+
+  const subject = `📅 Rappel : Votre formation "${data.formationTitre}" débute dans 7 jours`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rappel formation J-7</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+          <!-- Header avec logo -->
+          <tr>
+            <td style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%); padding: 35px 40px; text-align: center;">
+              ${data.organizationLogo
+                ? `<img src="${data.organizationLogo}" alt="${data.organizationName}" style="max-height: 60px; max-width: 200px;">`
+                : `<h1 style="color: white; margin: 0; font-size: 24px;">${data.organizationName}</h1>`
+              }
+            </td>
+          </tr>
+
+          <!-- Badge J-7 -->
+          <tr>
+            <td style="padding: 40px 40px 25px; text-align: center;">
+              <div style="width: 90px; height: 90px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 50%; margin: 0 auto 20px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);">
+                <span style="font-size: 42px;">📅</span>
+              </div>
+              <h2 style="color: #b45309; margin: 0 0 10px; font-size: 28px; font-weight: 600;">
+                J-7 avant votre formation
+              </h2>
+              <p style="color: #6c757d; margin: 0; font-size: 16px;">
+                Préparez-vous pour le jour J !
+              </p>
+            </td>
+          </tr>
+
+          <!-- Message principal -->
+          <tr>
+            <td style="padding: 0 40px 30px;">
+              <p style="margin: 0 0 20px; color: #495057; font-size: 16px; line-height: 1.7;">
+                Bonjour <strong>${data.prenom}</strong>,
+              </p>
+              <p style="margin: 0 0 20px; color: #495057; font-size: 16px; line-height: 1.7;">
+                Votre formation <strong style="color: ${color};">"${data.formationTitre}"</strong> débute dans 7 jours.
+              </p>
+
+              <!-- Informations de la session -->
+              <div style="background-color: #f8f9fa; border-radius: 12px; padding: 25px; margin-bottom: 25px; border-left: 4px solid ${color};">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="width: 35px; vertical-align: top;">
+                            <span style="font-size: 18px;">📆</span>
+                          </td>
+                          <td>
+                            <p style="margin: 0 0 3px; color: #6c757d; font-size: 12px; text-transform: uppercase;">Date</p>
+                            <p style="margin: 0; color: #1a1a2e; font-size: 15px; font-weight: 500;">
+                              ${data.dateDebut} à ${data.heureDebut}
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="width: 35px; vertical-align: top;">
+                            <span style="font-size: 18px;">📍</span>
+                          </td>
+                          <td>
+                            <p style="margin: 0 0 3px; color: #6c757d; font-size: 12px; text-transform: uppercase;">Lieu</p>
+                            <p style="margin: 0; color: #1a1a2e; font-size: 15px; font-weight: 500;">
+                              ${data.lieu || "À distance"}
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  ${data.formateur ? `
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="width: 35px; vertical-align: top;">
+                            <span style="font-size: 18px;">👨‍🏫</span>
+                          </td>
+                          <td>
+                            <p style="margin: 0 0 3px; color: #6c757d; font-size: 12px; text-transform: uppercase;">Formateur</p>
+                            <p style="margin: 0; color: #1a1a2e; font-size: 15px; font-weight: 500;">
+                              ${data.formateur}
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  ` : ""}
+                </table>
+              </div>
+
+              <!-- Checklist de préparation -->
+              <div style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                <h3 style="margin: 0 0 15px; color: #0369a1; font-size: 16px; font-weight: 600;">
+                  ✅ Nous vous invitons à :
+                </h3>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  ${data.hasProgramme ? `
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="width: 30px; vertical-align: top;">
+                            <span style="font-size: 16px;">📚</span>
+                          </td>
+                          <td style="color: #0c4a6e; font-size: 14px; line-height: 1.5;">
+                            <strong>Consulter le programme</strong> de formation
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  ` : ""}
+                  ${data.hasReglement ? `
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="width: 30px; vertical-align: top;">
+                            <span style="font-size: 16px;">📋</span>
+                          </td>
+                          <td style="color: #0c4a6e; font-size: 14px; line-height: 1.5;">
+                            <strong>Lire le règlement intérieur</strong>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  ` : ""}
+                  ${data.hasCGV ? `
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="width: 30px; vertical-align: top;">
+                            <span style="font-size: 16px;">📄</span>
+                          </td>
+                          <td style="color: #0c4a6e; font-size: 14px; line-height: 1.5;">
+                            <strong>Prendre connaissance des CGV</strong>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  ` : ""}
+                  ${data.hasConvocation ? `
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <table cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="width: 30px; vertical-align: top;">
+                            <span style="font-size: 16px;">📨</span>
+                          </td>
+                          <td style="color: #0c4a6e; font-size: 14px; line-height: 1.5;">
+                            <strong>Télécharger votre convocation</strong>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  ` : ""}
+                </table>
+                <p style="margin: 15px 0 0; color: #0c4a6e; font-size: 13px;">
+                  Tous ces documents sont disponibles sur votre espace apprenant.
+                </p>
+              </div>
+
+              <!-- Bouton CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="${data.espaceApprenantUrl}" style="display: inline-block; background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 15px ${color}40;">
+                      📂 Accéder à mes documents
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Contact -->
+          <tr>
+            <td style="padding: 25px 40px; background-color: #fef3c7; border-top: 1px solid #fde68a;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width: 40px; vertical-align: top;">
+                    <span style="font-size: 22px;">💬</span>
+                  </td>
+                  <td>
+                    <p style="margin: 0 0 8px; color: #92400e; font-size: 15px; font-weight: 600;">
+                      Des questions ou des besoins spécifiques ?
+                    </p>
+                    <p style="margin: 0; color: #a16207; font-size: 14px; line-height: 1.6;">
+                      N'hésitez pas à nous contacter, nous sommes là pour vous accompagner.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Contact info -->
+          ${data.organizationEmail || data.organizationTelephone ? `
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-top: 1px solid #e9ecef;">
+              <div style="text-align: center;">
+                ${data.organizationEmail
+                  ? `<a href="mailto:${data.organizationEmail}" style="display: inline-block; margin: 0 10px; color: ${color}; text-decoration: none; font-size: 14px;">✉️ ${data.organizationEmail}</a>`
+                  : ""
+                }
+                ${data.organizationTelephone
+                  ? `<a href="tel:${data.organizationTelephone}" style="display: inline-block; margin: 0 10px; color: ${color}; text-decoration: none; font-size: 14px;">📞 ${data.organizationTelephone}</a>`
+                  : ""
+                }
+              </div>
+            </td>
+          </tr>
+          ` : ""}
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 25px 40px; background-color: #1a1a2e; text-align: center;">
+              <p style="margin: 0 0 5px; color: #ffffff; font-size: 14px; font-weight: 500;">
+                À très bientôt !
+              </p>
+              <p style="margin: 0; color: #ffffff80; font-size: 12px;">
+                L'équipe ${data.organizationName}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const text = `
+📅 RAPPEL : Votre formation débute dans 7 jours
+
+Bonjour ${data.prenom},
+
+Votre formation "${data.formationTitre}" débute dans 7 jours.
+
+📆 Date : ${data.dateDebut} à ${data.heureDebut}
+📍 Lieu : ${data.lieu || "À distance"}
+${data.formateur ? `👨‍🏫 Formateur : ${data.formateur}` : ""}
+
+✅ NOUS VOUS INVITONS À :
+${data.hasProgramme ? "• Consulter le programme de formation" : ""}
+${data.hasReglement ? "• Lire le règlement intérieur" : ""}
+${data.hasCGV ? "• Prendre connaissance des CGV" : ""}
+${data.hasConvocation ? "• Télécharger votre convocation" : ""}
+
+Tous ces documents sont disponibles sur votre espace apprenant :
+🔗 ${data.espaceApprenantUrl}
+
+Des questions ou des besoins spécifiques ?
+N'hésitez pas à nous contacter.
+
+${data.organizationEmail ? `📧 ${data.organizationEmail}` : ""}
+${data.organizationTelephone ? `📞 ${data.organizationTelephone}` : ""}
+
+À très bientôt !
+L'équipe ${data.organizationName}
+`;
+
+  return { subject, html, text };
+}
+
+// ===========================================
+// SYSTÈME D'ENVOI EMAIL AVEC PIÈCES JOINTES PDF
+// ===========================================
+// Qualiopi IND 5 - Envoi des documents importants avant formation
+
+interface PDFAttachment {
+  filename: string;
+  content: Buffer | string; // Buffer pour fichiers, string base64
+  contentType?: string;
+}
+
+interface EmailWithAttachmentsData {
+  // Destinataire
+  to: string;
+  toName?: string;
+  // IDs pour traçabilité
+  apprenantId?: string;
+  sessionId?: string;
+  formationId?: string;
+  // Organisation
+  organizationId: string;
+  // Email content (subject, html, text)
+  emailContent: {
+    subject: string;
+    html: string;
+    text: string;
+  };
+  // Pièces jointes
+  attachments?: PDFAttachment[];
+  // Type d'email
+  type?: SentEmailType;
+}
+
+/**
+ * Envoie un email avec pièces jointes PDF
+ * Utilisé pour J-7, convocations, etc.
+ */
+export async function sendEmailWithAttachments(
+  data: EmailWithAttachmentsData
+): Promise<EmailResult> {
+  const { to, toName, apprenantId, sessionId, formationId, organizationId, emailContent, attachments, type } = data;
+
+  // Préparer les pièces jointes au format attendu par sendEmail
+  const formattedAttachments = attachments?.map(att => ({
+    filename: att.filename,
+    content: att.content,
+    contentType: att.contentType || "application/pdf",
+  }));
+
+  // Utiliser sendEmail avec les options étendues
+  return sendEmail(
+    {
+      to,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
+      attachments: formattedAttachments,
+      // Options étendues pour traçabilité
+      type: type || "RAPPEL",
+      toName,
+      apprenantId,
+      sessionId,
+      formationId,
+    },
+    organizationId
+  );
+}
+
+// ===========================================
+// FONCTION D'ENVOI RAPPEL J-7 AVEC PIÈCES JOINTES
+// ===========================================
+
+interface SendRappelJ7Options {
+  // Données apprenant
+  apprenant: {
+    id: string;
+    prenom: string;
+    nom: string;
+    email: string;
+  };
+  // Données session
+  session: {
+    id: string;
+    formationId: string;
+    formationTitre: string;
+    dateDebut: Date;
+    heureDebut: string;
+    lieu: string | null;
+    formateur: string | null;
+  };
+  // Organisation
+  organization: {
+    id: string;
+    name: string;
+    logo?: string | null;
+    email?: string | null;
+    telephone?: string | null;
+    primaryColor?: string;
+    baseUrl: string; // URL de base pour l'espace apprenant
+  };
+  // Documents PDF à joindre (optionnels)
+  documents?: {
+    convocation?: Buffer | null;
+    programme?: Buffer | null;
+    reglement?: Buffer | null;
+    cgv?: Buffer | null;
+  };
+}
+
+/**
+ * Envoie l'email de rappel J-7 avec les documents en pièces jointes
+ * Qualiopi IND 5 - Information des objectifs et déroulement
+ */
+export async function sendRappelJ7WithDocuments(
+  options: SendRappelJ7Options
+): Promise<EmailResult> {
+  const { apprenant, session, organization, documents } = options;
+
+  // Formater la date en français
+  const dateDebut = new Date(session.dateDebut);
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  };
+  const dateDebutFormatted = dateDebut.toLocaleDateString("fr-FR", dateOptions);
+
+  // URL de l'espace apprenant
+  const espaceApprenantUrl = `${organization.baseUrl}/apprenant/documents`;
+
+  // Générer le contenu de l'email
+  const emailContent = generateRappelJ7Email({
+    prenom: apprenant.prenom,
+    nom: apprenant.nom,
+    formationTitre: session.formationTitre,
+    dateDebut: dateDebutFormatted,
+    heureDebut: session.heureDebut,
+    lieu: session.lieu,
+    formateur: session.formateur,
+    organizationName: organization.name,
+    organizationLogo: organization.logo,
+    organizationEmail: organization.email,
+    organizationTelephone: organization.telephone,
+    primaryColor: organization.primaryColor,
+    espaceApprenantUrl,
+    // Indiquer quels documents sont disponibles
+    hasConvocation: !!documents?.convocation,
+    hasProgramme: !!documents?.programme,
+    hasReglement: !!documents?.reglement,
+    hasCGV: !!documents?.cgv,
+  });
+
+  // Préparer les pièces jointes
+  const attachments: PDFAttachment[] = [];
+
+  if (documents?.convocation) {
+    attachments.push({
+      filename: `Convocation_${session.formationTitre.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
+      content: documents.convocation,
+      contentType: "application/pdf",
+    });
+  }
+
+  if (documents?.programme) {
+    attachments.push({
+      filename: `Programme_${session.formationTitre.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
+      content: documents.programme,
+      contentType: "application/pdf",
+    });
+  }
+
+  if (documents?.reglement) {
+    attachments.push({
+      filename: "Reglement_Interieur.pdf",
+      content: documents.reglement,
+      contentType: "application/pdf",
+    });
+  }
+
+  if (documents?.cgv) {
+    attachments.push({
+      filename: "Conditions_Generales_Vente.pdf",
+      content: documents.cgv,
+      contentType: "application/pdf",
+    });
+  }
+
+  // Envoyer l'email
+  return sendEmailWithAttachments({
+    to: apprenant.email,
+    toName: `${apprenant.prenom} ${apprenant.nom}`,
+    apprenantId: apprenant.id,
+    sessionId: session.id,
+    formationId: session.formationId,
+    organizationId: organization.id,
+    emailContent,
+    attachments: attachments.length > 0 ? attachments : undefined,
+    type: "RAPPEL",
+  });
+}
+
+// ===========================================
+// FONCTION GÉNÉRIQUE D'ENVOI DE DOCUMENTS
+// ===========================================
+
+interface SendDocumentsEmailData {
+  // Destinataire
+  to: string;
+  toName: string;
+  // IDs pour traçabilité
+  apprenantId?: string;
+  sessionId?: string;
+  formationId?: string;
+  // Organisation
+  organizationId: string;
+  organizationName: string;
+  organizationLogo?: string | null;
+  organizationEmail?: string | null;
+  primaryColor?: string;
+  // Contexte
+  formationTitre: string;
+  // Documents
+  documents: Array<{
+    name: string;
+    filename: string;
+    content: Buffer;
+  }>;
+  // Message personnalisé (optionnel)
+  customMessage?: string;
+}
+
+/**
+ * Envoie un email avec une liste de documents PDF en pièces jointes
+ * Utilisé pour envoyer des documents spécifiques (attestations, certificats, etc.)
+ */
+export async function sendDocumentsEmail(
+  data: SendDocumentsEmailData
+): Promise<EmailResult> {
+  const color = data.primaryColor || "#4277FF";
+
+  // Construire la liste des documents pour l'email
+  const documentsList = data.documents
+    .map(doc => `<li style="padding: 8px 0; color: #495057; font-size: 15px;">📎 ${doc.name}</li>`)
+    .join("");
+
+  const subject = `📄 Documents - ${data.formationTitre}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%); padding: 35px 40px; text-align: center;">
+              ${data.organizationLogo
+                ? `<img src="${data.organizationLogo}" alt="${data.organizationName}" style="max-height: 60px; max-width: 200px;">`
+                : `<h1 style="color: white; margin: 0; font-size: 24px;">${data.organizationName}</h1>`
+              }
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <span style="font-size: 48px;">📄</span>
+              </div>
+
+              <h2 style="color: #1a1a2e; margin: 0 0 20px; font-size: 22px; text-align: center;">
+                Vos documents
+              </h2>
+
+              <p style="margin: 0 0 25px; color: #495057; font-size: 16px; line-height: 1.7;">
+                Bonjour <strong>${data.toName}</strong>,
+              </p>
+
+              ${data.customMessage ? `
+              <p style="margin: 0 0 25px; color: #495057; font-size: 16px; line-height: 1.7;">
+                ${data.customMessage}
+              </p>
+              ` : `
+              <p style="margin: 0 0 25px; color: #495057; font-size: 16px; line-height: 1.7;">
+                Veuillez trouver ci-joint les documents relatifs à votre formation
+                <strong style="color: ${color};">"${data.formationTitre}"</strong>.
+              </p>
+              `}
+
+              <!-- Liste des documents -->
+              <div style="background-color: #f8f9fa; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                <h3 style="margin: 0 0 15px; color: #1a1a2e; font-size: 16px; font-weight: 600;">
+                  📎 Documents joints :
+                </h3>
+                <ul style="margin: 0; padding-left: 0; list-style: none;">
+                  ${documentsList}
+                </ul>
+              </div>
+
+              <p style="margin: 0; color: #6c757d; font-size: 14px; text-align: center;">
+                Ces documents sont importants, pensez à les conserver.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Contact -->
+          ${data.organizationEmail ? `
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-top: 1px solid #e9ecef; text-align: center;">
+              <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                Une question ? Contactez-nous :
+                <a href="mailto:${data.organizationEmail}" style="color: ${color}; text-decoration: none;">${data.organizationEmail}</a>
+              </p>
+            </td>
+          </tr>
+          ` : ""}
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 25px 40px; background-color: #1a1a2e; text-align: center;">
+              <p style="margin: 0; color: #ffffff80; font-size: 12px;">
+                L'équipe ${data.organizationName}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const documentsListText = data.documents.map(doc => `• ${doc.name}`).join("\n");
+  const text = `
+📄 VOS DOCUMENTS
+
+Bonjour ${data.toName},
+
+${data.customMessage || `Veuillez trouver ci-joint les documents relatifs à votre formation "${data.formationTitre}".`}
+
+📎 Documents joints :
+${documentsListText}
+
+Ces documents sont importants, pensez à les conserver.
+
+${data.organizationEmail ? `Une question ? Contactez-nous : ${data.organizationEmail}` : ""}
+
+L'équipe ${data.organizationName}
+`;
+
+  // Préparer les pièces jointes
+  const attachments: PDFAttachment[] = data.documents.map(doc => ({
+    filename: doc.filename,
+    content: doc.content,
+    contentType: "application/pdf",
+  }));
+
+  return sendEmailWithAttachments({
+    to: data.to,
+    toName: data.toName,
+    apprenantId: data.apprenantId,
+    sessionId: data.sessionId,
+    formationId: data.formationId,
+    organizationId: data.organizationId,
+    emailContent: { subject, html, text },
+    attachments,
+    type: "DOCUMENT",
+  });
+}

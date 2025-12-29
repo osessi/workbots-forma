@@ -146,6 +146,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             duree: true,
             ordre: true,
             contenu: true,
+            isModuleZero: true, // Qualiopi IND 10
+          },
+          where: {
+            isModuleZero: false, // Exclure Module 0 du catalogue public
           },
           orderBy: { ordre: "asc" },
         },

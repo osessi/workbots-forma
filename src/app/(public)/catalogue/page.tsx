@@ -49,6 +49,7 @@ interface Formation {
   lieux: string[];
   indicateurs: {
     tauxSatisfaction: number | null;
+    tauxCertification: number | null;
     nombreAvis: number;
     nombreStagiaires: number;
   } | null;

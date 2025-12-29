@@ -49,6 +49,11 @@ const initialContexteData = {
   tarifIndependant: "",
   tarifParticulier: "",
   description: "",
+  // Qualiopi IND 3 - Certification
+  isCertifiante: false,
+  numeroFicheRS: "",
+  referentielRSUrl: "",
+  lienFranceCompetences: "",
 };
 
 // Données initiales vides pour la fiche pédagogique (sera rempli par l'IA)
@@ -77,6 +82,7 @@ const initialModules: Array<{
   id: string;
   titre: string;
   contenu: string[];
+  isModuleZero?: boolean; // Qualiopi IND 10 - Module 0 de mise à niveau
 }> = [];
 
 
@@ -94,6 +100,7 @@ interface FichePedagogiqueGeneree {
     objectifs?: string[];
     contenu?: string[];
     methodePedagogique?: string;
+    isModuleZero?: boolean; // Qualiopi IND 10 - Module 0 de mise à niveau
   }>;
   moyensPedagogiques?: string[];
   modalitesEvaluation?: string[];
@@ -185,8 +192,9 @@ function CreateFormationContent() {
         if (dataToSave.modules && dataToSave.modules.length > 0) {
           payload.modules = dataToSave.modules.map((m, i) => ({
             titre: m.titre,
-            ordre: i + 1,
+            ordre: m.isModuleZero ? -1 : i + 1, // Module 0 a ordre -1
             contenu: { items: m.contenu },
+            isModuleZero: m.isModuleZero || false,
           }));
         }
 
@@ -282,6 +290,11 @@ function CreateFormationContent() {
             tarifIndependant: String(savedContexte.tarifIndependant || ""),
             tarifParticulier: String(savedContexte.tarifParticulier || ""),
             description: savedContexte.description as string || "",
+            // Qualiopi IND 3 - Certification
+            isCertifiante: Boolean(savedContexte.isCertifiante) || formation.isCertifiante || false,
+            numeroFicheRS: String(savedContexte.numeroFicheRS || formation.numeroFicheRS || ""),
+            referentielRSUrl: String(savedContexte.referentielRSUrl || formation.referentielRSUrl || ""),
+            lienFranceCompetences: String(savedContexte.lienFranceCompetences || formation.lienFranceCompetences || ""),
           });
         } else {
           // Ancien format: extraire depuis fichePedagogique
@@ -295,6 +308,11 @@ function CreateFormationContent() {
             tarifIndependant: String(fiche.tarifIndependant || ""),
             tarifParticulier: String(fiche.tarifParticulier || ""),
             description: fiche.description as string || formation.description || "",
+            // Qualiopi IND 3 - Certification
+            isCertifiante: Boolean(fiche.isCertifiante) || formation.isCertifiante || false,
+            numeroFicheRS: String(fiche.numeroFicheRS || formation.numeroFicheRS || ""),
+            referentielRSUrl: String(fiche.referentielRSUrl || formation.referentielRSUrl || ""),
+            lienFranceCompetences: String(fiche.lienFranceCompetences || formation.lienFranceCompetences || ""),
           });
         }
 
@@ -343,10 +361,11 @@ function CreateFormationContent() {
 
         // Restaurer les modules
         if (formation.modules && formation.modules.length > 0) {
-          setModules(formation.modules.map((m: { id: string; titre: string; contenu?: { items?: string[] } }) => ({
+          setModules(formation.modules.map((m: { id: string; titre: string; contenu?: { items?: string[] }; isModuleZero?: boolean }) => ({
             id: m.id,
             titre: m.titre,
             contenu: m.contenu?.items || [],
+            isModuleZero: m.isModuleZero || false,
           })));
         }
 
@@ -406,8 +425,9 @@ function CreateFormationContent() {
         },
         modules: mods.map((m, i) => ({
           titre: m.titre,
-          ordre: i + 1,
+          ordre: m.isModuleZero ? -1 : i + 1, // Module 0 a ordre -1
           contenu: { items: m.contenu },
+          isModuleZero: m.isModuleZero || false,
         })),
       };
 
@@ -531,13 +551,18 @@ function CreateFormationContent() {
           ? `${contexte.tarifParticulier} € TTC`
           : "";
 
-        // Construire le contenu des modules
+        // Construire le contenu des modules (avec gestion Module 0)
+        let contenuModuleIndex = 1;
         const contenuModules = genere.modules
           ? genere.modules
-              .map(
-                (m, i) =>
-                  `Module ${i + 1} - ${m.titre}\n${(m.contenu || []).map((c) => `• ${c}`).join("\n")}`
-              )
+              .map((m) => {
+                const isModuleZero = m.isModuleZero === true;
+                const moduleNum = isModuleZero ? 0 : contenuModuleIndex++;
+                const moduleLabel = isModuleZero
+                  ? m.titre // Le titre inclut déjà "Module 0 - Mise à niveau"
+                  : `Module ${moduleNum} - ${m.titre.replace(/^Module\s*\d*\s*[-–:]*\s*/i, "")}`;
+                return `${moduleLabel}\n${(m.contenu || []).map((c) => `• ${c}`).join("\n")}`;
+              })
               .join("\n\n")
           : "";
 
@@ -563,12 +588,23 @@ function CreateFormationContent() {
         });
 
         // Mettre a jour les modules - l'IA determine le nombre de modules necessaires
+        // Module 0 (isModuleZero) garde son numéro 0, les autres sont numérotés à partir de 1
+        let moduleIndex = 1;
         const newModules = genere.modules && genere.modules.length > 0
-          ? genere.modules.map((m, i) => ({
-              id: String(i + 1),
-              titre: `Module ${i + 1} - ${m.titre}`,
-              contenu: m.contenu || [],
-            }))
+          ? genere.modules.map((m) => {
+              const isModuleZero = m.isModuleZero === true;
+              const moduleNum = isModuleZero ? 0 : moduleIndex++;
+              // Le titre du Module 0 commence déjà par "Module 0", pas besoin de le préfixer
+              const titre = isModuleZero
+                ? m.titre
+                : `Module ${moduleNum} - ${m.titre.replace(/^Module\s*\d*\s*[-–:]*\s*/i, "")}`;
+              return {
+                id: String(moduleNum),
+                titre,
+                contenu: m.contenu || [],
+                isModuleZero,
+              };
+            })
           : [];
 
         if (newModules.length > 0) {
@@ -704,6 +740,11 @@ function CreateFormationContent() {
             goToNextStep("fiche", "slides");
           }}
           onPrevious={() => goToPreviousStep("contexte")}
+          certificationData={{
+            isCertifiante: contexteData.isCertifiante,
+            numeroFicheRS: contexteData.numeroFicheRS,
+            lienFranceCompetences: contexteData.lienFranceCompetences,
+          }}
         />
       )}
 

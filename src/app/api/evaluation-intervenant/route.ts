@@ -211,6 +211,7 @@ export async function GET(request: NextRequest) {
     // Récupérer les évaluations
     const evaluations = await prisma.evaluationIntervenant.findMany({
       where: whereClause,
+      distinct: ["id"], // Éviter les doublons
       include: {
         intervenant: {
           select: { id: true, nom: true, prenom: true, email: true },

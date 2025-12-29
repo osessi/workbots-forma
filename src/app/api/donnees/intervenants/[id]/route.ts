@@ -55,6 +55,9 @@ export async function GET(
         id,
         organizationId: user.organizationId,
       },
+      include: {
+        diplomes: true, // Inclure les diplômes pour Qualiopi IND 17
+      },
     });
 
     if (!intervenant) {
@@ -136,6 +139,12 @@ export async function PUT(
       structure,
       structureSiret,
       notes,
+      // Nouveaux champs Qualiopi IND 17
+      photoUrl,
+      cv,
+      biographie,
+      anneesExperience,
+      numeroDeclarationActivite,
     } = body;
 
     const intervenant = await prisma.intervenant.update({
@@ -150,6 +159,15 @@ export async function PUT(
         structure,
         structureSiret,
         notes,
+        // Qualiopi IND 17
+        photoUrl,
+        cv,
+        biographie,
+        anneesExperience: anneesExperience !== undefined ? (anneesExperience ? parseInt(anneesExperience) : null) : undefined,
+        numeroDeclarationActivite,
+      },
+      include: {
+        diplomes: true,
       },
     });
 

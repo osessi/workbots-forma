@@ -46,7 +46,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+      console.log("=== API Intervenants POST - Body reçu ===");
+      console.log("Body:", JSON.stringify(body, null, 2));
+      console.log("User organizationId:", user.organizationId);
+    } catch (parseError) {
+      console.error("Erreur parsing JSON:", parseError);
+      return NextResponse.json({ error: "Format JSON invalide" }, { status: 400 });
+    }
+
     const {
       nom,
       prenom,
@@ -57,23 +67,44 @@ export async function POST(request: NextRequest) {
       structure,
       structureSiret,
       notes,
+      // Nouveaux champs Qualiopi IND 17
+      photoUrl,
+      cv,
+      biographie,
+      anneesExperience,
+      numeroDeclarationActivite,
     } = body;
 
     if (!nom || !prenom) {
       return NextResponse.json({ error: "Nom et prénom sont requis" }, { status: 400 });
     }
 
+    // Convertir anneesExperience en nombre ou null
+    let parsedAnneesExperience: number | null = null;
+    if (anneesExperience !== undefined && anneesExperience !== null && anneesExperience !== "") {
+      const parsed = parseInt(String(anneesExperience), 10);
+      if (!isNaN(parsed)) {
+        parsedAnneesExperience = parsed;
+      }
+    }
+
     const intervenant = await prisma.intervenant.create({
       data: {
         nom,
         prenom,
-        email,
-        telephone,
-        fonction,
+        email: email || null,
+        telephone: telephone || null,
+        fonction: fonction || null,
         specialites: specialites || [],
-        structure,
-        structureSiret,
-        notes,
+        structure: structure || null,
+        structureSiret: structureSiret || null,
+        notes: notes || null,
+        // Qualiopi IND 17
+        photoUrl: photoUrl || null,
+        cv: cv || null,
+        biographie: biographie || null,
+        anneesExperience: parsedAnneesExperience,
+        numeroDeclarationActivite: numeroDeclarationActivite || null,
         organizationId: user.organizationId,
       },
     });
@@ -81,8 +112,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(intervenant, { status: 201 });
   } catch (error) {
     console.error("Erreur création intervenant:", error);
+    // Log plus détaillé
+    if (error instanceof Error) {
+      console.error("Message:", error.message);
+      console.error("Stack:", error.stack);
+    }
     return NextResponse.json(
-      { error: "Erreur lors de la création de l'intervenant" },
+      { error: "Erreur lors de la création de l'intervenant", details: error instanceof Error ? error.message : "Unknown" },
       { status: 500 }
     );
   }
@@ -140,6 +176,9 @@ export async function GET(request: NextRequest) {
           { email: { contains: search, mode: "insensitive" } },
           { fonction: { contains: search, mode: "insensitive" } },
         ] : undefined,
+      },
+      include: {
+        diplomes: true, // Inclure les diplômes pour Qualiopi IND 17
       },
       orderBy: [{ nom: "asc" }, { prenom: "asc" }],
     });

@@ -23,6 +23,10 @@ interface SessionParticipant {
   id: string;
   estConfirme: boolean;
   aAssiste: boolean;
+  // Qualiopi IND 3 - Certification
+  certificationObtenue: boolean;
+  dateCertification: string | null;
+  numeroCertificat: string | null;
   apprenant: Apprenant;
 }
 
@@ -57,6 +61,10 @@ interface Session {
     id: string;
     titre: string;
     dureeHeures: number | null;
+    // Qualiopi IND 3 - Certification
+    isCertifiante: boolean;
+    numeroFicheRS: string | null;
+    lienFranceCompetences: string | null;
   };
   lieu: {
     id: string;
@@ -72,6 +80,8 @@ interface Session {
   } | null;
   journees: SessionJournee[];
   clients: SessionClient[];
+  // Qualiopi IND 3 - Certification par session
+  delivreCertification: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -156,6 +166,26 @@ const EditIcon = () => (
   </svg>
 );
 
+const AwardIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <circle cx="9" cy="6" r="4" />
+    <path d="M6 9.5l-1.5 6.5 4.5-2 4.5 2-1.5-6.5" />
+  </svg>
+);
+
+const EyeIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
+    <circle cx="8" cy="8" r="2" />
+  </svg>
+);
+
+const DownloadIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M8 2v8M4 7l4 4 4-4M2 12v2h12v-2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 // Status colors
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
   BROUILLON: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400", dot: "bg-gray-400" },
@@ -202,6 +232,16 @@ export default function SessionDetailPage() {
   const [selectedLieuId, setSelectedLieuId] = useState("");
   const [selectedFormateurId, setSelectedFormateurId] = useState("");
   const [updating, setUpdating] = useState(false);
+
+  // Certification modal (Qualiopi IND 3)
+  const [showCertificationModal, setShowCertificationModal] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<SessionParticipant | null>(null);
+  const [certificationForm, setCertificationForm] = useState({
+    certificationObtenue: false,
+    dateCertification: "",
+    numeroCertificat: "",
+  });
+  const [updatingCertification, setUpdatingCertification] = useState(false);
 
   // Form state
   const [clientForm, setClientForm] = useState({
@@ -342,6 +382,47 @@ export default function SessionDetailPage() {
     }
   };
 
+  // Open certification modal (Qualiopi IND 3)
+  const openCertificationModal = (participant: SessionParticipant) => {
+    setSelectedParticipant(participant);
+    setCertificationForm({
+      certificationObtenue: participant.certificationObtenue || false,
+      dateCertification: participant.dateCertification
+        ? new Date(participant.dateCertification).toISOString().split("T")[0]
+        : "",
+      numeroCertificat: participant.numeroCertificat || "",
+    });
+    setShowCertificationModal(true);
+  };
+
+  // Update participant certification (Qualiopi IND 3)
+  const handleUpdateCertification = async () => {
+    if (!selectedParticipant) return;
+    setUpdatingCertification(true);
+    try {
+      const res = await fetch(`/api/session-participant/${selectedParticipant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          certificationObtenue: certificationForm.certificationObtenue,
+          dateCertification: certificationForm.dateCertification || null,
+          numeroCertificat: certificationForm.numeroCertificat || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erreur lors de la mise à jour");
+      }
+      setShowCertificationModal(false);
+      setSelectedParticipant(null);
+      fetchSession();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setUpdatingCertification(false);
+    }
+  };
+
   // Add client with participants
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -417,6 +498,65 @@ export default function SessionDetailPage() {
     return session.clients.reduce((acc, client) => acc + client.participants.length, 0);
   };
 
+  // Get certification stats (Qualiopi IND 3)
+  // Un participant est "présenté" s'il a assisté OU s'il est certifié
+  const getCertificationStats = () => {
+    if (!session) return { total: 0, certified: 0, rate: 0 };
+    let total = 0;
+    let certified = 0;
+    session.clients.forEach((client) => {
+      client.participants.forEach((p) => {
+        // Un participant certifié est automatiquement considéré comme présenté
+        if (p.aAssiste || p.certificationObtenue) {
+          total++;
+          if (p.certificationObtenue) certified++;
+        }
+      });
+    });
+    return {
+      total,
+      certified,
+      rate: total > 0 ? Math.round((certified / total) * 100) : 0,
+    };
+  };
+
+  // Check if session delivers certifications (Qualiopi IND 3)
+  // Logic: delivreCertification overrides formation.isCertifiante
+  // - delivreCertification = true → delivers
+  // - delivreCertification = false → does not deliver
+  // - delivreCertification = null → inherits from formation.isCertifiante
+  const sessionDeliversCertification = () => {
+    if (!session) return false;
+    if (session.delivreCertification === true) return true;
+    if (session.delivreCertification === false) return false;
+    return session.formation.isCertifiante;
+  };
+
+  // Toggle certification delivery for this session
+  const handleToggleCertification = async () => {
+    if (!session) return;
+    setUpdating(true);
+    try {
+      // If currently delivers (explicit or inherited), set to false
+      // If currently doesn't deliver, set to true
+      const newValue = !sessionDeliversCertification();
+      const res = await fetch(`/api/training-sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delivreCertification: newValue }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erreur lors de la mise à jour");
+      }
+      fetchSession();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -459,6 +599,38 @@ export default function SessionDetailPage() {
             <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
               {modaliteLabels[session.modalite]}
             </span>
+            {/* Badge certification session (Qualiopi IND 3) */}
+            {sessionDeliversCertification() && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                <AwardIcon />
+                Certifiante
+                {session.formation.numeroFicheRS && (
+                  <span className="opacity-70">({session.formation.numeroFicheRS})</span>
+                )}
+              </span>
+            )}
+            {/* Toggle certification for this session (only if formation is certifiante) */}
+            {session.formation.isCertifiante && (
+              <button
+                onClick={handleToggleCertification}
+                disabled={updating}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sessionDeliversCertification()
+                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200"
+                }`}
+                title={sessionDeliversCertification() ? "Désactiver la certification pour cette session" : "Activer la certification pour cette session"}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  {sessionDeliversCertification() ? (
+                    <path d="M2 6L4.5 8.5L10 3" strokeLinecap="round" strokeLinejoin="round" />
+                  ) : (
+                    <path d="M3 3L9 9M3 9L9 3" strokeLinecap="round" strokeLinejoin="round" />
+                  )}
+                </svg>
+                {sessionDeliversCertification() ? "Certification ON" : "Certification OFF"}
+              </button>
+            )}
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {session.formation.titre}
@@ -601,6 +773,50 @@ export default function SessionDetailPage() {
         </div>
       </div>
 
+      {/* Certification stats card (Qualiopi IND 3) - Only for sessions with certification enabled and TERMINEE status */}
+      {sessionDeliversCertification() && session.status === "TERMINEE" && (
+        <div className="p-5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg text-amber-600 dark:text-amber-400">
+              <AwardIcon />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Suivi des certifications</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Formation certifiante - Qualiopi IND 3
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-xl">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{getCertificationStats().total}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Présentés</p>
+            </div>
+            <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-xl">
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{getCertificationStats().certified}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Certifiés</p>
+            </div>
+            <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-xl">
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{getCertificationStats().rate}%</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Taux</p>
+            </div>
+          </div>
+          {session.formation.lienFranceCompetences && (
+            <a
+              href={session.formation.lienFranceCompetences}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400"
+            >
+              Voir sur France Compétences
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M10 4L4 10M10 4v5M10 4H5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Participants section */}
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -674,6 +890,49 @@ export default function SessionDetailPage() {
                             <CheckIcon />
                             Confirmé
                           </span>
+                        )}
+                        {/* Badge certification (Qualiopi IND 3) */}
+                        {sessionDeliversCertification() && participant.certificationObtenue && (
+                          <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs rounded-full flex items-center gap-1">
+                            <AwardIcon />
+                            Certifié
+                          </span>
+                        )}
+                        {/* Boutons prévisualisation/téléchargement certificat (Qualiopi IND 3) */}
+                        {sessionDeliversCertification() && participant.certificationObtenue && (
+                          <>
+                            <a
+                              href={`/api/apprenant/certificate/${participant.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                              title="Prévisualiser le certificat"
+                            >
+                              <EyeIcon />
+                            </a>
+                            <a
+                              href={`/api/apprenant/certificate/${participant.id}`}
+                              download={`certificat-${participant.numeroCertificat || participant.id}.html`}
+                              className="p-1.5 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                              title="Télécharger le certificat"
+                            >
+                              <DownloadIcon />
+                            </a>
+                          </>
+                        )}
+                        {/* Bouton certification (Qualiopi IND 3) - visible si session certifiante et terminée */}
+                        {sessionDeliversCertification() && session.status === "TERMINEE" && (
+                          <button
+                            onClick={() => openCertificationModal(participant)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              participant.certificationObtenue
+                                ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                : "text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                            }`}
+                            title="Gérer la certification"
+                          >
+                            <AwardIcon />
+                          </button>
                         )}
                         <button
                           onClick={() => removeParticipant(client.id, participant.id)}
@@ -941,6 +1200,127 @@ export default function SessionDetailPage() {
                   className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
                 >
                   {updating && <LoaderIcon />}
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Certification Modal (Qualiopi IND 3) */}
+      {showCertificationModal && selectedParticipant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Certification</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedParticipant.apprenant.prenom} {selectedParticipant.apprenant.nom}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowCertificationModal(false);
+                  setSelectedParticipant(null);
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Toggle certification */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    certificationForm.certificationObtenue
+                      ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-400"
+                  }`}>
+                    <AwardIcon />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">Certification obtenue</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Le participant a obtenu sa certification
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCertificationForm(prev => ({
+                    ...prev,
+                    certificationObtenue: !prev.certificationObtenue,
+                  }))}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    certificationForm.certificationObtenue
+                      ? "bg-amber-500"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      certificationForm.certificationObtenue ? "left-7" : "left-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Date de certification */}
+              {certificationForm.certificationObtenue && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Date de certification
+                    </label>
+                    <input
+                      type="date"
+                      value={certificationForm.dateCertification}
+                      onChange={(e) => setCertificationForm(prev => ({
+                        ...prev,
+                        dateCertification: e.target.value,
+                      }))}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  {/* Numéro de certificat */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Numéro de certificat (optionnel)
+                    </label>
+                    <input
+                      type="text"
+                      value={certificationForm.numeroCertificat}
+                      onChange={(e) => setCertificationForm(prev => ({
+                        ...prev,
+                        numeroCertificat: e.target.value,
+                      }))}
+                      placeholder="Ex: CERT-2025-0001"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCertificationModal(false);
+                    setSelectedParticipant(null);
+                  }}
+                  className="px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleUpdateCertification}
+                  disabled={updatingCertification}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
+                >
+                  {updatingCertification && <LoaderIcon />}
                   Enregistrer
                 </button>
               </div>

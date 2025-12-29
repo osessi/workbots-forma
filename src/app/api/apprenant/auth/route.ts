@@ -250,7 +250,6 @@ export async function GET(request: NextRequest) {
         email: apprenant.email,
         telephone: apprenant.telephone,
         adresse: apprenant.adresse,
-        entreprise: apprenant.entreprise,
         createdAt: apprenant.createdAt?.toISOString(),
       },
       organization: {

@@ -28,6 +28,7 @@ import {
   Globe,
   UserPlus,
   BookOpen,
+  ClipboardList,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -110,6 +111,11 @@ const mainNavItems: NavItem[] = [
         icon: <UserPlus size={18} strokeWidth={1.5} />,
         name: "Pré-inscriptions",
         path: "/automate/pre-inscriptions",
+      },
+      {
+        icon: <ClipboardList size={18} strokeWidth={1.5} />,
+        name: "Évaluations",
+        path: "/automate/catalogue/evaluations",
       },
     ],
   },

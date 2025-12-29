@@ -124,6 +124,12 @@ enum DocumentType {
   CERTIFICAT
   DEVIS
   FACTURE
+  CONDITIONS_GENERALES_VENTE
+  CONTRAT_SOUS_TRAITANCE
+  EVALUATION_INTERVENANT
+  EVALUATION_ENTREPRISE
+  EVALUATION_FINANCEUR
+  FEUILLE_EMARGEMENT
   AUTRE
 }
 
@@ -235,6 +241,10 @@ model Organization {
 
   // Notifications
   notifications     Notification[]
+
+  // Évaluations de satisfaction (Qualiopi IND 2)
+  evaluationsSatisfaction EvaluationSatisfaction[]
+  evaluationsIntervenant  EvaluationIntervenant[]
 
   @@index([slug])
   @@index([customDomain])
@@ -1187,6 +1197,9 @@ model Apprenant {
   authCodes         ApprenantAuthCode[]
   inviteTokens      ApprenantInviteToken[]
 
+  // Évaluations de satisfaction (Qualiopi IND 2)
+  evaluationsSatisfaction EvaluationSatisfaction[] @relation("EvaluationSatisfactionApprenant")
+
   @@index([organizationId])
   @@index([entrepriseId])
   @@index([statut])
@@ -1233,8 +1246,15 @@ model Intervenant {
   sessionsCoFormateurNew   SessionCoFormateurNew[] @relation("SessionCoFormateurIntervenant")
   signaturesEmargementNew  SignatureEmargementNew[] @relation("SignatureEmargementFormateur")
 
+  // Auth codes pour connexion OTP
+  authCodes                IntervenantAuthCode[]
+
+  // Évaluations intervenant (Qualiopi IND 2)
+  evaluationsIntervenant   EvaluationIntervenant[] @relation("EvaluationIntervenantIntervenant")
+
   @@index([organizationId])
   @@index([nom])
+  @@index([email])
 }
 
 // Lieux de formation
@@ -1365,6 +1385,10 @@ model DocumentSession {
   coFormateurs      SessionCoFormateur[]
   documentsGeneres  SessionDocument[]
   signatureDocuments SignatureDocument[]
+
+  // Évaluations de satisfaction (Qualiopi IND 2)
+  evaluationsSatisfaction EvaluationSatisfaction[]
+  evaluationsIntervenant  EvaluationIntervenant[]
 
   @@index([formationId])
   @@index([organizationId])
@@ -2977,4 +3001,328 @@ model ApprenantInviteToken {
 
   @@index([apprenantId])
   @@index([token])
+}
+
+// Code OTP pour connexion intervenant
+model IntervenantAuthCode {
+  id              String      @id @default(cuid())
+
+  // Intervenant concerné
+  intervenantId   String
+  intervenant     Intervenant @relation(fields: [intervenantId], references: [id], onDelete: Cascade)
+
+  // Code de vérification
+  code            String      // Code à 6 chiffres
+
+  // Validité
+  expiresAt       DateTime    // Expiration (10 minutes)
+  usedAt          DateTime?   // Date d'utilisation (null si pas encore utilisé)
+
+  // Sécurité
+  attempts        Int         @default(0) // Nombre de tentatives
+  ipAddress       String?     // IP de la demande
+  userAgent       String?     // User agent
+
+  // Timestamps
+  createdAt       DateTime    @default(now())
+
+  @@index([intervenantId])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+// ===========================================
+// ÉVALUATIONS DE SATISFACTION (Qualiopi IND 2 & 30)
+// ===========================================
+// Évaluations à chaud (fin de formation) et à froid (3 mois après)
+// pour calculer le taux de satisfaction et respecter Qualiopi
+
+enum EvaluationSatisfactionType {
+  CHAUD    // Évaluation à chaud - fin de formation
+  FROID    // Évaluation à froid - 3 mois après
+}
+
+enum EvaluationSatisfactionStatus {
+  PENDING     // En attente de complétion
+  IN_PROGRESS // En cours de remplissage
+  COMPLETED   // Complété
+  EXPIRED     // Expiré
+}
+
+// Demande d'évaluation de satisfaction
+model EvaluationSatisfaction {
+  id                String                       @id @default(cuid())
+
+  // Organisation (multi-tenant)
+  organizationId    String
+  organization      Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Session de formation liée
+  sessionId         String
+  session           DocumentSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Apprenant concerné
+  apprenantId       String
+  apprenant         Apprenant                    @relation("EvaluationSatisfactionApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Type d'évaluation
+  type              EvaluationSatisfactionType
+
+  // Token unique pour accès public (QR code / lien)
+  token             String                       @unique @default(cuid())
+
+  // Statut
+  status            EvaluationSatisfactionStatus @default(PENDING)
+
+  // Dates
+  expiresAt         DateTime?                    // Date d'expiration du lien
+  sentAt            DateTime?                    // Date d'envoi au participant
+  startedAt         DateTime?                    // Date de début de complétion
+  completedAt       DateTime?                    // Date de complétion
+
+  // Réponse (stockée dans un modèle séparé)
+  reponse           EvaluationSatisfactionReponse?
+
+  // Metadata
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  @@unique([sessionId, apprenantId, type])
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([apprenantId])
+  @@index([token])
+  @@index([type])
+  @@index([status])
+}
+
+// Réponses détaillées à l'évaluation de satisfaction
+model EvaluationSatisfactionReponse {
+  id                      String                  @id @default(cuid())
+
+  // Évaluation parent
+  evaluationId            String                  @unique
+  evaluation              EvaluationSatisfaction  @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  // ===========================================
+  // SECTION 2: PRÉPARATION (Évaluation à chaud uniquement)
+  // ===========================================
+  // 2.1 Informations reçues avant la formation
+  preparationInfos        Int?                    // Note 0-10
+  // 2.2 Messages envoyés avant la formation
+  preparationMessages     Int?                    // Note 0-10
+  // 2.3 Prérequis correspondaient au niveau
+  preparationPrerequis    Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 3: ORGANISATION (Évaluation à chaud uniquement)
+  // ===========================================
+  // 3.1 Calendrier bien organisé
+  organisationCalendrier  Int?                    // Note 0-10
+  // 3.2 Conditions matérielles et techniques
+  organisationConditions  Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 4: ANIMATION (Évaluation à chaud uniquement)
+  // ===========================================
+  // 4.1 Explications claires et structurées
+  animationExplications   Int?                    // Note 0-10
+  // 4.2 Échanges et participation favorisés
+  animationEchanges       Int?                    // Note 0-10
+  // 4.3 Ambiance de travail agréable
+  animationAmbiance       Int?                    // Note 0-10
+  // 4.4 Rythme adapté
+  animationRythme         Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 5: CONTENU (Évaluation à chaud uniquement)
+  // ===========================================
+  // 5.1 Contenu en cohérence avec attentes
+  contenuCoherence        Int?                    // Note 0-10
+  // 5.2 Notions utiles pour la pratique
+  contenuUtilite          Int?                    // Note 0-10
+  // 5.3 Supports clairs et structurés
+  contenuSupports         Int?                    // Note 0-10
+  // 5.4 Niveau adapté au profil
+  contenuNiveau           Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 6: ATTEINTE DES OBJECTIFS
+  // ===========================================
+  // Objectifs pédagogiques atteints (0-10)
+  objectifsAtteints       Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 7 (CHAUD) / SECTION 2 (FROID): APPRÉCIATION GLOBALE
+  // ===========================================
+  // Note globale de satisfaction
+  noteGlobale             Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTIONS SPÉCIFIQUES À L'ÉVALUATION À FROID
+  // ===========================================
+  // 2.2 (Froid) Répondu aux attentes initiales
+  froidAttentesInitiales  Int?                    // Note 0-10
+
+  // 3.1 (Froid) Compétences utiles acquises
+  froidCompetencesUtiles  Int?                    // Note 0-10
+  // 3.2 (Froid) Mise en pratique des acquis
+  froidMiseEnPratique     Int?                    // Note 0-10
+  // 3.3 (Froid) Impact positif sur le travail
+  froidImpactTravail      Int?                    // Note 0-10
+
+  // 4.1 (Froid) Contenu encore pertinent
+  froidPertinenceActuelle Int?                    // Note 0-10
+  // 4.2 (Froid) Utilité dans les prochains mois
+  froidUtiliteFuture      Int?                    // Note 0-10
+
+  // 5 (Froid) Mise en pratique des objectifs pédagogiques
+  froidObjectifsPratique  Int?                    // Note 0-10
+
+  // 6 (Froid) Recommandation
+  recommandation          Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION COMMENTAIRES
+  // ===========================================
+  suggestions             String?                 @db.Text
+
+  // ===========================================
+  // SCORES CALCULÉS
+  // ===========================================
+  // Score moyen automatiquement calculé (moyenne de toutes les notes)
+  scoreMoyen              Float?
+
+  // Score de satisfaction (note globale / 10 * 100)
+  tauxSatisfaction        Float?
+
+  // ===========================================
+  // METADATA TECHNIQUE
+  // ===========================================
+  ipAddress               String?
+  userAgent               String?
+
+  // Timestamps
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([evaluationId])
+}
+
+// ===========================================
+// ÉVALUATION INTERVENANT (Qualiopi IND 2)
+// ===========================================
+// Évaluation par l'intervenant après chaque session
+
+enum EvaluationIntervenantStatus {
+  PENDING     // En attente de complétion
+  IN_PROGRESS // En cours de remplissage
+  COMPLETED   // Complété
+  EXPIRED     // Expiré
+}
+
+// Demande d'évaluation intervenant
+model EvaluationIntervenant {
+  id                String                     @id @default(cuid())
+
+  // Organisation (multi-tenant)
+  organizationId    String
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Session de formation liée
+  sessionId         String
+  session           DocumentSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Intervenant concerné
+  intervenantId     String
+  intervenant       Intervenant                @relation("EvaluationIntervenantIntervenant", fields: [intervenantId], references: [id], onDelete: Cascade)
+
+  // Token unique pour accès public (QR code / lien)
+  token             String                     @unique @default(cuid())
+
+  // Statut
+  status            EvaluationIntervenantStatus @default(PENDING)
+
+  // Dates
+  expiresAt         DateTime?                  // Date d'expiration du lien
+  sentAt            DateTime?                  // Date d'envoi à l'intervenant
+  startedAt         DateTime?                  // Date de début de complétion
+  completedAt       DateTime?                  // Date de complétion
+
+  // Réponse (stockée dans un modèle séparé)
+  reponse           EvaluationIntervenantReponse?
+
+  // Metadata
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@unique([sessionId, intervenantId])
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([intervenantId])
+  @@index([token])
+  @@index([status])
+}
+
+// Réponses détaillées à l'évaluation intervenant
+model EvaluationIntervenantReponse {
+  id                      String                  @id @default(cuid())
+
+  // Évaluation parent
+  evaluationId            String                  @unique
+  evaluation              EvaluationIntervenant   @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  // ===========================================
+  // SECTION 2: ORGANISATION ET LOGISTIQUE
+  // ===========================================
+  // 2.1 Conditions matérielles et logistiques adaptées
+  organisationConditions  Int?                    // Note 0-10
+  // 2.2 Taille du groupe et niveau des participants adaptés
+  organisationGroupe      Int?                    // Note 0-10
+  // 2.3 Coordination avec l'organisme satisfaisante
+  organisationCoordination Int?                   // Note 0-10
+  // 2.4 Supports mis à disposition cohérents
+  organisationSupports    Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 3: CONTENU, MÉTHODES ET DYNAMIQUE
+  // ===========================================
+  // 3.1 Programme et objectifs réalistes et adaptés
+  contenueObjectifs       Int?                    // Note 0-10
+  // 3.2 Méthodes pédagogiques ont bien fonctionné
+  contenuMethodes         Int?                    // Note 0-10
+  // 3.3 Niveau de participation et engagement satisfaisant
+  contenuParticipation    Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 4: ATTEINTE OBJECTIFS ET RESSENTI
+  // ===========================================
+  // 4.1 Objectifs pédagogiques atteints par le groupe
+  objectifsAtteints       Int?                    // Note 0-10
+  // 4.2 Valeur ajoutée apportée aux participants
+  valeurAjoutee           Int?                    // Note 0-10
+  // 4.3 Satisfaction globale du déroulement
+  satisfactionGlobale     Int?                    // Note 0-10
+
+  // ===========================================
+  // SECTION 5: SUGGESTIONS
+  // ===========================================
+  suggestions             String?                 @db.Text
+
+  // ===========================================
+  // SCORES CALCULÉS
+  // ===========================================
+  scoreMoyen              Float?
+
+  // ===========================================
+  // METADATA TECHNIQUE
+  // ===========================================
+  ipAddress               String?
+  userAgent               String?
+
+  // Timestamps
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([evaluationId])
 }

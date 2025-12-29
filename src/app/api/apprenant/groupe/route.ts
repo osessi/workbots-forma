@@ -89,7 +89,6 @@ export async function GET(request: NextRequest) {
       nom: insc.apprenant.nom,
       prenom: insc.apprenant.prenom,
       email: insc.apprenant.email,
-      entreprise: insc.apprenant.entreprise,
     }));
 
     // Trier pour mettre l'utilisateur actuel en premier

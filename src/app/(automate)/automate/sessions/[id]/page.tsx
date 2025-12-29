@@ -150,6 +150,12 @@ const TrashIcon = () => (
   </svg>
 );
 
+const EditIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M10 1.5l2.5 2.5L4.5 12H2v-2.5L10 1.5z" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 // Status colors
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
   BROUILLON: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400", dot: "bg-gray-400" },
@@ -187,6 +193,15 @@ export default function SessionDetailPage() {
   const [addingClient, setAddingClient] = useState(false);
   const [availableApprenants, setAvailableApprenants] = useState<Apprenant[]>([]);
   const [availableEntreprises, setAvailableEntreprises] = useState<Entreprise[]>([]);
+
+  // Edit modals
+  const [showEditLieuModal, setShowEditLieuModal] = useState(false);
+  const [showEditFormateurModal, setShowEditFormateurModal] = useState(false);
+  const [availableLieux, setAvailableLieux] = useState<{ id: string; nom: string; typeLieu: string; lieuFormation: string }[]>([]);
+  const [availableFormateurs, setAvailableFormateurs] = useState<{ id: string; nom: string; prenom: string }[]>([]);
+  const [selectedLieuId, setSelectedLieuId] = useState("");
+  const [selectedFormateurId, setSelectedFormateurId] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   // Form state
   const [clientForm, setClientForm] = useState({
@@ -242,11 +257,37 @@ export default function SessionDetailPage() {
     }
   }, []);
 
+  // Fetch lieux
+  const fetchLieux = useCallback(async () => {
+    try {
+      const res = await fetch("/api/lieux");
+      if (!res.ok) return;
+      const data = await res.json();
+      setAvailableLieux(data || []);
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  // Fetch formateurs
+  const fetchFormateurs = useCallback(async () => {
+    try {
+      const res = await fetch("/api/intervenants");
+      if (!res.ok) return;
+      const data = await res.json();
+      setAvailableFormateurs(data || []);
+    } catch {
+      // Ignore
+    }
+  }, []);
+
   useEffect(() => {
     fetchSession();
     fetchApprenants();
     fetchEntreprises();
-  }, [fetchSession, fetchApprenants, fetchEntreprises]);
+    fetchLieux();
+    fetchFormateurs();
+  }, [fetchSession, fetchApprenants, fetchEntreprises, fetchLieux, fetchFormateurs]);
 
   // Update session status
   const updateStatus = async (newStatus: string) => {
@@ -260,6 +301,44 @@ export default function SessionDetailPage() {
       fetchSession();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erreur");
+    }
+  };
+
+  // Update lieu
+  const handleUpdateLieu = async () => {
+    setUpdating(true);
+    try {
+      const res = await fetch(`/api/training-sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lieuId: selectedLieuId || null }),
+      });
+      if (!res.ok) throw new Error("Erreur lors de la mise à jour du lieu");
+      setShowEditLieuModal(false);
+      fetchSession();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Update formateur
+  const handleUpdateFormateur = async () => {
+    setUpdating(true);
+    try {
+      const res = await fetch(`/api/training-sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formateurId: selectedFormateurId || null }),
+      });
+      if (!res.ok) throw new Error("Erreur lors de la mise à jour du formateur");
+      setShowEditFormateurModal(false);
+      fetchSession();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -457,11 +536,23 @@ export default function SessionDetailPage() {
 
         {/* Lieu */}
         <div className="p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
-              <MapPinIcon />
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
+                <MapPinIcon />
+              </div>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Lieu</h3>
             </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Lieu</h3>
+            <button
+              onClick={() => {
+                setSelectedLieuId(session.lieu?.id || "");
+                setShowEditLieuModal(true);
+              }}
+              className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+              title="Modifier le lieu"
+            >
+              <EditIcon />
+            </button>
           </div>
           {session.lieu ? (
             <div>
@@ -477,11 +568,23 @@ export default function SessionDetailPage() {
 
         {/* Formateur */}
         <div className="p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
-              <UserIcon />
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
+                <UserIcon />
+              </div>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Formateur</h3>
             </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Formateur</h3>
+            <button
+              onClick={() => {
+                setSelectedFormateurId(session.formateur?.id || "");
+                setShowEditFormateurModal(true);
+              }}
+              className="p-1.5 text-gray-400 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+              title="Modifier le formateur"
+            >
+              <EditIcon />
+            </button>
           </div>
           {session.formateur ? (
             <div>
@@ -736,6 +839,112 @@ export default function SessionDetailPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Lieu Modal */}
+      {showEditLieuModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Modifier le lieu</h2>
+              <button
+                onClick={() => setShowEditLieuModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Lieu de formation
+                </label>
+                <select
+                  value={selectedLieuId}
+                  onChange={(e) => setSelectedLieuId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Aucun lieu sélectionné</option>
+                  {availableLieux.map((lieu) => (
+                    <option key={lieu.id} value={lieu.id}>
+                      {lieu.nom} - {lieu.typeLieu === "DISTANCIEL" ? "En ligne" : lieu.lieuFormation}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditLieuModal(false)}
+                  className="px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleUpdateLieu}
+                  disabled={updating}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
+                >
+                  {updating && <LoaderIcon />}
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Formateur Modal */}
+      {showEditFormateurModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md">
+            <div className="border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Modifier le formateur</h2>
+              <button
+                onClick={() => setShowEditFormateurModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Formateur
+                </label>
+                <select
+                  value={selectedFormateurId}
+                  onChange={(e) => setSelectedFormateurId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">Aucun formateur sélectionné</option>
+                  {availableFormateurs.map((formateur) => (
+                    <option key={formateur.id} value={formateur.id}>
+                      {formateur.prenom} {formateur.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditFormateurModal(false)}
+                  className="px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleUpdateFormateur}
+                  disabled={updating}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
+                >
+                  {updating && <LoaderIcon />}
+                  Enregistrer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

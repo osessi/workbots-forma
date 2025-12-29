@@ -36,6 +36,11 @@ interface ProgrammeData {
     description: string | null;
     dureeHeures: number;
     objectifsPedagogiques: string[];
+    modalite: string | null;
+    publicCible: string | null;
+    prerequis: string | null;
+    moyensPedagogiques: string | null;
+    reference: string | null;
   };
   modules: Module[];
   progression: {
@@ -382,6 +387,91 @@ export default function ProgrammePage() {
               <span className="text-xl font-bold">{data.progression.global}%</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Infos formation */}
+      {data?.formation && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Informations sur la formation
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Durée */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                <Clock className="w-4 h-4" />
+                <span className="text-xs font-medium">Durée</span>
+              </div>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">
+                {data.formation.dureeHeures}h
+              </p>
+            </div>
+
+            {/* Modalité */}
+            {data.formation.modalite && (
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                  <BookOpen className="w-4 h-4" />
+                  <span className="text-xs font-medium">Modalité</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {data.formation.modalite === "PRESENTIEL" ? "Présentiel" :
+                   data.formation.modalite === "DISTANCIEL" ? "Distanciel" :
+                   data.formation.modalite === "MIXTE" ? "Mixte" : data.formation.modalite}
+                </p>
+              </div>
+            )}
+
+            {/* Référence */}
+            {data.formation.reference && (
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                  <FileText className="w-4 h-4" />
+                  <span className="text-xs font-medium">Référence</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {data.formation.reference}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Public cible */}
+          {data.formation.publicCible && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                Public cible
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {data.formation.publicCible}
+              </p>
+            </div>
+          )}
+
+          {/* Prérequis */}
+          {data.formation.prerequis && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                Prérequis
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {data.formation.prerequis}
+              </p>
+            </div>
+          )}
+
+          {/* Moyens pédagogiques */}
+          {data.formation.moyensPedagogiques && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                Moyens pédagogiques
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line">
+                {data.formation.moyensPedagogiques}
+              </p>
+            </div>
+          )}
         </div>
       )}
 

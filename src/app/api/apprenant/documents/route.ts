@@ -81,20 +81,15 @@ export async function GET(request: NextRequest) {
     // Formater les documents
     const documents = inscription.formation.documents.map((doc) => ({
       id: doc.id,
-      nom: doc.nom,
-      description: doc.description,
+      nom: doc.titre,
       type: doc.type,
-      url: doc.url,
-      taille: doc.taille,
-      categorie: doc.categorie,
+      url: doc.fileUrl,
+      taille: doc.fileSize,
       createdAt: doc.createdAt.toISOString(),
     }));
 
-    // Extraire les catégories uniques
-    const categories = [...new Set(documents
-      .map((d) => d.categorie)
-      .filter((c): c is string => c !== null)
-    )];
+    // Extraire les types uniques comme catégories
+    const categories = [...new Set(documents.map((d) => d.type))];
 
     return NextResponse.json({
       documents,

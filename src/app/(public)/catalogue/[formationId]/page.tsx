@@ -381,7 +381,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
             {formation.indicateurs?.tauxSatisfaction && (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/90 text-white backdrop-blur-sm flex items-center gap-1">
                 <Star className="w-3.5 h-3.5" />
-                {formation.indicateurs.tauxSatisfaction}/10
+                {(formation.indicateurs.tauxSatisfaction / 10).toFixed(1)}/10
                 {formation.indicateurs.nombreAvis > 0 && ` (${formation.indicateurs.nombreAvis} avis)`}
               </span>
             )}
@@ -458,7 +458,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                           className="h-full rounded-full transition-all"
                           style={{
                             width: `${formation.indicateurs?.tauxSatisfaction
-                              ? Math.min(formation.indicateurs.tauxSatisfaction * 10, 100)
+                              ? Math.min(formation.indicateurs.tauxSatisfaction, 100)
                               : 0}%`,
                             backgroundColor: primaryColor,
                           }}
@@ -466,7 +466,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                       </div>
                       <span className="text-lg font-bold whitespace-nowrap" style={{ color: primaryColor }}>
                         {formation.indicateurs?.tauxSatisfaction
-                          ? `${formation.indicateurs.tauxSatisfaction}/10`
+                          ? `${(formation.indicateurs.tauxSatisfaction / 10).toFixed(1)}/10`
                           : "N/A"}
                       </span>
                       {formation.indicateurs?.nombreAvis && formation.indicateurs.nombreAvis > 0 && (
@@ -880,7 +880,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                           className="h-full rounded-full transition-all"
                           style={{
                             width: `${formation.indicateurs?.tauxSatisfaction
-                              ? Math.min(formation.indicateurs.tauxSatisfaction * 10, 100)
+                              ? Math.min(formation.indicateurs.tauxSatisfaction, 100)
                               : 0}%`,
                             backgroundColor: primaryColor,
                           }}
@@ -888,7 +888,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                       </div>
                       <span className="text-2xl font-bold" style={{ color: primaryColor }}>
                         {formation.indicateurs?.tauxSatisfaction
-                          ? `${formation.indicateurs.tauxSatisfaction}/10`
+                          ? `${(formation.indicateurs.tauxSatisfaction / 10).toFixed(1)}/10`
                           : "N/A"}
                       </span>
                       {formation.indicateurs?.nombreAvis && formation.indicateurs.nombreAvis > 0 && (

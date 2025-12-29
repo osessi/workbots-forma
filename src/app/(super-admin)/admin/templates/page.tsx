@@ -23,7 +23,7 @@ const DOCUMENT_TYPES = {
   CONVENTION: { label: "Convention de formation", color: "bg-purple-500" },
   CONTRAT_FORMATION: { label: "Contrat de formation", color: "bg-violet-500" },
   CONVOCATION: { label: "Convocation", color: "bg-green-500" },
-  ATTESTATION_PRESENCE: { label: "Feuille d'émargement", color: "bg-orange-500" },
+  ATTESTATION_PRESENCE: { label: "Attestation de présence", color: "bg-orange-400" },
   ATTESTATION_FIN: { label: "Attestation de fin", color: "bg-pink-500" },
   EVALUATION_CHAUD: { label: "Évaluation à chaud", color: "bg-yellow-500" },
   EVALUATION_FROID: { label: "Évaluation à froid", color: "bg-amber-500" },
@@ -31,6 +31,12 @@ const DOCUMENT_TYPES = {
   CERTIFICAT: { label: "Certificat", color: "bg-emerald-500" },
   DEVIS: { label: "Devis", color: "bg-teal-500" },
   FACTURE: { label: "Facture", color: "bg-cyan-500" },
+  CONDITIONS_GENERALES_VENTE: { label: "Conditions générales de vente", color: "bg-slate-500" },
+  CONTRAT_SOUS_TRAITANCE: { label: "Contrat de sous-traitance", color: "bg-rose-500" },
+  EVALUATION_INTERVENANT: { label: "Évaluation intervenant", color: "bg-lime-500" },
+  EVALUATION_ENTREPRISE: { label: "Évaluation entreprise", color: "bg-sky-500" },
+  EVALUATION_FINANCEUR: { label: "Évaluation financeur", color: "bg-fuchsia-500" },
+  FEUILLE_EMARGEMENT: { label: "Feuille d'émargement", color: "bg-orange-500" },
   AUTRE: { label: "Autre", color: "bg-gray-500" },
 };
 

@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
         description: module.description,
         ordre: module.ordre,
         duree: module.duree,
-        objectifs: module.objectifs || [],
+        objectifs: [],
         contenu: module.contenu,
         progression: progression?.progression || 0,
         statut: progression?.statut || "NON_COMMENCE",
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
 
     // Calculer la progression globale
     const modulesTermines = modulesAvecProgression.filter(
-      (m) => m.statut === "TERMINE"
+      (m) => m.statut === "COMPLETE"
     ).length;
     const totalModules = modulesAvecProgression.length;
     const progressionGlobale = totalModules > 0
@@ -116,8 +116,13 @@ export async function GET(request: NextRequest) {
         id: inscription.formation.id,
         titre: inscription.formation.titre,
         description: inscription.formation.description,
-        dureeHeures: inscription.formation.dureeHeures,
-        objectifsPedagogiques: inscription.formation.objectifsPedagogiques || [],
+        dureeHeures: inscription.formation.modules.reduce((sum, m) => sum + ((m.duree || 0) / 60), 0),
+        objectifsPedagogiques: [],
+        modalite: null,
+        publicCible: null,
+        prerequis: null,
+        moyensPedagogiques: null,
+        reference: null,
       },
       modules: modulesAvecProgression,
       progression: {

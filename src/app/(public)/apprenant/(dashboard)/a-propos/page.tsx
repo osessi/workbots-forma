@@ -61,9 +61,9 @@ export default function AProposPage() {
               <h2 className="text-2xl font-bold">
                 {organization?.nomCommercial || organization?.name || "Organisme de formation"}
               </h2>
-              {organization?.siren && (
+              {organization?.siret && (
                 <p className="text-white/80 text-sm mt-1">
-                  SIREN: {organization.siren}
+                  SIRET: {organization.siret}
                 </p>
               )}
             </div>
@@ -128,7 +128,7 @@ export default function AProposPage() {
                 Certifications
               </h3>
 
-              {organization?.numeroDA && (
+              {organization?.numeroFormateur && (
                 <div className="flex items-center gap-3 p-3 bg-brand-50 dark:bg-brand-500/10 rounded-lg">
                   <Shield className="w-5 h-5 text-brand-600 dark:text-brand-400" />
                   <div>
@@ -136,31 +136,12 @@ export default function AProposPage() {
                       Numéro de déclaration d&apos;activité
                     </p>
                     <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">
-                      {organization.numeroDA}
+                      {organization.numeroFormateur}
                     </p>
                   </div>
                 </div>
               )}
 
-              {organization?.qualiopi && (
-                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-500/10 rounded-lg">
-                  <Image
-                    src="/logoqualiopi.png"
-                    alt="Qualiopi"
-                    width={60}
-                    height={40}
-                    className="h-10 w-auto object-contain"
-                  />
-                  <div>
-                    <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                      Certification Qualiopi
-                    </p>
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      Organisme certifié qualité
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 

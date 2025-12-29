@@ -99,8 +99,8 @@ export async function GET(request: NextRequest) {
             id: evaluation.resultats[0].id,
             status: evaluation.resultats[0].status,
             score: evaluation.resultats[0].score,
-            datePassage: evaluation.resultats[0].datePassage?.toISOString() || null,
-            tempsTotal: evaluation.resultats[0].tempsTotal,
+            datePassage: evaluation.resultats[0].completedAt?.toISOString() || null,
+            tempsTotal: evaluation.resultats[0].tempsPassé,
           }
         : null,
     }));

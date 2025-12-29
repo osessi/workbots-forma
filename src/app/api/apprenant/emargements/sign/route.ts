@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
         feuilleId,
         participantId,
         periode,
-        signature,
+        signatureData: signature,
         signedAt: new Date(),
         ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null,
         userAgent: request.headers.get("user-agent") || null,

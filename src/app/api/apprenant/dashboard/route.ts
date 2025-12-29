@@ -77,8 +77,18 @@ export async function GET(request: NextRequest) {
         : { apprenantId },
       include: {
         formation: {
-          include: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+            image: true,
             modules: {
+              select: {
+                id: true,
+                titre: true,
+                ordre: true,
+                duree: true,
+              },
               orderBy: { ordre: "asc" },
             },
             documents: true,
@@ -104,7 +114,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Récupérer les évaluations en attente
+    // Récupérer les évaluations QCM/Atelier en attente
     const evaluationsEnAttente = await prisma.evaluation.count({
       where: {
         formationId: inscription.formationId,
@@ -134,6 +144,32 @@ export async function GET(request: NextRequest) {
       orderBy: { ordre: "asc" },
     });
 
+    // Récupérer les évaluations de satisfaction en attente (Qualiopi IND 2)
+    const evaluationsSatisfactionEnAttente = await prisma.evaluationSatisfaction.findMany({
+      where: {
+        apprenantId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
+      },
+      include: {
+        session: {
+          include: {
+            formation: {
+              select: { id: true, titre: true },
+            },
+            journees: {
+              orderBy: { date: "asc" },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
     // Compter les documents disponibles
     const documentsDisponibles = inscription.formation.documents.length;
 
@@ -154,19 +190,6 @@ export async function GET(request: NextRequest) {
             session: {
               include: {
                 journees: {
-                  include: {
-                    emargements: {
-                      include: {
-                        signatures: {
-                          where: {
-                            participantId: {
-                              not: undefined,
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
                   orderBy: { date: "asc" },
                 },
                 formateur: true,
@@ -190,23 +213,14 @@ export async function GET(request: NextRequest) {
       priorite: "haute" | "moyenne" | "basse";
     }> = [];
 
-    // Parcourir les participations pour trouver les émargements non signés
+    // Calculer les émargements en attente à partir des signatures du participant
     for (const participation of sessionParticipations) {
-      const session = participation.client.session;
-
-      for (const journee of session.journees) {
-        for (const feuille of journee.emargements) {
-          // Vérifier si l'apprenant a signé le matin
-          const signatureMatin = feuille.signatures.find(
-            (s) => s.participantId === participation.id && s.periode === "matin"
-          );
-          const signatureAprem = feuille.signatures.find(
-            (s) => s.participantId === participation.id && s.periode === "aprem"
-          );
-
-          if (!signatureMatin) emargementsEnAttente++;
-          if (!signatureAprem) emargementsEnAttente++;
-        }
+      const signatureCount = participation.signatures?.length || 0;
+      const journeeCount = participation.client.session.journees?.length || 0;
+      // Chaque journée nécessite 2 signatures (matin + après-midi)
+      const totalSignaturesNeeded = journeeCount * 2;
+      if (signatureCount < totalSignaturesNeeded) {
+        emargementsEnAttente += totalSignaturesNeeded - signatureCount;
       }
     }
 
@@ -233,6 +247,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Ajouter les évaluations de satisfaction en attente (Qualiopi IND 2)
+    if (evaluationsSatisfactionEnAttente.length > 0) {
+      actionsUrgentes.push({
+        type: "evaluation_satisfaction",
+        titre: "Évaluations de satisfaction",
+        description: `${evaluationsSatisfactionEnAttente.length} évaluation${evaluationsSatisfactionEnAttente.length > 1 ? "s" : ""} de satisfaction à compléter`,
+        action: "Donner mon avis",
+        actionUrl: "/apprenant/evaluations-satisfaction",
+        priorite: "haute",
+      });
+    }
+
     // Récupérer les prochains créneaux
     const now = new Date();
     const prochainsCreneaux: Array<{
@@ -253,8 +279,8 @@ export async function GET(request: NextRequest) {
           prochainsCreneaux.push({
             id: journee.id,
             date: journee.date.toISOString(),
-            heureDebut: journee.heureDebut || "09:00",
-            heureFin: journee.heureFin || "17:00",
+            heureDebut: journee.heureDebutMatin || "09:00",
+            heureFin: journee.heureFinAprem || "17:00",
             sessionNom: session.nom || `Session ${session.reference}`,
             lieu: session.lieu?.nom || null,
             formateur: session.formateur
@@ -290,6 +316,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       stats: {
         evaluationsEnAttente,
+        evaluationsSatisfactionEnAttente: evaluationsSatisfactionEnAttente.length,
         documentsDisponibles,
         emargementsEnAttente,
         prochainsCréneaux: prochainsCréneauxLimités.length,
@@ -317,7 +344,7 @@ export async function GET(request: NextRequest) {
         titre: inscription.formation.titre,
         description: inscription.formation.description,
         image: inscription.formation.image,
-        dureeHeures: inscription.formation.dureeHeures,
+        dureeMinutes: inscription.formation.modules.reduce((sum, m) => sum + (m.duree || 0), 0),
         nombreModules: inscription.formation.modules.length,
       },
       evaluations: evaluationsDetails.map((e) => ({
@@ -327,6 +354,20 @@ export async function GET(request: NextRequest) {
         description: e.description,
         dureeEstimee: e.dureeEstimee,
         resultat: e.resultats[0] || null,
+      })),
+      // Évaluations de satisfaction en attente (Qualiopi IND 2)
+      evaluationsSatisfaction: evaluationsSatisfactionEnAttente.map((e) => ({
+        id: e.id,
+        type: e.type,
+        status: e.status,
+        token: e.token,
+        sessionId: e.sessionId,
+        formationTitre: e.session?.formation?.titre || null,
+        dateSession: e.session?.journees?.[0]?.date?.toISOString() || null,
+        expiresAt: e.expiresAt?.toISOString() || null,
+        createdAt: e.createdAt.toISOString(),
+        // URL directe pour compléter l'évaluation
+        evaluationUrl: `/evaluation-satisfaction/${e.token}`,
       })),
     });
   } catch (error) {

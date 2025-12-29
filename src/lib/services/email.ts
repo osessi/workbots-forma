@@ -1555,3 +1555,143 @@ ${data.organizationName} - Organisme de formation
 
   return { subject, html, text };
 }
+
+// ===========================================
+// EMAIL CODE OTP INTERVENANT
+// ===========================================
+// Code de connexion pour l'espace intervenant
+
+interface IntervenantOTPEmailData {
+  prenom: string;
+  code: string;
+  organizationName: string;
+  organizationLogo?: string | null;
+  primaryColor?: string;
+  expiresInMinutes: number;
+}
+
+export function generateIntervenantOTPEmail(data: IntervenantOTPEmailData) {
+  const color = data.primaryColor || "#10B981"; // Emerald color for intervenants
+
+  const subject = `🔐 Votre code de connexion Intervenant - ${data.organizationName}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Code de connexion</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="500" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+          <!-- Header avec logo -->
+          <tr>
+            <td style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%); padding: 30px 40px; text-align: center;">
+              ${data.organizationLogo
+                ? `<img src="${data.organizationLogo}" alt="${data.organizationName}" style="max-height: 50px; max-width: 180px;">`
+                : `<h1 style="color: white; margin: 0; font-size: 22px;">${data.organizationName}</h1>`
+              }
+            </td>
+          </tr>
+
+          <!-- Icône cadenas -->
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center;">
+              <div style="width: 70px; height: 70px; background: linear-gradient(135deg, ${color}15 0%, ${color}25 100%); border-radius: 50%; margin: 0 auto 20px; display: inline-flex; align-items: center; justify-content: center;">
+                <span style="font-size: 32px;">🔐</span>
+              </div>
+              <h2 style="color: #1a1a2e; margin: 0 0 8px; font-size: 24px; font-weight: 600;">
+                Bonjour ${data.prenom} !
+              </h2>
+              <p style="color: #6c757d; margin: 0; font-size: 15px;">
+                Voici votre code de connexion à l'espace intervenant
+              </p>
+            </td>
+          </tr>
+
+          <!-- Code OTP -->
+          <tr>
+            <td style="padding: 10px 40px 30px; text-align: center;">
+              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px; padding: 25px; margin: 0 auto; max-width: 280px; border: 2px dashed ${color}40;">
+                <p style="margin: 0 0 10px; color: #6c757d; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
+                  Code de vérification
+                </p>
+                <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 42px; font-weight: bold; letter-spacing: 8px; color: ${color};">
+                  ${data.code}
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Instructions -->
+          <tr>
+            <td style="padding: 0 40px 30px; text-align: center;">
+              <p style="margin: 0 0 15px; color: #495057; font-size: 14px; line-height: 1.6;">
+                Entrez ce code sur la page de connexion pour accéder à votre espace intervenant.
+              </p>
+              <div style="display: inline-block; background-color: #fff3cd; border-radius: 8px; padding: 12px 20px;">
+                <p style="margin: 0; color: #856404; font-size: 13px;">
+                  ⏱️ Ce code expire dans <strong>${data.expiresInMinutes} minutes</strong>
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Sécurité -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-top: 1px solid #e9ecef;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width: 30px; vertical-align: top; padding-top: 2px;">
+                    <span style="font-size: 16px;">🔒</span>
+                  </td>
+                  <td>
+                    <p style="margin: 0; color: #6c757d; font-size: 12px; line-height: 1.5;">
+                      Si vous n'avez pas demandé ce code, ignorez simplement cet email.
+                      Ne partagez jamais ce code avec qui que ce soit.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #1a1a2e; text-align: center;">
+              <p style="margin: 0; color: #ffffff99; font-size: 12px;">
+                ${data.organizationName} - Espace Intervenant
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const text = `
+Bonjour ${data.prenom},
+
+Voici votre code de connexion pour accéder à votre espace intervenant :
+
+🔐 ${data.code}
+
+Ce code expire dans ${data.expiresInMinutes} minutes.
+
+Entrez ce code sur la page de connexion pour accéder à votre espace.
+
+Si vous n'avez pas demandé ce code, ignorez simplement cet email.
+
+---
+${data.organizationName} - Espace Intervenant
+`;
+
+  return { subject, html, text };
+}

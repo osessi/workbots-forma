@@ -89,7 +89,6 @@ export async function PUT(request: NextRequest) {
         email: updatedApprenant.email,
         telephone: updatedApprenant.telephone,
         adresse: updatedApprenant.adresse,
-        entreprise: updatedApprenant.entreprise,
       },
     });
   } catch (error) {

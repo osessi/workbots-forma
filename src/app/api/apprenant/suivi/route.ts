@@ -100,11 +100,11 @@ export async function GET(request: NextRequest) {
         duree: module.duree,
         progression: progression?.progression || 0,
         statut: progression?.statut || "NON_COMMENCE",
-        tempsConsacre: progression?.tempsConsacre || 0,
+        tempsConsacre: progression?.tempsPasse || 0,
       };
     });
 
-    const modulesTermines = modules.filter((m) => m.statut === "TERMINE").length;
+    const modulesTermines = modules.filter((m) => m.statut === "COMPLETE").length;
     const totalModules = modules.length;
 
     // Récupérer les résultats d'évaluations

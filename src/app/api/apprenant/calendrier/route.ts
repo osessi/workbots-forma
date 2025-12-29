@@ -113,8 +113,8 @@ export async function GET(request: NextRequest) {
         events.push({
           id: journee.id,
           date: journee.date.toISOString(),
-          heureDebut: journee.heureDebut || "09:00",
-          heureFin: journee.heureFin || "17:00",
+          heureDebut: journee.heureDebutMatin || "09:00",
+          heureFin: journee.heureFinAprem || "17:00",
           sessionNom: session.nom || `Session ${session.reference}`,
           sessionReference: session.reference,
           lieu: session.lieu?.nom || null,

@@ -1,6 +1,7 @@
 # Nixpacks configuration for Coolify deployment
 [phases.setup]
-nixPkgs = ["nodejs_22", "npm", "openssl"]
+# npm is included with nodejs, no need to specify it separately
+nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
 cmds = ["npm ci"]
@@ -15,6 +16,5 @@ cmds = [
 cmd = "npm run start"
 
 [variables]
-NODE_ENV = "production"
 NEXT_TELEMETRY_DISABLED = "1"
 NODE_OPTIONS = "--max-old-space-size=4096"

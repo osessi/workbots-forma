@@ -33,6 +33,7 @@ import {
   Eye,
   MessageSquareWarning,
   TrendingUp as TrendingUpIcon,
+  Workflow,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -137,6 +138,11 @@ const mainNavItems: NavItem[] = [
     icon: <Bot size={20} strokeWidth={1.5} />,
     name: "Agent Qualiopi",
     path: "/automate/agent-qualiopi",
+  },
+  {
+    icon: <Workflow size={20} strokeWidth={1.5} />,
+    name: "Automatisations",
+    path: "/automate/automatisations",
   },
   {
     icon: <Newspaper size={20} strokeWidth={1.5} />,

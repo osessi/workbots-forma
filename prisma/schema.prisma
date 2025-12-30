@@ -162,6 +162,61 @@ enum TemplateCategory {
 }
 
 // ===========================================
+// ENUMS QUALIOPI
+// ===========================================
+
+// Statut d'un indicateur Qualiopi
+enum IndicateurStatus {
+  CONFORME          // Indicateur conforme
+  NON_CONFORME      // Indicateur non conforme
+  EN_COURS          // En cours de mise en conformité
+  NON_APPLICABLE    // Non applicable à l'organisme
+  A_EVALUER         // À évaluer
+}
+
+// Type d'alerte Qualiopi
+enum AlerteQualiopiType {
+  DOCUMENT_MANQUANT       // Document obligatoire manquant
+  DOCUMENT_EXPIRE         // Document expiré
+  INDICATEUR_NON_CONFORME // Indicateur non conforme
+  AUDIT_PROCHE            // Audit approchant
+  ACTION_EN_RETARD        // Action corrective en retard
+  MISE_A_JOUR_REQUISE     // Mise à jour requise
+}
+
+// Priorité d'une alerte
+enum AlertePriorite {
+  BASSE
+  MOYENNE
+  HAUTE
+  CRITIQUE
+}
+
+// Statut d'une action corrective
+enum ActionCorrectiveStatus {
+  A_FAIRE
+  EN_COURS
+  TERMINEE
+  ANNULEE
+}
+
+// Type d'audit
+enum AuditType {
+  INITIAL        // Premier audit de certification
+  SURVEILLANCE   // Audit de surveillance
+  RENOUVELLEMENT // Audit de renouvellement
+  SIMULATION     // Simulation interne
+}
+
+// Résultat d'audit
+enum AuditResultat {
+  EN_ATTENTE
+  REUSSI
+  ECHOUE
+  PARTIEL
+}
+
+// ===========================================
 // ORGANISATIONS (Multi-tenant root)
 // ===========================================
 
@@ -288,6 +343,18 @@ model Organization {
   // Qualiopi IND 32 - Améliorations
   ameliorations ActionAmelioration[]
 
+  // Module 6 - Moteur d'automatisation
+  workflows              Workflow[]
+  workflowEmailTemplates WorkflowEmailTemplate[]
+  workflowSMSTemplates   WorkflowSMSTemplate[]
+
+  // Module 7 & 8 - Qualiopi & Agent IA
+  auditsQualiopi         AuditQualiopi[]
+  indicateursConformite  IndicateurConformite[]
+  alertesQualiopi        AlerteQualiopi[]
+  conversationsQualiopi  ConversationQualiopi[]
+  bilansFinanciers       BilanPedagogiqueFinancier[]
+
   @@index([slug])
   @@index([customDomain])
 }
@@ -335,6 +402,10 @@ model User {
   // Qualiopi IND 23, 24, 25 - Veille réglementaire
   veilleArticleLectures VeilleArticleLecture[]
   veilleConversations   VeilleConversation[]
+
+  // Module 7 & 8 - Qualiopi & Agent IA
+  actionsCorrectivesResponsable ActionCorrective[]
+  conversationsQualiopi         ConversationQualiopi[]
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -4047,4 +4118,654 @@ model ActionAmelioration {
   @@index([origine])
   @@index([echeance])
   @@index([formationId])
+}
+
+// ===========================================
+// MODULE 6 : MOTEUR D'AUTOMATISATION
+// ===========================================
+
+// Types de déclencheurs disponibles
+enum WorkflowTriggerType {
+  // Événements liés aux inscriptions
+  PRE_INSCRIPTION // Nouvelle pré-inscription
+  INSCRIPTION_SESSION // Inscription confirmée à une session
+
+  // Événements temporels liés aux sessions
+  SESSION_J_MOINS_7 // 7 jours avant début session
+  SESSION_J_MOINS_1 // 1 jour avant début session
+  SESSION_DEBUT // Début de session
+  SESSION_FIN_JOURNEE // Fin de journée de formation
+  SESSION_FIN // Fin de session
+  SESSION_J_PLUS_30 // 30 jours après fin (éval à froid)
+
+  // Événements liés aux évaluations
+  EVALUATION_COMPLETEE // Évaluation complétée
+  SCORE_INFERIEUR_SEUIL // Score inférieur à un seuil défini
+
+  // Événements liés aux documents
+  DOCUMENT_NON_SIGNE // Document non signé après X jours
+  DOCUMENT_GENERE // Document généré
+  SIGNATURE_RECUE // Signature reçue
+
+  // Événements liés aux réclamations/qualité
+  RECLAMATION_RECUE // Nouvelle réclamation
+  AMELIORATION_CREEE // Nouvelle action d'amélioration
+
+  // Planification personnalisée
+  CRON // Exécution planifiée (cron expression)
+
+  // Événements manuels
+  MANUEL // Déclenché manuellement
+}
+
+// Types d'actions disponibles
+enum WorkflowActionType {
+  // Communication
+  ENVOYER_EMAIL // Envoyer un email avec template
+  ENVOYER_SMS // Envoyer un SMS
+
+  // Documents
+  GENERER_DOCUMENT // Générer un document PDF
+  DEMANDER_SIGNATURE // Demander une signature électronique
+
+  // Données
+  METTRE_A_JOUR_CHAMP // Mettre à jour un champ
+  CREER_APPRENANT // Créer un apprenant
+  CREER_INSCRIPTION // Créer une inscription
+
+  // Qualité Qualiopi
+  CREER_RECLAMATION // Créer une réclamation
+  CREER_AMELIORATION // Créer une action d'amélioration
+  CREER_TACHE // Créer une tâche interne
+
+  // Notifications
+  NOTIFIER_EQUIPE // Notification in-app à l'équipe
+  NOTIFIER_UTILISATEUR // Notification à un utilisateur spécifique
+
+  // Intégrations externes
+  WEBHOOK // Appeler un webhook externe
+  APPEL_API // Appeler une API externe
+
+  // Contrôle de flux
+  DELAI // Attendre un délai
+  CONDITION // Branchement conditionnel
+  BOUCLE // Répéter une action
+}
+
+// Types de conditions disponibles
+enum WorkflowConditionType {
+  // Conditions sur les formations
+  FORMATION_CERTIFIANTE // Si formation certifiante
+  FORMATION_MODALITE // Si modalité = présentiel/distanciel/mixte
+
+  // Conditions sur les évaluations
+  SCORE_INFERIEUR // Si score < X
+  SCORE_SUPERIEUR // Si score > X
+
+  // Conditions sur les documents
+  DOCUMENT_MANQUANT // Si document manquant
+  SIGNATURE_EN_ATTENTE // Si signature en attente
+
+  // Conditions sur les apprenants
+  APPRENANT_HANDICAP // Si stagiaire en situation de handicap
+  APPRENANT_FINANCEMENT // Si financé par type spécifique (OPCO, CPF, etc.)
+
+  // Conditions personnalisées
+  CHAMP_EGAL // Si champ = valeur
+  CHAMP_CONTIENT // Si champ contient valeur
+  CHAMP_VIDE // Si champ est vide
+  CHAMP_NON_VIDE // Si champ n'est pas vide
+  FORMULE_PERSONNALISEE // Condition avec formule personnalisée
+}
+
+// Statut d'exécution d'un workflow
+enum WorkflowExecutionStatus {
+  EN_ATTENTE // En attente d'exécution (délai, condition)
+  EN_COURS // En cours d'exécution
+  PAUSE // Mis en pause (attente délai, événement)
+  TERMINEE // Exécution terminée avec succès
+  ERREUR // Exécution terminée avec erreur
+  ANNULEE // Exécution annulée
+}
+
+// Catégories de workflows pour l'organisation
+enum WorkflowCategory {
+  INSCRIPTION // Parcours inscription
+  SESSION // Gestion des sessions
+  EVALUATION // Évaluations et enquêtes
+  DOCUMENT // Gestion documentaire
+  QUALITE // Réclamations et améliorations
+  COMMUNICATION // Communications générales
+  PERSONNALISE // Workflows personnalisés
+}
+
+// Workflow (automatisation)
+model Workflow {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations de base
+  nom         String // Nom du workflow
+  description String?            @db.Text // Description du workflow
+  icone       String? // Emoji ou icône du workflow
+  categorie   WorkflowCategory   @default(PERSONNALISE)
+
+  // Activation
+  actif Boolean @default(true) // Workflow activé ou non
+
+  // Déclencheur
+  triggerType   WorkflowTriggerType // Type de déclencheur
+  triggerConfig Json? // Configuration spécifique au trigger (ex: seuil score, délai, cron)
+
+  // Statistiques
+  nombreExecutions       Int       @default(0) // Nombre total d'exécutions
+  derniereDeclenchement  DateTime? // Date du dernier déclenchement
+  nombreErreurs          Int       @default(0) // Nombre d'erreurs
+
+  // Template pré-configuré
+  estTemplate    Boolean @default(false) // Est un template système
+  templateSource String? // ID du template source si cloné
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  etapes     WorkflowEtape[]
+  executions WorkflowExecution[]
+  logs       WorkflowLog[]
+
+  @@index([organizationId])
+  @@index([actif])
+  @@index([triggerType])
+  @@index([categorie])
+}
+
+// Étape d'un workflow
+model WorkflowEtape {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // Position dans le workflow
+  ordre Int @default(0) // Ordre d'exécution
+
+  // Type et configuration
+  type   WorkflowActionType // Type d'action
+  config Json // Configuration de l'action (template email, délai, webhook URL, etc.)
+
+  // Nom et description pour l'UI
+  nom         String? // Nom de l'étape pour l'affichage
+  description String? // Description pour l'affichage
+
+  // Position visuelle pour l'éditeur
+  positionX Float @default(0)
+  positionY Float @default(0)
+
+  // Conditions d'exécution (optionnel)
+  conditions Json? // [{type, config, operator}] - AND/OR entre conditions
+
+  // Étape suivante (pour branchements)
+  etapeSuivanteId     String? // ID étape suivante (défaut)
+  etapeSuivanteOuiId  String? // ID étape si condition vraie
+  etapeSuivanteNonId  String? // ID étape si condition fausse
+
+  // Gestion des erreurs
+  continuerSurErreur Boolean @default(false) // Continuer si erreur
+  nombreReessais     Int     @default(0) // Nombre de réessais en cas d'erreur
+  delaiReessai       Int     @default(60) // Délai entre réessais (secondes)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  executionsEtapes WorkflowExecutionEtape[]
+
+  @@index([workflowId])
+  @@index([ordre])
+}
+
+// Exécution d'un workflow
+model WorkflowExecution {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // Contexte du déclenchement
+  declencheurType   String? // Type d'entité déclencheuse
+  declencheurId     String? // ID de l'entité déclencheuse
+  declencheurData   Json? // Données du contexte au moment du déclenchement
+
+  // Statut d'exécution
+  statut        WorkflowExecutionStatus @default(EN_ATTENTE)
+  etapeActuelle Int                     @default(0) // Index de l'étape en cours
+  progression   Int                     @default(0) // Pourcentage de progression (0-100)
+
+  // Planification (pour délais et CRON)
+  prochaineExecution DateTime? // Prochaine exécution planifiée
+  delaiRestant       Int? // Délai restant en secondes (pour affichage)
+
+  // Résultats
+  resultats Json? // Résultats de chaque étape
+  erreur    String?   @db.Text // Message d'erreur si échec
+  logs      Json? // Logs détaillés de l'exécution
+
+  // Timing
+  debutAt DateTime  @default(now())
+  finAt   DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  etapesExecution WorkflowExecutionEtape[]
+
+  @@index([workflowId])
+  @@index([statut])
+  @@index([prochaineExecution])
+  @@index([debutAt])
+}
+
+// Exécution d'une étape spécifique
+model WorkflowExecutionEtape {
+  id          String            @id @default(cuid())
+  executionId String
+  execution   WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  etapeId     String
+  etape       WorkflowEtape     @relation(fields: [etapeId], references: [id], onDelete: Cascade)
+
+  // Statut
+  statut    WorkflowExecutionStatus @default(EN_ATTENTE)
+  tentative Int                     @default(1) // Numéro de tentative
+
+  // Entrées/Sorties
+  entrees Json? // Données d'entrée de l'étape
+  sorties Json? // Données de sortie de l'étape
+
+  // Erreur
+  erreur String? @db.Text // Message d'erreur si échec
+
+  // Timing
+  debutAt DateTime?
+  finAt   DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@index([executionId])
+  @@index([etapeId])
+  @@index([statut])
+}
+
+// Logs des workflows (pour historique et debug)
+model WorkflowLog {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // Informations du log
+  niveau  String // info, warning, error, debug
+  message String   @db.Text
+  details Json? // Détails supplémentaires
+
+  // Contexte
+  executionId String? // ID de l'exécution associée
+  etapeId     String? // ID de l'étape associée
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@index([workflowId])
+  @@index([niveau])
+  @@index([createdAt])
+  @@index([executionId])
+}
+
+// Templates d'emails pour les workflows
+model WorkflowEmailTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations
+  nom         String // Nom du template
+  description String? // Description
+  sujet       String // Sujet de l'email
+  contenu     String  @db.Text // Contenu HTML/Markdown de l'email
+
+  // Variables disponibles
+  variables Json? // [{nom, description, exemple}]
+
+  // Catégorie
+  categorie String? // Ex: "inscription", "rappel", "evaluation"
+
+  // Template système ou personnalisé
+  estSysteme Boolean @default(false)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([categorie])
+}
+
+// Templates de SMS pour les workflows
+model WorkflowSMSTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations
+  nom         String // Nom du template
+  description String? // Description
+  contenu     String  @db.Text // Contenu du SMS (max 160 chars par segment)
+
+  // Variables disponibles
+  variables Json? // [{nom, description, exemple}]
+
+  // Template système ou personnalisé
+  estSysteme Boolean @default(false)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+// ===========================================
+// QUALIOPI - MODULE 7 & 8
+// ===========================================
+
+// Audit Qualiopi - Représente un audit (réel ou simulation)
+model AuditQualiopi {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations audit
+  type          AuditType     // INITIAL, SURVEILLANCE, RENOUVELLEMENT, SIMULATION
+  dateAudit     DateTime      // Date de l'audit
+  auditeur      String?       // Nom de l'auditeur/organisme certificateur
+  resultat      AuditResultat @default(EN_ATTENTE)
+
+  // Scores
+  scoreGlobal         Float?   @default(0) // Score global en pourcentage
+  indicateursConformes Int?    @default(0)
+  indicateursTotal     Int?    @default(32)
+
+  // Notes et observations
+  notes         String?  @db.Text
+  pointsForts   Json?    // [{critere, description}]
+  pointsAmeliorer Json?  // [{critere, description, priorite}]
+
+  // Rapport
+  rapportUrl    String?
+
+  // Relations
+  indicateurs   AuditIndicateur[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([dateAudit])
+  @@index([type])
+}
+
+// État de conformité d'un indicateur pour un audit
+model AuditIndicateur {
+  id       String        @id @default(cuid())
+  auditId  String
+  audit    AuditQualiopi @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  // Indicateur
+  numeroIndicateur Int           // 1 à 32
+  critere          Int           // 1 à 7
+  status           IndicateurStatus @default(A_EVALUER)
+
+  // Évaluation
+  note             String?  @db.Text // Note de l'auditeur
+  preuvesFournies  Json?    // [{type, description, documentId}]
+  actionsRequises  Json?    // [{description, priorite, deadline}]
+
+  // Score partiel (0-100)
+  score            Float?   @default(0)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([auditId, numeroIndicateur])
+  @@index([auditId])
+  @@index([numeroIndicateur])
+  @@index([status])
+}
+
+// Conformité en temps réel d'un indicateur (suivi continu)
+model IndicateurConformite {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Indicateur
+  numeroIndicateur Int              // 1 à 32
+  critere          Int              // 1 à 7
+  libelle          String           // Nom de l'indicateur
+  description      String?  @db.Text
+
+  // Statut actuel
+  status           IndicateurStatus @default(A_EVALUER)
+  score            Float            @default(0) // Score de conformité 0-100
+
+  // Détails
+  derniereEvaluation DateTime?
+  prochainControle   DateTime?
+  notes              String?  @db.Text
+
+  // Preuves associées
+  preuves   PreuveIndicateur[]
+
+  // Actions correctives
+  actions   ActionCorrective[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, numeroIndicateur])
+  @@index([organizationId])
+  @@index([status])
+  @@index([critere])
+}
+
+// Preuve pour un indicateur
+model PreuveIndicateur {
+  id           String               @id @default(cuid())
+  indicateurId String
+  indicateur   IndicateurConformite @relation(fields: [indicateurId], references: [id], onDelete: Cascade)
+
+  // Type de preuve
+  type         String    // document, processus, donnee, temoignage
+  nom          String
+  description  String?
+
+  // Source de la preuve
+  sourceType   String?   // formation, session, apprenant, evaluation, document
+  sourceId     String?   // ID de la source (formationId, sessionId, etc.)
+
+  // Document associé (optionnel)
+  documentId   String?   // Référence vers GeneratedDocument ou autre
+
+  // Validité
+  dateValidite DateTime?
+  estValide    Boolean   @default(true)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([indicateurId])
+  @@index([type])
+  @@index([sourceType, sourceId])
+}
+
+// Action corrective pour un indicateur
+model ActionCorrective {
+  id           String               @id @default(cuid())
+  indicateurId String
+  indicateur   IndicateurConformite @relation(fields: [indicateurId], references: [id], onDelete: Cascade)
+
+  // Informations
+  titre        String
+  description  String?  @db.Text
+  priorite     AlertePriorite @default(MOYENNE)
+  status       ActionCorrectiveStatus @default(A_FAIRE)
+
+  // Responsable
+  responsableId String?
+  responsable   User?    @relation(fields: [responsableId], references: [id])
+
+  // Dates
+  dateEcheance DateTime?
+  dateRealisation DateTime?
+
+  // Notes
+  notesProgres String?  @db.Text
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([indicateurId])
+  @@index([status])
+  @@index([dateEcheance])
+}
+
+// Alerte Qualiopi
+model AlerteQualiopi {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Type et priorité
+  type           AlerteQualiopiType
+  priorite       AlertePriorite @default(MOYENNE)
+
+  // Contenu
+  titre          String
+  message        String  @db.Text
+  indicateur     Int?    // Numéro de l'indicateur concerné (1-32)
+
+  // Statut
+  estLue         Boolean @default(false)
+  estResolue     Boolean @default(false)
+  dateResolution DateTime?
+
+  // Lien vers ressource
+  lienType       String?  // indicateur, document, action, audit
+  lienId         String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([estLue])
+  @@index([estResolue])
+  @@index([priorite])
+}
+
+// Historique des conversations avec l'Agent IA Qualiopi
+model ConversationQualiopi {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Titre de la conversation (généré ou personnalisé)
+  titre          String?
+
+  // Messages
+  messages       MessageQualiopi[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// Message dans une conversation avec l'Agent IA
+model MessageQualiopi {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   ConversationQualiopi @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  // Message
+  role           String   // "user" ou "assistant"
+  contenu        String   @db.Text
+
+  // Contexte utilisé par l'IA
+  contexte       Json?    // Données utilisées pour générer la réponse
+
+  // Indicateurs mentionnés
+  indicateursMentionnes Int[] // Liste des numéros d'indicateurs
+
+  // Feedback
+  feedback       String?  // "positive", "negative", null
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([role])
+}
+
+// Bilan Pédagogique et Financier (BPF)
+model BilanPedagogiqueFinancier {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Année concernée
+  annee          Int
+
+  // Section A - Identification
+  sectionA       Json?
+
+  // Section B - Bilan d'activité
+  nombreStagiaires        Int?
+  nombreHeuresFormation   Int?
+  nombreActions           Int?
+
+  // Section C - Données financières
+  chiffreAffaires         Float?
+  chargesExploitation     Float?
+  resultatNet             Float?
+
+  // Section D - Répartition
+  repartitionPublic       Json?  // Par type de public
+  repartitionFinancement  Json?  // Par type de financement
+  repartitionDomaine      Json?  // Par domaine de formation
+
+  // Statut
+  estSoumis      Boolean  @default(false)
+  dateSoumission DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, annee])
+  @@index([organizationId])
+  @@index([annee])
 }

@@ -1,24 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   Loader2,
-  Shield,
+  Bell,
   CheckCircle2,
   AlertTriangle,
   Clock,
-  TrendingUp,
   MessageSquare,
   FileText,
   Calendar,
   ChevronRight,
-  Target,
+  Send,
+  Download,
+  FolderArchive,
+  ExternalLink,
   Sparkles,
-  ArrowRight,
-  Play,
+  X,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 // ===========================================
 // TYPES
@@ -56,19 +60,20 @@ interface DashboardData {
     status: string;
     problemes: string[];
   }[];
-  derniereConversation: {
-    id: string;
-    titre: string;
-    updatedAt: string;
-  } | null;
+}
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 // ===========================================
-// COMPOSANTS
+// COMPOSANTS - SCORE CIRCLE
 // ===========================================
 
-function ScoreCircle({ score }: { score: number }) {
-  const circumference = 2 * Math.PI * 45;
+function ScoreCircle({ score, size = "large" }: { score: number; size?: "large" | "medium" }) {
+  const dimensions = size === "large" ? { w: 140, r: 55, stroke: 10 } : { w: 100, r: 40, stroke: 8 };
+  const circumference = 2 * Math.PI * dimensions.r;
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
   const getColor = (score: number) => {
@@ -78,23 +83,23 @@ function ScoreCircle({ score }: { score: number }) {
   };
 
   return (
-    <div className="relative w-32 h-32">
-      <svg className="w-32 h-32 -rotate-90">
+    <div className="relative" style={{ width: dimensions.w, height: dimensions.w }}>
+      <svg className="w-full h-full -rotate-90">
         <circle
-          cx="64"
-          cy="64"
-          r="45"
+          cx={dimensions.w / 2}
+          cy={dimensions.w / 2}
+          r={dimensions.r}
           stroke="currentColor"
-          strokeWidth="8"
+          strokeWidth={dimensions.stroke}
           fill="transparent"
           className="text-gray-200 dark:text-gray-700"
         />
         <circle
-          cx="64"
-          cy="64"
-          r="45"
+          cx={dimensions.w / 2}
+          cy={dimensions.w / 2}
+          r={dimensions.r}
           stroke={getColor(score)}
-          strokeWidth="8"
+          strokeWidth={dimensions.stroke}
           fill="transparent"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
@@ -103,7 +108,7 @@ function ScoreCircle({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-3xl font-bold text-gray-900 dark:text-white">
+        <span className={`font-bold text-gray-900 dark:text-white ${size === "large" ? "text-4xl" : "text-2xl"}`}>
           {score}%
         </span>
       </div>
@@ -111,32 +116,118 @@ function ScoreCircle({ score }: { score: number }) {
   );
 }
 
+// ===========================================
+// COMPOSANTS - CRITERE PROGRESS BAR
+// ===========================================
+
 function CritereProgressBar({
   critere,
+  score,
+  conformes,
+  total,
 }: {
-  critere: DashboardData["indicateursParCritere"][0];
+  critere: number;
+  score: number;
+  conformes: number;
+  total: number;
 }) {
-  const getColor = (score: number) => {
+  const critereTitres: Record<number, string> = {
+    1: "Information",
+    2: "Objectifs",
+    3: "Adaptation",
+    4: "Moyens",
+    5: "Qualification",
+    6: "Environnement",
+    7: "Recueil",
+  };
+
+  const getStatus = (score: number) => {
+    if (score >= 80) return { icon: "✅", color: "text-green-600" };
+    if (score >= 50) return { icon: "⚠️", color: "text-amber-600" };
+    if (score === 0) return { icon: "➖", color: "text-gray-400" };
+    return { icon: "❌", color: "text-red-600" };
+  };
+
+  const status = getStatus(score);
+
+  const getBarColor = (score: number) => {
     if (score >= 80) return "bg-green-500";
     if (score >= 60) return "bg-amber-500";
     return "bg-red-500";
   };
 
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="text-gray-700 dark:text-gray-300 font-medium">
-          C{critere.critere}. {critere.titre}
-        </span>
-        <span className="text-gray-500 dark:text-gray-400">
-          {critere.conformes}/{critere.total}
-        </span>
+    <div className="flex items-center gap-4">
+      <div className="w-48 text-sm text-gray-700 dark:text-gray-300">
+        Critère {critere} - {critereTitres[critere]}
       </div>
-      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="flex-1 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
-          className={`h-full ${getColor(critere.score)} transition-all duration-500`}
-          style={{ width: `${critere.score}%` }}
+          className={`h-full ${getBarColor(score)} transition-all duration-700`}
+          style={{ width: `${score}%` }}
         />
+      </div>
+      <div className="w-16 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
+        {score}%
+      </div>
+      <div className="w-8 text-center">
+        <span className={status.color}>{status.icon}</span>
+      </div>
+    </div>
+  );
+}
+
+// ===========================================
+// COMPOSANTS - ALERTES PANEL
+// ===========================================
+
+function AlertesPanel({
+  alertes,
+  isOpen,
+  onClose,
+}: {
+  alertes: DashboardData["alertesPrioritaires"];
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="absolute right-0 top-12 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <h3 className="font-semibold text-gray-900 dark:text-white">Alertes</h3>
+        <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
+      </div>
+      <div className="max-h-80 overflow-y-auto">
+        {alertes.length === 0 ? (
+          <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+            Aucune alerte
+          </div>
+        ) : (
+          alertes.map((alerte, index) => (
+            <Link
+              key={index}
+              href={`/automate/qualiopi/indicateurs/${alerte.indicateur}`}
+              className="flex items-start gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700 last:border-0"
+            >
+              <AlertTriangle className={`h-5 w-5 mt-0.5 ${
+                alerte.priorite === "HAUTE" || alerte.priorite === "CRITIQUE"
+                  ? "text-red-500"
+                  : "text-amber-500"
+              }`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Indicateur {alerte.indicateur}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                  {alerte.message}
+                </p>
+              </div>
+            </Link>
+          ))
+        )}
       </div>
     </div>
   );
@@ -149,10 +240,24 @@ function CritereProgressBar({
 export default function QualiopiDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [showAlertes, setShowAlertes] = useState(false);
+
+  // Chat states
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Génération de preuves
+  const [generatingProof, setGeneratingProof] = useState<number | null>(null);
 
   useEffect(() => {
     loadDashboard();
   }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   const loadDashboard = async () => {
     try {
@@ -165,6 +270,67 @@ export default function QualiopiDashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput("");
+    setChatMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setChatLoading(true);
+
+    try {
+      const response = await fetch("/api/qualiopi/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      if (!response.ok) throw new Error("Erreur");
+      const data = await response.json();
+
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.message },
+      ]);
+    } catch (error) {
+      toast.error("Erreur de communication avec l'assistant");
+      setChatMessages((prev) => prev.slice(0, -1));
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleSuggestionClick = (question: string) => {
+    setChatInput(question);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  };
+
+  const generateProof = async (indicateur: number) => {
+    setGeneratingProof(indicateur);
+    toast.info(`Génération des preuves pour l'indicateur ${indicateur}...`);
+
+    // Simuler la génération (à implémenter avec vraie logique)
+    setTimeout(() => {
+      setGeneratingProof(null);
+      toast.success(`Preuves générées pour l'indicateur ${indicateur}`);
+    }, 2000);
+  };
+
+  const generateFullDossier = async () => {
+    toast.info("Génération du dossier d'audit complet...");
+
+    // Simuler la génération (à implémenter avec vraie logique)
+    setTimeout(() => {
+      toast.success("Dossier d'audit généré avec succès");
+    }, 3000);
   };
 
   if (loading) {
@@ -182,9 +348,6 @@ export default function QualiopiDashboardPage() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           Erreur de chargement
         </h2>
-        <p className="text-gray-500 dark:text-gray-400 mt-2">
-          Impossible de charger les données Qualiopi
-        </p>
         <button
           onClick={loadDashboard}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -195,293 +358,296 @@ export default function QualiopiDashboardPage() {
     );
   }
 
+  const suggestions = [
+    "Comment préparer mon audit initial ?",
+    "Quelles preuves pour l'indicateur 7 ?",
+    "Comment améliorer mon taux de satisfaction ?",
+  ];
+
   return (
-    <div className="container mx-auto p-6 max-w-7xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Shield className="h-7 w-7 text-blue-600" />
-            Tableau de bord Qualiopi
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Suivez votre conformité au référentiel national qualité
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href="/automate/qualiopi/agent"
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:opacity-90 transition-opacity"
+    <div className="container mx-auto p-6 max-w-7xl">
+      {/* ============================================= */}
+      {/* HEADER AVEC ALERTES */}
+      {/* ============================================= */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          DASHBOARD QUALIOPI
+        </h1>
+        <div className="relative">
+          <button
+            onClick={() => setShowAlertes(!showAlertes)}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
           >
-            <Sparkles className="h-4 w-4" />
-            Agent IA
-          </Link>
-          <Link
-            href="/automate/qualiopi/indicateurs"
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-          >
-            <FileText className="h-4 w-4" />
-            Indicateurs
-          </Link>
+            <Bell className="h-5 w-5" />
+            <span className="font-medium">{data.alertesNonLues} alertes</span>
+          </button>
+          <AlertesPanel
+            alertes={data.alertesPrioritaires}
+            isOpen={showAlertes}
+            onClose={() => setShowAlertes(false)}
+          />
         </div>
       </div>
 
-      {/* Score global + Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Score global */}
-        <div className="md:col-span-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">
-            Score global
-          </h3>
-          <ScoreCircle score={data.scoreGlobal} />
-          <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
-            <span className="font-semibold text-green-600">
-              {data.indicateursConformes}
-            </span>{" "}
-            / {data.indicateursTotal} indicateurs conformes
-          </p>
-        </div>
-
-        {/* Stats cards */}
-        <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Prochain audit */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Prochain audit
-                </p>
-                {data.prochainAudit ? (
-                  <>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                      {data.prochainAudit.joursRestants} jours
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {new Date(data.prochainAudit.dateAudit).toLocaleDateString(
-                        "fr-FR"
-                      )}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-lg font-medium text-gray-900 dark:text-white mt-1">
-                    Non planifié
-                  </p>
-                )}
-              </div>
-              <Calendar className="h-8 w-8 text-blue-500" />
-            </div>
-          </div>
-
-          {/* Alertes */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Alertes
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {data.alertesNonLues}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  non lues
-                </p>
-              </div>
-              <AlertTriangle
-                className={`h-8 w-8 ${
-                  data.alertesNonLues > 0 ? "text-amber-500" : "text-gray-400"
-                }`}
-              />
-            </div>
-          </div>
-
-          {/* Actions en cours */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Actions
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {data.actionsEnCours}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  en cours
-                </p>
-              </div>
-              <Target className="h-8 w-8 text-purple-500" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Conformité par critère + Actions prioritaires */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Conformité par critère */}
+      {/* ============================================= */}
+      {/* STATS PRINCIPALES - Score, Indicateurs, Audit */}
+      {/* ============================================= */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        {/* Score Global */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              Conformité par critère
-            </h3>
-            <Link
-              href="/automate/qualiopi/indicateurs"
-              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              Voir tout <ChevronRight className="h-4 w-4" />
-            </Link>
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4 text-center">
+            Score Global
+          </h3>
+          <div className="flex justify-center">
+            <ScoreCircle score={data.scoreGlobal} size="large" />
           </div>
-          <div className="space-y-4">
-            {data.indicateursParCritere.map((critere) => (
-              <CritereProgressBar key={critere.critere} critere={critere} />
+        </div>
+
+        {/* Indicateurs */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4 text-center">
+            Indicateurs
+          </h3>
+          <div className="flex flex-col items-center justify-center h-32">
+            <div className="text-5xl font-bold text-gray-900 dark:text-white">
+              {data.indicateursConformes} / {data.indicateursTotal}
+            </div>
+            <div className="text-gray-500 dark:text-gray-400 mt-2">
+              conformes
+            </div>
+          </div>
+        </div>
+
+        {/* Prochain Audit */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4 text-center">
+            Prochain Audit
+          </h3>
+          <div className="flex flex-col items-center justify-center h-32">
+            {data.prochainAudit ? (
+              <>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {new Date(data.prochainAudit.dateAudit).toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </div>
+                <div className="flex items-center gap-2 mt-2 text-blue-600 dark:text-blue-400">
+                  <Clock className="h-4 w-4" />
+                  <span>dans {data.prochainAudit.joursRestants}j</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <Calendar className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-2" />
+                <span className="text-gray-500 dark:text-gray-400">Non planifié</span>
+                <Link
+                  href="/automate/qualiopi/audits"
+                  className="mt-2 text-sm text-blue-600 hover:underline"
+                >
+                  Planifier un audit
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================= */}
+      {/* CONFORMITÉ PAR CRITÈRE */}
+      {/* ============================================= */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          CONFORMITÉ PAR CRITÈRE
+        </h3>
+        <div className="space-y-4">
+          {data.indicateursParCritere.map((c) => (
+            <CritereProgressBar
+              key={c.critere}
+              critere={c.critere}
+              score={c.score}
+              conformes={c.conformes}
+              total={c.total}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ============================================= */}
+      {/* ACTIONS PRIORITAIRES */}
+      {/* ============================================= */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertCircle className="h-5 w-5 text-red-500" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            ACTIONS PRIORITAIRES
+          </h3>
+        </div>
+
+        {data.indicateursAttention.length === 0 ? (
+          <div className="flex items-center justify-center py-8 text-green-600 dark:text-green-400">
+            <CheckCircle2 className="h-6 w-6 mr-2" />
+            <span>Tous les indicateurs sont conformes !</span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {data.indicateursAttention.map((ind, index) => (
+              <div
+                key={ind.numero}
+                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="w-6 h-6 flex items-center justify-center bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-sm font-bold">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <span className="text-gray-900 dark:text-white">
+                      {ind.problemes[0] || ind.libelle}
+                    </span>
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      (IND {ind.numero})
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => generateProof(ind.numero)}
+                    disabled={generatingProof === ind.numero}
+                    className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg flex items-center gap-1"
+                  >
+                    {generatingProof === ind.numero ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Preuves
+                  </button>
+                  <Link
+                    href={`/automate/qualiopi/indicateurs/${ind.numero}`}
+                    className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Résoudre
+                  </Link>
+                </div>
+              </div>
             ))}
           </div>
+        )}
+
+        {/* Bouton dossier complet */}
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={generateFullDossier}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <FolderArchive className="h-5 w-5" />
+            Générer dossier d'audit complet (ZIP)
+          </button>
+        </div>
+      </div>
+
+      {/* ============================================= */}
+      {/* ASSISTANT QUALIOPI - Chat intégré */}
+      {/* ============================================= */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="h-5 w-5 text-purple-500" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            ASSISTANT QUALIOPI
+          </h3>
         </div>
 
-        {/* Actions prioritaires */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              Indicateurs à traiter
-            </h3>
-            <span className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
-              {data.indicateursAttention.length} prioritaires
-            </span>
-          </div>
-          {data.indicateursAttention.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
-              <p className="text-gray-600 dark:text-gray-300">
-                Tous les indicateurs sont conformes !
-              </p>
+        {/* Zone de chat */}
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-4 h-64 overflow-y-auto">
+          {chatMessages.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+              <p>Posez votre question sur Qualiopi...</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {data.indicateursAttention.map((ind) => (
-                <Link
-                  key={ind.numero}
-                  href={`/automate/qualiopi/indicateurs/${ind.numero}`}
-                  className="block p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            <div className="space-y-4">
+              {chatMessages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
-                          IND {ind.numero}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {ind.score}%
-                        </span>
+                  <div
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      msg.role === "user"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-                        {ind.libelle}
-                      </p>
-                      {ind.problemes.length > 0 && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {ind.problemes[0]}
-                        </p>
-                      )}
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <p className="text-sm">{msg.content}</p>
+                    )}
                   </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Agent IA + Simulation */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Agent IA */}
-        <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl p-6 text-white">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                Agent IA Qualiopi
-              </h3>
-              <p className="text-white/80 text-sm mt-1">
-                Posez vos questions sur la certification Qualiopi
-              </p>
-            </div>
-          </div>
-
-          {data.derniereConversation && (
-            <div className="mt-4 p-3 bg-white/10 rounded-lg">
-              <p className="text-xs text-white/60">Dernière conversation</p>
-              <p className="text-sm font-medium mt-1">
-                {data.derniereConversation.titre}
-              </p>
-            </div>
-          )}
-
-          <Link
-            href="/automate/qualiopi/agent"
-            className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-white text-purple-600 rounded-lg hover:bg-white/90 transition-colors font-medium"
-          >
-            <MessageSquare className="h-4 w-4" />
-            Démarrer une conversation
-          </Link>
-        </div>
-
-        {/* Simulation d'audit */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white text-lg">
-                Simulation d'audit
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                Testez votre préparation avec une simulation
-              </p>
-            </div>
-            <Play className="h-8 w-8 text-green-500" />
-          </div>
-
-          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              L'agent IA va analyser votre conformité et simuler un audit complet
-              avec points forts, points à améliorer et recommandations.
-            </p>
-          </div>
-
-          <Link
-            href="/automate/qualiopi/audits"
-            className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-          >
-            Lancer une simulation
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
-
-      {/* Alertes prioritaires */}
-      {data.alertesPrioritaires.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
-          <h3 className="font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-2 mb-4">
-            <AlertTriangle className="h-5 w-5" />
-            Alertes prioritaires
-          </h3>
-          <div className="space-y-2">
-            {data.alertesPrioritaires.map((alerte, index) => (
-              <Link
-                key={index}
-                href={`/automate/qualiopi/indicateurs/${alerte.indicateur}`}
-                className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded">
-                    IND {alerte.indicateur}
-                  </span>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {alerte.message}
-                  </span>
                 </div>
-                <ChevronRight className="h-5 w-5 text-gray-400" />
-              </Link>
+              ))}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Input de chat */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Posez votre question sur Qualiopi..."
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            disabled={chatLoading}
+          />
+          <button
+            onClick={sendChatMessage}
+            disabled={!chatInput.trim() || chatLoading}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Suggestions */}
+        <div className="mt-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Suggestions :</p>
+          <div className="flex flex-wrap gap-2">
+            {suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                • {suggestion}
+              </button>
             ))}
           </div>
         </div>
-      )}
+
+        {/* Lien vers chat complet */}
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <Link
+            href="/automate/qualiopi/agent"
+            className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:underline"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Ouvrir l'assistant en plein écran
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

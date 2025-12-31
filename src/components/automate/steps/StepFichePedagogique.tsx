@@ -43,6 +43,14 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const SparklesIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 1L9.5 5.5L14 7L9.5 8.5L8 13L6.5 8.5L2 7L6.5 5.5L8 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M12.5 11L13 12.5L14.5 13L13 13.5L12.5 15L12 13.5L10.5 13L12 12.5L12.5 11Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M3.5 1L4 2.5L5.5 3L4 3.5L3.5 5L3 3.5L1.5 3L3 2.5L3.5 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const TableIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="2.25" y="2.25" width="13.5" height="13.5" rx="2" stroke="currentColor" strokeWidth="1.5"/>
@@ -85,7 +93,7 @@ interface ImageResult {
   alt: string;
   credit: string;
   creditUrl: string;
-  source: "unsplash" | "picsum";
+  source: "unsplash" | "pexels" | "pixabay" | "picsum";
 }
 
 interface CertificationData {
@@ -236,6 +244,8 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   const [imageResults, setImageResults] = useState<ImageResult[]>([]);
   const [isSearchingImages, setIsSearchingImages] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(data.imageUrl || null);
+  const [isGeneratingAIImage, setIsGeneratingAIImage] = useState(false);
+  const [aiImageError, setAiImageError] = useState<string | null>(null);
 
   // Rechercher des images
   const handleSearchImages = async () => {
@@ -305,6 +315,48 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       console.error("Erreur recherche images:", error);
     } finally {
       setIsSearchingImages(false);
+    }
+  };
+
+  // Générer une image via DALL-E (IA)
+  const handleGenerateAIImage = async () => {
+    if (!imageQuery.trim() && !data.titre) return;
+
+    setIsGeneratingAIImage(true);
+    setAiImageError(null);
+
+    try {
+      const promptText = imageQuery.trim() || data.titre
+        .replace(/Module \d+ –/gi, "")
+        .replace(/Formation/gi, "")
+        .trim();
+
+      const response = await fetch("/api/ai/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: promptText,
+          formationTitle: data.titre,
+          style: "professional",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la génération de l'image");
+      }
+
+      const result = await response.json();
+      if (result.success && result.data?.url) {
+        handleSelectImage(result.data.url);
+      } else {
+        throw new Error("Aucune image générée");
+      }
+    } catch (error) {
+      console.error("Erreur génération image IA:", error);
+      setAiImageError(error instanceof Error ? error.message : "Erreur lors de la génération");
+    } finally {
+      setIsGeneratingAIImage(false);
     }
   };
 
@@ -1178,6 +1230,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                     onClick={handleSearchImages}
                     disabled={isSearchingImages || !imageQuery.trim()}
                     className="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Rechercher"
                   >
                     {isSearchingImages ? (
                       <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -1188,9 +1241,43 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                       <SearchIcon />
                     )}
                   </button>
+                  <button
+                    onClick={handleGenerateAIImage}
+                    disabled={isGeneratingAIImage || (!imageQuery.trim() && !data.titre)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    title="Générer avec l'IA (DALL-E)"
+                  >
+                    {isGeneratingAIImage ? (
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                    ) : (
+                      <SparklesIcon />
+                    )}
+                    <span className="hidden sm:inline">IA</span>
+                  </button>
                 </div>
 
-                {imageResults.length > 0 && (
+                {/* Message d'erreur génération IA */}
+                {aiImageError && (
+                  <p className="text-xs text-red-500 dark:text-red-400">
+                    {aiImageError}
+                  </p>
+                )}
+
+                {/* Indicateur de génération IA */}
+                {isGeneratingAIImage && (
+                  <div className="flex items-center justify-center gap-2 py-4 text-purple-600 dark:text-purple-400">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    <span className="text-sm">Génération de l&apos;image IA en cours...</span>
+                  </div>
+                )}
+
+                {imageResults.length > 0 && !isGeneratingAIImage && (
                   <div className="grid grid-cols-2 gap-2">
                     {imageResults.map((img) => (
                       <button
@@ -1209,14 +1296,18 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                             <CheckIcon />
                           </div>
                         )}
+                        {/* Badge source */}
+                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 text-[10px] font-medium bg-black/50 text-white rounded">
+                          {img.source}
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
 
-                {imageResults.length > 0 && (
+                {imageResults.length > 0 && !isGeneratingAIImage && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-                    Images libres de droits
+                    Images libres de droits • Cliquez sur IA pour générer une image unique
                   </p>
                 )}
               </div>

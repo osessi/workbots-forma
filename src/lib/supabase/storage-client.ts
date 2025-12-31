@@ -3,6 +3,69 @@ import { getSupabaseBrowserClient } from "./client";
 // Nom du bucket principal
 export const STORAGE_BUCKET = "worksbots-forma-stockage";
 
+// ===========================================
+// CONVERSION URL SUPABASE -> URL PROXY
+// ===========================================
+
+/**
+ * Convertit une URL Supabase Storage en URL proxy locale
+ * Cela masque l'URL Supabase aux utilisateurs finaux
+ */
+export function toProxyUrl(supabaseUrl: string | null | undefined): string | null {
+  if (!supabaseUrl) return null;
+
+  // Si c'est déjà une URL proxy, retourner telle quelle
+  if (supabaseUrl.startsWith("/api/fichiers/") || supabaseUrl.startsWith("/api/qualiopi/fichiers/")) {
+    return supabaseUrl;
+  }
+
+  // Extraire le chemin du fichier depuis l'URL Supabase
+  // Format: https://xxx.supabase.co/storage/v1/object/public/bucket-name/path/to/file
+  try {
+    const url = new URL(supabaseUrl);
+    const pathParts = url.pathname.split("/");
+
+    // Trouver l'index du bucket name dans le path
+    const bucketIndex = pathParts.findIndex(part => part === STORAGE_BUCKET);
+    if (bucketIndex === -1) {
+      // Si le bucket n'est pas trouvé, essayer d'extraire après "public/"
+      const publicIndex = pathParts.findIndex(part => part === "public");
+      if (publicIndex !== -1 && pathParts[publicIndex + 1]) {
+        // path après "public/bucket-name/"
+        const filePath = pathParts.slice(publicIndex + 2).join("/");
+        if (filePath) {
+          return `/api/fichiers/${filePath}`;
+        }
+      }
+      return supabaseUrl; // Retourner l'URL originale si on ne peut pas la convertir
+    }
+
+    // Extraire le chemin après le bucket name
+    const filePath = pathParts.slice(bucketIndex + 1).join("/");
+    if (!filePath) return supabaseUrl;
+
+    return `/api/fichiers/${filePath}`;
+  } catch {
+    // Si l'URL n'est pas valide, retourner telle quelle
+    return supabaseUrl;
+  }
+}
+
+/**
+ * Convertit un chemin de stockage en URL proxy
+ */
+export function pathToProxyUrl(storagePath: string): string {
+  return `/api/fichiers/${storagePath}`;
+}
+
+/**
+ * Vérifie si une URL est une URL Supabase
+ */
+export function isSupabaseUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return url.includes("supabase.co") || url.includes("supabase.io");
+}
+
 // Types
 export interface UploadResult {
   path: string;
@@ -81,14 +144,12 @@ export async function uploadFileClient(
     throw new Error(`Erreur upload: ${error.message}`);
   }
 
-  // Récupère l'URL publique
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+  // Retourne une URL proxy au lieu de l'URL Supabase publique
+  const proxyUrl = pathToProxyUrl(data.path);
 
   return {
     path: data.path,
-    publicUrl,
+    publicUrl: proxyUrl, // URL proxy qui masque Supabase
     size: file.size,
   };
 }
@@ -141,11 +202,10 @@ export async function uploadAvatarClient(
       return { url: null, error: error.message };
     }
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+    // Retourne une URL proxy au lieu de l'URL Supabase publique
+    const proxyUrl = pathToProxyUrl(data.path);
 
-    return { url: publicUrl, error: null };
+    return { url: proxyUrl, error: null };
   } catch (err) {
     return { url: null, error: "Erreur lors de l'upload" };
   }

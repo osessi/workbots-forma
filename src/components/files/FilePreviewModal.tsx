@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { toProxyUrl, pathToProxyUrl } from "@/lib/supabase/storage-client";
 
 // Import dynamique de l'éditeur TipTap
 const DocumentEditor = dynamic(
@@ -133,9 +134,14 @@ export default function FilePreviewModal({
           setContent("<p>Contenu du fichier non disponible</p>");
           setEditedContent("<p>Contenu du fichier non disponible</p>");
         }
-      } else if (file.publicUrl) {
-        // Fichier avec URL publique
-        const response = await fetch(file.publicUrl);
+      } else if (file.publicUrl || file.storagePath) {
+        // Fichier avec URL publique ou chemin de stockage
+        // Convertir l'URL Supabase en URL proxy si nécessaire
+        const fileUrl = file.publicUrl
+          ? toProxyUrl(file.publicUrl) || file.publicUrl
+          : pathToProxyUrl(file.storagePath);
+
+        const response = await fetch(fileUrl);
         if (response.ok) {
           const text = await response.text();
           setContent(text);

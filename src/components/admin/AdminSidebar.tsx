@@ -115,6 +115,14 @@ const VeilleIcon = () => (
   </svg>
 );
 
+// Emailing Icon
+const EmailingIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.33333 4.16667C3.33333 3.24619 4.07953 2.5 5 2.5H15C15.9205 2.5 16.6667 3.24619 16.6667 4.16667V15.8333C16.6667 16.7538 15.9205 17.5 15 17.5H5C4.07953 17.5 3.33333 16.7538 3.33333 15.8333V4.16667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M3.33333 6.66667L10 10.8333L16.6667 6.66667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 // Main navigation items
 const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/admin", icon: <DashboardIcon /> },
@@ -122,6 +130,7 @@ const navItems: NavItem[] = [
   { id: "users", label: "Utilisateurs", href: "/admin/users", icon: <UsersIcon /> },
   { id: "templates", label: "Templates", href: "/admin/templates", icon: <TemplateIcon /> },
   { id: "email-templates", label: "Templates Email", href: "/admin/email-templates", icon: <EmailTemplateIcon /> },
+  { id: "emailing", label: "Emailing", href: "/admin/emailing", icon: <EmailingIcon /> },
   { id: "integrations", label: "Integrations", href: "/admin/integrations", icon: <IntegrationsIcon /> },
   { id: "veille", label: "Sources Veille", href: "/admin/veille", icon: <VeilleIcon /> },
   { id: "ai-prompts", label: "Prompts IA", href: "/admin/ai-prompts", icon: <AIIcon /> },

@@ -281,10 +281,8 @@ export async function POST(request: NextRequest) {
       // Continue quand même pour créer l'entrée DB avec le contenu
     }
 
-    // Obtenir l'URL publique
-    const { data: urlData } = supabaseAdmin.storage
-      .from("files")
-      .getPublicUrl(storagePath);
+    // Retourner une URL proxy au lieu de l'URL Supabase publique
+    const proxyUrl = `/api/fichiers/${storagePath}`;
 
     // Créer l'enregistrement du fichier dans la base de données
     const file = await prisma.file.create({
@@ -295,7 +293,7 @@ export async function POST(request: NextRequest) {
         size: fileBuffer.length,
         category: mapToFileCategory(documentType),
         storagePath: storagePath,
-        publicUrl: urlData?.publicUrl || null,
+        publicUrl: proxyUrl,
         organizationId: user.organizationId,
         userId: user.id,
         formationId: formationId,

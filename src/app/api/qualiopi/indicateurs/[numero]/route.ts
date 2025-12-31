@@ -4,13 +4,39 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import prisma from "@/lib/db/prisma";
 import {
   getIndicateur,
   getCritere,
   analyserIndicateurSpecifique,
 } from "@/lib/services/qualiopi";
+
+// Helper pour créer le client Supabase
+async function getSupabaseClient() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Ignore
+          }
+        },
+      },
+    }
+  );
+}
 
 export async function GET(
   request: NextRequest,
@@ -28,10 +54,8 @@ export async function GET(
     }
 
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const supabase = await getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
@@ -74,6 +98,15 @@ export async function GET(
       include: {
         preuves: {
           orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            type: true,
+            nom: true,
+            description: true,
+            documentId: true,
+            sourceType: true,
+            createdAt: true,
+          },
         },
         actions: {
           orderBy: { createdAt: "desc" },
@@ -150,10 +183,8 @@ export async function PATCH(
     }
 
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const supabase = await getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });

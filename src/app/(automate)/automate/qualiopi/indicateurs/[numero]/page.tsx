@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,6 +16,11 @@ import {
   ChevronRight,
   Plus,
   ExternalLink,
+  X,
+  Upload,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
@@ -50,6 +55,8 @@ interface IndicateurDetail {
     type: string;
     nom: string;
     description: string | null;
+    documentId: string | null; // URL du fichier/lien
+    sourceType: string | null; // DOCUMENT, CAPTURE, LIEN
     createdAt: string;
   }[];
   actions: {
@@ -114,26 +121,104 @@ function StatusBadge({ status, score }: { status: string; score: number }) {
   );
 }
 
-function PreuveCard({ preuve }: { preuve: IndicateurDetail["preuves"][0] }) {
+function PreuveCard({
+  preuve,
+  onDelete
+}: {
+  preuve: IndicateurDetail["preuves"][0];
+  onDelete: (preuveId: string) => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+
+  // Vérifie si c'est une URL externe (lien) ou un fichier local (proxy API)
+  const isExternalUrl = preuve.documentId && preuve.documentId.startsWith("http");
+  const isLocalFile = preuve.documentId && preuve.documentId.startsWith("/api/");
+  const hasUrl = isExternalUrl || isLocalFile;
+  const isImage = preuve.sourceType === "CAPTURE" || preuve.nom.match(/\.(png|jpg|jpeg|gif|webp)$/i);
+  const isLink = preuve.sourceType === "LIEN";
+
+  const handleOpen = () => {
+    if (hasUrl) {
+      window.open(preuve.documentId!, "_blank");
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (deleting) return;
+
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette preuve ?")) {
+      return;
+    }
+
+    setDeleting(true);
+    onDelete(preuve.id);
+  };
+
   return (
-    <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-      <FileText className="h-5 w-5 text-gray-400 mt-0.5" />
+    <div
+      className={`flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg ${hasUrl ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors" : ""}`}
+      onClick={hasUrl ? handleOpen : undefined}
+    >
+      {isImage ? (
+        <ImageIcon className="h-5 w-5 text-blue-500 mt-0.5" />
+      ) : isLink ? (
+        <LinkIcon className="h-5 w-5 text-green-500 mt-0.5" />
+      ) : (
+        <FileText className="h-5 w-5 text-purple-500 mt-0.5" />
+      )}
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-gray-900 dark:text-white text-sm">
+        <p className="font-medium text-gray-900 dark:text-white text-sm flex items-center gap-2">
           {preuve.nom}
+          {hasUrl && (
+            <ExternalLink className="h-3 w-3 text-gray-400" />
+          )}
         </p>
         {preuve.description && (
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {preuve.description}
           </p>
         )}
-        <p className="text-xs text-gray-400 mt-1">
-          {new Date(preuve.createdAt).toLocaleDateString("fr-FR")}
-        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-xs text-gray-400">
+            {new Date(preuve.createdAt).toLocaleDateString("fr-FR")}
+          </span>
+          {!hasUrl && (
+            <span className="text-xs text-amber-500 dark:text-amber-400">
+              (pas de fichier)
+            </span>
+          )}
+        </div>
       </div>
-      <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded">
-        {preuve.type}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded">
+          {preuve.type}
+        </span>
+        {hasUrl && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpen();
+            }}
+            className="p-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+            title="Ouvrir la preuve"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </button>
+        )}
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="p-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-50"
+          title="Supprimer la preuve"
+        >
+          {deleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -185,6 +270,398 @@ function ActionCard({ action }: { action: IndicateurDetail["actions"][0] }) {
 }
 
 // ===========================================
+// MODAL - AJOUTER UNE PREUVE
+// ===========================================
+
+function AddPreuveModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  indicateur,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<void>;
+  indicateur: number;
+}) {
+  const [type, setType] = useState<"DOCUMENT" | "CAPTURE" | "LIEN">("DOCUMENT");
+  const [nom, setNom] = useState("");
+  const [description, setDescription] = useState("");
+  const [lien, setLien] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Réinitialiser le formulaire à l'ouverture
+  useEffect(() => {
+    if (isOpen) {
+      setType("DOCUMENT");
+      setNom("");
+      setDescription("");
+      setLien("");
+      setFile(null);
+      setLoading(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nom.trim()) {
+      toast.error("Le nom de la preuve est requis");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onSubmit({
+        type,
+        nom: nom.trim(),
+        description: description.trim(),
+        lien: type === "LIEN" ? lien.trim() : undefined,
+        file: type !== "LIEN" ? file : undefined,
+      });
+      onClose();
+    } catch (error) {
+      toast.error("Erreur lors de l'ajout de la preuve");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Ajouter une preuve - Indicateur {indicateur}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+          >
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Type de preuve */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Type de preuve
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setType("DOCUMENT")}
+                className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${
+                  type === "DOCUMENT"
+                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                    : "border-gray-200 dark:border-gray-600 hover:border-gray-300"
+                }`}
+              >
+                <FileText className={`h-6 w-6 ${type === "DOCUMENT" ? "text-purple-600" : "text-gray-400"}`} />
+                <span className={`text-xs ${type === "DOCUMENT" ? "text-purple-600" : "text-gray-500"}`}>
+                  Document
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("CAPTURE")}
+                className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${
+                  type === "CAPTURE"
+                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                    : "border-gray-200 dark:border-gray-600 hover:border-gray-300"
+                }`}
+              >
+                <ImageIcon className={`h-6 w-6 ${type === "CAPTURE" ? "text-purple-600" : "text-gray-400"}`} />
+                <span className={`text-xs ${type === "CAPTURE" ? "text-purple-600" : "text-gray-500"}`}>
+                  Capture
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("LIEN")}
+                className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-colors ${
+                  type === "LIEN"
+                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                    : "border-gray-200 dark:border-gray-600 hover:border-gray-300"
+                }`}
+              >
+                <LinkIcon className={`h-6 w-6 ${type === "LIEN" ? "text-purple-600" : "text-gray-400"}`} />
+                <span className={`text-xs ${type === "LIEN" ? "text-purple-600" : "text-gray-500"}`}>
+                  Lien
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Nom */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Nom de la preuve *
+            </label>
+            <input
+              type="text"
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
+              placeholder="Ex: Catalogue des formations 2026"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Décrivez cette preuve..."
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          {/* Fichier ou Lien */}
+          {type === "LIEN" ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                URL du lien *
+              </label>
+              <input
+                type="url"
+                value={lien}
+                onChange={(e) => setLien(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                required={type === "LIEN"}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Fichier {type === "CAPTURE" ? "(image)" : "(PDF, Word, etc.)"}
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={type === "CAPTURE" ? "image/*" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"}
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full px-4 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-purple-400 transition-colors"
+              >
+                {file ? (
+                  <div className="flex items-center justify-center gap-2 text-purple-600">
+                    <FileText className="h-5 w-5" />
+                    <span>{file.name}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-gray-500">
+                    <Upload className="h-8 w-8" />
+                    <span>Cliquez pour sélectionner un fichier</span>
+                  </div>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Boutons */}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+              ) : (
+                "Ajouter la preuve"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ===========================================
+// MODAL - NOUVELLE ACTION CORRECTIVE
+// ===========================================
+
+function AddActionModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  indicateur,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<void>;
+  indicateur: number;
+}) {
+  const [titre, setTitre] = useState("");
+  const [description, setDescription] = useState("");
+  const [priorite, setPriorite] = useState("MOYENNE");
+  const [dateEcheance, setDateEcheance] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Réinitialiser le formulaire à l'ouverture
+  useEffect(() => {
+    if (isOpen) {
+      setTitre("");
+      setDescription("");
+      setPriorite("MOYENNE");
+      setDateEcheance("");
+      setLoading(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!titre.trim()) {
+      toast.error("Le titre de l'action est requis");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onSubmit({
+        titre: titre.trim(),
+        description: description.trim(),
+        priorite,
+        dateEcheance: dateEcheance || undefined,
+      });
+      onClose();
+    } catch (error) {
+      toast.error("Erreur lors de la création de l'action");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Nouvelle action corrective - Indicateur {indicateur}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+          >
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Titre */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Titre de l'action *
+            </label>
+            <input
+              type="text"
+              value={titre}
+              onChange={(e) => setTitre(e.target.value)}
+              placeholder="Ex: Mettre à jour le catalogue"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Détaillez l'action à réaliser..."
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          {/* Priorité */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Priorité
+            </label>
+            <select
+              value={priorite}
+              onChange={(e) => setPriorite(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="BASSE">Basse</option>
+              <option value="MOYENNE">Moyenne</option>
+              <option value="HAUTE">Haute</option>
+              <option value="CRITIQUE">Critique</option>
+            </select>
+          </div>
+
+          {/* Date d'échéance */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Date d'échéance
+            </label>
+            <input
+              type="date"
+              value={dateEcheance}
+              onChange={(e) => setDateEcheance(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          {/* Boutons */}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+              ) : (
+                "Créer l'action"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ===========================================
 // PAGE PRINCIPALE
 // ===========================================
 
@@ -196,6 +673,8 @@ export default function IndicateurDetailPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<IndicateurDetail | null>(null);
   const [showAnalyse, setShowAnalyse] = useState(false);
+  const [showAddPreuve, setShowAddPreuve] = useState(false);
+  const [showAddAction, setShowAddAction] = useState(false);
 
   useEffect(() => {
     if (!isNaN(numero) && numero >= 1 && numero <= 32) {
@@ -216,6 +695,69 @@ export default function IndicateurDetailPage() {
       router.push("/automate/qualiopi/indicateurs");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddPreuve = async (preuveData: any) => {
+    try {
+      const formData = new FormData();
+      formData.append("indicateur", numero.toString());
+      formData.append("type", preuveData.type);
+      formData.append("nom", preuveData.nom);
+      if (preuveData.description) formData.append("description", preuveData.description);
+      if (preuveData.lien) formData.append("lien", preuveData.lien);
+      if (preuveData.file) formData.append("file", preuveData.file);
+
+      const response = await fetch(`/api/qualiopi/indicateurs/${numero}/preuves`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
+        toast.error(errorData.error || "Erreur lors de l'upload");
+        throw new Error(errorData.error || "Erreur");
+      }
+      toast.success("Preuve ajoutée avec succès");
+      loadIndicateur(); // Recharger les données
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleAddAction = async (actionData: any) => {
+    try {
+      const response = await fetch(`/api/qualiopi/indicateurs/${numero}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(actionData),
+      });
+
+      if (!response.ok) throw new Error("Erreur");
+      toast.success("Action corrective créée");
+      loadIndicateur(); // Recharger les données
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleDeletePreuve = async (preuveId: string) => {
+    try {
+      const response = await fetch(`/api/qualiopi/indicateurs/${numero}/preuves`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preuveId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
+        toast.error(errorData.error || "Erreur lors de la suppression");
+        return;
+      }
+      toast.success("Preuve supprimée");
+      loadIndicateur(); // Recharger les données
+    } catch (error) {
+      toast.error("Erreur lors de la suppression");
     }
   };
 
@@ -330,7 +872,10 @@ export default function IndicateurDetailPage() {
           <h2 className="font-semibold text-gray-900 dark:text-white">
             Preuves fournies ({data.preuves.length})
           </h2>
-          <button className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700">
+          <button
+            onClick={() => setShowAddPreuve(true)}
+            className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+          >
             <Plus className="h-4 w-4" />
             Ajouter une preuve
           </button>
@@ -347,7 +892,7 @@ export default function IndicateurDetailPage() {
         ) : (
           <div className="space-y-2">
             {data.preuves.map((preuve) => (
-              <PreuveCard key={preuve.id} preuve={preuve} />
+              <PreuveCard key={preuve.id} preuve={preuve} onDelete={handleDeletePreuve} />
             ))}
           </div>
         )}
@@ -359,7 +904,10 @@ export default function IndicateurDetailPage() {
           <h2 className="font-semibold text-gray-900 dark:text-white">
             Actions correctives ({data.actions.length})
           </h2>
-          <button className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700">
+          <button
+            onClick={() => setShowAddAction(true)}
+            className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+          >
             <Plus className="h-4 w-4" />
             Nouvelle action
           </button>
@@ -450,6 +998,20 @@ export default function IndicateurDetailPage() {
           </Link>
         )}
       </div>
+
+      {/* Modals */}
+      <AddPreuveModal
+        isOpen={showAddPreuve}
+        onClose={() => setShowAddPreuve(false)}
+        onSubmit={handleAddPreuve}
+        indicateur={numero}
+      />
+      <AddActionModal
+        isOpen={showAddAction}
+        onClose={() => setShowAddAction(false)}
+        onSubmit={handleAddAction}
+        indicateur={numero}
+      />
     </div>
   );
 }

@@ -566,6 +566,37 @@ function CreateFormationContent() {
               .join("\n\n")
           : "";
 
+        // Recherche automatique d'une image adaptée à la formation (asynchrone)
+        const autoSearchImage = async (titre: string): Promise<string> => {
+          try {
+            // Extraire les mots-clés du titre pour la recherche
+            const searchQuery = titre
+              .replace(/Module \d+ –/gi, "")
+              .replace(/Formation/gi, "")
+              .trim()
+              .slice(0, 50);
+
+            const imageResponse = await fetch("/api/ai/search-image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: searchQuery, count: 1 }),
+            });
+
+            if (imageResponse.ok) {
+              const imageData = await imageResponse.json();
+              if (imageData.success && imageData.data?.images?.length > 0) {
+                return imageData.data.images[0].url;
+              }
+            }
+          } catch (error) {
+            console.log("Auto-recherche image échouée, l'utilisateur pourra en sélectionner une manuellement:", error);
+          }
+          return "";
+        };
+
+        // Lancer la recherche d'image en parallèle
+        const imagePromise = autoSearchImage(genere.titre || contexte.description);
+
         // Mettre a jour les donnees de la fiche avec les valeurs generees (pas de fallback vers prev)
         setFicheData({
           titre: genere.titre || "Formation sans titre",
@@ -584,7 +615,14 @@ function CreateFormationContent() {
           ressourcesPedagogiques: FIXED_RESSOURCES_PEDAGOGIQUES,
           contenu: contenuModules,
           delaiAcces: FIXED_DELAI_ACCES,
-          imageUrl: "", // Sera defini par l'utilisateur dans l'etape suivante
+          imageUrl: "", // Sera mis à jour automatiquement après la recherche
+        });
+
+        // Mettre à jour l'image une fois trouvée (asynchrone, ne bloque pas)
+        imagePromise.then((imageUrl) => {
+          if (imageUrl) {
+            setFicheData((prev) => ({ ...prev, imageUrl }));
+          }
         });
 
         // Mettre a jour les modules - l'IA determine le nombre de modules necessaires

@@ -4,8 +4,9 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import prisma from "@/lib/db/prisma";
 import {
   analyserConformiteOrganisation,
   initialiserIndicateursOrganisation,
@@ -14,13 +15,44 @@ import {
 export async function GET(request: NextRequest) {
   try {
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+    console.log("[Qualiopi Dashboard] Cookies count:", allCookies.length);
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return allCookies;
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore
+            }
+          },
+        },
+      }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    console.log("[Qualiopi Dashboard] Auth result:", {
+      hasUser: !!user,
+      userId: user?.id,
+      authError: authError?.message
+    });
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({
+        error: "Non authentifié",
+        details: authError?.message || "No user session found"
+      }, { status: 401 });
     }
 
     // Récupérer l'utilisateur avec son organisation
@@ -38,23 +70,50 @@ export async function GET(request: NextRequest) {
 
     const organizationId = dbUser.organizationId;
 
-    // Initialiser les indicateurs si nécessaire
-    await initialiserIndicateursOrganisation(organizationId);
+    console.log("[Qualiopi Dashboard] OrganizationId:", organizationId);
 
-    // Analyser la conformité
-    const { score, analyses, alertes } = await analyserConformiteOrganisation(
-      organizationId
-    );
+    // Essayer d'initialiser les indicateurs (avec fallback)
+    let score = {
+      scoreGlobal: 0,
+      indicateursConformes: 0,
+      indicateursTotal: 32,
+      scoreParCritere: [
+        { critere: 1, titre: "Information", score: 0, indicateursConformes: 0, indicateursTotal: 3 },
+        { critere: 2, titre: "Objectifs", score: 0, indicateursConformes: 0, indicateursTotal: 4 },
+        { critere: 3, titre: "Adaptation", score: 0, indicateursConformes: 0, indicateursTotal: 5 },
+        { critere: 4, titre: "Moyens", score: 0, indicateursConformes: 0, indicateursTotal: 6 },
+        { critere: 5, titre: "Qualification", score: 0, indicateursConformes: 0, indicateursTotal: 6 },
+        { critere: 6, titre: "Environnement", score: 0, indicateursConformes: 0, indicateursTotal: 5 },
+        { critere: 7, titre: "Recueil", score: 0, indicateursConformes: 0, indicateursTotal: 3 },
+      ]
+    };
+    let analyses: any[] = [];
+    let alertes: any[] = [];
 
-    // Récupérer les données supplémentaires
-    const [
-      prochainAudit,
-      actionsEnCours,
-      alertesNonLues,
-      derniereConversation,
-    ] = await Promise.all([
-      // Prochain audit prévu
-      prisma.auditQualiopi.findFirst({
+    try {
+      // Initialiser les indicateurs si nécessaire
+      await initialiserIndicateursOrganisation(organizationId);
+      console.log("[Qualiopi Dashboard] Indicateurs initialisés");
+
+      // Analyser la conformité
+      const result = await analyserConformiteOrganisation(organizationId);
+      score = result.score;
+      analyses = result.analyses;
+      alertes = result.alertes;
+      console.log("[Qualiopi Dashboard] Analyse effectuée, score:", score.scoreGlobal);
+    } catch (serviceError: any) {
+      console.error("[Qualiopi Dashboard] Service error (using defaults):", serviceError?.message);
+      // On continue avec les valeurs par défaut
+    }
+
+    // Récupérer les données supplémentaires (avec gestion d'erreur individuelle)
+    let prochainAudit = null;
+    let actionsEnCours = 0;
+    let alertesNonLues = 0;
+    let derniereConversation = null;
+
+    try {
+      prochainAudit = await prisma.auditQualiopi.findFirst({
         where: {
           organizationId,
           dateAudit: { gte: new Date() },
@@ -66,25 +125,37 @@ export async function GET(request: NextRequest) {
           dateAudit: true,
           auditeur: true,
         },
-      }),
-      // Actions correctives en cours
-      prisma.actionCorrective.count({
+      });
+    } catch (e) {
+      console.error("[Qualiopi Dashboard] Error fetching audit:", e);
+    }
+
+    try {
+      actionsEnCours = await prisma.actionCorrective.count({
         where: {
           indicateur: {
             organizationId,
           },
           status: { in: ["A_FAIRE", "EN_COURS"] },
         },
-      }),
-      // Alertes non lues
-      prisma.alerteQualiopi.count({
+      });
+    } catch (e) {
+      console.error("[Qualiopi Dashboard] Error counting actions:", e);
+    }
+
+    try {
+      alertesNonLues = await prisma.alerteQualiopi.count({
         where: {
           organizationId,
           estLue: false,
         },
-      }),
-      // Dernière conversation IA
-      prisma.conversationQualiopi.findFirst({
+      });
+    } catch (e) {
+      console.error("[Qualiopi Dashboard] Error counting alertes:", e);
+    }
+
+    try {
+      derniereConversation = await prisma.conversationQualiopi.findFirst({
         where: { organizationId },
         orderBy: { updatedAt: "desc" },
         select: {
@@ -92,8 +163,10 @@ export async function GET(request: NextRequest) {
           titre: true,
           updatedAt: true,
         },
-      }),
-    ]);
+      });
+    } catch (e) {
+      console.error("[Qualiopi Dashboard] Error fetching conversation:", e);
+    }
 
     // Calculer les jours avant le prochain audit
     let joursAvantAudit = null;
@@ -130,6 +203,30 @@ export async function GET(request: NextRequest) {
         problemes: a.problemes,
       }));
 
+    // Indicateurs validés (conformes)
+    const indicateursValides = analyses
+      .filter((a) => a.status === "CONFORME")
+      .map((a) => ({
+        numero: a.numero,
+        libelle: a.libelle,
+        critere: a.critere,
+      }));
+
+    // Indicateurs détaillés par critère pour le modal
+    const indicateursDetailles: Record<number, any[]> = {};
+    for (let critere = 1; critere <= 7; critere++) {
+      indicateursDetailles[critere] = analyses
+        .filter((a) => a.critere === critere)
+        .map((a) => ({
+          numero: a.numero,
+          libelle: a.libelle,
+          status: a.status,
+          score: a.score,
+        }));
+    }
+
+    console.log("[Qualiopi Dashboard] Returning response");
+
     return NextResponse.json({
       // Scores globaux
       scoreGlobal: score.scoreGlobal,
@@ -147,19 +244,30 @@ export async function GET(request: NextRequest) {
           }
         : null,
 
-      // Alertes et actions
+      // Alertes et actions - utiliser le max entre la DB et les alertes générées
       alertesPrioritaires,
-      alertesNonLues,
+      alertesNonLues: Math.max(alertesNonLues, alertesPrioritaires.length),
       actionsEnCours,
 
       // Indicateurs à traiter
       indicateursAttention,
 
+      // Indicateurs validés (conformes)
+      indicateursValides,
+
+      // Indicateurs détaillés par critère pour le modal
+      indicateursDetailles,
+
       // Dernière activité IA
       derniereConversation,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[API] GET /api/qualiopi/dashboard error:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    console.error("[API] Error stack:", error?.stack);
+    return NextResponse.json({
+      error: "Erreur serveur",
+      message: error?.message || "Unknown error",
+      details: process.env.NODE_ENV === "development" ? error?.stack : undefined
+    }, { status: 500 });
   }
 }

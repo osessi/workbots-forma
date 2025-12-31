@@ -191,13 +191,11 @@ export async function POST(
 
     console.log("Upload success:", data.path);
 
-    // Récupérer l'URL publique
-    const {
-      data: { publicUrl },
-    } = adminClient.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+    // Retourner une URL proxy au lieu de l'URL Supabase publique
+    const proxyUrl = `/api/fichiers/${data.path}`;
 
-    // Mettre à jour l'intervenant avec l'URL
-    const updateData = type === "photo" ? { photoUrl: publicUrl } : { cv: publicUrl };
+    // Mettre à jour l'intervenant avec l'URL proxy
+    const updateData = type === "photo" ? { photoUrl: proxyUrl } : { cv: proxyUrl };
 
     await prisma.intervenant.update({
       where: { id: intervenantId },
@@ -206,7 +204,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: proxyUrl,
       path: data.path,
       type,
     });

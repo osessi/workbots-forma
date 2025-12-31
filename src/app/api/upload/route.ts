@@ -179,14 +179,12 @@ export async function POST(request: NextRequest) {
 
     console.log("Upload success:", data.path);
 
-    // Récupérer l'URL publique avec le client admin
-    const { data: { publicUrl } } = adminClient.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(data.path);
+    // Retourner une URL proxy au lieu de l'URL Supabase publique
+    const proxyUrl = `/api/fichiers/${data.path}`;
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: proxyUrl,
       path: data.path,
     });
   } catch (error) {

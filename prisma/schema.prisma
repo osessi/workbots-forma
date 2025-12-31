@@ -355,6 +355,15 @@ model Organization {
   conversationsQualiopi  ConversationQualiopi[]
   bilansFinanciers       BilanPedagogiqueFinancier[]
 
+  // Module Emailing
+  emailTemplates         EmailTemplate[]       @relation("EmailTemplates")
+  emailAudiences         EmailAudience[]       @relation("EmailAudiences")
+  emailCampaigns         EmailCampaign[]       @relation("EmailCampaigns")
+  newsletters            Newsletter[]          @relation("Newsletters")
+  emailSequences         EmailSequence[]       @relation("EmailSequences")
+  emailSmtpConfig        EmailSmtpConfig?      @relation("SmtpConfig")
+  emailDomains           EmailDomain[]         @relation("EmailDomains")
+
   @@index([slug])
   @@index([customDomain])
 }
@@ -406,6 +415,15 @@ model User {
   // Module 7 & 8 - Qualiopi & Agent IA
   actionsCorrectivesResponsable ActionCorrective[]
   conversationsQualiopi         ConversationQualiopi[]
+
+  // Module Emailing
+  emailTemplatesCreated         EmailTemplate[]         @relation("EmailTemplatesCreated")
+  emailTemplateVersionsCreated  EmailTemplateVersion[]  @relation("EmailTemplateVersionsCreated")
+  emailAudiencesCreated         EmailAudience[]         @relation("EmailAudiencesCreated")
+  emailCampaignsCreated         EmailCampaign[]         @relation("EmailCampaignsCreated")
+  newslettersCreated            Newsletter[]            @relation("NewslettersCreated")
+  newsletterIssuesCreated       NewsletterIssue[]       @relation("NewsletterIssuesCreated")
+  emailSequencesCreated         EmailSequence[]         @relation("EmailSequencesCreated")
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -1338,6 +1356,10 @@ model Apprenant {
   // Qualiopi IND 5 - Historique des notes internes
   notesHistory ApprenantNote[]
   reclamations Reclamation[]
+
+  // Module Emailing
+  audienceContacts        EmailAudienceContact[]    @relation("AudienceApprenant")
+  newsletterSubscriptions NewsletterSubscriber[]    @relation("NewsletterApprenant")
 
   @@index([organizationId])
   @@index([entrepriseId])
@@ -4768,4 +4790,675 @@ model BilanPedagogiqueFinancier {
   @@unique([organizationId, annee])
   @@index([organizationId])
   @@index([annee])
+}
+
+// ===========================================
+// SYSTÈME D'EMAILING COMPLET
+// ===========================================
+
+// Statut d'une campagne email
+enum EmailCampaignStatus {
+  DRAFT       // Brouillon
+  SCHEDULED   // Programmée
+  SENDING     // En cours d'envoi
+  SENT        // Envoyée
+  PAUSED      // En pause
+  CANCELLED   // Annulée
+}
+
+// Type de campagne
+enum EmailCampaignType {
+  ONE_TIME       // Envoi unique
+  AUTOMATED      // Automatisée (trigger)
+  SEQUENCE       // Séquence (drip)
+  NEWSLETTER     // Newsletter
+  TRANSACTIONAL  // Transactionnel
+}
+
+// Statut d'un contact dans une audience
+enum AudienceContactStatus {
+  ACTIVE       // Actif
+  UNSUBSCRIBED // Désabonné
+  BOUNCED      // Rebond
+  COMPLAINED   // Plainte spam
+  CLEANED      // Nettoyé
+}
+
+// Type de trigger pour automatisation
+enum EmailTriggerType {
+  INSCRIPTION_FORMATION  // Inscription à une formation
+  FIN_FORMATION          // Fin de formation
+  RAPPEL_SESSION         // Rappel avant session
+  ANNIVERSAIRE           // Anniversaire inscription
+  INACTIVITE             // Inactivité prolongée
+  TAG_ADDED              // Ajout d'un tag
+  CUSTOM                 // Personnalisé
+}
+
+// Template d'email stocké en base
+model EmailTemplate {
+  id             String       @id @default(cuid())
+  organizationId String?      // Null = template global (Super Admin)
+  organization   Organization? @relation("EmailTemplates", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations
+  name           String
+  description    String?
+  subject        String       // Sujet avec variables {{...}}
+  category       String       // lms, signature, notification, marketing, etc.
+
+  // Contenu
+  htmlContent    String       @db.Text
+  textContent    String?      @db.Text
+  jsonContent    Json?        // Pour éditeur drag & drop
+
+  // Variables disponibles
+  variables      String[]     // Liste des variables utilisables
+
+  // Statut
+  isActive       Boolean      @default(true)
+  isGlobal       Boolean      @default(false) // Template partagé à toutes les orgas
+
+  // Versioning
+  version        Int          @default(1)
+
+  // Metadata
+  createdById    String?
+  createdBy      User?        @relation("EmailTemplatesCreated", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  campaigns      EmailCampaign[]
+  versions       EmailTemplateVersion[]
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([isGlobal])
+}
+
+// Historique des versions de template
+model EmailTemplateVersion {
+  id             String        @id @default(cuid())
+  templateId     String
+  template       EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  // Version
+  version        Int
+  subject        String
+  htmlContent    String        @db.Text
+  jsonContent    Json?
+
+  // Metadata
+  createdById    String?
+  createdBy      User?         @relation("EmailTemplateVersionsCreated", fields: [createdById], references: [id])
+  createdAt      DateTime      @default(now())
+  changeNotes    String?
+
+  @@index([templateId])
+}
+
+// Audience (liste de contacts)
+model EmailAudience {
+  id             String       @id @default(cuid())
+  organizationId String?      // Null = audience globale (Super Admin)
+  organization   Organization? @relation("EmailAudiences", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations
+  name           String
+  description    String?
+
+  // Type
+  isDynamic      Boolean      @default(false) // Segment dynamique basé sur critères
+  criteria       Json?        // Critères pour segment dynamique
+
+  // Statistiques (cache)
+  contactCount   Int          @default(0)
+  activeCount    Int          @default(0)
+
+  // Metadata
+  createdById    String?
+  createdBy      User?        @relation("EmailAudiencesCreated", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  contacts       EmailAudienceContact[]
+  campaigns      EmailCampaign[]
+
+  @@index([organizationId])
+}
+
+// Contact dans une audience
+model EmailAudienceContact {
+  id             String       @id @default(cuid())
+  audienceId     String
+  audience       EmailAudience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+
+  // Contact
+  email          String
+  firstName      String?
+  lastName       String?
+  phone          String?
+
+  // Données personnalisées
+  customFields   Json?        // Champs personnalisés
+
+  // Tags
+  tags           String[]
+
+  // Statut
+  status         AudienceContactStatus @default(ACTIVE)
+
+  // Source
+  source         String?      // apprenant, import, form, manual
+  sourceId       String?      // ID de l'apprenant si applicable
+
+  // Opt-in
+  optInAt        DateTime?
+  optInSource    String?      // Source du consentement
+  optOutAt       DateTime?
+
+  // Scoring (engagement)
+  score          Int          @default(0)
+  lastEngagement DateTime?
+
+  // Metadata
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  apprenantId    String?
+  apprenant      Apprenant?   @relation("AudienceApprenant", fields: [apprenantId], references: [id])
+
+  @@unique([audienceId, email])
+  @@index([audienceId])
+  @@index([email])
+  @@index([status])
+  @@index([tags])
+}
+
+// Campagne email
+model EmailCampaign {
+  id             String       @id @default(cuid())
+  organizationId String?      // Null = campagne globale (Super Admin)
+  organization   Organization? @relation("EmailCampaigns", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations
+  name           String
+  description    String?
+
+  // Type et statut
+  type           EmailCampaignType @default(ONE_TIME)
+  status         EmailCampaignStatus @default(DRAFT)
+
+  // Template
+  templateId     String?
+  template       EmailTemplate? @relation(fields: [templateId], references: [id])
+
+  // Contenu (si pas de template)
+  subject        String?
+  htmlContent    String?      @db.Text
+  textContent    String?      @db.Text
+
+  // Audience
+  audienceId     String?
+  audience       EmailAudience? @relation(fields: [audienceId], references: [id])
+
+  // Expéditeur
+  fromName       String?
+  fromEmail      String?
+  replyTo        String?
+
+  // Programmation
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+
+  // A/B Testing
+  isAbTest       Boolean      @default(false)
+  abTestConfig   Json?        // Configuration A/B test
+
+  // Throttling
+  sendRate       Int?         // Emails par heure (null = pas de limite)
+
+  // Statistiques (cache)
+  totalRecipients Int         @default(0)
+  sentCount       Int         @default(0)
+  deliveredCount  Int         @default(0)
+  openedCount     Int         @default(0)
+  clickedCount    Int         @default(0)
+  bouncedCount    Int         @default(0)
+  unsubscribedCount Int       @default(0)
+  complainedCount Int         @default(0)
+
+  // Metadata
+  createdById    String?
+  createdBy      User?        @relation("EmailCampaignsCreated", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  sends          EmailCampaignSend[]
+  analytics      EmailCampaignAnalytics[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([type])
+  @@index([scheduledAt])
+}
+
+// Envoi individuel d'une campagne
+model EmailCampaignSend {
+  id             String       @id @default(cuid())
+  campaignId     String
+  campaign       EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Destinataire
+  email          String
+  contactId      String?      // ID du contact dans l'audience
+
+  // Statut
+  status         SentEmailStatus @default(SENT)
+  resendId       String?      // ID Resend
+
+  // Tracking
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  bouncedAt      DateTime?
+  unsubscribedAt DateTime?
+  complainedAt   DateTime?
+
+  // Détails
+  openCount      Int          @default(0)
+  clickCount     Int          @default(0)
+  clickedLinks   String[]     // URLs cliquées
+
+  // Erreur
+  errorMessage   String?
+
+  // Variante A/B
+  abVariant      String?      // A ou B
+
+  // Metadata
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([campaignId, email])
+  @@index([campaignId])
+  @@index([email])
+  @@index([status])
+}
+
+// Analytics détaillées d'une campagne
+model EmailCampaignAnalytics {
+  id             String       @id @default(cuid())
+  campaignId     String
+  campaign       EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Date (pour agrégation par jour/heure)
+  date           DateTime
+  hour           Int?         // Heure (0-23) pour granularité horaire
+
+  // Métriques
+  sent           Int          @default(0)
+  delivered      Int          @default(0)
+  opened         Int          @default(0)
+  uniqueOpened   Int          @default(0)
+  clicked        Int          @default(0)
+  uniqueClicked  Int          @default(0)
+  bounced        Int          @default(0)
+  unsubscribed   Int          @default(0)
+  complained     Int          @default(0)
+
+  // Par lien
+  linkClicks     Json?        // { "url1": 10, "url2": 5 }
+
+  // Par device
+  deviceStats    Json?        // { "desktop": 50, "mobile": 30, "tablet": 20 }
+
+  // Par client email
+  emailClientStats Json?      // { "gmail": 40, "outlook": 30, ... }
+
+  // Géolocalisation
+  geoStats       Json?        // { "FR": 80, "BE": 10, ... }
+
+  @@unique([campaignId, date, hour])
+  @@index([campaignId])
+  @@index([date])
+}
+
+// Newsletter
+model Newsletter {
+  id             String       @id @default(cuid())
+  organizationId String?      // Null = newsletter globale (Super Admin)
+  organization   Organization? @relation("Newsletters", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations
+  name           String
+  description    String?
+
+  // Configuration
+  fromName       String?
+  fromEmail      String?
+  replyTo        String?
+
+  // Double opt-in
+  doubleOptIn    Boolean      @default(true)
+  welcomeEmailId String?      // Template email de bienvenue
+
+  // Page d'inscription
+  formEnabled    Boolean      @default(true)
+  formTitle      String?
+  formDescription String?
+  formFields     Json?        // Champs du formulaire
+  formStyle      Json?        // Style personnalisé
+
+  // Page de confirmation
+  confirmationTitle String?
+  confirmationMessage String?
+
+  // Statistiques
+  subscriberCount Int         @default(0)
+  activeCount     Int         @default(0)
+
+  // Metadata
+  createdById    String?
+  createdBy      User?        @relation("NewslettersCreated", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  subscribers    NewsletterSubscriber[]
+  issues         NewsletterIssue[]
+
+  @@index([organizationId])
+}
+
+// Abonné newsletter
+model NewsletterSubscriber {
+  id             String       @id @default(cuid())
+  newsletterId   String
+  newsletter     Newsletter   @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+
+  // Contact
+  email          String
+  firstName      String?
+  lastName       String?
+
+  // Statut
+  status         AudienceContactStatus @default(ACTIVE)
+
+  // Double opt-in
+  isConfirmed    Boolean      @default(false)
+  confirmToken   String?      @unique
+  confirmedAt    DateTime?
+
+  // Opt-out
+  unsubscribedAt DateTime?
+  unsubscribeToken String?    @unique
+
+  // Source
+  source         String?      // form, import, manual, apprenant
+  sourceId       String?
+
+  // Metadata
+  subscribedAt   DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Lien apprenant
+  apprenantId    String?
+  apprenant      Apprenant?   @relation("NewsletterApprenant", fields: [apprenantId], references: [id])
+
+  @@unique([newsletterId, email])
+  @@index([newsletterId])
+  @@index([email])
+  @@index([status])
+}
+
+// Numéro de newsletter (issue)
+model NewsletterIssue {
+  id             String       @id @default(cuid())
+  newsletterId   String
+  newsletter     Newsletter   @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+
+  // Informations
+  title          String
+  subject        String
+  previewText    String?
+
+  // Contenu
+  htmlContent    String       @db.Text
+  textContent    String?      @db.Text
+  jsonContent    Json?
+
+  // Statut
+  status         EmailCampaignStatus @default(DRAFT)
+
+  // Programmation
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+
+  // Statistiques
+  recipientCount Int          @default(0)
+  sentCount      Int          @default(0)
+  deliveredCount Int          @default(0)
+  openedCount    Int          @default(0)
+  clickedCount   Int          @default(0)
+  bouncedCount   Int          @default(0)
+  unsubscribedCount Int       @default(0)
+
+  // Metadata
+  createdById    String?
+  createdBy      User?        @relation("NewsletterIssuesCreated", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([newsletterId])
+  @@index([status])
+  @@index([sentAt])
+}
+
+// Séquence email automatisée (drip campaign)
+model EmailSequence {
+  id             String       @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation("EmailSequences", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Informations
+  name           String
+  description    String?
+
+  // Trigger
+  triggerType    EmailTriggerType
+  triggerConfig  Json?        // Configuration du trigger
+
+  // Statut
+  isActive       Boolean      @default(false)
+
+  // Statistiques
+  enrolledCount  Int          @default(0)
+  completedCount Int          @default(0)
+
+  // Metadata
+  createdById    String?
+  createdBy      User?        @relation("EmailSequencesCreated", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  steps          EmailSequenceStep[]
+  enrollments    EmailSequenceEnrollment[]
+
+  @@index([organizationId])
+  @@index([triggerType])
+  @@index([isActive])
+}
+
+// Étape d'une séquence
+model EmailSequenceStep {
+  id             String       @id @default(cuid())
+  sequenceId     String
+  sequence       EmailSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  // Position
+  order          Int
+
+  // Délai
+  delayDays      Int          @default(0)
+  delayHours     Int          @default(0)
+  delayMinutes   Int          @default(0)
+
+  // Contenu
+  subject        String
+  htmlContent    String       @db.Text
+  textContent    String?      @db.Text
+
+  // Conditions (optionnel)
+  conditions     Json?        // Ex: envoyer seulement si email précédent ouvert
+
+  // Statistiques
+  sentCount      Int          @default(0)
+  openedCount    Int          @default(0)
+  clickedCount   Int          @default(0)
+
+  // Metadata
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([sequenceId])
+  @@index([order])
+}
+
+// Inscription à une séquence
+model EmailSequenceEnrollment {
+  id             String       @id @default(cuid())
+  sequenceId     String
+  sequence       EmailSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  // Contact
+  email          String
+  contactId      String?
+
+  // Progression
+  currentStep    Int          @default(0)
+  nextSendAt     DateTime?
+  isCompleted    Boolean      @default(false)
+  isPaused       Boolean      @default(false)
+
+  // Metadata
+  enrolledAt     DateTime     @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([sequenceId, email])
+  @@index([sequenceId])
+  @@index([nextSendAt])
+  @@index([isCompleted])
+}
+
+// Configuration SMTP personnalisée par organisation
+model EmailSmtpConfig {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation("SmtpConfig", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Type
+  provider       String       @default("resend") // resend, smtp, sendgrid, mailgun
+
+  // SMTP Settings
+  host           String?
+  port           Int?
+  secure         Boolean      @default(true)
+  username       String?
+  password       String?      // Chiffré
+
+  // API Settings (Resend, SendGrid, etc.)
+  apiKey         String?      // Chiffré
+
+  // Expéditeur par défaut
+  fromName       String?
+  fromEmail      String?
+  replyTo        String?
+
+  // Domaine vérifié
+  domain         String?
+  isDomainVerified Boolean    @default(false)
+
+  // Limites
+  dailyLimit     Int?
+  hourlyLimit    Int?
+
+  // Statut
+  isActive       Boolean      @default(true)
+  lastTestedAt   DateTime?
+  testResult     String?
+
+  // Metadata
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// Webhook events Resend
+model EmailWebhookEvent {
+  id             String       @id @default(cuid())
+
+  // Event
+  eventType      String       // email.sent, email.delivered, email.opened, etc.
+  resendId       String       // ID de l'email Resend
+  payload        Json         // Payload complet du webhook
+
+  // Email associé
+  sentEmailId    String?
+  campaignSendId String?
+
+  // Données extraites
+  email          String?
+  timestamp      DateTime
+  userAgent      String?
+  ipAddress      String?
+  link           String?      // Pour les clics
+  country        String?
+  city           String?
+
+  // Processing
+  isProcessed    Boolean      @default(false)
+  processedAt    DateTime?
+  error          String?
+
+  // Metadata
+  createdAt      DateTime     @default(now())
+
+  @@index([eventType])
+  @@index([resendId])
+  @@index([sentEmailId])
+  @@index([campaignSendId])
+  @@index([timestamp])
+  @@index([isProcessed])
+}
+
+// Domaine email vérifié (Resend)
+model EmailDomain {
+  id             String       @id @default(cuid())
+  organizationId String?      // Null = domaine global
+  organization   Organization? @relation("EmailDomains", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Domaine
+  domain         String       @unique
+  resendDomainId String?      // ID Resend
+
+  // DNS Records
+  dnsRecords     Json?        // Records à configurer
+
+  // Statut
+  status         String       @default("pending") // pending, verified, failed
+  verifiedAt     DateTime?
+
+  // Metadata
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
 }

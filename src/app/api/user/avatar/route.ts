@@ -126,16 +126,14 @@ export async function POST(request: NextRequest) {
 
     console.log("Upload success:", data.path);
 
-    // Récupérer l'URL publique avec le client admin
-    const { data: { publicUrl } } = adminClient.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(data.path);
+    // Retourner une URL proxy au lieu de l'URL Supabase publique
+    const proxyUrl = `/api/fichiers/${data.path}`;
 
     // Mettre à jour dans Prisma selon le type
     if (type === "avatar") {
       await prisma.user.update({
         where: { supabaseId: supabaseUser.id },
-        data: { avatar: publicUrl },
+        data: { avatar: proxyUrl },
       });
     } else if (type === "logo" || type === "signature" || type === "cachet") {
       // Récupérer l'utilisateur pour avoir son organizationId
@@ -146,10 +144,10 @@ export async function POST(request: NextRequest) {
 
       // Construire l'objet data selon le type
       const updateData = type === "logo"
-        ? { logo: publicUrl }
+        ? { logo: proxyUrl }
         : type === "signature"
-          ? { signature: publicUrl }
-          : { cachet: publicUrl };
+          ? { signature: proxyUrl }
+          : { cachet: proxyUrl };
 
       if (user?.organizationId) {
         // Mettre à jour l'organisation existante
@@ -178,7 +176,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: proxyUrl,
       path: data.path,
     });
   } catch (error) {

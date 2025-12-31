@@ -2,7 +2,7 @@
 // SERVICE D'ANALYSE DE CONFORMITÉ QUALIOPI
 // ===========================================
 
-import { prisma } from "@/lib/db/prisma";
+import prisma from "@/lib/db/prisma";
 import { IndicateurStatus } from "@prisma/client";
 import {
   INDICATEURS_QUALIOPI,
@@ -50,61 +50,113 @@ export async function analyserConformiteOrganisation(
   analyses: AnalyseIndicateur[];
   alertes: { indicateur: number; message: string; priorite: string }[];
 }> {
-  // Récupérer les données de l'organisation
-  const [
-    organization,
-    formations,
-    sessions,
-    apprenants,
-    intervenants,
-    documents,
-    evaluations,
-    reclamations,
-    ameliorations,
-    veilleSources,
-  ] = await Promise.all([
-    prisma.organization.findUnique({
+  console.log("[Qualiopi Service] Analyzing organization:", organizationId);
+
+  // Récupérer les données de l'organisation (avec gestion d'erreur individuelle)
+  let organization: any = null;
+  let formations: any[] = [];
+  let sessions: any[] = [];
+  let apprenants: any[] = [];
+  let intervenants: any[] = [];
+  let documents: any[] = [];
+  let evaluations: any[] = [];
+  let reclamations: any[] = [];
+  let ameliorations: any[] = [];
+  let veilleSources: any[] = [];
+
+  try {
+    organization = await prisma.organization.findUnique({
       where: { id: organizationId },
-      include: {
-        procedures: true,
-      },
-    }),
-    prisma.formation.findMany({
+      include: { procedures: true },
+    });
+    console.log("[Qualiopi Service] Organization loaded:", !!organization);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading organization:", e?.message);
+  }
+
+  try {
+    formations = await prisma.formation.findMany({
       where: { organizationId },
-      include: {
-        modules: true,
-        evaluations: true,
-      },
-    }),
-    prisma.session.findMany({
+      include: { modules: true },
+    });
+    console.log("[Qualiopi Service] Formations loaded:", formations.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading formations:", e?.message);
+  }
+
+  try {
+    sessions = await prisma.session.findMany({
       where: { organizationId },
-      include: {
-        clients: true,
-        journees: true,
-      },
-    }),
-    prisma.apprenant.findMany({
+      include: { clients: true, journees: true },
+    });
+    console.log("[Qualiopi Service] Sessions loaded:", sessions.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading sessions:", e?.message);
+  }
+
+  try {
+    apprenants = await prisma.apprenant.findMany({
       where: { organizationId },
-    }),
-    prisma.intervenant.findMany({
+    });
+    console.log("[Qualiopi Service] Apprenants loaded:", apprenants.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading apprenants:", e?.message);
+  }
+
+  try {
+    intervenants = await prisma.intervenant.findMany({
       where: { organizationId },
-    }),
-    prisma.document.findMany({
+    });
+    console.log("[Qualiopi Service] Intervenants loaded:", intervenants.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading intervenants:", e?.message);
+  }
+
+  try {
+    documents = await prisma.document.findMany({
       where: { formation: { organizationId } },
-    }),
-    prisma.evaluationSatisfaction.findMany({
+    });
+    console.log("[Qualiopi Service] Documents loaded:", documents.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading documents:", e?.message);
+  }
+
+  try {
+    evaluations = await prisma.evaluationSatisfaction.findMany({
       where: { organizationId },
-    }),
-    prisma.reclamation.findMany({
+      include: { reponse: true },
+    });
+    console.log("[Qualiopi Service] Evaluations loaded:", evaluations.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading evaluations:", e?.message);
+  }
+
+  try {
+    reclamations = await prisma.reclamation.findMany({
       where: { organizationId },
-    }),
-    prisma.actionAmelioration.findMany({
+    });
+    console.log("[Qualiopi Service] Reclamations loaded:", reclamations.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading reclamations:", e?.message);
+  }
+
+  try {
+    ameliorations = await prisma.actionAmelioration.findMany({
       where: { organizationId },
-    }),
-    prisma.veilleSource.findMany({
+    });
+    console.log("[Qualiopi Service] Ameliorations loaded:", ameliorations.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading ameliorations:", e?.message);
+  }
+
+  try {
+    veilleSources = await prisma.veilleSource.findMany({
       where: { organizationId },
-    }),
-  ]);
+    });
+    console.log("[Qualiopi Service] VeilleSources loaded:", veilleSources.length);
+  } catch (e: any) {
+    console.error("[Qualiopi Service] Error loading veilleSources:", e?.message);
+  }
 
   const analyses: AnalyseIndicateur[] = [];
   const alertes: { indicateur: number; message: string; priorite: string }[] = [];
@@ -344,15 +396,18 @@ function analyserIndicateur2(
 
   // Calculer un taux de satisfaction moyen
   if (evaluations.length > 0) {
-    const avgSatisfaction = evaluations.reduce((acc: number, e: any) =>
-      acc + (e.noteGlobale || 0), 0) / evaluations.length;
-    if (avgSatisfaction > 0) {
-      preuves.push({
-        type: "satisfaction",
-        count: 1,
-        description: `Taux de satisfaction moyen: ${avgSatisfaction.toFixed(1)}/5`,
-      });
-      score += 20;
+    const evaluationsAvecReponse = evaluations.filter((e: any) => e.reponse?.noteGlobale);
+    if (evaluationsAvecReponse.length > 0) {
+      const avgSatisfaction = evaluationsAvecReponse.reduce((acc: number, e: any) =>
+        acc + (e.reponse?.noteGlobale || 0), 0) / evaluationsAvecReponse.length;
+      if (avgSatisfaction > 0) {
+        preuves.push({
+          type: "satisfaction",
+          count: 1,
+          description: `Taux de satisfaction moyen: ${avgSatisfaction.toFixed(1)}/10`,
+        });
+        score += 20;
+      }
     }
   }
 

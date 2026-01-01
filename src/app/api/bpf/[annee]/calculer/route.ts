@@ -101,7 +101,10 @@ export async function POST(
             },
           },
           select: {
-            dureeMinutes: true,
+            heureDebutMatin: true,
+            heureFinMatin: true,
+            heureDebutAprem: true,
+            heureFinAprem: true,
           },
         },
         clients: {
@@ -141,12 +144,30 @@ export async function POST(
         }
       }
 
-      // Calculer les heures depuis les journées de session
-      const dureeMinutesTotal = session.journees.reduce(
-        (sum, j) => sum + (j.dureeMinutes || 60),
-        0
-      );
-      const dureeHeures = dureeMinutesTotal / 60;
+      // Calculer les heures depuis les journées de session (horaires)
+      // Helper pour convertir "HH:MM" en minutes depuis minuit
+      const timeToMinutes = (time: string | null): number => {
+        if (!time) return 0;
+        const [h, m] = time.split(":").map(Number);
+        return h * 60 + (m || 0);
+      };
+
+      let dureeMinutesTotal = 0;
+      for (const j of session.journees) {
+        // Matin: 09:00-12:30 = 3.5h par défaut
+        const matinDebut = timeToMinutes(j.heureDebutMatin) || 9 * 60;
+        const matinFin = timeToMinutes(j.heureFinMatin) || 12 * 60 + 30;
+        const dureeMatin = Math.max(0, matinFin - matinDebut);
+
+        // Après-midi: 14:00-17:30 = 3.5h par défaut
+        const apremDebut = timeToMinutes(j.heureDebutAprem) || 14 * 60;
+        const apremFin = timeToMinutes(j.heureFinAprem) || 17 * 60 + 30;
+        const dureeAprem = Math.max(0, apremFin - apremDebut);
+
+        dureeMinutesTotal += dureeMatin + dureeAprem;
+      }
+      // Si aucune journée, utiliser 7h par défaut
+      const dureeHeures = session.journees.length > 0 ? dureeMinutesTotal / 60 : 7;
       const participantsTotaux = session.clients.reduce(
         (sum, c) => sum + c.participants.length,
         0

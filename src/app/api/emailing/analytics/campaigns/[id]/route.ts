@@ -65,7 +65,7 @@ export async function GET(
       },
       include: {
         template: { select: { name: true } },
-        audience: { select: { name: true, totalContacts: true } },
+        audience: { select: { name: true, contactCount: true } },
         analytics: true,
       },
     });
@@ -160,7 +160,7 @@ export async function GET(
         type: campaign.type,
         templateName: campaign.template?.name,
         audienceName: campaign.audience?.name,
-        audienceSize: campaign.audience?.totalContacts,
+        audienceSize: campaign.audience?.contactCount,
         scheduledAt: campaign.scheduledAt,
         sentAt: campaign.sentAt,
         completedAt: campaign.completedAt,

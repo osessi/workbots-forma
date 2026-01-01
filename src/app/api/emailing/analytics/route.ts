@@ -219,15 +219,15 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        totalContacts: true,
-        activeContacts: true,
+        contactCount: true,
+        activeCount: true,
         _count: {
           select: {
             campaigns: true,
           },
         },
       },
-      orderBy: { totalContacts: "desc" },
+      orderBy: { contactCount: "desc" },
       take: 10,
     });
 
@@ -274,7 +274,10 @@ export async function GET(request: NextRequest) {
       topCampaigns,
       templatePerformance,
       audiences: audiences.map((a) => ({
-        ...a,
+        id: a.id,
+        name: a.name,
+        totalContacts: a.contactCount,
+        activeContacts: a.activeCount,
         campaignCount: a._count.campaigns,
       })),
       newsletters,

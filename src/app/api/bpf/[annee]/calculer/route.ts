@@ -90,8 +90,7 @@ export async function POST(
         formation: {
           select: {
             id: true,
-            dureeHeures: true,
-            domaine: true,
+            fichePedagogique: true,
           },
         },
         journees: {
@@ -100,6 +99,9 @@ export async function POST(
               gte: startDate,
               lte: endDate,
             },
+          },
+          select: {
+            dureeMinutes: true,
           },
         },
         clients: {
@@ -139,16 +141,21 @@ export async function POST(
         }
       }
 
-      // Calculer les heures
-      const dureeFormation = session.formation.dureeHeures || 0;
+      // Calculer les heures depuis les journées de session
+      const dureeMinutesTotal = session.journees.reduce(
+        (sum, j) => sum + (j.dureeMinutes || 60),
+        0
+      );
+      const dureeHeures = dureeMinutesTotal / 60;
       const participantsTotaux = session.clients.reduce(
         (sum, c) => sum + c.participants.length,
         0
       );
-      nombreHeuresFormation += dureeFormation * participantsTotaux;
+      nombreHeuresFormation += dureeHeures * participantsTotaux;
 
-      // Répartition par domaine
-      const domaine = session.formation.domaine || "Autre";
+      // Répartition par domaine (depuis fichePedagogique si disponible)
+      const fichePeda = session.formation.fichePedagogique as Record<string, unknown> | null;
+      const domaine = (fichePeda?.domaine as string) || "Autre";
       repartitionDomaine[domaine] = (repartitionDomaine[domaine] || 0) + 1;
     }
 

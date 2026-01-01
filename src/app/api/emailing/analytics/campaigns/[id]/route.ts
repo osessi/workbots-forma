@@ -163,7 +163,6 @@ export async function GET(
         audienceSize: campaign.audience?.contactCount,
         scheduledAt: campaign.scheduledAt,
         sentAt: campaign.sentAt,
-        completedAt: campaign.completedAt,
       },
       kpis: {
         totalSent: campaign.totalSent,

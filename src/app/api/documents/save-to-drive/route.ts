@@ -327,7 +327,7 @@ export async function POST(request: NextRequest) {
         mimeType: file.mimeType,
         folderId: file.folderId,
         folder: file.folder,
-        publicUrl: urlData?.publicUrl || null,
+        publicUrl: file.publicUrl || null,
       },
       message: `Document "${titre}" sauvegardé en ${fileExtension.toUpperCase()} dans le Drive`,
     });

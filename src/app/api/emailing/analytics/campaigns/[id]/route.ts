@@ -151,6 +151,13 @@ export async function GET(
       .sort((a, b) => b.sent - a.sent)
       .slice(0, 10);
 
+    // Calculer les KPIs à partir des envois
+    const totalSent = sends.length;
+    const totalDelivered = sends.filter(s => s.deliveredAt).length;
+    const totalOpened = sends.filter(s => s.openedAt).length;
+    const totalClicked = sends.filter(s => s.clickedAt).length;
+    const totalBounced = sends.filter(s => s.bouncedAt).length;
+
     return NextResponse.json({
       campaign: {
         id: campaign.id,
@@ -165,20 +172,16 @@ export async function GET(
         sentAt: campaign.sentAt,
       },
       kpis: {
-        totalSent: campaign.totalSent,
-        totalDelivered: campaign.totalDelivered,
-        totalOpened: campaign.totalOpened,
-        totalClicked: campaign.totalClicked,
-        totalBounced: campaign.totalBounced,
-        totalUnsubscribed: campaign.totalUnsubscribed,
-        openRate: campaign.openRate,
-        clickRate: campaign.clickRate,
-        bounceRate: campaign.totalSent > 0
-          ? Math.round((campaign.totalBounced / campaign.totalSent) * 100)
-          : 0,
-        deliveryRate: campaign.totalSent > 0
-          ? Math.round((campaign.totalDelivered / campaign.totalSent) * 100)
-          : 0,
+        totalSent,
+        totalDelivered,
+        totalOpened,
+        totalClicked,
+        totalBounced,
+        totalUnsubscribed: 0, // À calculer si le champ existe
+        openRate: totalDelivered > 0 ? Math.round((totalOpened / totalDelivered) * 100) : 0,
+        clickRate: totalOpened > 0 ? Math.round((totalClicked / totalOpened) * 100) : 0,
+        bounceRate: totalSent > 0 ? Math.round((totalBounced / totalSent) * 100) : 0,
+        deliveryRate: totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
       },
       timing: {
         avgTimeToOpen: avgTimeToOpen, // minutes

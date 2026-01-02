@@ -37,6 +37,24 @@ async function getSupabaseClient() {
   );
 }
 
+// Extraire les statuts de vérification depuis dnsRecords
+function extractVerificationStatus(dnsRecords: unknown) {
+  const records = dnsRecords as Array<{ type?: string; name?: string; status?: string }> | null;
+  if (!records || !Array.isArray(records)) {
+    return { dkimVerified: false, spfVerified: false, dmarcVerified: false };
+  }
+
+  const dkimRecord = records.find((r) => r.type === "TXT" && r.name?.includes("_domainkey"));
+  const spfRecord = records.find((r) => r.type === "TXT" && !r.name?.includes("_domainkey") && !r.name?.includes("_dmarc"));
+  const dmarcRecord = records.find((r) => r.type === "TXT" && r.name?.includes("_dmarc"));
+
+  return {
+    dkimVerified: dkimRecord?.status === "verified",
+    spfVerified: spfRecord?.status === "verified",
+    dmarcVerified: dmarcRecord?.status === "verified",
+  };
+}
+
 // ===========================================
 // GET - Détails d'un domaine
 // ===========================================
@@ -75,14 +93,14 @@ export async function GET(
       return NextResponse.json({ error: "Domaine non trouvé" }, { status: 404 });
     }
 
+    const verificationStatus = extractVerificationStatus(domain.dnsRecords);
+
     return NextResponse.json({
       domain: {
         id: domain.id,
         domain: domain.domain,
         status: domain.status,
-        dkimVerified: domain.dkimVerified,
-        spfVerified: domain.spfVerified,
-        dmarcVerified: domain.dmarcVerified,
+        ...verificationStatus,
         dnsRecords: domain.dnsRecords,
         createdAt: domain.createdAt,
         verifiedAt: domain.verifiedAt,
@@ -146,27 +164,28 @@ export async function POST(
           const result = await resend.domains.verify(domain.resendDomainId);
 
           if (result.data) {
-            // Mettre à jour les statuts
-            const records = result.data.records || [];
-            const dkimRecord = records.find((r: { type: string }) => r.type === "TXT" && r.name?.includes("_domainkey"));
-            const spfRecord = records.find((r: { type: string; name: string }) => r.type === "TXT" && r.name === domain.domain);
+            // Cast le résultat pour accéder aux propriétés
+            const domainData = result.data as unknown as {
+              status?: string;
+              records?: Array<{ type: string; name?: string; value?: string; status?: string }>
+            };
+            const records = domainData.records || [];
+            const domainStatus = domainData.status;
 
             await prisma.emailDomain.update({
               where: { id: domain.id },
               data: {
-                status: result.data.status === "verified" ? "VERIFIED" : domain.status,
-                dkimVerified: dkimRecord?.status === "verified",
-                spfVerified: spfRecord?.status === "verified",
-                dnsRecords: records,
-                verifiedAt: result.data.status === "verified" ? new Date() : null,
+                status: domainStatus === "verified" ? "verified" : domain.status,
+                dnsRecords: records as object,
+                verifiedAt: domainStatus === "verified" ? new Date() : null,
               },
             });
 
             return NextResponse.json({
               success: true,
-              status: result.data.status,
+              status: domainStatus,
               records: records,
-              message: result.data.status === "verified"
+              message: domainStatus === "verified"
                 ? "Domaine vérifié avec succès"
                 : "Vérification en cours. Assurez-vous que les enregistrements DNS sont configurés.",
             });

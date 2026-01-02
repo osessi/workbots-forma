@@ -79,8 +79,7 @@ export async function POST(
       return NextResponse.json({ error: "Séquence non trouvée" }, { status: 404 });
     }
 
-    let newStatus: string;
-    let enrollmentStatus: string | null = null;
+    let isActive: boolean;
 
     switch (action) {
       case "activate":
@@ -98,27 +97,49 @@ export async function POST(
           }, { status: 400 });
         }
 
-        newStatus = "ACTIVE";
-        enrollmentStatus = "ACTIVE";
-        break;
+        isActive = true;
 
-      case "pause":
-        newStatus = "PAUSED";
-        enrollmentStatus = "PAUSED";
-        break;
-
-      case "stop":
-        newStatus = "STOPPED";
-        // Arrêter toutes les inscriptions actives
+        // Reprendre les inscriptions en pause
         await prisma.emailSequenceEnrollment.updateMany({
           where: {
             sequenceId: id,
-            status: { in: ["ACTIVE", "PAUSED"] },
+            isPaused: true,
+            isCompleted: false,
           },
           data: {
-            status: "EXITED",
-            exitedAt: new Date(),
-            exitReason: "Séquence arrêtée manuellement",
+            isPaused: false,
+          },
+        });
+        break;
+
+      case "pause":
+        isActive = false;
+
+        // Mettre en pause toutes les inscriptions actives
+        await prisma.emailSequenceEnrollment.updateMany({
+          where: {
+            sequenceId: id,
+            isPaused: false,
+            isCompleted: false,
+          },
+          data: {
+            isPaused: true,
+          },
+        });
+        break;
+
+      case "stop":
+        isActive = false;
+
+        // Marquer toutes les inscriptions comme terminées
+        await prisma.emailSequenceEnrollment.updateMany({
+          where: {
+            sequenceId: id,
+            isCompleted: false,
+          },
+          data: {
+            isCompleted: true,
+            completedAt: new Date(),
           },
         });
         break;
@@ -130,19 +151,8 @@ export async function POST(
     // Mettre à jour le statut de la séquence
     await prisma.emailSequence.update({
       where: { id },
-      data: { status: newStatus },
+      data: { isActive },
     });
-
-    // Mettre à jour les inscriptions si nécessaire
-    if (enrollmentStatus && action !== "stop") {
-      await prisma.emailSequenceEnrollment.updateMany({
-        where: {
-          sequenceId: id,
-          status: action === "activate" ? "PAUSED" : "ACTIVE",
-        },
-        data: { status: enrollmentStatus },
-      });
-    }
 
     const messages: Record<string, string> = {
       activate: "Séquence activée. Les emails seront envoyés selon le calendrier défini.",
@@ -152,7 +162,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      status: newStatus,
+      isActive,
       message: messages[action],
     });
   } catch (error) {

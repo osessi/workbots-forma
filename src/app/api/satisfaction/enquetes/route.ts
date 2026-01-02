@@ -80,8 +80,6 @@ export async function GET(request: NextRequest) {
         session: {
           select: {
             id: true,
-            reference: true,
-            nom: true,
             formation: {
               select: {
                 id: true,
@@ -252,8 +250,7 @@ export async function POST(request: NextRequest) {
       include: {
         session: {
           select: {
-            reference: true,
-            nom: true,
+            id: true,
           },
         },
         apprenant: {

@@ -26,8 +26,7 @@ export async function GET(
       include: {
         session: {
           select: {
-            reference: true,
-            nom: true,
+            id: true,
             formation: {
               select: {
                 titre: true,
@@ -44,7 +43,7 @@ export async function GET(
         organization: {
           select: {
             name: true,
-            logoUrl: true,
+            logo: true,
           },
         },
         reponse: true,
@@ -97,12 +96,11 @@ export async function GET(
         description: enquete.session.formation.description,
       },
       session: {
-        reference: enquete.session.reference,
-        nom: enquete.session.nom,
+        id: enquete.session.id,
       },
       organization: {
         name: enquete.organization.name,
-        logoUrl: enquete.organization.logoUrl,
+        logo: enquete.organization.logo,
       },
       // Si une réponse partielle existe, la retourner
       reponsePartielle: enquete.reponse || null,

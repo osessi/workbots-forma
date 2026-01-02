@@ -63,14 +63,30 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
+    // Extraire les statuts de vérification depuis dnsRecords
+    const extractVerificationStatus = (dnsRecords: unknown) => {
+      const records = dnsRecords as Array<{ type?: string; name?: string; status?: string }> | null;
+      if (!records || !Array.isArray(records)) {
+        return { dkimVerified: false, spfVerified: false, dmarcVerified: false };
+      }
+
+      const dkimRecord = records.find((r) => r.type === "TXT" && r.name?.includes("_domainkey"));
+      const spfRecord = records.find((r) => r.type === "TXT" && !r.name?.includes("_domainkey") && !r.name?.includes("_dmarc"));
+      const dmarcRecord = records.find((r) => r.type === "TXT" && r.name?.includes("_dmarc"));
+
+      return {
+        dkimVerified: dkimRecord?.status === "verified",
+        spfVerified: spfRecord?.status === "verified",
+        dmarcVerified: dmarcRecord?.status === "verified",
+      };
+    };
+
     return NextResponse.json({
       domains: domains.map((d) => ({
         id: d.id,
         domain: d.domain,
         status: d.status,
-        dkimVerified: d.dkimVerified,
-        spfVerified: d.spfVerified,
-        dmarcVerified: d.dmarcVerified,
+        ...extractVerificationStatus(d.dnsRecords),
         dnsRecords: d.dnsRecords,
         createdAt: d.createdAt,
         verifiedAt: d.verifiedAt,
@@ -157,7 +173,7 @@ export async function POST(request: NextRequest) {
         domain: domain.toLowerCase(),
         resendDomainId: resendDomain?.id || null,
         status: "PENDING",
-        dnsRecords: dnsRecords || generateDefaultDnsRecords(domain),
+        dnsRecords: (dnsRecords || generateDefaultDnsRecords(domain)) as object,
       },
     });
 

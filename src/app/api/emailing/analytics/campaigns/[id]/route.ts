@@ -200,10 +200,9 @@ export async function GET(
       },
       topDomains,
       recentActivity: sends.slice(0, 20),
-      abTest: campaign.abTestEnabled ? {
-        variantA: campaign.analytics?.find(a => a.variant === "A"),
-        variantB: campaign.analytics?.find(a => a.variant === "B"),
-        winner: campaign.abWinner,
+      abTest: campaign.isAbTest ? {
+        config: campaign.abTestConfig,
+        analytics: campaign.analytics,
       } : null,
     });
   } catch (error) {

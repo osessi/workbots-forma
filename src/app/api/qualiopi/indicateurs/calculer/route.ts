@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         await prisma.alerteQualiopi.create({
           data: {
             organizationId,
-            type: "NON_CONFORMITE",
+            type: "INDICATEUR_NON_CONFORME",
             priorite: alerte.priorite === "CRITIQUE" ? "CRITIQUE" : "HAUTE",
             titre: `Indicateur ${alerte.indicateur} non conforme`,
             message: alerte.message,

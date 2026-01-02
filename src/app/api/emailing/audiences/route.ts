@@ -56,7 +56,10 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const global = searchParams.get("global") === "true" && dbUser.isSuperAdmin;
 
-    const where: Parameters<typeof prisma.emailAudience.findMany>[0]["where"] = global
+    const where: {
+      organizationId?: string | null;
+      name?: { contains: string; mode: "insensitive" };
+    } = global
       ? {}
       : { organizationId: dbUser.organizationId };
 
@@ -162,7 +165,7 @@ export async function POST(request: NextRequest) {
         where: {
           organizationId: dbUser.organizationId,
           isActive: true,
-          email: { not: null },
+          email: { not: undefined, notIn: [""] },
         },
         select: {
           id: true,
@@ -177,7 +180,7 @@ export async function POST(request: NextRequest) {
         await prisma.emailAudienceContact.createMany({
           data: apprenants.map((a) => ({
             audienceId: audience.id,
-            email: a.email,
+            email: a.email!,
             firstName: a.prenom,
             lastName: a.nom,
             phone: a.telephone,

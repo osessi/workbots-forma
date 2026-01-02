@@ -201,7 +201,7 @@ export async function POST(
                 firstName: mapped.firstName || existing.firstName,
                 lastName: mapped.lastName || existing.lastName,
                 phone: mapped.phone || existing.phone,
-                customFields: mapped.customFields || existing.customFields,
+                customFields: mapped.customFields || (existing.customFields as Record<string, string> | undefined),
                 tags: [...new Set([...(existing.tags || []), ...(mapped.tags || []), ...tagsToAdd])],
               },
             });

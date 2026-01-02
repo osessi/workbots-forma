@@ -93,10 +93,14 @@ export async function POST(
 
     // Si l'indicateur n'existe pas, le créer
     if (!indicateur) {
+      // Calculer le critère (les indicateurs sont regroupés par critère 1-7)
+      const critere = Math.min(7, Math.ceil(numeroInt / 5));
       indicateur = await prisma.indicateurConformite.create({
         data: {
           organizationId,
           numeroIndicateur: numeroInt,
+          critere,
+          libelle: `Indicateur ${numeroInt}`,
           status: "EN_COURS",
           score: 0,
         },

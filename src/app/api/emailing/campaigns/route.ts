@@ -61,7 +61,12 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
     const global = searchParams.get("global") === "true" && dbUser.isSuperAdmin;
 
-    const where: Parameters<typeof prisma.emailCampaign.findMany>[0]["where"] = global
+    const where: {
+      organizationId?: string | null;
+      status?: EmailCampaignStatus;
+      type?: EmailCampaignType;
+      name?: { contains: string; mode: "insensitive" };
+    } = global
       ? {}
       : { organizationId: dbUser.organizationId };
 

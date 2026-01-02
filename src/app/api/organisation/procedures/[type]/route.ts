@@ -175,7 +175,7 @@ export async function PATCH(
       const procedure = await tx.procedure.update({
         where: {
           organizationId_type: {
-            organizationId: dbUser.organizationId,
+            organizationId: dbUser.organizationId!,
             type: type as ProcedureType,
           },
         },

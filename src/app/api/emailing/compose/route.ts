@@ -203,15 +203,16 @@ export async function POST(request: NextRequest) {
         select: {
           id: true,
           name: true,
-          url: true,
+          publicUrl: true,
           mimeType: true,
         },
       });
 
       // Pour chaque fichier, récupérer le contenu
       for (const file of files) {
+        if (!file.publicUrl) continue;
         try {
-          const response = await fetch(file.url);
+          const response = await fetch(file.publicUrl);
           const buffer = await response.arrayBuffer();
           const base64 = Buffer.from(buffer).toString("base64");
           attachments.push({

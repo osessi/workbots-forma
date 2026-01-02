@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
         where: {
           organizationId: dbUser.organizationId,
           isActive: true,
-          email: { not: null },
+          email: { not: undefined, notIn: [""] },
         },
         select: {
           id: true,
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
         await prisma.newsletterSubscriber.createMany({
           data: apprenants.map((a) => ({
             newsletterId: newsletter.id,
-            email: a.email,
+            email: a.email!,
             firstName: a.prenom,
             lastName: a.nom,
             status: "ACTIVE",

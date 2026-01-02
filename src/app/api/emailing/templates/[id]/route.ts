@@ -179,7 +179,7 @@ export async function PATCH(
           version: template.version,
           subject: template.subject,
           htmlContent: template.htmlContent,
-          jsonContent: template.jsonContent,
+          jsonContent: template.jsonContent as object | undefined,
           createdById: dbUser.id,
           changeNotes: changeNotes || "Modification du contenu",
         },

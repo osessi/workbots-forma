@@ -66,7 +66,7 @@ export async function POST(
       where: {
         id,
         organizationId: dbUser.organizationId,
-        status: "ACTIVE",
+        isActive: true,
       },
       include: {
         steps: { orderBy: { order: "asc" }, take: 1 },
@@ -90,17 +90,15 @@ export async function POST(
 
     const enrollments: Array<{
       email: string;
-      name: string;
-      apprenantId?: string;
+      contactId?: string;
     }> = [];
 
     // Option 1: Liste de contacts directs
     if (contacts && Array.isArray(contacts)) {
-      contacts.forEach((contact: { email: string; name?: string }) => {
+      contacts.forEach((contact: { email: string }) => {
         if (contact.email) {
           enrollments.push({
             email: contact.email.toLowerCase(),
-            name: contact.name || "",
           });
         }
       });
@@ -113,13 +111,13 @@ export async function POST(
           audienceId,
           status: "ACTIVE",
         },
-        select: { email: true, firstName: true, lastName: true },
+        select: { id: true, email: true },
       });
 
       audienceContacts.forEach((c) => {
         enrollments.push({
           email: c.email.toLowerCase(),
-          name: `${c.firstName || ""} ${c.lastName || ""}`.trim(),
+          contactId: c.id,
         });
       });
     }
@@ -131,15 +129,14 @@ export async function POST(
           id: { in: apprenantIds },
           organizationId: dbUser.organizationId,
         },
-        select: { id: true, email: true, prenom: true, nom: true },
+        select: { id: true, email: true },
       });
 
       apprenants.forEach((a) => {
         if (a.email) {
           enrollments.push({
             email: a.email.toLowerCase(),
-            name: `${a.prenom || ""} ${a.nom || ""}`.trim(),
-            apprenantId: a.id,
+            contactId: a.id,
           });
         }
       });
@@ -155,13 +152,13 @@ export async function POST(
     const existingEnrollments = await prisma.emailSequenceEnrollment.findMany({
       where: {
         sequenceId: id,
-        contactEmail: { in: enrollments.map((e) => e.email) },
-        status: { in: ["ACTIVE", "PAUSED"] },
+        email: { in: enrollments.map((e) => e.email) },
+        isCompleted: false,
       },
-      select: { contactEmail: true },
+      select: { email: true },
     });
 
-    const existingEmails = new Set(existingEnrollments.map((e) => e.contactEmail));
+    const existingEmails = new Set(existingEnrollments.map((e) => e.email));
     const newEnrollments = enrollments.filter((e) => !existingEmails.has(e.email));
 
     if (newEnrollments.length === 0) {
@@ -178,19 +175,28 @@ export async function POST(
     const firstSendDate = new Date();
     firstSendDate.setDate(firstSendDate.getDate() + (firstStep.delayDays || 0));
     firstSendDate.setHours(firstSendDate.getHours() + (firstStep.delayHours || 0));
+    firstSendDate.setMinutes(firstSendDate.getMinutes() + (firstStep.delayMinutes || 0));
 
     // Créer les inscriptions
     await prisma.emailSequenceEnrollment.createMany({
       data: newEnrollments.map((e) => ({
         sequenceId: id,
-        contactEmail: e.email,
-        contactName: e.name,
-        apprenantId: e.apprenantId,
-        status: "ACTIVE",
-        currentStep: 1,
+        email: e.email,
+        contactId: e.contactId,
+        currentStep: 0,
         nextSendAt: firstSendDate,
-        metadata: {},
+        isCompleted: false,
+        isPaused: false,
       })),
+      skipDuplicates: true,
+    });
+
+    // Mettre à jour le compteur d'inscriptions
+    await prisma.emailSequence.update({
+      where: { id },
+      data: {
+        enrolledCount: { increment: newEnrollments.length },
+      },
     });
 
     return NextResponse.json({

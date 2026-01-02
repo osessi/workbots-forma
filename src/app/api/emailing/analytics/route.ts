@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       openedEmails,
       clickedEmails,
       bouncedEmails,
-      complainedEmails,
+      failedEmails,
     ] = await Promise.all([
       prisma.sentEmail.count({
         where: { ...whereOrg, sentAt: { gte: startDate } },
@@ -97,16 +97,16 @@ export async function GET(request: NextRequest) {
         where: { ...whereOrg, sentAt: { gte: startDate }, status: "DELIVERED" },
       }),
       prisma.sentEmail.count({
-        where: { ...whereOrg, sentAt: { gte: startDate }, openedAt: { not: null } },
+        where: { ...whereOrg, sentAt: { gte: startDate }, status: "OPENED" },
       }),
       prisma.sentEmail.count({
-        where: { ...whereOrg, sentAt: { gte: startDate }, clickedAt: { not: null } },
+        where: { ...whereOrg, sentAt: { gte: startDate }, status: "CLICKED" },
       }),
       prisma.sentEmail.count({
         where: { ...whereOrg, sentAt: { gte: startDate }, status: "BOUNCED" },
       }),
       prisma.sentEmail.count({
-        where: { ...whereOrg, sentAt: { gte: startDate }, status: "COMPLAINED" },
+        where: { ...whereOrg, sentAt: { gte: startDate }, status: "FAILED" },
       }),
     ]);
 
@@ -179,18 +179,16 @@ export async function GET(request: NextRequest) {
         status: "SENT",
         scheduledAt: { gte: startDate },
       },
-      orderBy: { totalOpened: "desc" },
+      orderBy: { openedCount: "desc" },
       take: 10,
       select: {
         id: true,
         name: true,
         subject: true,
-        totalSent: true,
-        totalDelivered: true,
-        totalOpened: true,
-        totalClicked: true,
-        openRate: true,
-        clickRate: true,
+        sentCount: true,
+        deliveredCount: true,
+        openedCount: true,
+        clickedCount: true,
         scheduledAt: true,
       },
     });
@@ -204,10 +202,14 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         category: true,
-        usageCount: true,
-        lastUsedAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            campaigns: true,
+          },
+        },
       },
-      orderBy: { usageCount: "desc" },
+      orderBy: { updatedAt: "desc" },
       take: 10,
     });
 
@@ -239,12 +241,8 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
+        subscriberCount: true,
         activeCount: true,
-        totalSent: true,
-        totalOpened: true,
-        totalClicked: true,
-        averageOpenRate: true,
-        averageClickRate: true,
       },
       orderBy: { activeCount: "desc" },
       take: 5,
@@ -262,17 +260,27 @@ export async function GET(request: NextRequest) {
         opened: openedEmails,
         clicked: clickedEmails,
         bounced: bouncedEmails,
-        complained: complainedEmails,
+        failed: failedEmails,
         deliveryRate: totalEmails > 0 ? Math.round((deliveredEmails / totalEmails) * 100) : 0,
         openRate: deliveredEmails > 0 ? Math.round((openedEmails / deliveredEmails) * 100) : 0,
         clickRate: openedEmails > 0 ? Math.round((clickedEmails / openedEmails) * 100) : 0,
         bounceRate: totalEmails > 0 ? Math.round((bouncedEmails / totalEmails) * 100) : 0,
-        complaintRate: totalEmails > 0 ? Math.round((complainedEmails / totalEmails) * 1000) / 10 : 0,
+        failedRate: totalEmails > 0 ? Math.round((failedEmails / totalEmails) * 1000) / 10 : 0,
       },
       timeline,
       byType: typeStats,
-      topCampaigns,
-      templatePerformance,
+      topCampaigns: topCampaigns.map((c) => ({
+        ...c,
+        openRate: c.deliveredCount > 0 ? Math.round((c.openedCount / c.deliveredCount) * 100) : 0,
+        clickRate: c.openedCount > 0 ? Math.round((c.clickedCount / c.openedCount) * 100) : 0,
+      })),
+      templatePerformance: templatePerformance.map((t) => ({
+        id: t.id,
+        name: t.name,
+        category: t.category,
+        usageCount: t._count.campaigns,
+        lastUsedAt: t.updatedAt,
+      })),
       audiences: audiences.map((a) => ({
         id: a.id,
         name: a.name,

@@ -145,8 +145,8 @@ export async function POST(request: NextRequest) {
         fromEmail,
         fromName: fromName || "",
         replyTo: replyTo || undefined,
-        encryption: encryption || undefined,
-        isVerified: false, // Nécessite re-vérification
+        secure: encryption === "ssl" || encryption === "tls",
+        isDomainVerified: false, // Nécessite re-vérification
         updatedAt: new Date(),
       },
       create: {
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
         fromEmail,
         fromName: fromName || "",
         replyTo: replyTo || undefined,
-        encryption: encryption || undefined,
+        secure: encryption === "ssl" || encryption === "tls",
         isActive: true,
       },
     });
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
         fromEmail: smtpConfig.fromEmail,
         fromName: smtpConfig.fromName,
         replyTo: smtpConfig.replyTo,
-        isVerified: smtpConfig.isVerified,
+        isDomainVerified: smtpConfig.isDomainVerified,
         isActive: smtpConfig.isActive,
       },
     });

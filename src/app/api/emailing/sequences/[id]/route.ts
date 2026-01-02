@@ -71,23 +71,18 @@ export async function GET(
       include: {
         steps: {
           orderBy: { order: "asc" },
-          include: {
-            template: { select: { id: true, name: true } },
-          },
         },
         enrollments: {
           orderBy: { enrolledAt: "desc" },
           take: 50,
           select: {
             id: true,
-            contactEmail: true,
-            contactName: true,
-            status: true,
+            email: true,
             currentStep: true,
+            isCompleted: true,
+            isPaused: true,
             enrolledAt: true,
             completedAt: true,
-            exitedAt: true,
-            exitReason: true,
           },
         },
         createdBy: { select: { firstName: true, lastName: true } },
@@ -101,55 +96,36 @@ export async function GET(
     // Stats d'engagement par étape
     const stepStats = await Promise.all(
       sequence.steps.map(async (step) => {
-        const [sent, opened, clicked] = await Promise.all([
-          prisma.emailSequenceEnrollment.count({
-            where: {
-              sequenceId: id,
-              currentStep: { gte: step.order },
-            },
-          }),
-          prisma.sentEmail.count({
-            where: {
-              metadata: {
-                path: ["sequenceStepId"],
-                equals: step.id,
-              },
-              openedAt: { not: null },
-            },
-          }),
-          prisma.sentEmail.count({
-            where: {
-              metadata: {
-                path: ["sequenceStepId"],
-                equals: step.id,
-              },
-              clickedAt: { not: null },
-            },
-          }),
-        ]);
+        const sent = await prisma.emailSequenceEnrollment.count({
+          where: {
+            sequenceId: id,
+            currentStep: { gte: step.order },
+          },
+        });
 
         return {
           stepId: step.id,
           order: step.order,
           sent,
-          opened,
-          clicked,
-          openRate: sent > 0 ? Math.round((opened / sent) * 100) : 0,
-          clickRate: opened > 0 ? Math.round((clicked / opened) * 100) : 0,
+          sentCount: step.sentCount,
+          openedCount: step.openedCount,
+          clickedCount: step.clickedCount,
+          openRate: step.sentCount > 0 ? Math.round((step.openedCount / step.sentCount) * 100) : 0,
+          clickRate: step.openedCount > 0 ? Math.round((step.clickedCount / step.openedCount) * 100) : 0,
         };
       })
     );
 
     // Stats globales
-    const [activeCount, completedCount, exitedCount] = await Promise.all([
+    const [activeCount, completedCount, pausedCount] = await Promise.all([
       prisma.emailSequenceEnrollment.count({
-        where: { sequenceId: id, status: "ACTIVE" },
+        where: { sequenceId: id, isCompleted: false, isPaused: false },
       }),
       prisma.emailSequenceEnrollment.count({
-        where: { sequenceId: id, status: "COMPLETED" },
+        where: { sequenceId: id, isCompleted: true },
       }),
       prisma.emailSequenceEnrollment.count({
-        where: { sequenceId: id, status: "EXITED" },
+        where: { sequenceId: id, isPaused: true },
       }),
     ]);
 
@@ -158,10 +134,9 @@ export async function GET(
         id: sequence.id,
         name: sequence.name,
         description: sequence.description,
-        status: sequence.status,
+        isActive: sequence.isActive,
         triggerType: sequence.triggerType,
-        triggerConditions: sequence.triggerConditions,
-        exitConditions: sequence.exitConditions,
+        triggerConfig: sequence.triggerConfig,
         createdBy: sequence.createdBy
           ? `${sequence.createdBy.firstName} ${sequence.createdBy.lastName}`
           : null,
@@ -171,33 +146,25 @@ export async function GET(
       steps: sequence.steps.map((step, index) => ({
         id: step.id,
         order: step.order,
-        name: step.name,
         subject: step.subject,
-        content: step.content,
-        templateId: step.templateId,
-        templateName: step.template?.name,
+        htmlContent: step.htmlContent,
+        textContent: step.textContent,
         delayDays: step.delayDays,
         delayHours: step.delayHours,
-        sendConditions: step.sendConditions,
+        delayMinutes: step.delayMinutes,
+        conditions: step.conditions,
         stats: stepStats[index],
       })),
       stats: {
-        totalEnrollments: activeCount + completedCount + exitedCount,
+        totalEnrollments: activeCount + completedCount + pausedCount,
         active: activeCount,
         completed: completedCount,
-        exited: exitedCount,
-        completionRate: (activeCount + completedCount + exitedCount) > 0
-          ? Math.round((completedCount / (activeCount + completedCount + exitedCount)) * 100)
+        paused: pausedCount,
+        completionRate: (activeCount + completedCount + pausedCount) > 0
+          ? Math.round((completedCount / (activeCount + completedCount + pausedCount)) * 100)
           : 0,
-        totalEmailsSent: sequence.totalEmailsSent,
-        totalOpened: sequence.totalOpened,
-        totalClicked: sequence.totalClicked,
-        overallOpenRate: sequence.totalEmailsSent > 0
-          ? Math.round((sequence.totalOpened / sequence.totalEmailsSent) * 100)
-          : 0,
-        overallClickRate: sequence.totalOpened > 0
-          ? Math.round((sequence.totalClicked / sequence.totalOpened) * 100)
-          : 0,
+        enrolledCount: sequence.enrolledCount,
+        completedCount: sequence.completedCount,
       },
       recentEnrollments: sequence.enrollments,
     });
@@ -253,23 +220,21 @@ export async function PATCH(
     const {
       name,
       description,
-      status,
+      isActive,
       triggerType,
-      triggerConditions,
-      exitConditions,
+      triggerConfig,
       steps,
     } = body;
 
     // Mise à jour de la séquence
-    const updated = await prisma.emailSequence.update({
+    await prisma.emailSequence.update({
       where: { id },
       data: {
         ...(name && { name }),
         ...(description !== undefined && { description }),
-        ...(status && { status }),
+        ...(isActive !== undefined && { isActive }),
         ...(triggerType && { triggerType }),
-        ...(triggerConditions && { triggerConditions }),
-        ...(exitConditions && { exitConditions }),
+        ...(triggerConfig && { triggerConfig }),
         updatedAt: new Date(),
       },
     });
@@ -284,23 +249,23 @@ export async function PATCH(
       // Créer les nouvelles
       await prisma.emailSequenceStep.createMany({
         data: steps.map((step: {
-          name: string;
           subject: string;
-          content?: string;
-          templateId?: string;
+          htmlContent: string;
+          textContent?: string;
           delayDays?: number;
           delayHours?: number;
-          sendConditions?: Record<string, unknown>;
+          delayMinutes?: number;
+          conditions?: Record<string, unknown>;
         }, index: number) => ({
           sequenceId: id,
           order: index + 1,
-          name: step.name || `Étape ${index + 1}`,
           subject: step.subject,
-          content: step.content,
-          templateId: step.templateId,
+          htmlContent: step.htmlContent,
+          textContent: step.textContent,
           delayDays: step.delayDays || 0,
           delayHours: step.delayHours || 0,
-          sendConditions: step.sendConditions || {},
+          delayMinutes: step.delayMinutes || 0,
+          conditions: step.conditions as object | undefined,
         })),
       });
     }
@@ -370,7 +335,7 @@ export async function DELETE(
 
     // Vérifier s'il y a des inscriptions actives
     const activeEnrollments = await prisma.emailSequenceEnrollment.count({
-      where: { sequenceId: id, status: "ACTIVE" },
+      where: { sequenceId: id, isCompleted: false, isPaused: false },
     });
 
     if (activeEnrollments > 0) {

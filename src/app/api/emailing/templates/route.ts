@@ -58,7 +58,12 @@ export async function GET(request: NextRequest) {
     const includeGlobal = searchParams.get("includeGlobal") !== "false";
 
     // Construire le filtre
-    const where: Parameters<typeof prisma.emailTemplate.findMany>[0]["where"] = {
+    const where: {
+      isActive: boolean;
+      OR?: Array<{ organizationId?: string | null; isGlobal?: boolean }>;
+      category?: string;
+      AND?: Array<{ OR?: Array<{ name?: { contains: string; mode: "insensitive" }; subject?: { contains: string; mode: "insensitive" } }> }>;
+    } = {
       isActive: true,
       OR: [
         // Templates de l'organisation

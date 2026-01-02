@@ -72,8 +72,10 @@ export async function GET(request: NextRequest) {
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
 
-    // Filtre organisation
-    const orgFilter = global ? {} : { organizationId: dbUser.organizationId };
+    // Filtre organisation - on ne filtre que si on a une orgId non null
+    const orgFilter = global || !dbUser.organizationId
+      ? {}
+      : { organizationId: dbUser.organizationId };
 
     // Stats emails envoyés (SentEmail)
     const [
@@ -104,24 +106,28 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    // Stats campagnes
+    // Stats campagnes - on doit gérer le cas où organizationId peut être null
+    const campaignOrgFilter = global || !dbUser.organizationId
+      ? {}
+      : { organizationId: dbUser.organizationId };
+
     const [
       totalCampaigns,
       activeCampaigns,
       campaignStats,
     ] = await Promise.all([
       prisma.emailCampaign.count({
-        where: global ? {} : { organizationId: dbUser.organizationId },
+        where: campaignOrgFilter,
       }),
       prisma.emailCampaign.count({
         where: {
-          ...(global ? {} : { organizationId: dbUser.organizationId }),
+          ...campaignOrgFilter,
           status: { in: ["SCHEDULED", "SENDING"] },
         },
       }),
       prisma.emailCampaign.aggregate({
         where: {
-          ...(global ? {} : { organizationId: dbUser.organizationId }),
+          ...campaignOrgFilter,
           sentAt: { gte: startDate },
         },
         _sum: {
@@ -138,16 +144,16 @@ export async function GET(request: NextRequest) {
     // Stats audiences
     const [totalAudiences, totalContacts, activeContacts] = await Promise.all([
       prisma.emailAudience.count({
-        where: global ? {} : { organizationId: dbUser.organizationId },
+        where: campaignOrgFilter,
       }),
       prisma.emailAudienceContact.count({
         where: {
-          audience: global ? {} : { organizationId: dbUser.organizationId },
+          audience: campaignOrgFilter,
         },
       }),
       prisma.emailAudienceContact.count({
         where: {
-          audience: global ? {} : { organizationId: dbUser.organizationId },
+          audience: campaignOrgFilter,
           status: "ACTIVE",
         },
       }),
@@ -156,16 +162,16 @@ export async function GET(request: NextRequest) {
     // Stats newsletters
     const [totalNewsletters, totalSubscribers, activeSubscribers] = await Promise.all([
       prisma.newsletter.count({
-        where: global ? {} : { organizationId: dbUser.organizationId },
+        where: campaignOrgFilter,
       }),
       prisma.newsletterSubscriber.count({
         where: {
-          newsletter: global ? {} : { organizationId: dbUser.organizationId },
+          newsletter: campaignOrgFilter,
         },
       }),
       prisma.newsletterSubscriber.count({
         where: {
-          newsletter: global ? {} : { organizationId: dbUser.organizationId },
+          newsletter: campaignOrgFilter,
           status: "ACTIVE",
           isConfirmed: true,
         },
@@ -191,7 +197,7 @@ export async function GET(request: NextRequest) {
 
     // Derniers emails
     const recentEmails = await prisma.sentEmail.findMany({
-      where: orgFilter,
+      where: { ...orgFilter },
       orderBy: { sentAt: "desc" },
       take: 10,
       select: {
@@ -207,7 +213,7 @@ export async function GET(request: NextRequest) {
 
     // Dernières campagnes
     const recentCampaigns = await prisma.emailCampaign.findMany({
-      where: global ? {} : { organizationId: dbUser.organizationId },
+      where: campaignOrgFilter,
       orderBy: { createdAt: "desc" },
       take: 5,
       select: {
@@ -265,7 +271,7 @@ export async function GET(request: NextRequest) {
         activeSubscribers,
       },
       emailsByType: emailsByType.reduce((acc, item) => {
-        acc[item.type] = item._count.id;
+        acc[item.type] = item._count?.id ?? 0;
         return acc;
       }, {} as Record<string, number>),
       recentEmails,

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { EmailTriggerType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -58,24 +59,37 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const trigger = searchParams.get("trigger");
+    const isActive = searchParams.get("isActive");
+    const trigger = searchParams.get("trigger") as EmailTriggerType | null;
+
+    const where: {
+      organizationId: string;
+      isActive?: boolean;
+      triggerType?: EmailTriggerType;
+    } = {
+      organizationId: dbUser.organizationId,
+    };
+
+    if (isActive !== null) {
+      where.isActive = isActive === "true";
+    }
+
+    if (trigger) {
+      where.triggerType = trigger;
+    }
 
     const sequences = await prisma.emailSequence.findMany({
-      where: {
-        organizationId: dbUser.organizationId,
-        ...(status && { status }),
-        ...(trigger && { triggerType: trigger }),
-      },
+      where,
       include: {
         steps: {
           orderBy: { order: "asc" },
           select: {
             id: true,
             order: true,
-            name: true,
+            subject: true,
             delayDays: true,
             delayHours: true,
+            delayMinutes: true,
           },
         },
         _count: {
@@ -92,10 +106,10 @@ export async function GET(request: NextRequest) {
       sequences.map(async (seq) => {
         const [activeEnrollments, completedEnrollments] = await Promise.all([
           prisma.emailSequenceEnrollment.count({
-            where: { sequenceId: seq.id, status: "ACTIVE" },
+            where: { sequenceId: seq.id, isCompleted: false, isPaused: false },
           }),
           prisma.emailSequenceEnrollment.count({
-            where: { sequenceId: seq.id, status: "COMPLETED" },
+            where: { sequenceId: seq.id, isCompleted: true },
           }),
         ]);
 
@@ -103,17 +117,16 @@ export async function GET(request: NextRequest) {
           id: seq.id,
           name: seq.name,
           description: seq.description,
-          status: seq.status,
+          isActive: seq.isActive,
           triggerType: seq.triggerType,
-          triggerConditions: seq.triggerConditions,
+          triggerConfig: seq.triggerConfig,
           stepsCount: seq.steps.length,
           steps: seq.steps,
           totalEnrollments: seq._count.enrollments,
           activeEnrollments,
           completedEnrollments,
-          totalEmailsSent: seq.totalEmailsSent,
-          totalOpened: seq.totalOpened,
-          totalClicked: seq.totalClicked,
+          enrolledCount: seq.enrolledCount,
+          completedCount: seq.completedCount,
           createdAt: seq.createdAt,
           updatedAt: seq.updatedAt,
         };
@@ -161,9 +174,8 @@ export async function POST(request: NextRequest) {
       name,
       description,
       triggerType = "MANUAL",
-      triggerConditions,
+      triggerConfig,
       steps = [],
-      exitConditions,
     } = body;
 
     if (!name) {
@@ -176,29 +188,28 @@ export async function POST(request: NextRequest) {
         organizationId: dbUser.organizationId,
         name,
         description,
-        triggerType,
-        triggerConditions: triggerConditions || {},
-        exitConditions: exitConditions || {},
-        status: "DRAFT",
+        triggerType: triggerType as EmailTriggerType,
+        triggerConfig: triggerConfig || {},
+        isActive: false,
         createdById: dbUser.id,
         steps: {
           create: steps.map((step: {
-            name: string;
             subject: string;
-            content?: string;
-            templateId?: string;
+            htmlContent: string;
+            textContent?: string;
             delayDays?: number;
             delayHours?: number;
-            sendConditions?: Record<string, unknown>;
+            delayMinutes?: number;
+            conditions?: Record<string, unknown>;
           }, index: number) => ({
             order: index + 1,
-            name: step.name || `Étape ${index + 1}`,
             subject: step.subject,
-            content: step.content,
-            templateId: step.templateId,
+            htmlContent: step.htmlContent || "",
+            textContent: step.textContent,
             delayDays: step.delayDays || 0,
             delayHours: step.delayHours || 0,
-            sendConditions: step.sendConditions || {},
+            delayMinutes: step.delayMinutes || 0,
+            conditions: step.conditions,
           })),
         },
       },
@@ -215,7 +226,7 @@ export async function POST(request: NextRequest) {
         id: sequence.id,
         name: sequence.name,
         description: sequence.description,
-        status: sequence.status,
+        isActive: sequence.isActive,
         triggerType: sequence.triggerType,
         steps: sequence.steps,
       },

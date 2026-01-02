@@ -35,6 +35,24 @@ async function getSupabaseClient() {
   );
 }
 
+// Extraire les statuts de vérification depuis dnsRecords
+function extractVerificationStatus(dnsRecords: unknown) {
+  const records = dnsRecords as Array<{ type?: string; name?: string; status?: string }> | null;
+  if (!records || !Array.isArray(records)) {
+    return { dkimVerified: false, spfVerified: false, dmarcVerified: false };
+  }
+
+  const dkimRecord = records.find((r) => r.type === "TXT" && r.name?.includes("_domainkey"));
+  const spfRecord = records.find((r) => r.type === "TXT" && !r.name?.includes("_domainkey") && !r.name?.includes("_dmarc"));
+  const dmarcRecord = records.find((r) => r.type === "TXT" && r.name?.includes("_dmarc"));
+
+  return {
+    dkimVerified: dkimRecord?.status === "verified",
+    spfVerified: spfRecord?.status === "verified",
+    dmarcVerified: dmarcRecord?.status === "verified",
+  };
+}
+
 // ===========================================
 // GET - Obtenir les paramètres emailing
 // ===========================================
@@ -66,7 +84,7 @@ export async function GET() {
         fromEmail: true,
         fromName: true,
         replyTo: true,
-        isVerified: true,
+        isDomainVerified: true,
         isActive: true,
         createdAt: true,
         lastTestedAt: true,
@@ -81,9 +99,7 @@ export async function GET() {
         id: true,
         domain: true,
         status: true,
-        dkimVerified: true,
-        spfVerified: true,
-        dmarcVerified: true,
+        dnsRecords: true,
         createdAt: true,
         verifiedAt: true,
       },
@@ -97,8 +113,7 @@ export async function GET() {
         id: true,
         name: true,
         email: true,
-        phone: true,
-        address: true,
+        adresse: true,
       },
     });
 
@@ -109,7 +124,6 @@ export async function GET() {
           { organizationId: dbUser.organizationId },
           { isGlobal: true },
         ],
-        isDefault: true,
       },
       select: {
         id: true,
@@ -117,11 +131,18 @@ export async function GET() {
         category: true,
         isGlobal: true,
       },
+      take: 10,
     });
 
     return NextResponse.json({
-      smtp: smtpConfig,
-      domains,
+      smtp: smtpConfig ? {
+        ...smtpConfig,
+        isVerified: smtpConfig.isDomainVerified,
+      } : null,
+      domains: domains.map((d) => ({
+        ...d,
+        ...extractVerificationStatus(d.dnsRecords),
+      })),
       organization,
       defaultTemplates,
       limits: {
@@ -172,7 +193,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { defaultFromEmail, defaultFromName, defaultReplyTo, footerText, unsubscribeUrl } = body;
+    const { defaultFromEmail, defaultFromName, defaultReplyTo } = body;
 
     // Mettre à jour ou créer la config SMTP
     const smtpConfig = await prisma.emailSmtpConfig.upsert({
@@ -185,19 +206,13 @@ export async function PATCH(request: NextRequest) {
       },
       create: {
         organizationId: dbUser.organizationId,
-        provider: "RESEND",
+        provider: "resend",
         fromEmail: defaultFromEmail || "",
         fromName: defaultFromName || "",
         replyTo: defaultReplyTo,
         isActive: true,
       },
     });
-
-    // Mettre à jour les métadonnées org si nécessaire
-    if (footerText || unsubscribeUrl) {
-      // Stocker dans les métadonnées de l'organisation ou une table dédiée
-      // Pour l'instant on retourne simplement
-    }
 
     return NextResponse.json({
       success: true,

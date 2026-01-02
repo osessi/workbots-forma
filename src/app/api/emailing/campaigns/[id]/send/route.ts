@@ -188,7 +188,7 @@ export async function POST(
         subject: `[TEST] ${replaceVariables(subject, testVariables)}`,
         html: replaceVariables(htmlContent, testVariables),
         from: `${fromName} <${fromEmail}>`,
-        replyTo: campaign.replyTo,
+        replyTo: campaign.replyTo ?? undefined,
         apiKey: config.apiKey,
       });
 

@@ -83,7 +83,11 @@ export async function GET(
     }
 
     // Filtre contacts
-    const contactWhere: Parameters<typeof prisma.emailAudienceContact.findMany>[0]["where"] = {
+    const contactWhere: {
+      audienceId: string;
+      status?: "ACTIVE" | "UNSUBSCRIBED" | "BOUNCED" | "COMPLAINED" | "CLEANED";
+      OR?: { email?: { contains: string; mode: "insensitive" }; firstName?: { contains: string; mode: "insensitive" }; lastName?: { contains: string; mode: "insensitive" } }[];
+    } = {
       audienceId: id,
     };
 

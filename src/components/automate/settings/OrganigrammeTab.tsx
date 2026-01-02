@@ -65,12 +65,12 @@ const POSTE_COLORS: Record<OrganigrammePoste["type"], { bg: string; border: stri
 };
 
 const POSTE_LABELS: Record<OrganigrammePoste["type"], string> = {
-  DIRIGEANT: "Dirigeant / Gerant",
-  REFERENT_HANDICAP: "Referent Handicap",
-  REFERENT_PEDAGOGIQUE: "Referent Pedagogique",
-  REFERENT_QUALITE: "Referent Qualite",
+  DIRIGEANT: "Dirigeant / Gérant",
+  REFERENT_HANDICAP: "Référent Handicap",
+  REFERENT_PEDAGOGIQUE: "Référent Pédagogique",
+  REFERENT_QUALITE: "Référent Qualité",
   FORMATEUR: "Formateur",
-  ADMINISTRATIF: "Administratif",
+  ADMINISTRATIF: "Responsable administratif",
   AUTRE: "Autre",
 };
 
@@ -107,28 +107,6 @@ const DownloadIcon = () => (
   </svg>
 );
 
-const GripIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-    <circle cx="9" cy="6" r="1.5" />
-    <circle cx="15" cy="6" r="1.5" />
-    <circle cx="9" cy="12" r="1.5" />
-    <circle cx="15" cy="12" r="1.5" />
-    <circle cx="9" cy="18" r="1.5" />
-    <circle cx="15" cy="18" r="1.5" />
-  </svg>
-);
-
-const ChevronUpIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M18 15l-6-6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const ChevronDownIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 
 const CameraIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -234,12 +212,12 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
 
     // Validation
     if (!file.type.startsWith("image/")) {
-      setUploadError("Veuillez selectionner une image (JPG, PNG, etc.)");
+      setUploadError("Veuillez sélectionner une image (JPG, PNG, etc.)");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setUploadError("L'image ne doit pas depasser 5 Mo");
+      setUploadError("L'image ne doit pas dépasser 5 Mo");
       return;
     }
 
@@ -333,7 +311,7 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto m-4">
         <div className="sticky top-0 bg-white dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700 z-10">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {poste ? "Modifier le poste" : "Ajouter un poste"}
+            {poste ? "Modifier le membre" : "Ajouter un membre à l'organigramme"}
           </h2>
         </div>
 
@@ -354,33 +332,33 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
             </select>
           </div>
 
-          {/* Niveau hierarchique */}
+          {/* Niveau hiérarchique */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Niveau hierarchique (0 = sommet de la pyramide)
+              Niveau hiérarchique
             </label>
             <select
               value={formData.niveau}
               onChange={(e) => setFormData(prev => ({ ...prev, niveau: parseInt(e.target.value) }))}
               className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
             >
-              <option value={0}>Niveau 0 - Direction (sommet)</option>
-              <option value={1}>Niveau 1 - Referents / Responsables</option>
-              <option value={2}>Niveau 2 - Equipe operationnelle</option>
-              <option value={3}>Niveau 3 - Support / Autres</option>
+              <option value={0}>Niveau 1 - Direction</option>
+              <option value={1}>Niveau 2 - Référents / Responsables</option>
+              <option value={2}>Niveau 3 - Équipe opérationnelle</option>
+              <option value={3}>Niveau 4 - Support / Autres</option>
             </select>
           </div>
 
-          {/* Titre du poste */}
+          {/* Fonction */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Titre du poste *
+              Fonction *
             </label>
             <input
               type="text"
               value={formData.titre}
               onChange={(e) => setFormData(prev => ({ ...prev, titre: e.target.value }))}
-              placeholder="Ex: Directeur General, Referent Handicap..."
+              placeholder="Ex: Directeur Général, Référent Handicap..."
               className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
               required
             />
@@ -395,17 +373,19 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
               {/* Preview */}
               <div className="relative">
                 {formData.photo ? (
-                  <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700">
-                    <Image
-                      src={formData.photo}
-                      alt="Photo de profil"
-                      fill
-                      className="object-cover"
-                    />
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                      <Image
+                        src={formData.photo}
+                        alt="Photo de profil"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={handleRemovePhoto}
-                      className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
+                      className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors z-10"
                     >
                       <XIcon />
                     </button>
@@ -455,22 +435,22 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
             </div>
           </div>
 
-          {/* Lier a un intervenant */}
+          {/* Associer à un intervenant */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Lier a un intervenant (optionnel)
+              Associer à un intervenant (optionnel)
             </label>
             <select
               value={formData.intervenantId}
               onChange={(e) => handleIntervenantChange(e.target.value)}
               className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
             >
-              <option value="">-- Aucun --</option>
+              <option value="">-- Sélectionner un intervenant --</option>
               {intervenants.map(i => (
                 <option key={i.id} value={i.id}>{i.prenom} {i.nom} {i.fonction ? `(${i.fonction})` : ""}</option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">Les informations seront pre-remplies depuis l&apos;intervenant</p>
+            <p className="text-xs text-gray-500 mt-1">Les champs seront automatiquement renseignés avec les informations de l&apos;intervenant sélectionné</p>
           </div>
 
           {/* Nom / Prenom */}
@@ -490,7 +470,7 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Prenom *
+                Prénom *
               </label>
               <input
                 type="text"
@@ -519,7 +499,7 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Telephone
+                Téléphone
               </label>
               <input
                 type="tel"
@@ -531,7 +511,7 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
             </div>
           </div>
 
-          {/* Visibilite */}
+          {/* Visibilité */}
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -541,7 +521,7 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
               className="w-4 h-4 text-brand-600 bg-white border-gray-300 rounded focus:ring-brand-500"
             />
             <label htmlFor="isVisible" className="text-sm text-gray-700 dark:text-gray-300">
-              Visible dans l&apos;organigramme public (espace apprenant)
+              Afficher dans l&apos;organigramme partagé aux apprenants
             </label>
           </div>
 
@@ -573,16 +553,12 @@ interface PyramidCardProps {
   poste: OrganigrammePoste;
   onEdit: () => void;
   onDelete: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
   isFirst?: boolean;
   isDragging?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
-function PyramidCard({ poste, onEdit, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, isFirst, isDragging, dragHandleProps }: PyramidCardProps) {
+function PyramidCard({ poste, onEdit, onDelete, isFirst, isDragging, dragHandleProps }: PyramidCardProps) {
   const colors = POSTE_COLORS[poste.type];
 
   return (
@@ -652,11 +628,11 @@ function PyramidCard({ poste, onEdit, onDelete, onMoveUp, onMoveDown, canMoveUp,
             </p>
           )}
 
-          {/* Indicateur masque */}
+          {/* Indicateur masqué */}
           {!poste.isVisible && (
             <div className="absolute top-3 right-3">
               <span className="text-[9px] text-gray-400 italic bg-white/80 dark:bg-gray-800/80 px-1.5 py-0.5 rounded">
-                Masque
+                Masqué
               </span>
             </div>
           )}
@@ -665,33 +641,6 @@ function PyramidCard({ poste, onEdit, onDelete, onMoveUp, onMoveDown, canMoveUp,
         {/* Actions au hover */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-white dark:from-gray-900 to-transparent pt-8 pb-2 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="flex items-center justify-center gap-1">
-            {/* Drag handle */}
-            <div
-              {...dragHandleProps}
-              className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-              title="Deplacer"
-            >
-              <GripIcon />
-            </div>
-
-            {/* Move up/down */}
-            <button
-              onClick={onMoveUp}
-              disabled={!canMoveUp}
-              className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Monter d'un niveau"
-            >
-              <ChevronUpIcon />
-            </button>
-            <button
-              onClick={onMoveDown}
-              disabled={!canMoveDown}
-              className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Descendre d'un niveau"
-            >
-              <ChevronDownIcon />
-            </button>
-
             {/* Edit */}
             <button
               onClick={onEdit}
@@ -822,29 +771,6 @@ export default function OrganigrammeTab() {
     }
   };
 
-  // Deplacer un poste (changer de niveau)
-  const handleMovePoste = async (posteId: string, direction: "up" | "down") => {
-    const poste = postes.find(p => p.id === posteId);
-    if (!poste) return;
-
-    const newNiveau = direction === "up" ? poste.niveau - 1 : poste.niveau + 1;
-    if (newNiveau < 0 || newNiveau > 3) return;
-
-    try {
-      const response = await fetch(`/api/settings/organigramme/${posteId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...poste, niveau: newNiveau }),
-      });
-
-      if (response.ok) {
-        await loadData();
-      }
-    } catch (err) {
-      console.error("Erreur deplacement poste:", err);
-    }
-  };
-
   // Export PDF pyramide
   const handleExportPDF = () => {
     const printWindow = window.open("", "_blank");
@@ -865,54 +791,67 @@ export default function OrganigrammeTab() {
       <head>
         <title>Organigramme</title>
         <style>
-          @page { size: A4 landscape; margin: 20mm; }
-          * { box-sizing: border-box; margin: 0; padding: 0; }
+          @page { size: A4 landscape; margin: 15mm; }
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
           body {
             font-family: 'Segoe UI', Arial, sans-serif;
-            padding: 40px;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%) !important;
             min-height: 100vh;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           h1 {
             text-align: center;
-            margin-bottom: 50px;
+            margin-bottom: 40px;
             color: #1a1a2e;
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 700;
           }
           .pyramid {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 30px;
+            gap: 25px;
           }
           .level {
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
             position: relative;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           .level::before {
             content: '';
             position: absolute;
-            top: -15px;
+            top: -12px;
             left: 50%;
             transform: translateX(-50%);
             width: 2px;
-            height: 15px;
-            background: #cbd5e1;
+            height: 12px;
+            background: #cbd5e1 !important;
           }
           .level:first-child::before { display: none; }
           .card {
-            background: white;
+            background: white !important;
             border-radius: 16px;
-            padding: 20px;
+            padding: 18px;
             text-align: center;
-            min-width: 160px;
-            max-width: 200px;
+            min-width: 150px;
+            max-width: 180px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             position: relative;
             overflow: hidden;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           .card::before {
             content: '';
@@ -922,23 +861,23 @@ export default function OrganigrammeTab() {
             right: 0;
             height: 4px;
           }
-          .card.DIRIGEANT::before { background: linear-gradient(90deg, #9333ea, #a855f7); }
-          .card.REFERENT_HANDICAP::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
-          .card.REFERENT_PEDAGOGIQUE::before { background: linear-gradient(90deg, #22c55e, #4ade80); }
-          .card.REFERENT_QUALITE::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-          .card.FORMATEUR::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
-          .card.ADMINISTRATIF::before, .card.AUTRE::before { background: linear-gradient(90deg, #64748b, #94a3b8); }
+          .card.DIRIGEANT::before { background: linear-gradient(90deg, #9333ea, #a855f7) !important; }
+          .card.REFERENT_HANDICAP::before { background: linear-gradient(90deg, #3b82f6, #60a5fa) !important; }
+          .card.REFERENT_PEDAGOGIQUE::before { background: linear-gradient(90deg, #22c55e, #4ade80) !important; }
+          .card.REFERENT_QUALITE::before { background: linear-gradient(90deg, #f59e0b, #fbbf24) !important; }
+          .card.FORMATEUR::before { background: linear-gradient(90deg, #06b6d4, #22d3ee) !important; }
+          .card.ADMINISTRATIF::before, .card.AUTRE::before { background: linear-gradient(90deg, #64748b, #94a3b8) !important; }
           .avatar {
-            width: 60px;
-            height: 60px;
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
-            margin: 0 auto 12px;
+            margin: 0 auto 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
+            color: white !important;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
             overflow: hidden;
           }
           .avatar img {
@@ -946,36 +885,41 @@ export default function OrganigrammeTab() {
             height: 100%;
             object-fit: cover;
           }
-          .avatar.DIRIGEANT { background: linear-gradient(135deg, #9333ea, #a855f7); }
-          .avatar.REFERENT_HANDICAP { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
-          .avatar.REFERENT_PEDAGOGIQUE { background: linear-gradient(135deg, #22c55e, #4ade80); }
-          .avatar.REFERENT_QUALITE { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
-          .avatar.FORMATEUR { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
-          .avatar.ADMINISTRATIF, .avatar.AUTRE { background: linear-gradient(135deg, #64748b, #94a3b8); }
+          .avatar.DIRIGEANT { background: linear-gradient(135deg, #9333ea, #a855f7) !important; }
+          .avatar.REFERENT_HANDICAP { background: linear-gradient(135deg, #3b82f6, #60a5fa) !important; }
+          .avatar.REFERENT_PEDAGOGIQUE { background: linear-gradient(135deg, #22c55e, #4ade80) !important; }
+          .avatar.REFERENT_QUALITE { background: linear-gradient(135deg, #f59e0b, #fbbf24) !important; }
+          .avatar.FORMATEUR { background: linear-gradient(135deg, #06b6d4, #22d3ee) !important; }
+          .avatar.ADMINISTRATIF, .avatar.AUTRE { background: linear-gradient(135deg, #64748b, #94a3b8) !important; }
           .badge {
-            font-size: 9px;
+            font-size: 8px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             padding: 3px 8px;
             border-radius: 10px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             display: inline-block;
           }
-          .badge.DIRIGEANT { background: #faf5ff; color: #9333ea; }
-          .badge.REFERENT_HANDICAP { background: #eff6ff; color: #3b82f6; }
-          .badge.REFERENT_PEDAGOGIQUE { background: #f0fdf4; color: #22c55e; }
-          .badge.REFERENT_QUALITE { background: #fffbeb; color: #f59e0b; }
-          .badge.FORMATEUR { background: #ecfeff; color: #06b6d4; }
-          .badge.ADMINISTRATIF, .badge.AUTRE { background: #f1f5f9; color: #64748b; }
-          .name { font-weight: 700; font-size: 14px; color: #1a1a2e; }
-          .title { font-size: 11px; color: #64748b; margin-top: 4px; }
-          .contact { font-size: 10px; color: #94a3b8; margin-top: 8px; }
+          .badge.DIRIGEANT { background: #faf5ff !important; color: #9333ea !important; }
+          .badge.REFERENT_HANDICAP { background: #eff6ff !important; color: #3b82f6 !important; }
+          .badge.REFERENT_PEDAGOGIQUE { background: #f0fdf4 !important; color: #22c55e !important; }
+          .badge.REFERENT_QUALITE { background: #fffbeb !important; color: #f59e0b !important; }
+          .badge.FORMATEUR { background: #ecfeff !important; color: #06b6d4 !important; }
+          .badge.ADMINISTRATIF, .badge.AUTRE { background: #f1f5f9 !important; color: #64748b !important; }
+          .name { font-weight: 700; font-size: 13px; color: #1a1a2e !important; }
+          .title { font-size: 10px; color: #64748b !important; margin-top: 3px; }
+          .contact { font-size: 9px; color: #94a3b8 !important; margin-top: 6px; }
           .footer {
             text-align: center;
-            margin-top: 50px;
+            margin-top: 40px;
             font-size: 10px;
-            color: #94a3b8;
+            color: #94a3b8 !important;
+            page-break-before: avoid;
+          }
+          @media print {
+            body { background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%) !important; }
+            .card, .avatar, .badge { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           }
         </style>
       </head>
@@ -1002,7 +946,7 @@ export default function OrganigrammeTab() {
           }).join("")}
         </div>
         <div class="footer">
-          Document genere le ${new Date().toLocaleDateString("fr-FR")}
+          Document généré le ${new Date().toLocaleDateString("fr-FR")}
         </div>
       </body>
       </html>
@@ -1035,7 +979,7 @@ export default function OrganigrammeTab() {
 
   const levels = Object.keys(postesByLevel).map(Number).sort((a, b) => a - b);
 
-  const LEVEL_LABELS = ["Direction", "Referents / Responsables", "Equipe operationnelle", "Support / Autres"];
+  const LEVEL_LABELS = ["Direction", "Référents / Responsables", "Équipe opérationnelle", "Support / Autres"];
 
   return (
     <div className="space-y-6">
@@ -1046,7 +990,7 @@ export default function OrganigrammeTab() {
             Organigramme de l&apos;organisme
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Structurez votre equipe en pyramide. Utilisez les fleches pour deplacer les postes entre les niveaux.
+            Organisez votre équipe de manière hiérarchique. La direction se situe en haut, puis les responsables et référents, et enfin les équipes opérationnelles.
           </p>
         </div>
         <div className="flex gap-2">
@@ -1091,7 +1035,7 @@ export default function OrganigrammeTab() {
             Construisez votre organigramme
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-            Commencez par ajouter le dirigeant au sommet de la pyramide, puis ajoutez les referents et l&apos;equipe.
+            Commencez par ajouter le dirigeant au sommet de la pyramide, puis ajoutez les référents et l&apos;équipe.
           </p>
           <button
             onClick={openCreateModal}
@@ -1139,10 +1083,6 @@ export default function OrganigrammeTab() {
                         poste={poste}
                         onEdit={() => openEditModal(poste)}
                         onDelete={() => handleDeletePoste(poste.id)}
-                        onMoveUp={() => handleMovePoste(poste.id, "up")}
-                        onMoveDown={() => handleMovePoste(poste.id, "down")}
-                        canMoveUp={level > 0}
-                        canMoveDown={level < 3}
                         isFirst={level === 0 && levelPostes.length === 1 && index === 0}
                       />
                     ))}
@@ -1177,9 +1117,7 @@ export default function OrganigrammeTab() {
       {/* Qualiopi Info */}
       <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
         <p className="text-sm text-blue-700 dark:text-blue-400">
-          <strong>Qualiopi IND 9 :</strong> L&apos;organigramme doit presenter clairement les responsables cles de l&apos;organisme,
-          notamment le <strong>referent handicap</strong> (obligatoire) et le <strong>responsable pedagogique</strong>. Ces informations sont accessibles aux apprenants
-          depuis leur espace dedie.
+          <strong>Qualiopi - IND 9 :</strong> Votre organigramme doit faire apparaître les personnes en charge des fonctions principales au sein de votre organisme, en particulier le référent handicap (obligatoire) et le responsable pédagogique. Vos apprenants pourront consulter ces informations directement depuis leur espace personnel.
         </p>
       </div>
 

@@ -13,12 +13,16 @@ from models.sql.template import PptxTemplateModel, TemplateModel
 from models.sql.presentation import PresentationModel
 from services.pptx_presentation_creator import PptxPresentationCreator
 from services.pptx_template_service import PPTX_TEMPLATE_SERVICE
+from services.smart_pptx_builder import build_presentation_from_content
 from services.temp_file_service import TEMP_FILE_SERVICE
 from utils.asset_directory_utils import get_exports_directory
 from services.database import engine
 
 # Get the Next.js app URL from environment variable or default to localhost:4000
 NEXTJS_URL = os.getenv("NEXTJS_URL", "http://localhost:4000")
+
+# Use the new smart builder for better visual quality
+USE_SMART_BUILDER = True
 
 
 async def export_presentation(
@@ -103,10 +107,50 @@ async def export_basic_pptx(
     title: str
 ) -> PresentationAndPath:
     """
-    Basic PPTX export (original method).
-    Creates a new PPTX from scratch.
+    PPTX export with professional styling.
+    Uses SmartPptxBuilder for high-quality output.
     """
-    # Get the converted PPTX model from the Next.js service
+    # Get presentation data to determine template
+    presentation_data = None
+    template_name = "general"
+
+    try:
+        with Session(engine) as session:
+            presentation = session.get(PresentationModel, presentation_id)
+            if presentation and presentation.layout:
+                layout_name = presentation.layout.get("name", "general")
+                # Map layout name to template
+                if layout_name.lower() in ["general", "modern", "standard", "swift"]:
+                    template_name = layout_name.lower()
+    except Exception as e:
+        print(f"Could not get presentation template: {e}")
+
+    # Get presentation content
+    slides_content = await get_presentation_content(presentation_id)
+
+    if USE_SMART_BUILDER and slides_content:
+        # Use the new smart builder for professional quality
+        try:
+            export_directory = get_exports_directory()
+            output_filename = sanitize_filename(title or str(uuid.uuid4()))
+            pptx_path = os.path.join(export_directory, f"{output_filename}.pptx")
+
+            pptx_path = await build_presentation_from_content(
+                slides_content=slides_content,
+                template_name=template_name,
+                title=output_filename,
+                output_path=pptx_path
+            )
+
+            return PresentationAndPath(
+                presentation_id=presentation_id,
+                path=pptx_path,
+            )
+        except Exception as e:
+            print(f"SmartPptxBuilder failed, falling back to basic: {e}")
+            # Fall through to basic method
+
+    # Fallback: Get the converted PPTX model from the Next.js service
     async with aiohttp.ClientSession() as session:
         async with session.get(
             f"{NEXTJS_URL}/api/presentation_to_pptx_model?id={presentation_id}"

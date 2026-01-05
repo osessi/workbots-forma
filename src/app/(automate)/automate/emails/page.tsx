@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 
 interface DashboardStats {
-  kpis: {
+  overview: {
     totalSent: number;
-    delivered: number;
-    opened: number;
-    clicked: number;
+    totalDelivered: number;
+    totalOpened: number;
+    totalClicked: number;
     deliveryRate: number;
     openRate: number;
     clickRate: number;
@@ -131,7 +131,7 @@ export default function EmailsPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Emails envoyés</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {loading ? "-" : stats?.kpis.totalSent.toLocaleString() || 0}
+                  {loading ? "-" : stats?.overview?.totalSent?.toLocaleString() || 0}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -146,7 +146,7 @@ export default function EmailsPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Taux de livraison</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {loading ? "-" : `${stats?.kpis.deliveryRate || 0}%`}
+                  {loading ? "-" : `${stats?.overview?.deliveryRate || 0}%`}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
@@ -154,7 +154,7 @@ export default function EmailsPage() {
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              {loading ? "-" : `${stats?.kpis.delivered.toLocaleString() || 0} délivrés`}
+              {loading ? "-" : `${stats?.overview?.totalDelivered?.toLocaleString() || 0} délivrés`}
             </p>
           </div>
 
@@ -163,7 +163,7 @@ export default function EmailsPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Taux d&apos;ouverture</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {loading ? "-" : `${stats?.kpis.openRate || 0}%`}
+                  {loading ? "-" : `${stats?.overview?.openRate || 0}%`}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
@@ -171,7 +171,7 @@ export default function EmailsPage() {
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              {loading ? "-" : `${stats?.kpis.opened.toLocaleString() || 0} ouverts`}
+              {loading ? "-" : `${stats?.overview?.totalOpened?.toLocaleString() || 0} ouverts`}
             </p>
           </div>
 
@@ -180,7 +180,7 @@ export default function EmailsPage() {
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Taux de clic</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {loading ? "-" : `${stats?.kpis.clickRate || 0}%`}
+                  {loading ? "-" : `${stats?.overview?.clickRate || 0}%`}
                 </p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
@@ -188,7 +188,7 @@ export default function EmailsPage() {
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              {loading ? "-" : `${stats?.kpis.clicked.toLocaleString() || 0} clics`}
+              {loading ? "-" : `${stats?.overview?.totalClicked?.toLocaleString() || 0} clics`}
             </p>
           </div>
         </div>

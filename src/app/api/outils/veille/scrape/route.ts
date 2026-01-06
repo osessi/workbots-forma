@@ -21,14 +21,21 @@ interface ParsedArticle {
   tags?: string[];
 }
 
+// Headers HTTP réalistes pour éviter les blocages
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept": "application/rss+xml, application/xml, application/atom+xml, text/xml, text/html, */*",
+  "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Cache-Control": "no-cache",
+  "Connection": "keep-alive",
+};
+
 // Parser un flux RSS
 async function parseRssFeed(url: string): Promise<ParsedArticle[]> {
   try {
     const response = await fetch(url, {
-      headers: {
-        "User-Agent": "WorkbotsForma/1.0 (Formation professionnelle; veille réglementaire)",
-        "Accept": "application/rss+xml, application/xml, text/xml, */*",
-      },
+      headers: BROWSER_HEADERS,
     });
 
     if (!response.ok) {
@@ -40,41 +47,100 @@ async function parseRssFeed(url: string): Promise<ParsedArticle[]> {
     // Parser le XML de manière simple (sans dépendance externe)
     const articles: ParsedArticle[] = [];
 
-    // Trouver tous les items (RSS) ou entries (Atom)
+    // Trouver tous les items (RSS 2.0) ou entries (Atom)
     const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi;
     const entryRegex = /<entry[^>]*>([\s\S]*?)<\/entry>/gi;
 
-    const items = [...text.matchAll(itemRegex), ...text.matchAll(entryRegex)];
+    let items = [...text.matchAll(itemRegex), ...text.matchAll(entryRegex)];
 
-    for (const match of items.slice(0, 20)) { // Limiter à 20 articles
+    // Si aucun item trouvé, essayer d'autres formats (RDF, RSS 1.0)
+    if (items.length === 0) {
+      const rdfItemRegex = /<rdf:item[^>]*>([\s\S]*?)<\/rdf:item>/gi;
+      items = [...text.matchAll(rdfItemRegex)];
+    }
+
+    console.log(`RSS Parser: Trouvé ${items.length} items dans le flux`);
+
+    for (const match of items.slice(0, 50)) { // Limiter à 50 articles les plus récents
       const itemContent = match[1];
 
-      // Extraire les champs
+      // Extraire les champs avec plusieurs fallbacks
       const titre = extractXmlValue(itemContent, "title");
-      const link = extractXmlValue(itemContent, "link") || extractXmlAttr(itemContent, "link", "href");
+
+      // Pour le lien, essayer plusieurs méthodes
+      // Méthode 1: <link>URL</link> (RSS 2.0 classique)
+      let link = extractXmlValue(itemContent, "link");
+
+      // Méthode 2: <link href="URL" /> (Atom)
+      if (!link || link.trim() === "") {
+        link = extractXmlAttr(itemContent, "link", "href");
+      }
+
+      // Méthode 3: Regex plus flexible pour Atom
+      if (!link || link.trim() === "") {
+        const linkMatch = itemContent.match(/<link[^>]*href=["']([^"']+)["'][^>]*\/?>/i);
+        if (linkMatch) link = linkMatch[1];
+      }
+
+      // Méthode 4: guid comme fallback (souvent contient l'URL)
+      if (!link || link.trim() === "") {
+        const guid = extractXmlValue(itemContent, "guid");
+        if (guid && (guid.startsWith("http://") || guid.startsWith("https://"))) {
+          link = guid;
+        }
+      }
+
+      // Méthode 5: Rechercher tout ce qui ressemble à une URL dans l'item
+      if (!link || link.trim() === "") {
+        const urlMatch = itemContent.match(/https?:\/\/[^\s<>"']+/i);
+        if (urlMatch) link = urlMatch[0];
+      }
+
       const description = extractXmlValue(itemContent, "description") ||
         extractXmlValue(itemContent, "summary") ||
-        extractXmlValue(itemContent, "content");
+        extractXmlValue(itemContent, "content") ||
+        extractXmlValue(itemContent, "content:encoded");
+
       const pubDate = extractXmlValue(itemContent, "pubDate") ||
         extractXmlValue(itemContent, "published") ||
-        extractXmlValue(itemContent, "updated");
+        extractXmlValue(itemContent, "updated") ||
+        extractXmlValue(itemContent, "dc:date");
+
       const author = extractXmlValue(itemContent, "author") ||
-        extractXmlValue(itemContent, "dc:creator");
-      const image = extractXmlValue(itemContent, "media:content", "url") ||
-        extractXmlValue(itemContent, "enclosure", "url");
+        extractXmlValue(itemContent, "dc:creator") ||
+        extractXmlAttr(itemContent, "author", "name");
+
+      const image = extractXmlAttr(itemContent, "media:content", "url") ||
+        extractXmlAttr(itemContent, "enclosure", "url") ||
+        extractXmlAttr(itemContent, "media:thumbnail", "url");
+
+      // Debug logging
+      console.log(`RSS Item: titre="${titre?.slice(0, 50)}...", link="${link?.slice(0, 80)}..."`);
 
       if (titre && link) {
+        // Valider et parser la date
+        let datePubli = new Date();
+        if (pubDate) {
+          const parsedDate = new Date(pubDate);
+          if (!isNaN(parsedDate.getTime())) {
+            datePubli = parsedDate;
+          }
+        }
+
         articles.push({
           titre: cleanHtml(titre),
           resume: cleanHtml(description || "").slice(0, 500),
-          url: link,
+          url: link.trim(),
           imageUrl: image || undefined,
           auteur: author ? cleanHtml(author) : undefined,
-          datePublication: pubDate ? new Date(pubDate) : new Date(),
+          datePublication: datePubli,
         });
+      } else {
+        console.log(`RSS Item SKIPPED: titre=${!!titre}, link=${!!link}`);
       }
     }
 
+    console.log(`RSS Parser: ${articles.length} articles extraits avec succès`);
     return articles;
   } catch (error) {
     console.error("Erreur parsing RSS:", error);
@@ -86,10 +152,7 @@ async function parseRssFeed(url: string): Promise<ParsedArticle[]> {
 async function scrapeWebPage(url: string, selector?: string): Promise<ParsedArticle[]> {
   try {
     const response = await fetch(url, {
-      headers: {
-        "User-Agent": "WorkbotsForma/1.0 (Formation professionnelle; veille réglementaire)",
-        "Accept": "text/html",
-      },
+      headers: BROWSER_HEADERS,
     });
 
     if (!response.ok) {
@@ -214,9 +277,17 @@ function extractXmlValue(xml: string, tag: string, attr?: string): string | null
     return match ? match[1] : null;
   }
 
-  const regex = new RegExp(`<${tag}[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/${tag}>`, "i");
+  // Support CDATA: <tag><![CDATA[content]]></tag> ou <tag>content</tag>
+  // Les crochets doivent être doublement échappés dans RegExp avec template string
+  const regex = new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/${tag}>`, "i");
   const match = xml.match(regex);
-  return match ? match[1].trim() : null;
+  if (match) {
+    let value = match[1].trim();
+    // Nettoyer les restes de CDATA si présents
+    value = value.replace(/^<!\[CDATA\[/, "").replace(/\]\]>$/, "").trim();
+    return value || null;
+  }
+  return null;
 }
 
 function extractXmlAttr(xml: string, tag: string, attr: string): string | null {

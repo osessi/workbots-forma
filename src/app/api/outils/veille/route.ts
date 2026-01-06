@@ -62,6 +62,96 @@ export async function GET(request: NextRequest) {
       whereClause.type = type;
     }
 
+    // Si on filtre par status IMPORTANT/ARCHIVE, utiliser une approche différente
+    // pour récupérer directement les articles avec ce status
+    if (status && status !== "NON_LU") {
+      // Récupérer d'abord les IDs des articles avec le status demandé pour cette org
+      const lecturesWithStatus = await prisma.veilleArticleLecture.findMany({
+        where: {
+          organizationId: user.organizationId,
+          status: status as "LU" | "IMPORTANT" | "ARCHIVE",
+        },
+        select: {
+          articleId: true,
+        },
+        orderBy: {
+          updatedAt: "desc",
+        },
+        take: limit,
+        skip: offset,
+      });
+
+      const articleIds = lecturesWithStatus.map(l => l.articleId);
+
+      // Récupérer les articles correspondants
+      const articles = await prisma.veilleArticle.findMany({
+        where: {
+          id: { in: articleIds },
+          ...(type ? { type } : {}),
+        },
+        include: {
+          source: {
+            select: {
+              id: true,
+              nom: true,
+              logoUrl: true,
+            },
+          },
+          lecturesParOrg: {
+            where: {
+              organizationId: user.organizationId,
+            },
+            select: {
+              status: true,
+              luAt: true,
+              notes: true,
+            },
+          },
+        },
+        orderBy: {
+          datePublication: "desc",
+        },
+      });
+
+      // Formater la réponse
+      const formattedArticles = articles.map(article => ({
+        id: article.id,
+        type: article.type,
+        titre: article.titre,
+        resume: article.resume,
+        resumeIA: article.resumeIA,
+        url: article.url,
+        imageUrl: article.imageUrl,
+        auteur: article.auteur,
+        datePublication: article.datePublication,
+        tags: article.tags,
+        pointsCles: article.pointsCles,
+        impactQualiopi: article.impactQualiopi,
+        source: article.source,
+        lecture: article.lecturesParOrg[0] || { status: "NON_LU" },
+      }));
+
+      // Compter le total pour pagination
+      const total = await prisma.veilleArticleLecture.count({
+        where: {
+          organizationId: user.organizationId,
+          status: status as "LU" | "IMPORTANT" | "ARCHIVE",
+          ...(type ? { article: { type } } : {}),
+        },
+      });
+
+      return NextResponse.json({
+        articles: formattedArticles,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total,
+        },
+        counts: {}, // Counts will be populated by the main view
+      });
+    }
+
     // Récupérer les articles avec leur statut de lecture pour cette organisation
     const articles = await prisma.veilleArticle.findMany({
       where: whereClause,
@@ -91,15 +181,12 @@ export async function GET(request: NextRequest) {
       skip: offset,
     });
 
-    // Filtrer par statut si demandé
+    // Filtrer par statut NON_LU si demandé (les autres status sont gérés ci-dessus)
     let filteredArticles = articles;
-    if (status) {
+    if (status === "NON_LU") {
       filteredArticles = articles.filter(article => {
         const lecture = article.lecturesParOrg[0];
-        if (status === "NON_LU") {
-          return !lecture || lecture.status === "NON_LU";
-        }
-        return lecture?.status === status;
+        return !lecture || lecture.status === "NON_LU";
       });
     }
 

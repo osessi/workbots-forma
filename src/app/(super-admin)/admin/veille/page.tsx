@@ -57,22 +57,6 @@ const VEILLE_TYPES: {
   { type: "HANDICAP", label: "Handicap & Accessibilité", icon: <Accessibility size={18} />, color: "text-purple-600 bg-purple-100" },
 ];
 
-// Sources par défaut à créer
-const DEFAULT_SOURCES: { type: VeilleType; nom: string; url: string; description: string; isRss: boolean }[] = [
-  // Légale
-  { type: "LEGALE", nom: "France Compétences - Actualités", url: "https://www.francecompetences.fr/fiche/rss-actualites/", description: "Actualités officielles de France Compétences", isRss: true },
-  { type: "LEGALE", nom: "Ministère du Travail", url: "https://travail-emploi.gouv.fr/rss.xml", description: "Actualités du Ministère du Travail", isRss: true },
-  { type: "LEGALE", nom: "Légifrance - Formation", url: "https://www.legifrance.gouv.fr/eli/jo/rss", description: "Journal Officiel - Formation professionnelle", isRss: true },
-  // Métiers
-  { type: "METIER", nom: "Centre Inffo", url: "https://www.centre-inffo.fr/site-centre-inffo/actualites-centre-inffo/feed", description: "Actualités de la formation professionnelle", isRss: true },
-  { type: "METIER", nom: "France Travail - Emploi", url: "https://www.francetravail.fr/accueil/flux-rss.html", description: "Actualités emploi et formation", isRss: true },
-  // Innovation
-  { type: "INNOVATION", nom: "EdTech France", url: "https://edtechfrance.fr/feed/", description: "Actualités de l'EdTech française", isRss: true },
-  { type: "INNOVATION", nom: "Thot Cursus", url: "https://cursus.edu/rss.xml", description: "Formation et culture numérique", isRss: true },
-  // Handicap
-  { type: "HANDICAP", nom: "AGEFIPH", url: "https://www.agefiph.fr/rss.xml", description: "Association de gestion du fonds pour l'insertion des personnes handicapées", isRss: true },
-  { type: "HANDICAP", nom: "Handicap.gouv.fr", url: "https://handicap.gouv.fr/rss.xml", description: "Actualités handicap gouvernement", isRss: true },
-];
 
 export default function AdminVeillePage() {
   const [sources, setSources] = useState<VeilleSource[]>([]);
@@ -83,6 +67,13 @@ export default function AdminVeillePage() {
   const [editingSource, setEditingSource] = useState<VeilleSource | null>(null);
   const [saving, setSaving] = useState(false);
   const [initializingDefaults, setInitializingDefaults] = useState(false);
+  const [testingFeed, setTestingFeed] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    itemsFound: number;
+    error?: string;
+    sampleItems?: { title: string; link: string }[];
+  } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -179,6 +170,7 @@ export default function AdminVeillePage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingSource(null);
+    setTestResult(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -234,23 +226,77 @@ export default function AdminVeillePage() {
     }
   };
 
+  // Initialiser avec les vraies sources depuis l'API
   const initializeDefaultSources = async () => {
     if (!confirm("Voulez-vous créer les sources de veille par défaut ? Les sources existantes ne seront pas modifiées.")) return;
 
     setInitializingDefaults(true);
     try {
-      for (const source of DEFAULT_SOURCES) {
-        await fetch("/api/outils/veille/sources", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...source, isGlobal: true }),
-        });
-      }
+      const res = await fetch("/api/outils/veille/init-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      alert(`${data.message}`);
       fetchSources();
     } catch (error) {
       console.error("Erreur init defaults:", error);
+      alert("Erreur lors de l'initialisation des sources");
     } finally {
       setInitializingDefaults(false);
+    }
+  };
+
+  // Réinitialiser toutes les sources
+  const resetAllSources = async () => {
+    if (!confirm("⚠️ ATTENTION: Cela va SUPPRIMER toutes les sources existantes et les recréer. Continuer ?")) return;
+
+    setInitializingDefaults(true);
+    try {
+      const res = await fetch("/api/outils/veille/init-sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetAll: true }),
+      });
+      const data = await res.json();
+      alert(`${data.message}`);
+      fetchSources();
+    } catch (error) {
+      console.error("Erreur reset sources:", error);
+      alert("Erreur lors de la réinitialisation");
+    } finally {
+      setInitializingDefaults(false);
+    }
+  };
+
+  // Tester un flux RSS
+  const testFeed = async () => {
+    if (!formData.url) {
+      alert("Veuillez entrer une URL");
+      return;
+    }
+
+    setTestingFeed(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch("/api/outils/veille/test-feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: formData.url }),
+      });
+      const data = await res.json();
+      setTestResult(data);
+    } catch (error) {
+      console.error("Erreur test feed:", error);
+      setTestResult({
+        success: false,
+        itemsFound: 0,
+        error: "Erreur lors du test",
+      });
+    } finally {
+      setTestingFeed(false);
     }
   };
 
@@ -285,8 +331,8 @@ export default function AdminVeillePage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {sources.length === 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {sources.length === 0 ? (
             <button
               onClick={initializeDefaultSources}
               disabled={initializingDefaults}
@@ -294,6 +340,16 @@ export default function AdminVeillePage() {
             >
               {initializingDefaults ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
               Initialiser sources par défaut
+            </button>
+          ) : (
+            <button
+              onClick={resetAllSources}
+              disabled={initializingDefaults}
+              className="flex items-center gap-2 px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 disabled:opacity-50 transition-colors text-sm"
+              title="Réinitialiser toutes les sources avec les valeurs par défaut"
+            >
+              {initializingDefaults ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={16} />}
+              Réinitialiser
             </button>
           )}
           <button
@@ -515,19 +571,65 @@ export default function AdminVeillePage() {
                 />
               </div>
 
-              {/* URL */}
+              {/* URL avec bouton de test */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   URL du flux RSS ou de la page
                 </label>
-                <input
-                  type="url"
-                  value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  required
-                  placeholder="https://example.com/feed.xml"
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={formData.url}
+                    onChange={(e) => {
+                      setFormData({ ...formData, url: e.target.value });
+                      setTestResult(null);
+                    }}
+                    required
+                    placeholder="https://example.com/feed.xml"
+                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={testFeed}
+                    disabled={testingFeed || !formData.url}
+                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+                  >
+                    {testingFeed ? <Loader2 size={16} className="animate-spin" /> : <Rss size={16} />}
+                    Tester
+                  </button>
+                </div>
+                {/* Résultat du test */}
+                {testResult && (
+                  <div className={`mt-2 p-3 rounded-lg text-sm ${
+                    testResult.success
+                      ? "bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800"
+                      : "bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800"
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      {testResult.success ? (
+                        <Check size={16} className="text-green-600" />
+                      ) : (
+                        <X size={16} className="text-red-600" />
+                      )}
+                      <span className={testResult.success ? "text-green-700 dark:text-green-400 font-medium" : "text-red-700 dark:text-red-400 font-medium"}>
+                        {testResult.success ? `${testResult.itemsFound} articles trouvés` : "Échec du test"}
+                      </span>
+                    </div>
+                    {testResult.error && (
+                      <p className="text-red-600 dark:text-red-400 text-xs">{testResult.error}</p>
+                    )}
+                    {testResult.sampleItems && testResult.sampleItems.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Aperçu des articles :</p>
+                        {testResult.sampleItems.slice(0, 3).map((item, idx) => (
+                          <p key={idx} className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                            • {item.title}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Description */}

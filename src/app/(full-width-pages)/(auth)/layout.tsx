@@ -25,8 +25,8 @@ export default function AuthLayout({
                   <Image
                     width={280}
                     height={60}
-                    src="/images/logo/logo-automate-darkmode.svg"
-                    alt="Automate Forma"
+                    src="/logo-workbots-dark.svg"
+                    alt="Workbots"
                   />
                 </Link>
                 <h2 className="text-2xl font-bold text-white mb-3 text-center">

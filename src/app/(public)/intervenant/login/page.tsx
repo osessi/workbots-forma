@@ -477,6 +477,16 @@ function LoginContent() {
             </p>
           )}
         </div>
+
+        {/* Powered by Workbots */}
+        <div className="flex items-center justify-center gap-2 mt-8 opacity-60">
+          <span className="text-xs text-gray-400 dark:text-gray-500">Propulsé par</span>
+          <img
+            src="/logo-workbots.svg"
+            alt="Workbots"
+            className="h-4 dark:invert dark:opacity-70"
+          />
+        </div>
       </motion.div>
     </div>
   );

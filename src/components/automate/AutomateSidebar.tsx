@@ -394,26 +394,26 @@ const AutomateSidebar: React.FC = () => {
     >
       {/* Logo */}
       <div
-        className={`py-8 px-4 flex items-center gap-2 ${
-          !isExpanded && !isHovered && !isMobileOpen ? "lg:justify-center" : "justify-start"
+        className={`py-4 px-4 flex flex-col ${
+          !isExpanded && !isHovered && !isMobileOpen ? "lg:items-center" : "items-center"
         }`}
       >
         <Link href="/automate" className="flex items-center gap-2">
           {(isExpanded || isHovered || isMobileOpen) ? (
             <Image
-              src={theme === "dark" ? "/images/logo/logo-automate-darkmode.svg" : "/images/logo/logo-automate-lightmode.svg"}
-              alt="Automate"
-              width={352}
-              height={96}
-              className="h-[96px] w-auto"
+              src={theme === "dark" ? "/logo-workbots-dark.svg" : "/logo-workbots.svg"}
+              alt="Workbots"
+              width={200}
+              height={50}
+              className="h-[70px] w-auto"
             />
           ) : (
             <Image
-              src="/images/logo/icone-automate.svg"
-              alt="Automate"
-              width={90}
-              height={90}
-              className="h-[90px] w-[90px]"
+              src={theme === "dark" ? "/logo-workbots-dark.svg" : "/logo-workbots.svg"}
+              alt="Workbots"
+              width={40}
+              height={40}
+              className="h-[40px] w-[40px]"
             />
           )}
         </Link>

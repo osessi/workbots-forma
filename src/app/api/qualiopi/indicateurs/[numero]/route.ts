@@ -127,7 +127,7 @@ export async function GET(
     const analyse = await analyserIndicateurSpecifique(organizationId, numeroInt);
 
     return NextResponse.json({
-      // Données de référence
+      // Données de référence RNQ V9
       numero: indicateurRef.numero,
       critere: {
         numero: critereRef?.numero,
@@ -136,8 +136,13 @@ export async function GET(
       },
       libelle: indicateurRef.libelle,
       description: indicateurRef.description,
+      niveauAttendu: indicateurRef.niveauAttendu,
+      nonConformite: indicateurRef.nonConformite,
       exigences: indicateurRef.exigences,
       preuvesAttendues: indicateurRef.preuvesAttendues,
+      obligationsSpecifiques: indicateurRef.obligationsSpecifiques || [],
+      applicabilite: indicateurRef.applicabilite,
+      sousTraitance: indicateurRef.sousTraitance || null,
       sourcesVerification: indicateurRef.sourcesVerification,
 
       // État actuel

@@ -977,7 +977,7 @@ export default function QualiopiDashboardPage() {
 
           {data.indicateursValides && data.indicateursValides.length > 6 && (
             <Link
-              href="/automate/qualiopi/indicateurs"
+              href="/automate/qualiopi/indicateurs-valides"
               className="mt-3 text-sm text-green-600 dark:text-green-400 hover:underline flex items-center gap-1"
             >
               Voir tous les {data.indicateursValides.length} indicateurs validés

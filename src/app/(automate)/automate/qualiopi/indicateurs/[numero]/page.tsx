@@ -21,9 +21,184 @@ import {
   Link as LinkIcon,
   Image as ImageIcon,
   Trash2,
+  ThumbsUp,
+  ShieldAlert,
+  Lightbulb,
+  TrendingUp,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+
+// ===========================================
+// COMPOSANT - ANALYSE IA FORMATÉE
+// ===========================================
+
+interface AnalyseSection {
+  type: "success" | "warning" | "danger" | "info" | "neutral";
+  title: string;
+  content: string;
+}
+
+function parseAnalyseIA(analyse: string): AnalyseSection[] {
+  const sections: AnalyseSection[] = [];
+  const lines = analyse.split("\n");
+  let currentSection: AnalyseSection | null = null;
+  let currentContent: string[] = [];
+
+  const sectionPatterns: { regex: RegExp; type: AnalyseSection["type"]; title: string }[] = [
+    { regex: /^#{1,3}\s*(situation\s*actuelle|état\s*actuel|analyse\s*actuelle)/i, type: "info", title: "Situation actuelle" },
+    { regex: /^#{1,3}\s*(points?\s*forts?|forces?|atouts?|éléments?\s*conformes?)/i, type: "success", title: "Points Forts" },
+    { regex: /^#{1,3}\s*(points?\s*(à\s*)?améliorer|améliorations?|axes?\s*d'amélioration|points?\s*faibles?)/i, type: "warning", title: "Points à Améliorer" },
+    { regex: /^#{1,3}\s*(risques?|alertes?|dangers?|non[\s-]?conform|écarts?|problèmes?)/i, type: "danger", title: "Risques Identifiés" },
+    { regex: /^#{1,3}\s*(recommandations?|conseils?|suggestions?|actions?\s*prioritaires?)/i, type: "info", title: "Recommandations" },
+    { regex: /^#{1,3}\s*(priorit[eé]\s*\d|étape|action)/i, type: "info", title: "Actions Prioritaires" },
+    { regex: /^#{1,3}\s*(synthèse|résumé|conclusion|bilan|résultat)/i, type: "neutral", title: "Synthèse" },
+    { regex: /^#{1,3}\s*(conformité|score|évaluation)/i, type: "neutral", title: "Évaluation" },
+    { regex: /^#{1,3}\s*(informations?\s*manquantes?|données?\s*manquantes?)/i, type: "warning", title: "Informations Manquantes" },
+  ];
+
+  for (const line of lines) {
+    let matchedPattern = false;
+
+    for (const pattern of sectionPatterns) {
+      if (pattern.regex.test(line)) {
+        // Sauvegarder la section précédente
+        if (currentSection) {
+          currentSection.content = currentContent.join("\n").trim();
+          if (currentSection.content) sections.push(currentSection);
+        }
+        // Démarrer nouvelle section
+        currentSection = { type: pattern.type, title: pattern.title, content: "" };
+        currentContent = [];
+        matchedPattern = true;
+        break;
+      }
+    }
+
+    if (!matchedPattern) {
+      // Vérifier si c'est un autre titre markdown
+      if (/^#{1,3}\s+/.test(line) && currentSection) {
+        // Sauvegarder et créer nouvelle section neutre
+        currentSection.content = currentContent.join("\n").trim();
+        if (currentSection.content) sections.push(currentSection);
+        const title = line.replace(/^#{1,3}\s+/, "").trim();
+        currentSection = { type: "neutral", title, content: "" };
+        currentContent = [];
+      } else {
+        currentContent.push(line);
+      }
+    }
+  }
+
+  // Sauvegarder la dernière section
+  if (currentSection) {
+    currentSection.content = currentContent.join("\n").trim();
+    if (currentSection.content) sections.push(currentSection);
+  }
+
+  // Si aucune section détectée, créer une section par défaut
+  if (sections.length === 0 && analyse.trim()) {
+    sections.push({
+      type: "info",
+      title: "Analyse détaillée",
+      content: analyse,
+    });
+  }
+
+  return sections;
+}
+
+function getAnalyseSectionStyle(type: AnalyseSection["type"]): string {
+  switch (type) {
+    case "success":
+      return "bg-green-50 dark:bg-green-900/20 border-green-500";
+    case "warning":
+      return "bg-amber-50 dark:bg-amber-900/20 border-amber-500";
+    case "danger":
+      return "bg-red-50 dark:bg-red-900/20 border-red-500";
+    case "info":
+      return "bg-blue-50 dark:bg-blue-900/20 border-blue-500";
+    default:
+      return "bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600";
+  }
+}
+
+function getAnalyseSectionTitleColor(type: AnalyseSection["type"]): string {
+  switch (type) {
+    case "success":
+      return "text-green-700 dark:text-green-400";
+    case "warning":
+      return "text-amber-700 dark:text-amber-400";
+    case "danger":
+      return "text-red-700 dark:text-red-400";
+    case "info":
+      return "text-blue-700 dark:text-blue-400";
+    default:
+      return "text-gray-700 dark:text-gray-300";
+  }
+}
+
+function getAnalyseSectionIcon(type: AnalyseSection["type"]) {
+  switch (type) {
+    case "success":
+      return <ThumbsUp className="h-5 w-5" />;
+    case "warning":
+      return <TrendingUp className="h-5 w-5" />;
+    case "danger":
+      return <ShieldAlert className="h-5 w-5" />;
+    case "info":
+      return <Lightbulb className="h-5 w-5" />;
+    default:
+      return <Info className="h-5 w-5" />;
+  }
+}
+
+function FormattedAnalyseIA({ analyse }: { analyse: string }) {
+  const sections = parseAnalyseIA(analyse);
+
+  return (
+    <div className="space-y-4">
+      {sections.map((section, index) => (
+        <div
+          key={index}
+          className={`p-4 rounded-lg border-l-4 ${getAnalyseSectionStyle(section.type)}`}
+        >
+          <h4 className={`font-semibold mb-2 flex items-center gap-2 ${getAnalyseSectionTitleColor(section.type)}`}>
+            {getAnalyseSectionIcon(section.type)}
+            {section.title}
+          </h4>
+          <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+            <ReactMarkdown
+              components={{
+                // Amélioration du style des listes
+                ul: ({ children }) => (
+                  <ul className="list-none space-y-2 ml-0 pl-0">{children}</ul>
+                ),
+                li: ({ children }) => (
+                  <li className="flex items-start gap-2">
+                    <span className="text-current mt-1.5 w-1.5 h-1.5 bg-current rounded-full flex-shrink-0"></span>
+                    <span>{children}</span>
+                  </li>
+                ),
+                // Style pour le texte en gras
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-gray-900 dark:text-white">{children}</strong>
+                ),
+                // Style pour les paragraphes
+                p: ({ children }) => (
+                  <p className="mb-2 last:mb-0">{children}</p>
+                ),
+              }}
+            >
+              {section.content}
+            </ReactMarkdown>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ===========================================
 // TYPES
@@ -38,6 +213,26 @@ interface IndicateurDetail {
   };
   libelle: string;
   description: string;
+  // Nouvelles données RNQ V9
+  niveauAttendu: string;
+  nonConformite: {
+    type: "mineure" | "majeure";
+    gradation?: boolean;
+    descriptionMineure?: string;
+  };
+  applicabilite: {
+    OF: boolean;
+    CFA: boolean;
+    CBC: boolean;
+    VAE: boolean;
+    nouveauxEntrants?: string;
+  };
+  obligationsSpecifiques?: {
+    type: string;
+    description: string;
+  }[];
+  sousTraitance?: string | null;
+  // Données existantes
   exigences: string[];
   preuvesAttendues: string[];
   sourcesVerification: {
@@ -834,6 +1029,75 @@ export default function IndicateurDetailPage() {
         </Link>
       </div>
 
+      {/* Informations RNQ V9 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Type de non-conformité */}
+        <div className={`px-4 py-3 rounded-xl ${
+          data.nonConformite?.type === "majeure" && !data.nonConformite?.gradation
+            ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+            : data.nonConformite?.gradation
+            ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
+            : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+        }`}>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Type de non-conformité</p>
+          <p className={`font-semibold text-sm ${
+            data.nonConformite?.type === "majeure" && !data.nonConformite?.gradation
+              ? "text-red-700 dark:text-red-400"
+              : data.nonConformite?.gradation
+              ? "text-amber-700 dark:text-amber-400"
+              : "text-blue-700 dark:text-blue-400"
+          }`}>
+            {data.nonConformite?.gradation
+              ? "Mineure ou Majeure"
+              : data.nonConformite?.type === "majeure"
+              ? "Majeure uniquement"
+              : "Mineure uniquement"}
+          </p>
+        </div>
+
+        {/* Applicabilité */}
+        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">S'applique à</p>
+          <div className="flex flex-wrap gap-1">
+            {data.applicabilite?.OF && (
+              <span className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">OF</span>
+            )}
+            {data.applicabilite?.CFA && (
+              <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">CFA</span>
+            )}
+            {data.applicabilite?.CBC && (
+              <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">CBC</span>
+            )}
+            {data.applicabilite?.VAE && (
+              <span className="text-xs px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">VAE</span>
+            )}
+          </div>
+        </div>
+
+        {/* Nouveaux entrants */}
+        {data.applicabilite?.nouveauxEntrants && (
+          <div className="px-4 py-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 md:col-span-2">
+            <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Nouveaux entrants</p>
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              {data.applicabilite.nouveauxEntrants}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Niveau attendu RNQ V9 */}
+      {data.niveauAttendu && (
+        <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl border border-purple-200 dark:border-purple-700 p-4">
+          <h2 className="font-semibold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+            <Target className="h-5 w-5 text-purple-600" />
+            Niveau attendu (RNQ V9)
+          </h2>
+          <p className="text-sm text-purple-800 dark:text-purple-200 leading-relaxed">
+            {data.niveauAttendu}
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Exigences */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -865,6 +1129,32 @@ export default function IndicateurDetailPage() {
           </ul>
         </div>
       </div>
+
+      {/* Obligations spécifiques par type de prestataire */}
+      {data.obligationsSpecifiques && data.obligationsSpecifiques.length > 0 && (
+        <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-4">
+            Obligations spécifiques par type
+          </h2>
+          <div className="space-y-3">
+            {data.obligationsSpecifiques.map((obligation, index) => (
+              <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                  obligation.type === "CFA" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
+                  obligation.type === "CBC" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
+                  obligation.type === "VAE" ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" :
+                  "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                }`}>
+                  {obligation.type}
+                </span>
+                <p className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                  {obligation.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Preuves fournies */}
       <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -948,23 +1238,24 @@ export default function IndicateurDetailPage() {
 
         {showAnalyse && (
           <div className="mt-4">
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown>{data.analyseIA}</ReactMarkdown>
-            </div>
+            <FormattedAnalyseIA analyse={data.analyseIA} />
 
             {data.actionsRecommandees.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-700">
-                <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+              <div className="mt-4 p-4 bg-purple-100 dark:bg-purple-900/30 rounded-lg border-l-4 border-purple-500">
+                <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-3 flex items-center gap-2">
+                  <Target className="h-5 w-5" />
                   Actions recommandées
                 </h3>
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {data.actionsRecommandees.map((action, index) => (
                     <li
                       key={index}
-                      className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300"
+                      className="flex items-start gap-3 p-2 bg-white dark:bg-gray-800 rounded-lg"
                     >
-                      <Target className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
-                      {action}
+                      <span className="flex-shrink-0 w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{action}</span>
                     </li>
                   ))}
                 </ul>

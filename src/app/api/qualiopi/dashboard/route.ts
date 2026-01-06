@@ -73,17 +73,20 @@ export async function GET(request: NextRequest) {
     console.log("[Qualiopi Dashboard] OrganizationId:", organizationId);
 
     // Essayer d'initialiser les indicateurs (avec fallback)
+    // Valeurs par défaut selon RNQ V9 (janvier 2024)
+    // Critère 1: ind 1-3 (3), Critère 2: ind 4-8 (5), Critère 3: ind 9-16 (8)
+    // Critère 4: ind 17-20 (4), Critère 5: ind 21-22 (2), Critère 6: ind 23-29 (7), Critère 7: ind 30-32 (3)
     let score = {
       scoreGlobal: 0,
       indicateursConformes: 0,
       indicateursTotal: 32,
       scoreParCritere: [
         { critere: 1, titre: "Information", score: 0, indicateursConformes: 0, indicateursTotal: 3 },
-        { critere: 2, titre: "Objectifs", score: 0, indicateursConformes: 0, indicateursTotal: 4 },
-        { critere: 3, titre: "Adaptation", score: 0, indicateursConformes: 0, indicateursTotal: 5 },
-        { critere: 4, titre: "Moyens", score: 0, indicateursConformes: 0, indicateursTotal: 6 },
-        { critere: 5, titre: "Qualification", score: 0, indicateursConformes: 0, indicateursTotal: 6 },
-        { critere: 6, titre: "Environnement", score: 0, indicateursConformes: 0, indicateursTotal: 5 },
+        { critere: 2, titre: "Objectifs", score: 0, indicateursConformes: 0, indicateursTotal: 5 },
+        { critere: 3, titre: "Adaptation", score: 0, indicateursConformes: 0, indicateursTotal: 8 },
+        { critere: 4, titre: "Moyens", score: 0, indicateursConformes: 0, indicateursTotal: 4 },
+        { critere: 5, titre: "Qualification", score: 0, indicateursConformes: 0, indicateursTotal: 2 },
+        { critere: 6, titre: "Environnement", score: 0, indicateursConformes: 0, indicateursTotal: 7 },
         { critere: 7, titre: "Recueil", score: 0, indicateursConformes: 0, indicateursTotal: 3 },
       ]
     };
@@ -191,9 +194,16 @@ export async function GET(request: NextRequest) {
       total: c.indicateursTotal,
     }));
 
-    // Indicateurs non conformes ou à améliorer
+    // Indicateurs non conformes ou à améliorer - TRIÉS PAR SCORE CROISSANT (plus urgents en premier)
     const indicateursAttention = analyses
       .filter((a) => a.status === "NON_CONFORME" || (a.status === "EN_COURS" && a.score < 50))
+      .sort((a, b) => {
+        // 1. Prioriser les NON_CONFORME avant EN_COURS
+        if (a.status === "NON_CONFORME" && b.status !== "NON_CONFORME") return -1;
+        if (b.status === "NON_CONFORME" && a.status !== "NON_CONFORME") return 1;
+        // 2. Ensuite trier par score croissant (les plus faibles en premier)
+        return a.score - b.score;
+      })
       .slice(0, 5)
       .map((a) => ({
         numero: a.numero,

@@ -41,33 +41,52 @@ interface AgentResponse {
 // PROMPT SYSTÈME
 // ===========================================
 
-const SYSTEM_PROMPT = `Tu es un expert Qualiopi, assistant spécialisé pour aider les organismes de formation français à obtenir et maintenir leur certification Qualiopi.
+const SYSTEM_PROMPT = `Tu es un expert Qualiopi, assistant spécialisé pour aider les organismes de formation français à obtenir et maintenir leur certification Qualiopi selon le Référentiel National Qualité (RNQ) Version 9 de janvier 2024.
 
 ## Ton rôle
-- Répondre aux questions sur la certification Qualiopi
+- Répondre aux questions sur la certification Qualiopi selon le RNQ V9
 - Analyser la conformité de l'organisme
 - Proposer des actions correctives
 - Expliquer les 32 indicateurs et les 7 critères
-- Aider à préparer les audits
+- Aider à préparer les audits (initial et de surveillance)
+- Distinguer les non-conformités mineures des majeures
 
-## Les 7 critères Qualiopi
-${CRITERES_QUALIOPI.map(c => `${c.numero}. ${c.titre}: ${c.description} (Indicateurs ${c.indicateurs.join(", ")})`).join("\n")}
+## Les 7 critères Qualiopi (RNQ V9)
+${CRITERES_QUALIOPI.map(c => `**Critère ${c.numero}** - ${c.titre}: ${c.description} (Indicateurs ${c.indicateurs.join(", ")})`).join("\n")}
 
-## Les 32 indicateurs
-${INDICATEURS_QUALIOPI.map(i => `IND ${i.numero} (C${i.critere}): ${i.libelle} - ${i.description.substring(0, 100)}...`).join("\n")}
+## Les 32 indicateurs avec types de non-conformité
+${INDICATEURS_QUALIOPI.map(i => {
+  const ncType = i.nonConformite.gradation ? "⚠️ Mineure ou Majeure" : (i.nonConformite.type === "mineure" ? "📝 Mineure" : "🔴 Majeure");
+  return `[IND ${i.numero}] (C${i.critere}) ${i.libelle} - NC: ${ncType}`;
+}).join("\n")}
+
+## Types de prestataires (applicabilité des indicateurs)
+- **OF** (Organisme de Formation): Formation professionnelle continue
+- **CFA** (Centre de Formation d'Apprentis): Formation par apprentissage
+- **CBC** (Centre de Bilan de Compétences): Bilans de compétences
+- **VAE** (Validation des Acquis de l'Expérience): Accompagnement VAE
+
+## Règles de non-conformité selon le RNQ V9
+- **Non-conformité mineure**: Écart partiel qui n'affecte pas la qualité des prestations. L'organisme a 3 mois pour corriger.
+- **Non-conformité majeure**: Écart significatif qui affecte la qualité des prestations. Peut entraîner le refus ou la suspension de la certification.
+- Certains indicateurs permettent une gradation (mineure puis majeure si récurrence).
+
+## Nouveaux entrants
+Les organismes sans activité lors de l'audit initial ont des modalités d'appréciation adaptées pour certains indicateurs (2, 3, 11, 13, 14, 19, 22, 24, 25, 26 et 32). Ces indicateurs seront audités lors de l'audit de surveillance.
 
 ## Règles importantes
-1. Toujours être précis et citer les numéros d'indicateurs
-2. Proposer des actions concrètes et réalisables
-3. Tenir compte du contexte de l'organisme
-4. Utiliser un langage clair et accessible
-5. Prioriser les actions selon leur impact sur la conformité
+1. Toujours être précis et citer les numéros d'indicateurs [IND X]
+2. Préciser le type de non-conformité possible pour chaque indicateur
+3. Proposer des actions concrètes et réalisables
+4. Tenir compte du type de prestataire (OF, CFA, CBC, VAE)
+5. Prioriser les indicateurs avec non-conformité majeure
 
 ## Format de réponse
 - Sois concis mais complet
 - Utilise des listes à puces pour la clarté
 - Cite les indicateurs concernés entre crochets [IND X]
-- Propose des actions prioritaires quand pertinent`;
+- Indique le type de non-conformité quand pertinent
+- Propose des actions prioritaires par ordre d'urgence`;
 
 // ===========================================
 // FONCTIONS PRINCIPALES
@@ -268,25 +287,61 @@ export async function analyserIndicateurSpecifique(
     (a) => a.numero === numeroIndicateur
   );
 
-  // Construire le prompt pour l'analyse
-  const prompt = `Analyse l'indicateur ${numeroIndicateur} pour cet organisme.
+  // Construire le prompt pour l'analyse avec les données RNQ V9
+  const ncType = indicateur.nonConformite.gradation
+    ? "Mineure ou Majeure (avec gradation)"
+    : (indicateur.nonConformite.type === "mineure" ? "Mineure" : "Majeure");
+
+  const applicabiliteStr = [
+    indicateur.applicabilite.OF ? "OF" : null,
+    indicateur.applicabilite.CFA ? "CFA" : null,
+    indicateur.applicabilite.CBC ? "CBC" : null,
+    indicateur.applicabilite.VAE ? "VAE" : null,
+  ].filter(Boolean).join(", ");
+
+  const prompt = `Analyse l'indicateur ${numeroIndicateur} pour cet organisme selon le RNQ V9.
 
 ## Indicateur ${numeroIndicateur}: ${indicateur.libelle}
+**Critère ${indicateur.critere}**
+
+### Description officielle
 ${indicateur.description}
 
-## Exigences
+### Niveau attendu (RNQ V9)
+${indicateur.niveauAttendu}
+
+### Type de non-conformité
+- **Type**: ${ncType}
+${indicateur.nonConformite.descriptionMineure ? `- **Si mineure**: ${indicateur.nonConformite.descriptionMineure}` : ""}
+
+### Applicabilité
+Cet indicateur s'applique à: ${applicabiliteStr}
+${indicateur.applicabilite.nouveauxEntrants ? `\n**Nouveaux entrants**: ${indicateur.applicabilite.nouveauxEntrants}` : ""}
+${indicateur.sousTraitance ? `\n**Sous-traitance**: ${indicateur.sousTraitance}` : ""}
+
+### Exigences détaillées
 ${indicateur.exigences.map((e) => `- ${e}`).join("\n")}
 
-## État actuel
+### Preuves attendues (RNQ V9)
+${indicateur.preuvesAttendues.map((p) => `- ${p}`).join("\n")}
+
+${indicateur.obligationsSpecifiques && indicateur.obligationsSpecifiques.length > 0 ? `
+### Obligations spécifiques par type
+${indicateur.obligationsSpecifiques.map((o) => `- **${o.type}**: ${o.description}`).join("\n")}
+` : ""}
+
+## État actuel de l'organisme
 - Score: ${analyseIndicateur?.score || 0}%
 - Statut: ${analyseIndicateur?.status || "À évaluer"}
-- Preuves trouvées: ${analyseIndicateur?.preuvesTrouvees?.map((p) => p.description).join(", ") || "Aucune"}
-- Problèmes: ${analyseIndicateur?.problemes?.join(", ") || "Aucun"}
+- Preuves trouvées: ${analyseIndicateur?.preuvesTrouvees?.map((p: { description: string }) => p.description).join(", ") || "Aucune"}
+- Problèmes identifiés: ${analyseIndicateur?.problemes?.join(", ") || "Aucun"}
 
-Fournis:
-1. Une analyse détaillée de la situation
-2. Les actions prioritaires à mener
-3. Les preuves à préparer pour l'audit`;
+## Consignes
+Fournis une analyse complète avec:
+1. **Diagnostic**: Analyse détaillée de la situation actuelle
+2. **Risques**: Type de non-conformité encourue si les écarts ne sont pas corrigés
+3. **Actions prioritaires**: Liste ordonnée des actions à mener
+4. **Preuves à préparer**: Documents concrets à préparer pour l'audit`;
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
@@ -330,35 +385,81 @@ export async function simulerAudit(
   score: number;
 }> {
   const conformite = await analyserConformiteOrganisation(organizationId);
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { name: true },
+  });
 
-  const prompt = `Simule un audit Qualiopi pour cet organisme.
+  // Séparer les indicateurs par statut
+  const indicateursConformes = conformite.analyses.filter((a) => a.status === "CONFORME");
+  const indicateursEnCours = conformite.analyses.filter((a) => a.status === "EN_COURS");
+  const indicateursNonConformes = conformite.analyses.filter((a) => a.status === "NON_CONFORME");
 
-## État de conformité
-- Score global: ${conformite.score.scoreGlobal}%
+  const prompt = `Tu es un auditeur Qualiopi expert. Simule un audit complet pour cet organisme de formation.
+
+## INFORMATIONS DE L'ORGANISME
+- Nom: ${organization?.name || "Organisme"}
+- Date d'audit: ${new Date().toLocaleDateString("fr-FR")}
+- Auditeur: Expert Qualiopi
+
+## ÉTAT DE CONFORMITÉ ACTUEL
+- **Score global: ${conformite.score.scoreGlobal}%**
 - Indicateurs conformes: ${conformite.score.indicateursConformes}/32
+- Indicateurs en cours: ${indicateursEnCours.length}/32
+- Indicateurs non conformes: ${indicateursNonConformes.length}/32
 
 ### Détail par critère
 ${conformite.score.scoreParCritere.map((c) =>
-  `Critère ${c.critere} (${c.titre}): ${c.score}% - ${c.indicateursConformes}/${c.indicateursTotal} conformes`
+  `- **Critère ${c.critere}** (${c.titre}): ${c.score}% - ${c.indicateursConformes}/${c.indicateursTotal} conformes`
 ).join("\n")}
 
-### Indicateurs problématiques
-${conformite.analyses
-  .filter((a) => a.status === "NON_CONFORME" || a.status === "EN_COURS")
-  .map((a) => `- IND ${a.numero}: ${a.libelle} (${a.score}%) - ${a.problemes.join(", ")}`)
-  .join("\n")}
+### Indicateurs CONFORMES (score >= 80%)
+${indicateursConformes.length > 0
+  ? indicateursConformes.map((a) => `- [IND ${a.numero}]: ${a.libelle}`).join("\n")
+  : "Aucun indicateur pleinement conforme"
+}
 
-Fournis un rapport d'audit simulé avec:
-1. Synthèse globale
-2. Points forts (3-5)
-3. Points à améliorer (3-5)
-4. Risques de non-certification
-5. Recommandations prioritaires`;
+### Indicateurs EN COURS (score 50-79%)
+${indicateursEnCours.length > 0
+  ? indicateursEnCours.map((a) => `- [IND ${a.numero}]: ${a.libelle} (${a.score}%)`).join("\n")
+  : "Aucun indicateur en cours"
+}
+
+### Indicateurs NON CONFORMES (score < 50%)
+${indicateursNonConformes.length > 0
+  ? indicateursNonConformes.map((a) => `- [IND ${a.numero}]: ${a.libelle} (${a.score}%) - Problèmes: ${a.problemes.join("; ")}`).join("\n")
+  : "Aucun indicateur non conforme"
+}
+
+## CONSIGNES DE FORMAT
+
+Génère un RAPPORT D'AUDIT QUALIOPI professionnel et structuré. Utilise EXACTEMENT ces titres de sections avec le format markdown:
+
+### 1. SYNTHÈSE GLOBALE
+(Résumé en 2-3 paragraphes: verdict global, niveau de préparation, recommandation certification)
+
+### 2. POINTS FORTS IDENTIFIÉS
+(Liste les éléments conformes, les bonnes pratiques observées - format liste à puces)
+
+### 3. POINTS À AMÉLIORER PRIORITAIRES
+(Liste les écarts critiques identifiés par critère - format liste à puces avec référence [IND X])
+
+### 4. RISQUES DE NON-CERTIFICATION
+(Liste les risques majeurs qui pourraient empêcher la certification - format liste à puces)
+
+### 5. RECOMMANDATIONS
+(Actions prioritaires à mettre en place - format liste numérotée par ordre de priorité)
+
+IMPORTANT:
+- Sois précis et cite les numéros d'indicateurs [IND X]
+- Utilise des listes à puces pour chaque section
+- Le rapport doit être professionnel et actionnable
+- Base-toi sur les données réelles fournies, pas sur des hypothèses`;
 
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 2048,
-    system: SYSTEM_PROMPT,
+    max_tokens: 3000,
+    system: `Tu es un auditeur Qualiopi certifié avec 10 ans d'expérience. Tu génères des rapports d'audit professionnels, structurés et précis. Tu te bases uniquement sur les données fournies.`,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -367,10 +468,10 @@ Fournis un rapport d'audit simulé avec:
     .map((block) => block.text)
     .join("\n");
 
-  // Extraire les sections
-  const pointsForts = extraireSection(rapportText, "points forts");
-  const pointsAmeliorer = extraireSection(rapportText, "points à améliorer");
-  const risques = extraireSection(rapportText, "risques");
+  // Extraire les sections avec des patterns plus flexibles
+  const pointsForts = extraireSectionAmeliore(rapportText, ["points forts", "éléments conformes", "points positifs"]);
+  const pointsAmeliorer = extraireSectionAmeliore(rapportText, ["points à améliorer", "améliorer prioritaires", "écarts", "non-conformités"]);
+  const risques = extraireSectionAmeliore(rapportText, ["risques", "non-certification", "risques majeurs"]);
 
   return {
     rapport: rapportText,
@@ -379,6 +480,25 @@ Fournis un rapport d'audit simulé avec:
     risques,
     score: conformite.score.scoreGlobal,
   };
+}
+
+// Fonction améliorée pour extraire les sections
+function extraireSectionAmeliore(text: string, keywords: string[]): string[] {
+  for (const keyword of keywords) {
+    const regex = new RegExp(
+      `(?:#{1,3}\\s*)?(?:\\d+\\.?\\s*)?${keyword}[^\\n]*\\n((?:[-•*]\\s*.+\\n?)+)`,
+      "gi"
+    );
+    const match = regex.exec(text);
+    if (match) {
+      return match[1]
+        .split("\n")
+        .filter((l) => l.match(/^[-•*]/))
+        .map((l) => l.replace(/^[-•*]\s*/, "").trim())
+        .filter((l) => l.length > 0);
+    }
+  }
+  return [];
 }
 
 // ===========================================

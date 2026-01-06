@@ -22,9 +22,23 @@ import {
   Calendar,
   ArrowRight,
   X,
+  Upload,
+  Trash2,
+  Image,
+  File,
+  Eye,
+  Pencil,
 } from "lucide-react";
 
 // Types
+interface PieceJointe {
+  id: string;
+  filename: string;
+  url: string;
+  type: string;
+  uploadedAt: string;
+}
+
 interface Reclamation {
   id: string;
   dateReclamation: string;
@@ -48,6 +62,7 @@ interface Reclamation {
   session: { id: string; reference: string; nom: string | null } | null;
   apprenant: { id: string; nom: string; prenom: string; email: string } | null;
   amelioration: { id: string; titre: string; statut: string } | null;
+  piecesJointes: PieceJointe[] | null;
   createdAt: string;
 }
 
@@ -65,20 +80,36 @@ const STATUT_CONFIG: Record<string, { label: string; color: string; icon: React.
 };
 
 const ORIGINE_CONFIG: Record<string, { label: string; icon: React.ReactNode }> = {
+  SESSION_FORMATION: { label: "Session de formation", icon: <Calendar size={14} /> },
+  ESPACE_APPRENANT: { label: "Espace apprenant", icon: <User size={14} /> },
+  ESPACE_INTERVENANT: { label: "Espace intervenant", icon: <User size={14} /> },
+  DOCUMENTS: { label: "Documents", icon: <FileText size={14} /> },
+  CATALOGUE: { label: "Catalogue en ligne", icon: <Building2 size={14} /> },
+  EVALUATION: { label: "Évaluation", icon: <MessageCircle size={14} /> },
+  LMS: { label: "LMS", icon: <MessageCircle size={14} /> },
+  SIGNATURE: { label: "Signature électronique", icon: <FileText size={14} /> },
+  FACTURATION: { label: "Facturation", icon: <FileText size={14} /> },
+  SUPPORT: { label: "Support", icon: <MessageCircle size={14} /> },
   EMAIL: { label: "Email", icon: <Mail size={14} /> },
   TELEPHONE: { label: "Téléphone", icon: <Phone size={14} /> },
-  COURRIER: { label: "Courrier", icon: <FileText size={14} /> },
-  FORMULAIRE: { label: "Formulaire", icon: <MessageCircle size={14} /> },
+  SMS: { label: "SMS", icon: <Phone size={14} /> },
+  SITE_WEB: { label: "Site web", icon: <Building2 size={14} /> },
+  RESEAUX_SOCIAUX: { label: "Réseaux sociaux", icon: <MessageCircle size={14} /> },
+  AVIS_EN_LIGNE: { label: "Avis en ligne", icon: <MessageCircle size={14} /> },
+  SUR_PLACE: { label: "Sur place (locaux)", icon: <Building2 size={14} /> },
   AUTRE: { label: "Autre", icon: <MessageSquareWarning size={14} /> },
 };
 
 const CATEGORIE_OPTIONS = [
   { value: "PEDAGOGIE", label: "Pédagogie" },
   { value: "ORGANISATION", label: "Organisation" },
-  { value: "ADMINISTRATIF", label: "Administratif" },
-  { value: "TECHNIQUE", label: "Technique" },
   { value: "INTERVENANT", label: "Intervenant" },
+  { value: "LOGISTIQUE", label: "Logistique" },
+  { value: "TECHNIQUE", label: "Technique" },
+  { value: "ADMINISTRATIF", label: "Administratif" },
+  { value: "FINANCEMENT", label: "Financement" },
   { value: "ACCESSIBILITE", label: "Accessibilité" },
+  { value: "DONNEES", label: "Données" },
   { value: "AUTRE", label: "Autre" },
 ];
 
@@ -90,6 +121,8 @@ export default function ReclamationsPage() {
   const [filterStatut, setFilterStatut] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewForm, setShowNewForm] = useState(false);
+  const [editingReclamation, setEditingReclamation] = useState<Reclamation | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Fetch reclamations
   const fetchReclamations = useCallback(async () => {
@@ -154,6 +187,33 @@ export default function ReclamationsPage() {
     } catch (error) {
       console.error("Erreur mise à jour statut:", error);
     }
+  };
+
+  // Delete reclamation
+  const handleDelete = async (id: string) => {
+    try {
+      setDeleting(true);
+      const res = await fetch(`/api/outils/reclamations/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setSelectedReclamation(null);
+        fetchReclamations();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la suppression");
+      }
+    } catch (error) {
+      console.error("Erreur suppression:", error);
+      alert("Erreur lors de la suppression");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Edit reclamation
+  const handleEdit = (reclamation: Reclamation) => {
+    setEditingReclamation(reclamation);
   };
 
   return (
@@ -251,7 +311,6 @@ export default function ReclamationsPage() {
             <div className="space-y-3">
               {filteredReclamations.map((reclamation) => {
                 const statutConfig = STATUT_CONFIG[reclamation.statut];
-                const origineConfig = ORIGINE_CONFIG[reclamation.origine];
 
                 return (
                   <div
@@ -270,10 +329,6 @@ export default function ReclamationsPage() {
                             {statutConfig.icon}
                             {statutConfig.label}
                           </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                            {origineConfig.icon}
-                            {origineConfig.label}
-                          </span>
                         </div>
                         <h3 className="font-medium text-gray-900 dark:text-white mb-1 line-clamp-1">
                           {reclamation.objet}
@@ -290,10 +345,10 @@ export default function ReclamationsPage() {
                             <Calendar size={12} />
                             {formatDate(reclamation.dateReclamation)}
                           </span>
-                          {reclamation.formation && (
+                          {reclamation.session && (
                             <span className="flex items-center gap-1">
                               <Building2 size={12} />
-                              {reclamation.formation.titre}
+                              {reclamation.session.reference}
                             </span>
                           )}
                         </div>
@@ -314,6 +369,8 @@ export default function ReclamationsPage() {
             onClose={() => setSelectedReclamation(null)}
             onUpdateStatut={updateStatut}
             onRefresh={fetchReclamations}
+            onDelete={handleDelete}
+            onEdit={handleEdit}
           />
         )}
       </div>
@@ -328,6 +385,25 @@ export default function ReclamationsPage() {
           }}
         />
       )}
+
+      {/* Modal modification réclamation */}
+      {editingReclamation && (
+        <EditReclamationModal
+          reclamation={editingReclamation}
+          onClose={() => setEditingReclamation(null)}
+          onUpdated={() => {
+            setEditingReclamation(null);
+            fetchReclamations();
+            // Rafraîchir la réclamation sélectionnée si c'est la même
+            if (selectedReclamation?.id === editingReclamation.id) {
+              fetch(`/api/outils/reclamations/${editingReclamation.id}`)
+                .then(res => res.json())
+                .then(data => setSelectedReclamation(data))
+                .catch(console.error);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -338,11 +414,15 @@ function ReclamationDetail({
   onClose,
   onUpdateStatut,
   onRefresh,
+  onDelete,
+  onEdit,
 }: {
   reclamation: Reclamation;
   onClose: () => void;
   onUpdateStatut: (id: string, statut: string) => void;
   onRefresh: () => void;
+  onDelete: (id: string) => void;
+  onEdit: (reclamation: Reclamation) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -351,8 +431,74 @@ function ReclamationDetail({
     retourClient: reclamation.retourClient || "",
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingPreuve, setUploadingPreuve] = useState(false);
+  const [deletingPreuveId, setDeletingPreuveId] = useState<string | null>(null);
+
+  // Réinitialiser formData quand la réclamation change
+  useEffect(() => {
+    setFormData({
+      analyse: reclamation.analyse || "",
+      actionsCorrectives: reclamation.actionsCorrectives || "",
+      retourClient: reclamation.retourClient || "",
+    });
+    setEditing(false);
+  }, [reclamation.id, reclamation.analyse, reclamation.actionsCorrectives, reclamation.retourClient]);
 
   const statutConfig = STATUT_CONFIG[reclamation.statut];
+
+  // Upload d'une preuve
+  const handleUploadPreuve = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingPreuve(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/outils/reclamations/${reclamation.id}/preuves`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        onRefresh();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de l'upload");
+      }
+    } catch (error) {
+      console.error("Erreur upload preuve:", error);
+      alert("Erreur lors de l'upload");
+    } finally {
+      setUploadingPreuve(false);
+      e.target.value = "";
+    }
+  };
+
+  // Supprimer une preuve
+  const handleDeletePreuve = async (pieceId: string) => {
+    if (!confirm("Supprimer cette pièce jointe ?")) return;
+
+    try {
+      setDeletingPreuveId(pieceId);
+      const res = await fetch(`/api/outils/reclamations/${reclamation.id}/preuves?pieceId=${pieceId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        onRefresh();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la suppression");
+      }
+    } catch (error) {
+      console.error("Erreur suppression preuve:", error);
+      alert("Erreur lors de la suppression");
+    } finally {
+      setDeletingPreuveId(null);
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -393,12 +539,32 @@ function ReclamationDetail({
             {statutConfig.label}
           </span>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-        >
-          <X size={20} className="text-gray-400" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onEdit(reclamation)}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title="Modifier la réclamation"
+          >
+            <Pencil size={18} className="text-gray-500" />
+          </button>
+          <button
+            onClick={() => {
+              if (confirm("Êtes-vous sûr de vouloir supprimer cette réclamation ?")) {
+                onDelete(reclamation.id);
+              }
+            }}
+            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+            title="Supprimer la réclamation"
+          >
+            <Trash2 size={18} className="text-red-500" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
       </div>
 
       <div className="p-6 space-y-6">
@@ -412,9 +578,9 @@ function ReclamationDetail({
           </p>
         </div>
 
-        {/* Infos plaignant */}
+        {/* Infos personne concernée */}
         <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl space-y-3">
-          <h3 className="font-medium text-gray-900 dark:text-white">Plaignant</h3>
+          <h3 className="font-medium text-gray-900 dark:text-white">Personne concernée</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-gray-500">Nom</span>
@@ -436,6 +602,25 @@ function ReclamationDetail({
               <span className="text-gray-500">Date réclamation</span>
               <p className="font-medium text-gray-900 dark:text-white">{formatDate(reclamation.dateReclamation)}</p>
             </div>
+          </div>
+        </div>
+
+        {/* Origine et Catégorie */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+            <span className="text-sm text-gray-500">Origine</span>
+            <div className="flex items-center gap-2 mt-1">
+              {ORIGINE_CONFIG[reclamation.origine]?.icon}
+              <p className="font-medium text-gray-900 dark:text-white">
+                {ORIGINE_CONFIG[reclamation.origine]?.label || reclamation.origine}
+              </p>
+            </div>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+            <span className="text-sm text-gray-500">Catégorie</span>
+            <p className="font-medium text-gray-900 dark:text-white mt-1">
+              {CATEGORIE_OPTIONS.find(c => c.value === reclamation.categorie)?.label || reclamation.categorie}
+            </p>
           </div>
         </div>
 
@@ -586,9 +771,95 @@ function ReclamationDetail({
             </p>
           </div>
         )}
+
+        {/* Section Preuves */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-gray-900 dark:text-white">Preuves / Pièces jointes</h3>
+            <label className="flex items-center gap-2 px-3 py-1.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 cursor-pointer text-sm transition-colors">
+              {uploadingPreuve ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Upload size={16} />
+              )}
+              Ajouter
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                onChange={handleUploadPreuve}
+                disabled={uploadingPreuve}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {reclamation.piecesJointes && reclamation.piecesJointes.length > 0 ? (
+            <div className="space-y-2">
+              {reclamation.piecesJointes.map((piece) => (
+                <div
+                  key={piece.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {piece.type.startsWith("image/") ? (
+                      <Image size={20} className="text-blue-500 flex-shrink-0" />
+                    ) : (
+                      <File size={20} className="text-red-500 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {piece.filename}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(piece.uploadedAt).toLocaleDateString("fr-FR")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <a
+                      href={piece.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      title="Voir"
+                    >
+                      <Eye size={16} className="text-gray-500" />
+                    </a>
+                    <button
+                      onClick={() => handleDeletePreuve(piece.id)}
+                      disabled={deletingPreuveId === piece.id}
+                      className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                      title="Supprimer"
+                    >
+                      {deletingPreuveId === piece.id ? (
+                        <Loader2 size={16} className="animate-spin text-red-500" />
+                      ) : (
+                        <Trash2 size={16} className="text-red-500" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center bg-gray-50 dark:bg-gray-900 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700">
+              <File size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+              <p className="text-sm text-gray-400">Aucune pièce jointe</p>
+              <p className="text-xs text-gray-400 mt-1">PDF et images acceptés (max 10 MB)</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+}
+
+// Types pour les sessions
+interface Session {
+  id: string;
+  reference: string;
+  nom: string | null;
+  formation?: { titre: string } | null;
 }
 
 // Modal nouvelle réclamation
@@ -604,12 +875,35 @@ function NewReclamationModal({
     emailPlaignant: "",
     telephonePlaignant: "",
     typePlaignant: "apprenant",
-    origine: "EMAIL",
+    origine: "SESSION_FORMATION",
     categorie: "AUTRE",
     objet: "",
     description: "",
+    sessionId: "",
   });
   const [saving, setSaving] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+
+  // Charger les sessions au montage
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const res = await fetch("/api/training-sessions");
+        if (res.ok) {
+          const data = await res.json();
+          // L'API retourne { data: [...], pagination: {...} }
+          const sessionsArray = Array.isArray(data) ? data : (data.data || data.sessions || []);
+          setSessions(sessionsArray);
+        }
+      } catch (error) {
+        console.error("Erreur chargement sessions:", error);
+      } finally {
+        setLoadingSessions(false);
+      }
+    };
+    fetchSessions();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -649,7 +943,7 @@ function NewReclamationModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Nom du plaignant *
+                Nom et prénom de la personne concernée *
               </label>
               <input
                 type="text"
@@ -693,11 +987,9 @@ function NewReclamationModal({
                 onChange={(e) => setFormData({ ...formData, origine: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
-                <option value="EMAIL">Email</option>
-                <option value="TELEPHONE">Téléphone</option>
-                <option value="COURRIER">Courrier</option>
-                <option value="FORMULAIRE">Formulaire</option>
-                <option value="AUTRE">Autre</option>
+                {Object.entries(ORIGINE_CONFIG).map(([value, config]) => (
+                  <option key={value} value={value}>{config.label}</option>
+                ))}
               </select>
             </div>
 
@@ -718,6 +1010,28 @@ function NewReclamationModal({
 
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Session concernée
+              </label>
+              <select
+                value={formData.sessionId}
+                onChange={(e) => setFormData({ ...formData, sessionId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">-- Aucune session --</option>
+                {loadingSessions ? (
+                  <option disabled>Chargement...</option>
+                ) : (
+                  sessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.reference} {session.nom ? `- ${session.nom}` : ""} {session.formation?.titre ? `(${session.formation.titre})` : ""}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Objet de la réclamation *
               </label>
               <input
@@ -726,7 +1040,7 @@ function NewReclamationModal({
                 value={formData.objet}
                 onChange={(e) => setFormData({ ...formData, objet: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                placeholder="Résumé court de la réclamation"
+                placeholder="Ex. : Problème d'accès à la classe virtuelle / Document manquant / Report de session…"
               />
             </div>
 
@@ -740,7 +1054,7 @@ function NewReclamationModal({
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                placeholder="Décrivez en détail le problème rencontré..."
+                placeholder="Décrivez précisément le problème rencontré (contexte, personnes concernées…)"
               />
             </div>
           </div>
@@ -759,6 +1073,231 @@ function NewReclamationModal({
               className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50"
             >
               {saving ? "Création..." : "Créer la réclamation"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Modal modification réclamation
+function EditReclamationModal({
+  reclamation,
+  onClose,
+  onUpdated,
+}: {
+  reclamation: Reclamation;
+  onClose: () => void;
+  onUpdated: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    nomPlaignant: reclamation.nomPlaignant,
+    emailPlaignant: reclamation.emailPlaignant || "",
+    telephonePlaignant: reclamation.telephonePlaignant || "",
+    origine: reclamation.origine,
+    categorie: reclamation.categorie,
+    objet: reclamation.objet,
+    description: reclamation.description,
+    sessionId: reclamation.session?.id || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+
+  // Charger les sessions au montage
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const res = await fetch("/api/training-sessions");
+        if (res.ok) {
+          const data = await res.json();
+          // L'API retourne { data: [...], pagination: {...} }
+          const sessionsArray = Array.isArray(data) ? data : (data.data || data.sessions || []);
+          setSessions(sessionsArray);
+        }
+      } catch (error) {
+        console.error("Erreur chargement sessions:", error);
+      } finally {
+        setLoadingSessions(false);
+      }
+    };
+    fetchSessions();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const res = await fetch(`/api/outils/reclamations/${reclamation.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          sessionId: formData.sessionId || null,
+        }),
+      });
+      if (res.ok) {
+        onUpdated();
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la mise à jour");
+      }
+    } catch (error) {
+      console.error("Erreur mise à jour:", error);
+      alert("Erreur lors de la mise à jour");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+            Modifier la réclamation
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+          >
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Nom et prénom de la personne concernée *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.nomPlaignant}
+                onChange={(e) => setFormData({ ...formData, nomPlaignant: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={formData.emailPlaignant}
+                onChange={(e) => setFormData({ ...formData, emailPlaignant: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Téléphone
+              </label>
+              <input
+                type="tel"
+                value={formData.telephonePlaignant}
+                onChange={(e) => setFormData({ ...formData, telephonePlaignant: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Origine
+              </label>
+              <select
+                value={formData.origine}
+                onChange={(e) => setFormData({ ...formData, origine: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                {Object.entries(ORIGINE_CONFIG).map(([value, config]) => (
+                  <option key={value} value={value}>{config.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Catégorie
+              </label>
+              <select
+                value={formData.categorie}
+                onChange={(e) => setFormData({ ...formData, categorie: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                {CATEGORIE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Session concernée
+              </label>
+              <select
+                value={formData.sessionId}
+                onChange={(e) => setFormData({ ...formData, sessionId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">-- Aucune session --</option>
+                {loadingSessions ? (
+                  <option disabled>Chargement...</option>
+                ) : (
+                  sessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.reference} {session.nom ? `- ${session.nom}` : ""} {session.formation?.titre ? `(${session.formation.titre})` : ""}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Objet de la réclamation *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.objet}
+                onChange={(e) => setFormData({ ...formData, objet: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Description détaillée *
+              </label>
+              <textarea
+                required
+                rows={4}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50"
+            >
+              {saving ? "Enregistrement..." : "Enregistrer les modifications"}
             </button>
           </div>
         </form>

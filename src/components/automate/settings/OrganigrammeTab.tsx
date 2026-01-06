@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import Image from "next/image";
 
 // Types
 interface OrganigrammePoste {
@@ -288,7 +287,6 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
     setFormData(prev => ({
       ...prev,
       type,
-      titre: prev.titre || POSTE_LABELS[type],
       niveau: autoNiveau,
     }));
   };
@@ -375,11 +373,11 @@ function PosteModal({ isOpen, onClose, onSave, poste, intervenants, postes, orga
                 {formData.photo ? (
                   <div className="relative">
                     <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700">
-                      <Image
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={formData.photo}
                         alt="Photo de profil"
-                        fill
-                        className="object-cover"
+                        className="w-full h-full object-cover"
                       />
                     </div>
                     <button
@@ -584,15 +582,14 @@ function PyramidCard({ poste, onEdit, onDelete, isFirst, isDragging, dragHandleP
             <div className={`
               w-16 h-16 rounded-full flex items-center justify-center
               bg-gradient-to-br ${colors.gradient} text-white shadow-lg
-              ring-4 ring-white dark:ring-gray-800
+              ring-4 ring-white dark:ring-gray-800 overflow-hidden
             `}>
               {poste.photo ? (
-                <Image
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
                   src={poste.photo}
                   alt={`${poste.prenom} ${poste.nom}`}
-                  width={64}
-                  height={64}
-                  className="rounded-full object-cover"
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="text-xl font-bold">
@@ -771,7 +768,7 @@ export default function OrganigrammeTab() {
     }
   };
 
-  // Export PDF pyramide
+  // Export PDF pyramide - UNIPAGE (tout sur une seule page A4 paysage)
   const handleExportPDF = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -785,13 +782,42 @@ export default function OrganigrammeTab() {
 
     const levels = Object.keys(postesByLevel).map(Number).sort((a, b) => a - b);
 
+    // Calculer la taille dynamique des cartes selon le nombre total de postes
+    const totalPostes = postes.length;
+    const maxPostesPerLevel = Math.max(...levels.map(l => postesByLevel[l].length));
+
+    // Ajuster les tailles selon le nombre de postes pour tenir sur une page
+    let cardWidth = 140;
+    let cardPadding = 12;
+    let avatarSize = 45;
+    let fontSize = { badge: 7, name: 11, title: 9, contact: 8 };
+    let levelGap = 18;
+
+    if (totalPostes > 10 || maxPostesPerLevel > 4) {
+      cardWidth = 110;
+      cardPadding = 8;
+      avatarSize = 35;
+      fontSize = { badge: 6, name: 9, title: 8, contact: 7 };
+      levelGap = 12;
+    }
+    if (totalPostes > 15 || maxPostesPerLevel > 6) {
+      cardWidth = 90;
+      cardPadding = 6;
+      avatarSize = 28;
+      fontSize = { badge: 5, name: 8, title: 7, contact: 6 };
+      levelGap = 8;
+    }
+
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <title>Organigramme</title>
         <style>
-          @page { size: A4 landscape; margin: 15mm; }
+          @page {
+            size: A4 landscape;
+            margin: 10mm;
+          }
           * {
             box-sizing: border-box;
             margin: 0;
@@ -800,58 +826,62 @@ export default function OrganigrammeTab() {
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
+          html, body {
+            width: 297mm;
+            height: 210mm;
+            overflow: hidden;
+          }
           body {
             font-family: 'Segoe UI', Arial, sans-serif;
-            padding: 30px;
+            padding: 15px;
             background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%) !important;
-            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           h1 {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 15px;
             color: #1a1a2e;
-            font-size: 26px;
+            font-size: 20px;
             font-weight: 700;
+            flex-shrink: 0;
           }
           .pyramid {
+            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 25px;
+            justify-content: center;
+            gap: ${levelGap}px;
           }
           .level {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 10px;
             position: relative;
-            page-break-inside: avoid;
-            break-inside: avoid;
           }
           .level::before {
             content: '';
             position: absolute;
-            top: -12px;
+            top: -${levelGap / 2 + 2}px;
             left: 50%;
             transform: translateX(-50%);
             width: 2px;
-            height: 12px;
+            height: ${levelGap / 2}px;
             background: #cbd5e1 !important;
           }
           .level:first-child::before { display: none; }
           .card {
             background: white !important;
-            border-radius: 16px;
-            padding: 18px;
+            border-radius: 12px;
+            padding: ${cardPadding}px;
             text-align: center;
-            min-width: 150px;
-            max-width: 180px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: ${cardWidth}px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             position: relative;
             overflow: hidden;
-            page-break-inside: avoid;
-            break-inside: avoid;
           }
           .card::before {
             content: '';
@@ -859,7 +889,7 @@ export default function OrganigrammeTab() {
             top: 0;
             left: 0;
             right: 0;
-            height: 4px;
+            height: 3px;
           }
           .card.DIRIGEANT::before { background: linear-gradient(90deg, #9333ea, #a855f7) !important; }
           .card.REFERENT_HANDICAP::before { background: linear-gradient(90deg, #3b82f6, #60a5fa) !important; }
@@ -868,16 +898,16 @@ export default function OrganigrammeTab() {
           .card.FORMATEUR::before { background: linear-gradient(90deg, #06b6d4, #22d3ee) !important; }
           .card.ADMINISTRATIF::before, .card.AUTRE::before { background: linear-gradient(90deg, #64748b, #94a3b8) !important; }
           .avatar {
-            width: 55px;
-            height: 55px;
+            width: ${avatarSize}px;
+            height: ${avatarSize}px;
             border-radius: 50%;
-            margin: 0 auto 10px;
+            margin: 0 auto 6px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white !important;
             font-weight: bold;
-            font-size: 16px;
+            font-size: ${avatarSize * 0.35}px;
             overflow: hidden;
           }
           .avatar img {
@@ -892,13 +922,13 @@ export default function OrganigrammeTab() {
           .avatar.FORMATEUR { background: linear-gradient(135deg, #06b6d4, #22d3ee) !important; }
           .avatar.ADMINISTRATIF, .avatar.AUTRE { background: linear-gradient(135deg, #64748b, #94a3b8) !important; }
           .badge {
-            font-size: 8px;
+            font-size: ${fontSize.badge}px;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 3px 8px;
-            border-radius: 10px;
-            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            margin-bottom: 4px;
             display: inline-block;
           }
           .badge.DIRIGEANT { background: #faf5ff !important; color: #9333ea !important; }
@@ -907,17 +937,21 @@ export default function OrganigrammeTab() {
           .badge.REFERENT_QUALITE { background: #fffbeb !important; color: #f59e0b !important; }
           .badge.FORMATEUR { background: #ecfeff !important; color: #06b6d4 !important; }
           .badge.ADMINISTRATIF, .badge.AUTRE { background: #f1f5f9 !important; color: #64748b !important; }
-          .name { font-weight: 700; font-size: 13px; color: #1a1a2e !important; }
-          .title { font-size: 10px; color: #64748b !important; margin-top: 3px; }
-          .contact { font-size: 9px; color: #94a3b8 !important; margin-top: 6px; }
+          .name { font-weight: 700; font-size: ${fontSize.name}px; color: #1a1a2e !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          .title { font-size: ${fontSize.title}px; color: #64748b !important; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          .contact { font-size: ${fontSize.contact}px; color: #94a3b8 !important; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
           .footer {
             text-align: center;
-            margin-top: 40px;
-            font-size: 10px;
+            margin-top: 10px;
+            font-size: 8px;
             color: #94a3b8 !important;
-            page-break-before: avoid;
+            flex-shrink: 0;
           }
           @media print {
+            html, body {
+              width: 297mm;
+              height: 210mm;
+            }
             body { background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%) !important; }
             .card, .avatar, .badge { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           }
@@ -1052,7 +1086,7 @@ export default function OrganigrammeTab() {
           className="relative p-8 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-2xl overflow-hidden"
         >
           {/* Background decoratif */}
-          <div className="absolute inset-0 opacity-30">
+          <div className="absolute inset-0 opacity-30 pointer-events-none">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-brand-200/20 to-transparent rounded-full" />
           </div>
 
@@ -1099,18 +1133,17 @@ export default function OrganigrammeTab() {
             })}
           </div>
 
-          {/* Bouton ajouter dans un niveau vide */}
-          {levels.length > 0 && levels.length < 4 && (
-            <div className="flex justify-center mt-8">
-              <button
-                onClick={openCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-brand-400 hover:text-brand-600 transition-colors"
-              >
-                <PlusIcon />
-                Ajouter un poste
-              </button>
-            </div>
-          )}
+          {/* Bouton ajouter un poste */}
+          <div className="relative z-10 flex justify-center mt-8">
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-500 bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-brand-400 hover:text-brand-600 transition-colors cursor-pointer"
+            >
+              <PlusIcon />
+              Ajouter un poste
+            </button>
+          </div>
         </div>
       )}
 

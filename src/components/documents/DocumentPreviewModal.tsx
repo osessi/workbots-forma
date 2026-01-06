@@ -342,7 +342,8 @@ export default function DocumentPreviewModal({
           h1 { font-size: 18pt; font-weight: 700; color: #111; margin: 0 0 16px 0; text-transform: uppercase; }
           h2 { font-size: 13pt; font-weight: 700; color: #222; margin: 24px 0 12px 0; border-bottom: 1px solid #e5e5e5; padding-bottom: 6px; }
           h3, h4 { font-size: 11pt; font-weight: 700; color: #333; margin: 16px 0 8px 0; }
-          p { margin: 0 0 10px 0; text-align: justify; }
+          p { margin: 0; padding: 0; min-height: 1.2em; text-align: justify; }
+          p:empty { min-height: 1.2em; }
           ul, ol { margin: 10px 0; padding-left: 25px; }
           li { margin: 4px 0; }
           strong { font-weight: 700; }
@@ -447,7 +448,8 @@ export default function DocumentPreviewModal({
           h1 { font-size: 18pt; font-weight: bold; color: #111; margin: 0 0 16px 0; text-transform: uppercase; }
           h2 { font-size: 13pt; font-weight: bold; color: #222; margin: 24px 0 12px 0; border-bottom: 1px solid #e5e5e5; padding-bottom: 6px; }
           h3, h4 { font-size: 11pt; font-weight: bold; color: #333; margin: 16px 0 8px 0; }
-          p { margin: 0 0 10px 0; text-align: justify; }
+          p { margin: 0; padding: 0; min-height: 1.2em; text-align: justify; }
+          p:empty { min-height: 1.2em; }
           ul, ol { margin: 10px 0; padding-left: 25px; }
           li { margin: 4px 0; }
           strong { font-weight: bold; }
@@ -757,11 +759,21 @@ export default function DocumentPreviewModal({
                       margin: 16px 0 8px 0;
                     }
                     .document-preview p {
-                      margin: 0 0 10px 0;
+                      margin: 0;
+                      padding: 0;
+                      min-height: 1.2em;
                       text-align: justify;
+                    }
+                    .document-preview p:not(:last-child) {
+                      margin-bottom: 0;
                     }
                     .document-preview p[style*="text-align: center"] {
                       text-align: center !important;
+                    }
+                    /* Préserver les espacements/sauts de ligne */
+                    .document-preview p:empty,
+                    .document-preview p:only-child:empty {
+                      min-height: 1.2em;
                     }
                     .document-preview hr {
                       border: none;

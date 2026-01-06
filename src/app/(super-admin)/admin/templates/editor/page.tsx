@@ -470,6 +470,12 @@ export default function TemplateEditorPage() {
           img { max-width: 100%; height: auto; }
           table { border-collapse: collapse; width: 100%; }
           td, th { border: 1px solid #ddd; padding: 8px; }
+          /* Styles pour les paragraphes - préserver les espacements */
+          p { margin: 0; padding: 0; min-height: 1.2em; }
+          p:empty { min-height: 1.2em; }
+          h1 { font-size: 18pt; font-weight: 700; margin: 0 0 16px 0; }
+          h2 { font-size: 14pt; font-weight: 700; margin: 20px 0 10px 0; }
+          h3, h4 { font-size: 12pt; font-weight: 700; margin: 16px 0 8px 0; }
           /* Saut de page pour l'impression */
           .page-break {
             display: block;
@@ -523,6 +529,12 @@ export default function TemplateEditorPage() {
           img { max-width: 100%; }
           table { border-collapse: collapse; width: 100%; }
           td, th { border: 1px solid #ccc; padding: 8px; }
+          /* Styles pour les paragraphes - préserver les espacements */
+          p { margin: 0; padding: 0; min-height: 1.2em; }
+          p:empty { min-height: 1.2em; }
+          h1 { font-size: 18pt; font-weight: bold; margin: 0 0 16px 0; }
+          h2 { font-size: 14pt; font-weight: bold; margin: 20px 0 10px 0; }
+          h3, h4 { font-size: 12pt; font-weight: bold; margin: 16px 0 8px 0; }
         </style>
       </head>
       <body>
@@ -743,11 +755,21 @@ export default function TemplateEditorPage() {
               margin: 16px 0 8px 0;
             }
             .document-preview-content p {
-              margin: 0 0 10px 0;
+              margin: 0;
+              padding: 0;
+              min-height: 1.2em;
               text-align: justify;
+            }
+            .document-preview-content p:not(:last-child) {
+              margin-bottom: 0;
             }
             .document-preview-content p[style*="text-align: center"] {
               text-align: center !important;
+            }
+            /* Préserver les espacements/sauts de ligne */
+            .document-preview-content p:empty,
+            .document-preview-content p:only-child:empty {
+              min-height: 1.2em;
             }
             .document-preview-content hr {
               border: none;

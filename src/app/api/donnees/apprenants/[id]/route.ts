@@ -141,6 +141,7 @@ export async function PUT(
       ville,
       pays,
       statut,
+      situationActuelle,
       entrepriseId,
       notes,
     } = body;
@@ -172,6 +173,7 @@ export async function PUT(
         ville,
         pays: pays || "France",
         statut,
+        situationActuelle: statut === "PARTICULIER" ? situationActuelle : null,
         entrepriseId: statut === "SALARIE" ? entrepriseId : null,
         notes,
       },

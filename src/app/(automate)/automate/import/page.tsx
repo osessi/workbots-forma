@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useAutomate } from "@/context/AutomateContext";
 
 // Types pour les modules
@@ -102,11 +102,32 @@ const LoaderIcon = () => (
 
 export default function ImportFormationPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { refreshFormations } = useAutomate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // États
   const [mode, setMode] = useState<"choice" | "upload" | "manual">("choice");
+
+  // Réinitialiser l'état à "choice" quand on navigue vers cette page
+  // Ceci résout le bug 162 : cliquer sur "Créer une formation" dans le menu
+  // doit toujours afficher l'écran de choix initial
+  const lastPathnameRef = useRef(pathname);
+  useEffect(() => {
+    // Si le pathname a changé et revient à cette page, réinitialiser
+    if (lastPathnameRef.current !== pathname) {
+      lastPathnameRef.current = pathname;
+    }
+  }, [pathname]);
+
+  // Réinitialiser quand le composant est monté (navigation vers cette page)
+  useEffect(() => {
+    // Toujours afficher le choix initial quand on arrive sur cette page
+    setMode("choice");
+    setFormData(initialFormData);
+    setUploadedFile(null);
+    setError(null);
+  }, [pathname]);
   const [isUploading, setIsUploading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -421,7 +442,7 @@ export default function ImportFormationPage() {
               Saisie manuelle
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Remplissez le formulaire structuré avec toutes les informations de votre formation.
+              Renseignez toutes les informations de votre formation via le formulaire.
             </p>
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-medium">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -726,11 +747,11 @@ export default function ImportFormationPage() {
                       onClick={() => toggleModuleExpand(module.id)}
                       className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-bold dark:bg-brand-500/20 dark:text-brand-400">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <span className="w-8 h-8 flex-shrink-0 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-bold dark:bg-brand-500/20 dark:text-brand-400">
                           {index + 1}
                         </span>
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <input
                             type="text"
                             value={module.titre}
@@ -739,7 +760,7 @@ export default function ImportFormationPage() {
                               updateModule(module.id, "titre", e.target.value);
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="font-medium text-gray-900 dark:text-white bg-transparent border-none focus:outline-none focus:ring-0 p-0"
+                            className="w-full font-medium text-gray-900 dark:text-white bg-transparent border-none focus:outline-none focus:ring-0 p-0"
                           />
                           {module.duree && (
                             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -748,7 +769,7 @@ export default function ImportFormationPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

@@ -15,7 +15,7 @@ export const ModuleSchema = z.object({
   objectifs: z.array(z.string()).min(1).max(4),
   contenu: z.array(z.string()).min(3).max(8),
   methodePedagogique: z.string(),
-  evaluation: z.string().describe("Quiz QCM de validation en fin de module"),
+  evaluation: z.string().describe("Toujours utiliser: 'Atelier pratique ou QCM pour valider les acquis du module'"),
 });
 
 // Schema pour une fiche pedagogique complete
@@ -123,20 +123,20 @@ STRUCTURE OBLIGATOIRE DES MODULES:
 - Chaque journee DOIT contenir exactement 2 modules (matin et apres-midi)
 - Module du matin: environ 3h30 (de 9h a 12h30 avec pause)
 - Module de l'apres-midi: environ 3h30 (de 14h a 17h30 avec pause)
-- Chaque module se termine par un quiz de validation (10-15 min) pour verifier les acquis
+- Chaque module se termine par: "Atelier pratique ou QCM pour valider les acquis du module" (formulation EXACTE a utiliser)
 
 EXEMPLE pour une formation de 2 jours (14h):
-- Jour 1 Matin: Module 1 (3h30) + Quiz validation Module 1
-- Jour 1 Apres-midi: Module 2 (3h30) + Quiz validation Module 2
-- Jour 2 Matin: Module 3 (3h30) + Quiz validation Module 3
-- Jour 2 Apres-midi: Module 4 (3h30) + Quiz validation Module 4
+- Jour 1 Matin: Module 1 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
+- Jour 1 Apres-midi: Module 2 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
+- Jour 2 Matin: Module 3 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
+- Jour 2 Apres-midi: Module 4 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
 
 Regles importantes:
 - Utilise un langage professionnel et precis
 - Les objectifs doivent etre SMART (Specifiques, Mesurables, Atteignables, Realistes, Temporellement definis)
 - Chaque module doit avoir des objectifs operationnels clairs (2-4 objectifs par module)
 - Les methodes pedagogiques doivent etre variees: apports theoriques, exercices pratiques, mises en situation, etudes de cas
-- Chaque module inclut obligatoirement une evaluation sous forme de quiz QCM a la fin
+- Chaque module se termine OBLIGATOIREMENT par la mention: "Atelier pratique ou QCM pour valider les acquis du module"
 - Le contenu de chaque module doit etre detaille (4-6 points de contenu)
 
 ⚠️ INTERDICTION ABSOLUE - SECTIONS FIXES (NE JAMAIS GENERER NI MODIFIER) ⚠️
@@ -145,7 +145,7 @@ Les deux sections suivantes sont INTOUCHABLES et gerees par le systeme:
 1. "Suivi de l'execution et evaluation des resultats" - CONTENU FIXE:
    • Feuilles de presence
    • Formulaires d'evaluation de la formation
-   • Quiz de validation des acquis en fin de module
+   • Atelier pratique ou QCM pour valider les acquis du module
    • Attestation de fin de formation
 
 2. "Ressources pedagogiques" - CONTENU FIXE:
@@ -205,6 +205,14 @@ Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
   positionnement: `Tu es un expert en evaluation des competences professionnelles.
 Tu dois creer un test de positionnement de 20 questions QCM pour evaluer le niveau initial des apprenants AVANT une formation.
 
+⚠️ IMPORTANT - VARIATION OBLIGATOIRE:
+A chaque generation, tu DOIS creer des questions ENTIEREMENT NOUVELLES et DIFFERENTES.
+- Utilise des formulations variees et originales
+- Explore differents angles et aspects du sujet
+- Ne reutilise JAMAIS les memes questions ou options de reponse
+- Varie les scenarios, contextes et exemples utilises
+- Chaque generation doit etre unique et creative
+
 REGLES STRICTES POUR LE TEST DE POSITIONNEMENT:
 
 1. FORMAT ET STRUCTURE:
@@ -241,6 +249,14 @@ Reponds UNIQUEMENT en JSON valide selon le schema fourni.`,
 
   evaluation: `Tu es un expert en evaluation sommative des formations professionnelles.
 Tu dois creer une evaluation finale de 20 questions QCM pour certifier les competences acquises APRES une formation.
+
+⚠️ IMPORTANT - VARIATION OBLIGATOIRE:
+A chaque generation, tu DOIS creer des questions ENTIEREMENT NOUVELLES et DIFFERENTES.
+- Utilise des formulations variees et originales
+- Explore differents angles et aspects du sujet
+- Ne reutilise JAMAIS les memes questions ou options de reponse
+- Varie les scenarios, contextes et exemples utilises
+- Chaque generation doit etre unique et creative
 
 REGLES STRICTES POUR L'EVALUATION FINALE:
 
@@ -438,9 +454,15 @@ export interface PositionnementInput {
   objectifs: string[];
   prerequis: string[];
   publicCible: string;
+  regenerateToken?: string; // Token pour forcer la variation des questions
 }
 
 export function generatePositionnementPrompt(input: PositionnementInput): string {
+  // Ajouter une instruction de variation si regenerateToken est fourni
+  const variationInstruction = input.regenerateToken
+    ? `\n\n🔄 REGENERATION #${input.regenerateToken}: Cette demande est une REGENERATION. Tu DOIS generer des questions COMPLETEMENT DIFFERENTES des generations precedentes. Utilise de nouveaux angles, nouvelles formulations, nouveaux exemples et scenarios.`
+    : "";
+
   return `Cree un test de positionnement QCM de 20 questions pour cette formation:
 
 FORMATION: ${input.formationTitre}
@@ -450,7 +472,7 @@ OBJECTIFS DE LA FORMATION:
 ${input.objectifs.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 
 PREREQUIS ATTENDUS:
-${input.prerequis.map((p, i) => `${i + 1}. ${p}`).join("\n")}
+${input.prerequis.map((p, i) => `${i + 1}. ${p}`).join("\n")}${variationInstruction}
 
 REGLES OBLIGATOIRES:
 
@@ -508,9 +530,15 @@ export interface EvaluationInput {
   formationTitre: string;
   modules: Array<{ titre: string; objectifs: string[] }>;
   dureeEvaluation?: string;
+  regenerateToken?: string; // Token pour forcer la variation des questions
 }
 
 export function generateEvaluationPrompt(input: EvaluationInput): string {
+  // Ajouter une instruction de variation si regenerateToken est fourni
+  const variationInstruction = input.regenerateToken
+    ? `\n\n🔄 REGENERATION #${input.regenerateToken}: Cette demande est une REGENERATION. Tu DOIS generer des questions COMPLETEMENT DIFFERENTES des generations precedentes. Utilise de nouveaux angles, nouvelles formulations, nouveaux exemples et scenarios.`
+    : "";
+
   return `Cree une evaluation finale QCM de 20 questions pour cette formation:
 
 FORMATION: ${input.formationTitre}
@@ -523,7 +551,7 @@ ${input.modules
 Module ${i + 1}: ${m.titre}
 Objectifs: ${m.objectifs.join(", ")}`
   )
-  .join("\n")}
+  .join("\n")}${variationInstruction}
 
 REGLES OBLIGATOIRES:
 

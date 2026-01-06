@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useApprenantPortal, ApprenantPortalProvider } from "@/context/ApprenantPortalContext";
+import { useCustomDomainOrg, useApplyOrgColors } from "@/hooks/useCustomDomainOrg";
 
 // =====================================
 // LOGIN CONTENT
@@ -24,6 +25,10 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, isLoading: contextLoading } = useApprenantPortal();
+
+  // Branding dynamique via domaine personnalisé
+  const { organization: brandOrg, isCustomDomain, isLoading: brandLoading } = useCustomDomainOrg();
+  useApplyOrgColors(brandOrg);
 
   // State
   const [step, setStep] = useState<"email" | "code">("email");
@@ -193,6 +198,18 @@ function LoginContent() {
     }
   };
 
+  // Couleur primaire (utiliser celle de l'organisation ou brand par défaut)
+  const primaryColor = brandOrg?.primaryColor || "#4277FF";
+
+  // Loading du branding
+  if (brandLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-brand-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex items-center justify-center p-4">
       <motion.div
@@ -202,16 +219,38 @@ function LoginContent() {
       >
         {/* Card */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-8 text-center">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <GraduationCap className="w-8 h-8 text-white" />
-            </div>
+          {/* Header avec branding dynamique */}
+          <div
+            className="px-6 py-8 text-center"
+            style={{
+              background: isCustomDomain && brandOrg
+                ? `linear-gradient(to right, ${primaryColor}, ${primaryColor}dd)`
+                : "linear-gradient(to right, #4277FF, #3366ee)",
+            }}
+          >
+            {/* Logo ou icône */}
+            {isCustomDomain && brandOrg?.logo ? (
+              <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 p-2 shadow-lg">
+                <img
+                  src={brandOrg.logo}
+                  alt={brandOrg.name}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
+            )}
+
+            {/* Nom de l'organisation ou titre par défaut */}
             <h1 className="text-2xl font-bold text-white mb-1">
-              Espace Apprenant
+              {isCustomDomain && brandOrg ? brandOrg.name : "Espace Apprenant"}
             </h1>
-            <p className="text-brand-100 text-sm">
-              Connectez-vous pour accéder à vos formations
+            <p className="text-white/80 text-sm">
+              {isCustomDomain && brandOrg
+                ? "Espace Apprenant"
+                : "Connectez-vous pour accéder à vos formations"}
             </p>
           </div>
 
@@ -260,7 +299,10 @@ function LoginContent() {
                   <button
                     type="submit"
                     disabled={loading || !email.trim()}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-medium rounded-xl transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-medium rounded-xl transition-colors"
+                    style={{
+                      backgroundColor: loading || !email.trim() ? undefined : primaryColor,
+                    }}
                   >
                     {loading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -392,12 +434,30 @@ function LoginContent() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
-          Vous n&apos;avez pas de compte ?{" "}
-          <span className="text-gray-600 dark:text-gray-300">
-            Contactez votre organisme de formation.
-          </span>
-        </p>
+        <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
+          {isCustomDomain && brandOrg ? (
+            <>
+              <p className="mb-1">Vous n&apos;avez pas de compte ?</p>
+              {brandOrg.contact.email && (
+                <p className="text-gray-600 dark:text-gray-300">
+                  Contactez-nous : {brandOrg.contact.email}
+                </p>
+              )}
+              {brandOrg.contact.phone && (
+                <p className="text-gray-600 dark:text-gray-300">
+                  Tél : {brandOrg.contact.phone}
+                </p>
+              )}
+            </>
+          ) : (
+            <p>
+              Vous n&apos;avez pas de compte ?{" "}
+              <span className="text-gray-600 dark:text-gray-300">
+                Contactez votre organisme de formation.
+              </span>
+            </p>
+          )}
+        </div>
       </motion.div>
     </div>
   );

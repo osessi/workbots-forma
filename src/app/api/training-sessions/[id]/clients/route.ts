@@ -159,6 +159,32 @@ export async function POST(
         },
       });
 
+      // 3. Créer automatiquement les inscriptions LMS pour que les apprenants
+      // puissent accéder à l'espace apprenant (programme, slides, évaluations)
+      for (const apprenantId of apprenantIds) {
+        // Vérifier si une inscription existe déjà pour cet apprenant et cette formation
+        const existingInscription = await tx.lMSInscription.findFirst({
+          where: {
+            apprenantId,
+            formationId: session.formationId,
+          },
+        });
+
+        // Créer l'inscription seulement si elle n'existe pas
+        if (!existingInscription) {
+          await tx.lMSInscription.create({
+            data: {
+              apprenantId,
+              formationId: session.formationId,
+              organizationId: user.organizationId!,
+              statut: "NON_COMMENCE",
+              progression: 0,
+              dateInscription: new Date(),
+            },
+          });
+        }
+      }
+
       return newClient;
     });
 

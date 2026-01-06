@@ -251,7 +251,8 @@ model Organization {
   cachet         String? // URL du cachet de l'entreprise
   primaryColor   String  @default("#4277FF")
   secondaryColor String?
-  customDomain   String? @unique
+  customDomain         String? @unique
+  customDomainVerified Boolean @default(false)
 
   // Limites selon plan
   maxFormateurs Int @default(1)
@@ -322,6 +323,7 @@ model Organization {
   // Évaluations de satisfaction (Qualiopi IND 2)
   evaluationsSatisfaction EvaluationSatisfaction[]
   evaluationsIntervenant  EvaluationIntervenant[]
+  evaluationsFinanceur    EvaluationFinanceur[]
 
   // Organigramme (Qualiopi IND 9)
   organigrammePostes OrganigrammePoste[]
@@ -363,6 +365,11 @@ model Organization {
   emailSequences         EmailSequence[]       @relation("EmailSequences")
   emailSmtpConfig        EmailSmtpConfig?      @relation("SmtpConfig")
   emailDomains           EmailDomain[]         @relation("EmailDomains")
+
+  // Intégrations vidéo (Zoom, Meet, Teams)
+  videoIntegrations VideoIntegration[]
+  videoMeetings     VideoMeeting[]
+  videoRecordings   VideoRecording[]
 
   @@index([slug])
   @@index([customDomain])
@@ -408,6 +415,9 @@ model User {
   // Qualiopi IND 5 - Notes créées
   apprenantNotes ApprenantNote[] @relation("ApprenantNoteCreatedBy")
 
+  // Documents apprenant uploadés
+  apprenantDocuments ApprenantDocument[] @relation("ApprenantDocumentCreatedBy")
+
   // Qualiopi IND 23, 24, 25 - Veille réglementaire
   veilleArticleLectures VeilleArticleLecture[]
   veilleConversations   VeilleConversation[]
@@ -424,6 +434,11 @@ model User {
   newslettersCreated            Newsletter[]            @relation("NewslettersCreated")
   newsletterIssuesCreated       NewsletterIssue[]       @relation("NewsletterIssuesCreated")
   emailSequencesCreated         EmailSequence[]         @relation("EmailSequencesCreated")
+
+  // Intégrations vidéo (Zoom, Meet, Teams)
+  videoIntegrations VideoIntegration[]
+  videoMeetings     VideoMeeting[]
+  videoRecordings   VideoRecording[]
 
   @@index([supabaseId])
   @@index([organizationId])
@@ -1316,6 +1331,10 @@ model Apprenant {
   // Statut
   statut ApprenantStatus @default(PARTICULIER)
 
+  // Situation actuelle (pour les particuliers)
+  // Valeurs: CDI, CDD, INTERIM, ALTERNANCE, RECHERCHE_EMPLOI, RECONVERSION, AUTRE
+  situationActuelle String?
+
   // Si salarié, entreprise rattachée
   entrepriseId String?
   entreprise   Entreprise? @relation(fields: [entrepriseId], references: [id], onDelete: SetNull)
@@ -1361,6 +1380,12 @@ model Apprenant {
   audienceContacts        EmailAudienceContact[]    @relation("AudienceApprenant")
   newsletterSubscriptions NewsletterSubscriber[]    @relation("NewsletterApprenant")
 
+  // Documents liés à l'apprenant
+  documents ApprenantDocument[]
+
+  // Participants aux réunions vidéo
+  videoParticipants VideoParticipant[]
+
   @@index([organizationId])
   @@index([entrepriseId])
   @@index([statut])
@@ -1381,6 +1406,33 @@ model ApprenantNote {
   // Qui a ajouté cette note
   createdById String?
   createdBy   User?   @relation("ApprenantNoteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@index([apprenantId])
+  @@index([createdAt])
+  @@index([createdById])
+}
+
+// Documents liés à un apprenant
+model ApprenantDocument {
+  id String @id @default(cuid())
+
+  // Apprenant parent
+  apprenantId String
+  apprenant   Apprenant @relation(fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Informations du fichier
+  nom         String // Nom original du fichier
+  type        String // Type MIME (application/pdf, image/png, etc.)
+  taille      Int    // Taille en bytes
+  url         String // URL publique du fichier
+  storagePath String? // Chemin dans le storage (pour suppression)
+
+  // Qui a uploadé ce document
+  createdById String?
+  createdBy   User?   @relation("ApprenantDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -1455,6 +1507,9 @@ model Intervenant {
 
   // Fiches mission (Qualiopi IND 17)
   fichesMission FicheMissionIntervenant[]
+
+  // Participants aux réunions vidéo
+  videoParticipants VideoParticipant[]
 
   @@index([organizationId])
   @@index([nom])
@@ -1641,6 +1696,9 @@ model Financeur {
   // Nouveau système de sessions
   sessionFinancementsNew SessionFinancementNew[] @relation("SessionFinanceur")
 
+  // Évaluations financeur
+  evaluationsFinanceur EvaluationFinanceur[] @relation("EvaluationFinanceurFinanceur")
+
   @@index([organizationId])
   @@index([nom])
   @@index([type])
@@ -1657,6 +1715,10 @@ model DocumentSession {
   // Formation parent
   formationId String
   formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade)
+
+  // Lien optionnel avec une Session (nouveau système)
+  trainingSessionId String?  @unique
+  trainingSession   Session? @relation("DocumentSessionTrainingSession", fields: [trainingSessionId], references: [id], onDelete: SetNull)
 
   // Étape 3 - Modalité et lieu
   modalite SessionModalite @default(PRESENTIEL)
@@ -1698,6 +1760,11 @@ model DocumentSession {
   // Évaluations de satisfaction (Qualiopi IND 2)
   evaluationsSatisfaction EvaluationSatisfaction[]
   evaluationsIntervenant  EvaluationIntervenant[]
+  evaluationsFinanceur    EvaluationFinanceur[]
+
+  // Réunions vidéo liées
+  videoMeetings  VideoMeeting[]
+  videoRecordings VideoRecording[]
 
   @@index([formationId])
   @@index([organizationId])
@@ -2235,6 +2302,200 @@ model VirtualRoom {
 }
 
 // ===========================================
+// INTÉGRATIONS VIDÉO (Zoom, Google Meet, Teams)
+// ===========================================
+
+enum VideoProvider {
+  ZOOM
+  GOOGLE_MEET
+  MICROSOFT_TEAMS
+}
+
+enum VideoMeetingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  ENDED
+  CANCELLED
+}
+
+// Intégration OAuth pour chaque fournisseur vidéo
+model VideoIntegration {
+  id String @id @default(cuid())
+
+  provider      VideoProvider
+  accessToken   String        @db.Text
+  refreshToken  String?       @db.Text
+  tokenExpiry   DateTime?
+  accountEmail  String? // Email du compte connecté
+  accountName   String? // Nom du compte
+  isActive      Boolean       @default(true)
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Utilisateur qui a connecté le compte
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  meetings VideoMeeting[]
+
+  @@unique([organizationId, provider, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([provider])
+}
+
+// Réunion vidéo créée via une intégration
+model VideoMeeting {
+  id String @id @default(cuid())
+
+  // Infos de la réunion
+  title         String
+  description   String?       @db.Text
+  provider      VideoProvider
+  externalId    String // ID de la réunion chez le fournisseur (Zoom meeting ID, etc.)
+  joinUrl       String // URL pour rejoindre
+  hostUrl       String? // URL hôte (si différent)
+  password      String? // Mot de passe si requis
+
+  // Planification
+  scheduledStart DateTime
+  scheduledEnd   DateTime?
+  actualStart    DateTime?
+  actualEnd      DateTime?
+  duration       Int? // Durée en minutes
+  timezone       String        @default("Europe/Paris")
+
+  status VideoMeetingStatus @default(SCHEDULED)
+
+  // Options
+  enableRecording Boolean @default(false) // Enregistrement activé
+  enableWaitingRoom Boolean @default(false)
+  enableAutoRecord Boolean @default(false) // Démarrer l'enregistrement automatiquement
+
+  // Lien vers la session de formation (optionnel)
+  sessionId String?
+  session   DocumentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Intégration utilisée
+  integrationId String
+  integration   VideoIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  // Créateur
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  recordings   VideoRecording[]
+  participants VideoParticipant[]
+
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([integrationId])
+  @@index([provider])
+  @@index([status])
+  @@index([scheduledStart])
+  @@index([externalId])
+}
+
+// Participants à une réunion
+model VideoParticipant {
+  id String @id @default(cuid())
+
+  meetingId String
+  meeting   VideoMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  // Participant
+  email     String
+  name      String?
+  role      String  @default("attendee") // host, co-host, attendee
+
+  // Lien optionnel vers apprenant ou intervenant
+  apprenantId   String?
+  apprenant     Apprenant?   @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
+  intervenantId String?
+  intervenant   Intervenant? @relation(fields: [intervenantId], references: [id], onDelete: SetNull)
+
+  // Présence
+  joinedAt DateTime?
+  leftAt   DateTime?
+  attended Boolean   @default(false)
+
+  // Metadata
+  createdAt DateTime @default(now())
+
+  @@index([meetingId])
+  @@index([email])
+  @@index([apprenantId])
+  @@index([intervenantId])
+}
+
+// Enregistrement vidéo
+model VideoRecording {
+  id String @id @default(cuid())
+
+  // Infos de l'enregistrement
+  title       String
+  description String? @db.Text
+  provider    VideoProvider
+  externalId  String? // ID chez le fournisseur
+
+  // Fichier
+  fileUrl      String  @db.Text // URL du fichier (Supabase Storage ou externe)
+  storagePath  String? // Chemin dans Supabase Storage
+  fileSize     BigInt? // Taille en bytes
+  duration     Int? // Durée en secondes
+  mimeType     String  @default("video/mp4")
+
+  // Transcription
+  hasTranscription    Boolean  @default(false)
+  transcriptionText   String?  @db.Text
+  transcriptionUrl    String?  @db.Text // URL du fichier de transcription
+  transcriptionStatus String?  @default("none") // none, processing, completed, failed
+
+  // Source
+  meetingId String?
+  meeting   VideoMeeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  // Lien vers la session de formation (optionnel)
+  sessionId String?
+  session   DocumentSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Téléchargé par
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  recordedAt DateTime? // Date de l'enregistrement original
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([meetingId])
+  @@index([sessionId])
+  @@index([provider])
+  @@index([uploadedById])
+}
+
+// ===========================================
 // SIGNATURE ÉLECTRONIQUE SÉCURISÉE
 // ===========================================
 
@@ -2587,6 +2848,9 @@ model Session {
   signatures       SignatureDocumentNew[] // Documents de signature
   fichesMission    FicheMissionIntervenant[] @relation("FicheMissionSession") // Fiches mission (Qualiopi IND 17)
   reclamations     Reclamation[]
+
+  // Lien vers le wizard documents (ancien système)
+  documentSession  DocumentSession? @relation("DocumentSessionTrainingSession")
 
   @@index([formationId])
   @@index([organizationId])
@@ -3634,6 +3898,115 @@ model EvaluationIntervenantReponse {
 
   // ===========================================
   // SECTION 5: SUGGESTIONS
+  // ===========================================
+  suggestions String? @db.Text
+
+  // ===========================================
+  // SCORES CALCULÉS
+  // ===========================================
+  scoreMoyen Float?
+
+  // ===========================================
+  // METADATA TECHNIQUE
+  // ===========================================
+  ipAddress String?
+  userAgent String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([evaluationId])
+}
+
+// ===========================================
+// ÉVALUATION FINANCEUR - Qualiopi
+// ===========================================
+// Évaluation de satisfaction des financeurs (OPCO, CPF, Pôle Emploi, etc.)
+
+enum EvaluationFinanceurStatus {
+  PENDING // En attente
+  IN_PROGRESS // Commencé mais pas terminé
+  COMPLETED // Complété
+  EXPIRED // Expiré (lien plus valide)
+}
+
+model EvaluationFinanceur {
+  id String @id @default(cuid())
+
+  // Organisation (multi-tenant)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Session de formation liée
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Financeur concerné
+  financeurId String
+  financeur   Financeur @relation("EvaluationFinanceurFinanceur", fields: [financeurId], references: [id], onDelete: Cascade)
+
+  // Token unique pour accès public (QR code / lien)
+  token String @unique @default(cuid())
+
+  // Statut
+  status EvaluationFinanceurStatus @default(PENDING)
+
+  // Dates
+  expiresAt   DateTime? // Date d'expiration du lien
+  sentAt      DateTime? // Date d'envoi au financeur
+  startedAt   DateTime? // Date de début de complétion
+  completedAt DateTime? // Date de complétion
+
+  // Réponse (stockée dans un modèle séparé)
+  reponse EvaluationFinanceurReponse?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, financeurId])
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([financeurId])
+  @@index([token])
+  @@index([status])
+}
+
+// Réponses détaillées à l'évaluation financeur
+model EvaluationFinanceurReponse {
+  id String @id @default(cuid())
+
+  // Évaluation parent
+  evaluationId String               @unique
+  evaluation   EvaluationFinanceur @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  // ===========================================
+  // INFORMATIONS DU RÉPONDANT
+  // ===========================================
+  nomContact     String?
+  fonctionContact String?
+
+  // ===========================================
+  // SECTION: QUALITÉ DE LA COLLABORATION
+  // ===========================================
+  // La communication avec l'organisme de formation était-elle claire et efficace ?
+  qualiteCommunication Int? // Note 0-10
+
+  // Les documents administratifs ont-ils été fournis dans les délais impartis ?
+  documentsDelais Int? // Note 0-10
+
+  // La qualité des livrables (convention, certificats, etc.) est-elle satisfaisante ?
+  qualiteLivrables Int? // Note 0-10
+
+  // Les échanges avec l'organisme ont-ils été professionnels et courtois ?
+  echangesProfessionnels Int? // Note 0-10
+
+  // Recommanderiez-vous cet organisme pour de futures formations ?
+  recommandation Int? // Note 0-10
+
+  // ===========================================
+  // SUGGESTIONS / COMMENTAIRES
   // ===========================================
   suggestions String? @db.Text
 

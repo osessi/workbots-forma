@@ -25046,7 +25046,7 @@ export const REGLEMENT_INTERIEUR_TEMPLATE: DefaultTemplate = {
 export const CONTRAT_DE_FORMATION_TEMPLATE: DefaultTemplate = {
   "name": "Contrat de formation",
   "description": "Contrat de formation pour les particuliers (Article L.6353-3 à L.6353-7)",
-  "documentType": "CONVENTION",
+  "documentType": "CONTRAT_FORMATION",
   "category": "DOCUMENT",
   "content": {
     "type": "doc",
@@ -49844,6 +49844,318 @@ export const EVALUATION_FINANCEUR_TEMPLATE: DefaultTemplate = {
 };
 
 // ===========================================
+// CERTIFICAT DE RÉALISATION (QUALIOPI)
+// ===========================================
+export const CERTIFICAT_DE_REALISATION_TEMPLATE: DefaultTemplate = {
+  "name": "Certificat de réalisation",
+  "description": "Document Qualiopi attestant de la réalisation effective de la formation (pour les financeurs)",
+  "documentType": "CERTIFICAT",
+  "category": "DOCUMENT",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 1, "textAlign": "center" },
+        "content": [{ "text": "CERTIFICAT DE RÉALISATION", "type": "text" }]
+      },
+      { "type": "paragraph", "attrs": { "textAlign": "center" } },
+      { "type": "horizontalRule" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Je soussigné(e) ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Prénom du représentant", "category": "of", "variableId": "of_representant_prenom" } },
+          { "text": " ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Nom du représentant", "category": "of", "variableId": "of_representant_nom" } },
+          { "text": ", représentant légal de l'organisme de formation ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Nom commercial de l'organisme", "category": "of", "variableId": "of_nom_commercial" } },
+          { "text": " (SIRET : ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "SIRET de l'organisme", "category": "of", "variableId": "of_siret" } },
+          { "text": "), déclaré sous le numéro d'activité ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Numéro de déclaration d'activité", "category": "of", "variableId": "of_nda" } },
+          { "text": ", atteste que :", "type": "text" }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "text": "Le bénéficiaire", "type": "text" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Nom et prénom : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Prénom de l'apprenant", "category": "apprenant", "variableId": "apprenant_prenom" } },
+          { "text": " ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Nom de l'apprenant", "category": "apprenant", "variableId": "apprenant_nom" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Entreprise : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Raison sociale de l'entreprise", "category": "entreprise", "variableId": "entreprise_raison_sociale" } }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "text": "A suivi l'action de formation", "type": "text" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Intitulé : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Titre de la formation", "category": "formation", "variableId": "formation_titre" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Durée : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Durée de la formation", "category": "formation", "variableId": "formation_duree" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Du : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Date de début", "category": "formation", "variableId": "formation_date_debut" } },
+          { "text": " au ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Date de fin", "category": "formation", "variableId": "formation_date_fin" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Modalité : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Modalité", "category": "formation", "variableId": "formation_modalites" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Lieu : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Lieu de la formation", "category": "formation", "variableId": "formation_lieu" } }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Ce certificat est établi pour servir et valoir ce que de droit, notamment auprès des financeurs de la formation professionnelle (OPCO, Pôle Emploi, etc.).", "type": "text" }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Fait à ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Ville de l'organisme", "category": "of", "variableId": "of_ville" } },
+          { "text": ", le ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Date du jour", "category": "dates", "variableId": "dates_date_complete" } }
+        ]
+      },
+      { "type": "paragraph" },
+      { "type": "paragraph" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Signature et cachet de l'organisme de formation :", "type": "text", "marks": [{ "type": "bold" }] }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "templateVariable", "attrs": { "label": "Signature du responsable", "category": "of", "variableId": "of_signature_responsable" } }
+        ]
+      }
+    ]
+  },
+  "variables": []
+};
+
+// ===========================================
+// FACTURE
+// ===========================================
+export const FACTURE_TEMPLATE: DefaultTemplate = {
+  "name": "Facture",
+  "description": "Facture pour les prestations de formation",
+  "documentType": "FACTURE",
+  "category": "DOCUMENT",
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 1, "textAlign": "center" },
+        "content": [{ "text": "FACTURE", "type": "text" }]
+      },
+      { "type": "paragraph", "attrs": { "textAlign": "center" } },
+      { "type": "horizontalRule" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Numéro de facture : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Numéro de facture", "category": "facture", "variableId": "facture_numero" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Date : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Date de facture", "category": "facture", "variableId": "facture_date" } }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "text": "Émetteur", "type": "text" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "templateVariable", "attrs": { "label": "Nom commercial", "category": "of", "variableId": "of_nom_commercial" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "templateVariable", "attrs": { "label": "Adresse de l'organisme", "category": "of", "variableId": "of_adresse" } },
+          { "text": " - ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Code postal", "category": "of", "variableId": "of_code_postal" } },
+          { "text": " ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Ville", "category": "of", "variableId": "of_ville" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "SIRET : ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "SIRET", "category": "of", "variableId": "of_siret" } },
+          { "text": " - N° DA : ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Numéro de déclaration d'activité", "category": "of", "variableId": "of_nda" } }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "text": "Client", "type": "text" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "templateVariable", "attrs": { "label": "Raison sociale entreprise", "category": "entreprise", "variableId": "entreprise_raison_sociale" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "templateVariable", "attrs": { "label": "Adresse entreprise", "category": "entreprise", "variableId": "entreprise_adresse_complete" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "SIRET : ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "SIRET entreprise", "category": "entreprise", "variableId": "entreprise_siret" } }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "text": "Prestation de formation", "type": "text" }]
+      },
+      {
+        "type": "table",
+        "content": [
+          {
+            "type": "tableRow",
+            "content": [
+              { "type": "tableHeader", "content": [{ "type": "paragraph", "content": [{ "text": "Désignation", "type": "text" }] }] },
+              { "type": "tableHeader", "content": [{ "type": "paragraph", "content": [{ "text": "Quantité", "type": "text" }] }] },
+              { "type": "tableHeader", "content": [{ "type": "paragraph", "content": [{ "text": "Prix unitaire HT", "type": "text" }] }] },
+              { "type": "tableHeader", "content": [{ "type": "paragraph", "content": [{ "text": "Total HT", "type": "text" }] }] }
+            ]
+          },
+          {
+            "type": "tableRow",
+            "content": [
+              { "type": "tableCell", "content": [{ "type": "paragraph", "content": [{ "type": "templateVariable", "attrs": { "label": "Titre formation", "category": "formation", "variableId": "formation_titre" } }, { "text": " (", "type": "text" }, { "type": "templateVariable", "attrs": { "label": "Durée", "category": "formation", "variableId": "formation_duree" } }, { "text": ")", "type": "text" }] }] },
+              { "type": "tableCell", "content": [{ "type": "paragraph", "content": [{ "type": "templateVariable", "attrs": { "label": "Nombre de participants", "category": "tarif", "variableId": "tarif_nombre_participants" } }] }] },
+              { "type": "tableCell", "content": [{ "type": "paragraph", "content": [{ "type": "templateVariable", "attrs": { "label": "Prix HT", "category": "tarif", "variableId": "tarif_ht_format" } }] }] },
+              { "type": "tableCell", "content": [{ "type": "paragraph", "content": [{ "type": "templateVariable", "attrs": { "label": "Prix HT", "category": "tarif", "variableId": "tarif_ht_format" } }] }] }
+            ]
+          }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "paragraph",
+        "attrs": { "textAlign": "right" },
+        "content": [
+          { "text": "Total HT : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Total HT", "category": "tarif", "variableId": "tarif_ht_format" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": { "textAlign": "right" },
+        "content": [
+          { "text": "TVA (20%) : ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "TVA", "category": "tarif", "variableId": "tarif_tva_format" } }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": { "textAlign": "right" },
+        "content": [
+          { "text": "Total TTC : ", "type": "text", "marks": [{ "type": "bold" }] },
+          { "type": "templateVariable", "attrs": { "label": "Total TTC", "category": "tarif", "variableId": "tarif_ttc_format" } }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Période de formation : du ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Date début", "category": "formation", "variableId": "formation_date_debut" } },
+          { "text": " au ", "type": "text" },
+          { "type": "templateVariable", "attrs": { "label": "Date fin", "category": "formation", "variableId": "formation_date_fin" } }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "text": "Conditions de règlement", "type": "text" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "Paiement à réception de facture. En cas de retard de paiement, une pénalité de retard égale à 3 fois le taux d'intérêt légal sera appliquée, ainsi qu'une indemnité forfaitaire de 40€ pour frais de recouvrement.", "type": "text" }
+        ]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "paragraph",
+        "content": [
+          { "text": "TVA non applicable, art. 261.4.4°a du CGI (pour les organismes exonérés)", "type": "text", "marks": [{ "type": "italic" }] }
+        ]
+      }
+    ]
+  },
+  "variables": []
+};
+
+// ===========================================
 // IMPORTS DES TEMPLATES DE PROCÉDURES
 // ===========================================
 import { PROCEDURE_TEMPLATES } from "./procedure-templates";
@@ -49866,6 +50178,8 @@ export const DEFAULT_TEMPLATES: DefaultTemplate[] = [
   EVALUATION_INTERVENANT_TEMPLATE,
   EVALUATION_ENTREPRISE_TEMPLATE,
   EVALUATION_FINANCEUR_TEMPLATE,
+  CERTIFICAT_DE_REALISATION_TEMPLATE,
+  FACTURE_TEMPLATE,
   // Templates de procédures Qualiopi IND 26
   ...PROCEDURE_TEMPLATES,
 ];

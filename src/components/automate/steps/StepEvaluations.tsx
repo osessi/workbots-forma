@@ -295,7 +295,7 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
     return (
       <div className="h-48 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600">
         <SpinnerIcon />
-        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">Generation en cours...</p>
+        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">Génération en cours...</p>
       </div>
     );
   }
@@ -343,14 +343,14 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); onViewAll(); }}
             className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-brand-600 dark:text-brand-400"
-            title="Voir tout"
+            title="Visualiser"
           >
             <EyeIcon />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(); }}
             className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-green-600 dark:text-green-400"
-            title="Telecharger le test"
+            title="Télécharger le test"
           >
             <DownloadIcon />
           </button>
@@ -358,7 +358,7 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
             <button
               onClick={(e) => { e.stopPropagation(); onDownloadAnswers(); }}
               className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-purple-600 dark:text-purple-400"
-              title="Telecharger les reponses"
+              title="Télécharger les réponses"
             >
               <AnswersIcon />
             </button>
@@ -366,7 +366,7 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
             className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-            title="Regenerer"
+            title="Actualiser"
           >
             <RefreshIcon />
           </button>
@@ -389,11 +389,11 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
         <FileIcon />
       </div>
       <span className="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400 group-hover:text-brand-600 dark:group-hover:text-brand-400">
-        Generer {title}
+        Générer {title}
       </span>
       <span className="mt-1 flex items-center gap-1 text-xs text-gray-400 group-hover:text-brand-500">
         <SparklesIcon />
-        Cliquez pour generer
+        Cliquez pour générer
       </span>
     </button>
   );
@@ -426,7 +426,7 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ data, onClose, onDown
               className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors dark:bg-green-900/20 dark:text-green-400"
             >
               <DownloadIcon />
-              Telecharger
+              Télécharger
             </button>
             <button
               onClick={onClose}
@@ -502,7 +502,7 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ data, onClose, onDown
 
                 {q.type === "ouvert" && (
                   <div className="ml-11 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Reponse attendue:</p>
+                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Réponse attendue :</p>
                     <p className="text-sm text-blue-700 dark:text-blue-300">{q.correctAnswer || "Question ouverte"}</p>
                   </div>
                 )}
@@ -515,6 +515,57 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ data, onClose, onDown
   );
 };
 
+// Helper pour mapper les données d'évaluation avec correctAnswer et corriger les accents
+// Certaines données anciennes peuvent avoir reponseCorrecte au lieu de correctAnswer
+// et des titres sans accents
+const mapEvaluationData = (data: EvaluationData | null): EvaluationData | null => {
+  if (!data) return null;
+
+  // Corriger les titres sans accents (données anciennes)
+  let titre = data.titre;
+  let description = data.description;
+
+  // Corriger "Evaluation" → "Évaluation" dans le titre et la description
+  if (titre.includes("Evaluation") && !titre.includes("Évaluation")) {
+    titre = titre.replace(/Evaluation/g, "Évaluation");
+  }
+  if (description.includes("Evaluation") && !description.includes("Évaluation")) {
+    description = description.replace(/Evaluation/g, "Évaluation");
+  }
+
+  return {
+    ...data,
+    titre,
+    description,
+    questions: data.questions.map((q) => ({
+      ...q,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      correctAnswer: q.correctAnswer ?? (q as any).reponseCorrecte,
+    })),
+  };
+};
+
+// Helper pour mapper les données QCM avec correctAnswer
+// Certaines données anciennes peuvent avoir reponseCorrecte au lieu de correctAnswer
+const mapQcmData = (qcmByModule: Record<string, QCMData | null>): Record<string, QCMData | null> => {
+  const mapped: Record<string, QCMData | null> = {};
+  for (const [moduleId, qcm] of Object.entries(qcmByModule)) {
+    if (!qcm) {
+      mapped[moduleId] = null;
+      continue;
+    }
+    mapped[moduleId] = {
+      ...qcm,
+      questions: qcm.questions.map((q) => ({
+        ...q,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        correctAnswer: q.correctAnswer ?? (q as any).reponseCorrecte,
+      })),
+    };
+  }
+  return mapped;
+};
+
 export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   modules,
   formationTitre = "Formation",
@@ -525,9 +576,10 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   onPrevious,
 }) => {
   // Etats pour les evaluations generees - initialisés avec les données sauvegardées si disponibles
-  const [positionnement, setPositionnement] = useState<EvaluationData | null>(initialData?.positionnement || null);
-  const [evaluationFinale, setEvaluationFinale] = useState<EvaluationData | null>(initialData?.evaluationFinale || null);
-  const [qcmByModule, setQcmByModule] = useState<Record<string, QCMData | null>>(initialData?.qcmByModule || {});
+  // On applique le mapping pour les données anciennes qui peuvent avoir reponseCorrecte au lieu de correctAnswer
+  const [positionnement, setPositionnement] = useState<EvaluationData | null>(mapEvaluationData(initialData?.positionnement || null));
+  const [evaluationFinale, setEvaluationFinale] = useState<EvaluationData | null>(mapEvaluationData(initialData?.evaluationFinale || null));
+  const [qcmByModule, setQcmByModule] = useState<Record<string, QCMData | null>>(mapQcmData(initialData?.qcmByModule || {}));
   const [atelierByModule, setAtelierByModule] = useState<Record<string, AtelierData | null>>(initialData?.atelierByModule || {});
   const [evaluationTypeByModule, setEvaluationTypeByModule] = useState<Record<string, ModuleEvaluationType>>(initialData?.evaluationTypeByModule || {});
   const [correlationDocument, setCorrelationDocument] = useState<CorrelationData | null>(initialData?.correlationDocument || null);
@@ -628,7 +680,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         }, 250);
       };
     } else {
-      alert("Veuillez autoriser les popups pour telecharger le PDF");
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
   }, []);
 
@@ -669,7 +721,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </style>
       </head>
       <body>
-        <h1>${evaluation.titre}<span class="badge">CORRIGE</span></h1>
+        <h1>${evaluation.titre}<span class="badge">CORRIGÉ</span></h1>
         <p class="description">${evaluation.description}</p>
 
         ${evaluation.questions.map((q, i) => `
@@ -687,11 +739,11 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
               </div>
             ` : ''}
             <div class="answer-section">
-              <div class="answer-label">BONNE REPONSE :</div>
+              <div class="answer-label">BONNE RÉPONSE :</div>
               <div class="answer-text">
                 ${q.options && typeof q.correctAnswer === 'number'
                   ? `${String.fromCharCode(65 + q.correctAnswer)} - ${q.options[q.correctAnswer]}`
-                  : q.correctAnswer || 'Non specifie'
+                  : q.correctAnswer || 'Non spécifié'
                 }
               </div>
             </div>
@@ -711,7 +763,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         }, 250);
       };
     } else {
-      alert("Veuillez autoriser les popups pour telecharger le PDF");
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
   }, []);
 
@@ -734,16 +786,21 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
 
+      // Ajouter un timestamp pour forcer une nouvelle génération (éviter cache + varier les questions)
+      const regenerateToken = Date.now().toString();
+
       const response = await fetch("/api/ai/generate-positionnement", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
         },
         body: JSON.stringify({
           formationTitre,
           objectifs: formationObjectifs,
           modules: modules.map(m => ({ titre: m.titre, contenu: m.contenu })),
+          regenerate: regenerateToken, // Force nouvelle génération avec questions différentes
         }),
         signal: controller.signal,
       });
@@ -757,10 +814,25 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
       const data = await response.json();
       if (data.success && data.data) {
+        // Mapper reponseCorrecte vers correctAnswer pour compatibilité
+        const mappedQuestions = (data.data.questions || []).map((q: {
+          question: string;
+          options?: string[];
+          reponseCorrecte?: number;
+          correctAnswer?: number;
+          type?: string;
+          explication?: string;
+        }) => ({
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer ?? q.reponseCorrecte,
+          type: q.type || "qcm",
+          explication: q.explication,
+        }));
         setPositionnement({
           titre: "Test de positionnement",
-          description: `Evaluation pre-formation pour ${formationTitre}`,
-          questions: data.data.questions || [],
+          description: `Évaluation pré-formation pour ${formationTitre}`,
+          questions: mappedQuestions,
         });
       } else if (data.error) {
         throw new Error(data.error);
@@ -769,9 +841,9 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       console.error("Erreur generation positionnement:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
       if (errorMessage.includes("abort")) {
-        alert("Timeout: La generation a pris trop de temps. Reessayez.");
+        alert("Timeout: La génération a pris trop de temps. Réessayez.");
       } else {
-        alert(`Erreur lors de la generation: ${errorMessage}`);
+        alert(`Erreur lors de la génération: ${errorMessage}`);
       }
     } finally {
       setGeneratingPositionnement(false);
@@ -785,16 +857,21 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
 
+      // Ajouter un timestamp pour forcer une nouvelle génération (éviter cache + varier les questions)
+      const regenerateToken = Date.now().toString();
+
       const response = await fetch("/api/ai/generate-evaluation", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
         },
         body: JSON.stringify({
           formationTitre,
           objectifs: formationObjectifs,
           modules: modules.map(m => ({ titre: m.titre, contenu: m.contenu })),
+          regenerate: regenerateToken, // Force nouvelle génération avec questions différentes
         }),
         signal: controller.signal,
       });
@@ -808,10 +885,25 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
       const data = await response.json();
       if (data.success && data.data) {
+        // Mapper reponseCorrecte vers correctAnswer pour compatibilité
+        const mappedQuestions = (data.data.questions || []).map((q: {
+          question: string;
+          options?: string[];
+          reponseCorrecte?: number;
+          correctAnswer?: number;
+          type?: string;
+          explication?: string;
+        }) => ({
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer ?? q.reponseCorrecte,
+          type: q.type || "qcm",
+          explication: q.explication,
+        }));
         setEvaluationFinale({
-          titre: "Evaluation finale",
-          description: `Evaluation des acquis pour ${formationTitre}`,
-          questions: data.data.questions || [],
+          titre: "Évaluation finale",
+          description: `Évaluation des acquis pour ${formationTitre}`,
+          questions: mappedQuestions,
         });
       } else if (data.error) {
         throw new Error(data.error);
@@ -820,9 +912,9 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       console.error("Erreur generation evaluation:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
       if (errorMessage.includes("abort")) {
-        alert("Timeout: La generation a pris trop de temps. Reessayez.");
+        alert("Timeout: La génération a pris trop de temps. Réessayez.");
       } else {
-        alert(`Erreur lors de la generation: ${errorMessage}`);
+        alert(`Erreur lors de la génération: ${errorMessage}`);
       }
     } finally {
       setGeneratingEvaluation(false);
@@ -864,11 +956,24 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
       const data = await response.json();
       if (data.success && data.data) {
+        // Mapper reponseCorrecte vers correctAnswer pour compatibilité
+        const mappedQuestions = (data.data.questions || []).map((q: {
+          question: string;
+          options: string[];
+          reponseCorrecte?: number;
+          correctAnswer?: number;
+          explication?: string;
+        }) => ({
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer ?? q.reponseCorrecte,
+          explanation: q.explication,
+        }));
         setQcmByModule(prev => ({
           ...prev,
           [moduleId]: {
             titre: `QCM - ${module.titre}`,
-            questions: data.data.questions || [],
+            questions: mappedQuestions,
           },
         }));
       } else if (data.error) {
@@ -878,9 +983,9 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       console.error("Erreur generation QCM:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
       if (errorMessage.includes("abort")) {
-        alert(`Timeout: La generation du QCM a pris trop de temps. Reessayez.`);
+        alert(`Timeout: La génération du QCM a pris trop de temps. Réessayez.`);
       } else {
-        alert(`Erreur lors de la generation du QCM: ${errorMessage}`);
+        alert(`Erreur lors de la génération du QCM: ${errorMessage}`);
       }
     } finally {
       setGeneratingQCM(prev => ({ ...prev, [moduleId]: false }));
@@ -939,9 +1044,9 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       console.error("Erreur generation atelier:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
       if (errorMessage.includes("abort")) {
-        alert(`Timeout: La generation de l'atelier a pris trop de temps. Reessayez.`);
+        alert(`Timeout: La génération de l'atelier a pris trop de temps. Réessayez.`);
       } else {
-        alert(`Erreur lors de la generation de l'atelier: ${errorMessage}`);
+        alert(`Erreur lors de la génération de l'atelier: ${errorMessage}`);
       }
     } finally {
       setGeneratingAtelier(prev => ({ ...prev, [moduleId]: false }));
@@ -1203,7 +1308,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     }
   }, [correlationDocument]);
 
-  // Telecharger un QCM individuel
+  // Telecharger un QCM individuel (test vierge sans réponses)
   const handleDownloadQCM = useCallback((module: Module, qcm: QCMData) => {
     const printContent = `
       <!DOCTYPE html>
@@ -1231,9 +1336,6 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .options { margin-top: 15px; padding-left: 40px; }
           .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; }
           .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
-          .correct { background: #dcfce7; border: 1px solid #86efac; }
-          .correct .option-letter { background: #22c55e; color: white; }
-          .explanation { margin-top: 10px; padding: 10px; background: #eff6ff; border-radius: 6px; font-size: 13px; color: #1e40af; }
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -1257,11 +1359,104 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             <span class="question-text">${q.question}</span>
             <div class="options">
               ${q.options.map((opt, idx) => `
+                <div class="option">
+                  <span class="option-letter">${String.fromCharCode(65 + idx)}</span>
+                  ${opt}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+    } else {
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
+    }
+  }, []);
+
+  // Telecharger le corrigé d'un QCM individuel (avec bonnes réponses)
+  const handleDownloadQCMAnswers = useCallback((module: Module, qcm: QCMData) => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${qcm.titre} - Corrigé</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+          }
+          h1 { color: #1a1a2e; font-size: 22px; margin-bottom: 8px; border-bottom: 3px solid #22c55e; padding-bottom: 10px; }
+          .badge { display: inline-block; background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-left: 10px; }
+          .module-title { color: #64748b; font-size: 14px; margin-bottom: 20px; }
+          .module-content { background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 25px; }
+          .module-content h3 { font-size: 14px; color: #334155; margin-bottom: 10px; }
+          .module-content ul { margin: 0; padding-left: 20px; }
+          .module-content li { font-size: 13px; color: #475569; margin-bottom: 5px; }
+          .question-block { margin-bottom: 25px; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #22c55e; }
+          .question-number { display: inline-block; width: 28px; height: 28px; background: #22c55e; color: white; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; font-size: 14px; }
+          .question-text { font-weight: 600; color: #1e293b; display: inline; }
+          .options { margin-top: 15px; padding-left: 40px; }
+          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; }
+          .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
+          .correct { background: #dcfce7; border: 1px solid #86efac; }
+          .correct .option-letter { background: #22c55e; color: white; }
+          .answer-section { margin-top: 15px; padding: 12px; background: #dcfce7; border-radius: 8px; border: 1px solid #86efac; }
+          .answer-label { font-weight: 600; color: #166534; font-size: 12px; margin-bottom: 5px; }
+          .answer-text { color: #15803d; font-size: 14px; }
+          .explanation { margin-top: 10px; padding: 10px; background: #eff6ff; border-radius: 6px; font-size: 13px; color: #1e40af; }
+          @media print {
+            body { padding: 20px; }
+            .question-block { break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>${qcm.titre} <span class="badge">CORRIGÉ</span></h1>
+        <p class="module-title">${module.titre}</p>
+
+        <div class="module-content">
+          <h3>Contenu du module :</h3>
+          <ul>
+            ${module.contenu.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+
+        ${qcm.questions.map((q, i) => `
+          <div class="question-block">
+            <span class="question-number">${i + 1}</span>
+            <span class="question-text">${q.question}</span>
+            <div class="options">
+              ${q.options.map((opt, idx) => `
                 <div class="option ${q.correctAnswer === idx ? 'correct' : ''}">
                   <span class="option-letter">${String.fromCharCode(65 + idx)}</span>
                   ${opt}
                 </div>
               `).join('')}
+            </div>
+            <div class="answer-section">
+              <div class="answer-label">BONNE RÉPONSE :</div>
+              <div class="answer-text">
+                ${typeof q.correctAnswer === 'number' && q.options[q.correctAnswer]
+                  ? `${String.fromCharCode(65 + q.correctAnswer)} - ${q.options[q.correctAnswer]}`
+                  : 'Non spécifié'
+                }
+              </div>
             </div>
             ${q.explanation ? `<div class="explanation"><strong>Explication :</strong> ${q.explanation}</div>` : ''}
           </div>
@@ -1280,7 +1475,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         }, 250);
       };
     } else {
-      alert("Veuillez autoriser les popups pour telecharger le PDF");
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
   }, []);
 
@@ -1401,7 +1596,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         }, 250);
       };
     } else {
-      alert("Veuillez autoriser les popups pour telecharger le PDF");
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
   }, [modules, qcmByModule, formationTitre]);
 
@@ -1440,14 +1635,14 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       <body>
         <h1>${atelier.titre}</h1>
         <p class="module-title">${module.titre}</p>
-        <span class="duree">⏱ ${atelier.dureeEstimee}</span>
+        <span class="duree">${atelier.dureeEstimee}</span>
 
         <div class="description">
           ${atelier.description}
         </div>
 
         <div class="section">
-          <h3>🎯 Objectifs de l'atelier</h3>
+          <h3>Objectifs de l'atelier</h3>
           <div class="objectifs">
             <ul>
               ${atelier.objectifs.map(obj => `<li>${obj}</li>`).join('')}
@@ -1456,7 +1651,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </div>
 
         <div class="section">
-          <h3>📋 Instructions</h3>
+          <h3>Instructions</h3>
           <div class="instructions">
             <ol style="padding-left: 20px; margin: 0;">
               ${atelier.instructions.map(inst => `<li style="margin-bottom: 10px;">${inst}</li>`).join('')}
@@ -1465,7 +1660,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </div>
 
         <div class="section">
-          <h3>✅ Critères d'évaluation</h3>
+          <h3>Critères d'évaluation</h3>
           <div class="criteres">
             <ul>
               ${atelier.critereEvaluation.map(crit => `<li>${crit}</li>`).join('')}
@@ -1486,7 +1681,112 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         }, 250);
       };
     } else {
-      alert("Veuillez autoriser les popups pour telecharger le PDF");
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
+    }
+  }, []);
+
+  // Telecharger un exemple de correction/rendu pour un atelier
+  const handleDownloadAtelierCorrection = useCallback((module: Module, atelier: AtelierData) => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${atelier.titre} - Exemple de rendu</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+          }
+          h1 { color: #1a1a2e; font-size: 22px; margin-bottom: 8px; border-bottom: 3px solid #22c55e; padding-bottom: 10px; }
+          .badge { display: inline-block; background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-left: 10px; }
+          .module-title { color: #64748b; font-size: 14px; margin-bottom: 20px; }
+          .duree { display: inline-block; background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 20px; }
+          .intro { background: #f0fdf4; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #86efac; }
+          .intro-title { font-weight: 600; color: #166534; margin-bottom: 8px; }
+          .intro-text { font-size: 14px; color: #15803d; }
+          .section { margin-bottom: 25px; }
+          .section h3 { font-size: 16px; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+          .section ul { margin: 0; padding-left: 20px; }
+          .section li { font-size: 14px; color: #475569; margin-bottom: 8px; }
+          .objectifs { background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; border-radius: 0 8px 8px 0; }
+          .exemple-rendu { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 20px; border-radius: 0 8px 8px 0; }
+          .exemple-title { font-weight: 600; color: #166534; font-size: 15px; margin-bottom: 15px; }
+          .exemple-step { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #86efac; }
+          .exemple-step-title { font-weight: 600; color: #166534; font-size: 14px; margin-bottom: 10px; }
+          .exemple-step-content { font-size: 13px; color: #475569; }
+          .evaluation { background: #dcfce7; border: 1px solid #86efac; padding: 15px; border-radius: 8px; margin-top: 25px; }
+          .evaluation-title { font-weight: 600; color: #166534; margin-bottom: 10px; }
+          .evaluation-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+          .check-icon { color: #22c55e; font-size: 16px; }
+          @media print {
+            body { padding: 20px; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>${atelier.titre} <span class="badge">EXEMPLE DE RENDU</span></h1>
+        <p class="module-title">${module.titre}</p>
+        <span class="duree">${atelier.dureeEstimee}</span>
+
+        <div class="intro">
+          <div class="intro-title">Document destiné au formateur</div>
+          <div class="intro-text">
+            Ce document présente un exemple de rendu type pour cet atelier. Il peut servir de référence pour évaluer les travaux des apprenants ou comme support de correction collective.
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Objectifs à atteindre</h3>
+          <div class="objectifs">
+            <ul>
+              ${atelier.objectifs.map(obj => `<li>${obj}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Exemple de réalisation étape par étape</h3>
+          <div class="exemple-rendu">
+            ${atelier.instructions.map((inst, idx) => `
+              <div class="exemple-step">
+                <div class="exemple-step-title">Étape ${idx + 1}</div>
+                <div class="exemple-step-content">
+                  <strong>Instruction :</strong> ${inst}<br><br>
+                  <strong>Rendu attendu :</strong> L'apprenant doit avoir complété cette étape en appliquant les connaissances acquises dans le module "${module.titre}". Le résultat doit démontrer une compréhension des concepts clés et une mise en pratique correcte.
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="evaluation">
+          <div class="evaluation-title">Grille de correction</div>
+          ${atelier.critereEvaluation.map(crit => `
+            <div class="evaluation-item">
+              <span class="check-icon">✓</span>
+              <span>${crit}</span>
+            </div>
+          `).join('')}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+    } else {
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
   }, []);
 
@@ -1500,7 +1800,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             Test de positionnement
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Mesure le niveau de depart des participants avant la formation.
+            Mesure le niveau de départ des participants avant la formation.
           </p>
           <EvaluationPreview
             title="le test"
@@ -1517,13 +1817,13 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         {/* Evaluation finale */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Evaluation finale
+            Évaluation finale
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Verifie les acquis des participants en fin de formation.
+            Vérifie les acquis des participants en fin de formation.
           </p>
           <EvaluationPreview
-            title="l'evaluation"
+            title="l'évaluation"
             data={evaluationFinale}
             isGenerating={generatingEvaluation}
             onGenerate={handleGenerateEvaluation}
@@ -1555,7 +1855,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                 </span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Prouve que chaque objectif pédagogique est évalué dans l&apos;évaluation finale
+                Vérifie que chaque objectif pédagogique est bien couvert dans l&apos;évaluation finale.
               </p>
             </div>
           </div>
@@ -1595,7 +1895,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                   <button
                     onClick={handleGenerateCorrelation}
                     className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-lg transition-colors"
-                    title="Régénérer"
+                    title="Actualiser"
                   >
                     <RefreshIcon />
                   </button>
@@ -1683,32 +1983,13 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
       {/* Évaluations par module (QCM ou Atelier) */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Évaluations par module
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Choisissez QCM ou Atelier pour chaque module de la formation
-            </p>
-          </div>
-          <button
-            onClick={handleGenerateAllEvaluations}
-            disabled={generatingAllEvaluations}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-lg hover:from-brand-600 hover:to-purple-600 transition-all shadow-md disabled:opacity-50"
-          >
-            {generatingAllEvaluations ? (
-              <>
-                <SpinnerIcon />
-                Generation en cours...
-              </>
-            ) : (
-              <>
-                <SparklesIcon />
-                Generer toutes les evaluations
-              </>
-            )}
-          </button>
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Évaluations par module
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Sélectionnez un QCM ou un atelier pour valider les acquis de chaque module.
+          </p>
         </div>
 
         <div className="space-y-6">
@@ -1765,15 +2046,39 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                         <button
                           onClick={() => evalType === "qcm" && qcm ? handleDownloadQCM(module, qcm) : atelier && handleDownloadAtelier(module, atelier)}
                           className="p-2 text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                          title="Télécharger"
+                          title={evalType === "qcm" ? "Télécharger le test" : "Télécharger l'atelier"}
                         >
                           <DownloadIcon />
                         </button>
+                        {/* Bouton corrigé pour QCM uniquement */}
+                        {evalType === "qcm" && qcm && (
+                          <button
+                            onClick={() => handleDownloadQCMAnswers(module, qcm)}
+                            className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                            title="Télécharger le corrigé"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
+                        {/* Bouton exemple de rendu pour Atelier uniquement */}
+                        {evalType === "atelier" && atelier && (
+                          <button
+                            onClick={() => handleDownloadAtelierCorrection(module, atelier)}
+                            className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                            title="Télécharger l'exemple de rendu"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
                         <button
                           onClick={() => evalType === "qcm" ? handleGenerateQCM(module.id) : handleGenerateAtelier(module.id)}
                           disabled={isGeneratingQCM || isGeneratingAtelier}
                           className="p-2 text-gray-500 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-50"
-                          title="Régénérer"
+                          title="Actualiser"
                         >
                           {(isGeneratingQCM || isGeneratingAtelier) ? <SpinnerIcon /> : <RefreshIcon />}
                         </button>
@@ -1851,7 +2156,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                         {atelier.titre}
                       </h5>
                       <span className="text-xs px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-full">
-                        ⏱ {atelier.dureeEstimee}
+                        {atelier.dureeEstimee}
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -1860,7 +2165,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
                     {/* Objectifs */}
                     <div className="mb-3">
-                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">🎯 Objectifs</h6>
+                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">Objectifs</h6>
                       <ul className="space-y-1">
                         {atelier.objectifs.slice(0, 3).map((obj, i) => (
                           <li key={i} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-2">
@@ -1876,7 +2181,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
                     {/* Instructions */}
                     <div className="mb-3">
-                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">📋 Instructions</h6>
+                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">Instructions</h6>
                       <ol className="space-y-1 list-decimal list-inside">
                         {atelier.instructions.slice(0, 3).map((inst, i) => (
                           <li key={i} className="text-xs text-gray-600 dark:text-gray-400">
@@ -1891,7 +2196,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
                     {/* Critères d'évaluation */}
                     <div>
-                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">✅ Critères d'évaluation</h6>
+                      <h6 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">Critères d'évaluation</h6>
                       <ul className="space-y-1">
                         {atelier.critereEvaluation.slice(0, 2).map((crit, i) => (
                           <li key={i} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-2">
@@ -1918,7 +2223,10 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           onClick={onNext}
           className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors shadow-sm"
         >
-          Generer les documents
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 4.16667V15.8333M4.16667 10H15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Créer une session
         </button>
       </div>
 

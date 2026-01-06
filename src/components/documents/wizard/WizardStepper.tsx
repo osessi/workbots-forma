@@ -11,7 +11,7 @@ interface Step {
 
 const steps: Step[] = [
   { id: "clients", label: "Clients & Participants", icon: <Users size={18} /> },
-  { id: "tarifs", label: "Tarifs & Financement", icon: <CreditCard size={18} /> },
+  { id: "tarifs", label: "Tarifs", icon: <CreditCard size={18} /> },
   { id: "lieu", label: "Lieu & Dates", icon: <MapPin size={18} /> },
   { id: "formateurs", label: "Formateur(s)", icon: <GraduationCap size={18} /> },
   { id: "documents", label: "Documents", icon: <FileText size={18} /> },

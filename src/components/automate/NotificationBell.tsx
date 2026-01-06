@@ -207,13 +207,15 @@ export default function NotificationBell({ isExpanded = true }: NotificationBell
       }}
     >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              Notifications
+          <div className="flex items-start justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                Notifications
+              </h3>
               {unreadCount > 0 && (
-                <span className="ml-2 text-xs text-gray-500">({unreadCount} non lues)</span>
+                <span className="text-xs text-gray-500">({unreadCount} non lue{unreadCount > 1 ? "s" : ""})</span>
               )}
-            </h3>
+            </div>
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <button
@@ -226,7 +228,7 @@ export default function NotificationBell({ isExpanded = true }: NotificationBell
                   ) : (
                     <Check className="w-3 h-3" />
                   )}
-                  Tout marquer lu
+                  Tout marquer comme lu
                 </button>
               )}
               <button

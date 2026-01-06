@@ -134,8 +134,6 @@ const DEFAULT_MODALITE_OPTIONS = [
   { value: "E_LEARNING", label: "E-learning" },
   { value: "DISTANCIEL", label: "Distanciel" },
   { value: "MIXTE", label: "Mixte" },
-  { value: "SITUATION_TRAVAIL", label: "Situation de travail" },
-  { value: "STAGE", label: "Stage" },
 ];
 
 export function CatalogueFilterPanel({

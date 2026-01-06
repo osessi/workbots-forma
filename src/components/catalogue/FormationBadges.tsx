@@ -161,7 +161,7 @@ export function FormationBadges({
         title="Formation accessible aux personnes en situation de handicap"
       >
         <Accessibility className={`${iconSizes[size]} text-teal-500`} />
-        {formation.accessibiliteHandicap ? "Accessible PMR" : "Accessible"}
+        {formation.accessibiliteHandicap ? "Accessible PSH" : "Accessible PSH"}
       </span>
 
       {/* Éligible CPF - Badge vert avec check */}

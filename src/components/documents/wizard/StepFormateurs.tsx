@@ -12,6 +12,9 @@ import {
   Users,
   Trash2,
   Check,
+  Tag,
+  Clock,
+  Award,
 } from "lucide-react";
 import { SessionFormateurs, Intervenant } from "./types";
 
@@ -42,14 +45,57 @@ export default function StepFormateurs({
   const [modalType, setModalType] = useState<"principal" | "coformateur">("principal");
   const [searchFormateur, setSearchFormateur] = useState("");
 
-  // Création rapide
+  // Modal création complète
+  const [showCreateIntervenantModal, setShowCreateIntervenantModal] = useState(false);
   const [creatingIntervenant, setCreatingIntervenant] = useState(false);
-  const [newIntervenant, setNewIntervenant] = useState({
+
+  // Liste des spécialités prédéfinies
+  const SPECIALITES_SUGGESTIONS = [
+    "Commerce & Vente",
+    "Marketing & Communication",
+    "Management & Leadership",
+    "Ressources Humaines & Recrutement",
+    "Ingénierie pédagogique & Formation de formateurs",
+    "Gestion d'entreprise & Entrepreneuriat",
+    "Bureautique & Outils collaboratifs",
+    "Gestion de projet",
+    "Digital & Web (SEO / Ads / Réseaux sociaux)",
+    "Intelligence Artificielle & Automatisation",
+    "Informatique & Cybersécurité",
+    "Finance",
+    "Comptabilité & Paie",
+    "Relation client",
+    "Développement personnel",
+    "Santé",
+    "Sécurité & Prévention",
+    "Bien-être",
+    "Nutrition & Santé",
+    "Sport & Coaching",
+    "Immobilier",
+    "Assurance & Banque",
+    "Hôtellerie",
+    "Restauration & Tourisme",
+    "Accueil, Secrétariat & Administratif",
+    "Industrie",
+  ];
+
+  // Formulaire intervenant complet
+  const [intervenantForm, setIntervenantForm] = useState({
     nom: "",
     prenom: "",
     email: "",
+    telephone: "",
     fonction: "",
+    specialites: [] as string[],
+    structure: "",
+    structureSiret: "",
+    notes: "",
+    biographie: "",
+    anneesExperience: "",
+    numeroDeclarationActivite: "",
   });
+  const [newSpecialite, setNewSpecialite] = useState("");
+  const [showSpecialiteSuggestions, setShowSpecialiteSuggestions] = useState(false);
 
   // Charger les intervenants
   const fetchIntervenants = useCallback(async () => {
@@ -146,15 +192,55 @@ export default function StepFormateurs({
     });
   };
 
-  // Créer un intervenant rapidement
-  const handleCreateIntervenant = async () => {
-    if (!newIntervenant.nom || !newIntervenant.prenom) return;
+  // Reset formulaire intervenant
+  const resetIntervenantForm = () => {
+    setIntervenantForm({
+      nom: "",
+      prenom: "",
+      email: "",
+      telephone: "",
+      fonction: "",
+      specialites: [],
+      structure: "",
+      structureSiret: "",
+      notes: "",
+      biographie: "",
+      anneesExperience: "",
+      numeroDeclarationActivite: "",
+    });
+    setNewSpecialite("");
+    setShowSpecialiteSuggestions(false);
+  };
+
+  // Ajouter une spécialité
+  const addSpecialite = () => {
+    if (newSpecialite.trim() && !intervenantForm.specialites.includes(newSpecialite.trim())) {
+      setIntervenantForm({
+        ...intervenantForm,
+        specialites: [...intervenantForm.specialites, newSpecialite.trim()],
+      });
+      setNewSpecialite("");
+    }
+  };
+
+  // Supprimer une spécialité
+  const removeSpecialite = (spec: string) => {
+    setIntervenantForm({
+      ...intervenantForm,
+      specialites: intervenantForm.specialites.filter((s) => s !== spec),
+    });
+  };
+
+  // Créer un intervenant avec formulaire complet
+  const handleCreateIntervenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!intervenantForm.nom || !intervenantForm.prenom || !intervenantForm.email) return;
     setCreatingIntervenant(true);
     try {
       const res = await fetch("/api/donnees/intervenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newIntervenant),
+        body: JSON.stringify(intervenantForm),
       });
       if (res.ok) {
         const created = await res.json();
@@ -167,10 +253,15 @@ export default function StepFormateurs({
           addCoformateur(created);
         }
 
-        setNewIntervenant({ nom: "", prenom: "", email: "", fonction: "" });
+        resetIntervenantForm();
+        setShowCreateIntervenantModal(false);
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la création");
       }
     } catch (error) {
       console.error("Erreur création intervenant:", error);
+      alert("Erreur lors de la création");
     } finally {
       setCreatingIntervenant(false);
     }
@@ -526,66 +617,339 @@ export default function StepFormateurs({
 
             {/* Créer un nouvel intervenant */}
             <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-              <p className="text-xs text-gray-500 mb-3">
-                Ou créer un nouvel intervenant :
-              </p>
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Prénom *"
-                    value={newIntervenant.prenom}
-                    onChange={(e) =>
-                      setNewIntervenant({ ...newIntervenant, prenom: e.target.value })
-                    }
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Nom *"
-                    value={newIntervenant.nom}
-                    onChange={(e) =>
-                      setNewIntervenant({ ...newIntervenant, nom: e.target.value })
-                    }
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
+              <button
+                onClick={() => {
+                  resetIntervenantForm();
+                  setShowCreateIntervenantModal(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors dark:bg-brand-500/10 dark:border-brand-500/30 dark:text-brand-400 dark:hover:bg-brand-500/20"
+              >
+                <Plus size={18} />
+                Créer un nouvel intervenant
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création intervenant complète */}
+      {showCreateIntervenantModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Nouvel intervenant
+              </h2>
+              <button
+                onClick={() => {
+                  setShowCreateIntervenantModal(false);
+                  resetIntervenantForm();
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors dark:hover:bg-gray-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateIntervenant} className="p-6 space-y-6">
+              {/* Informations personnelles */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Informations personnelles
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Prénom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={intervenantForm.prenom}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, prenom: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Nom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={intervenantForm.nom}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, nom: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={intervenantForm.email}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, email: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Téléphone *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={intervenantForm.telephone}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, telephone: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Fonction
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenantForm.fonction}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, fonction: e.target.value })}
+                      placeholder="Ex: Formateur, Consultant, Coach..."
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={newIntervenant.email}
-                    onChange={(e) =>
-                      setNewIntervenant({ ...newIntervenant, email: e.target.value })
-                    }
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Fonction"
-                    value={newIntervenant.fonction}
-                    onChange={(e) =>
-                      setNewIntervenant({ ...newIntervenant, fonction: e.target.value })
-                    }
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                </div>
-                <button
-                  onClick={handleCreateIntervenant}
-                  disabled={
-                    !newIntervenant.nom ||
-                    !newIntervenant.prenom ||
-                    creatingIntervenant
-                  }
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {creatingIntervenant && (
-                    <Loader2 size={14} className="animate-spin" />
+              </div>
+
+              {/* Spécialités */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Spécialités
+                </h3>
+                <div className="relative">
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={newSpecialite}
+                      onChange={(e) => setNewSpecialite(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSpecialite())}
+                      onFocus={() => setShowSpecialiteSuggestions(true)}
+                      placeholder="Ajouter une spécialité..."
+                      className="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSpecialiteSuggestions(!showSpecialiteSuggestions)}
+                      className="px-4 py-2.5 text-sm font-medium text-brand-500 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:hover:bg-brand-500/20"
+                      title="Voir les suggestions"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+
+                  {/* Liste déroulante des suggestions */}
+                  {showSpecialiteSuggestions && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-[5]"
+                        onClick={() => setShowSpecialiteSuggestions(false)}
+                      />
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                            Sélectionnez une ou plusieurs spécialités
+                          </p>
+                        </div>
+                        {SPECIALITES_SUGGESTIONS
+                          .filter(spec => !intervenantForm.specialites.includes(spec))
+                          .filter(spec => !newSpecialite || spec.toLowerCase().includes(newSpecialite.toLowerCase()))
+                          .map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => {
+                              if (!intervenantForm.specialites.includes(suggestion)) {
+                                setIntervenantForm({
+                                  ...intervenantForm,
+                                  specialites: [...intervenantForm.specialites, suggestion],
+                                });
+                              }
+                              setNewSpecialite("");
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                        {newSpecialite.trim() && !SPECIALITES_SUGGESTIONS.some(s => s.toLowerCase() === newSpecialite.toLowerCase()) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addSpecialite();
+                              setShowSpecialiteSuggestions(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors border-t border-gray-100 dark:border-gray-700"
+                          >
+                            + Ajouter &quot;{newSpecialite}&quot;
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowSpecialiteSuggestions(false)}
+                          className="w-full px-4 py-2 text-center text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border-t border-gray-100 dark:border-gray-700"
+                        >
+                          Fermer
+                        </button>
+                      </div>
+                    </>
                   )}
+                </div>
+                {intervenantForm.specialites.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {intervenantForm.specialites.map((spec) => (
+                      <span
+                        key={spec}
+                        className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-full dark:bg-gray-800 dark:text-gray-300"
+                      >
+                        <Tag size={12} />
+                        {spec}
+                        <button
+                          type="button"
+                          onClick={() => removeSpecialite(spec)}
+                          className="ml-1 text-gray-400 hover:text-gray-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Structure */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Structure (si externe)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Nom de la structure
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenantForm.structure}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, structure: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      SIRET structure
+                    </label>
+                    <input
+                      type="text"
+                      value={intervenantForm.structureSiret}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, structureSiret: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Qualiopi IND 17 */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Award className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Qualiopi IND 17 - Profil intervenant
+                  </h3>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Expérience et numéro déclaration */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        <span className="flex items-center gap-1">
+                          <Clock size={14} />
+                          Années d&apos;expérience
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={intervenantForm.anneesExperience}
+                        onChange={(e) => setIntervenantForm({ ...intervenantForm, anneesExperience: e.target.value })}
+                        placeholder="5"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        N° déclaration d&apos;activité
+                      </label>
+                      <input
+                        type="text"
+                        value={intervenantForm.numeroDeclarationActivite}
+                        onChange={(e) => setIntervenantForm({ ...intervenantForm, numeroDeclarationActivite: e.target.value })}
+                        placeholder="ex: 11756789012"
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Biographie */}
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Biographie professionnelle
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={intervenantForm.biographie}
+                      onChange={(e) => setIntervenantForm({ ...intervenantForm, biographie: e.target.value })}
+                      placeholder="Parcours professionnel, domaines d'expertise..."
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Notes internes
+                </label>
+                <textarea
+                  rows={3}
+                  value={intervenantForm.notes}
+                  onChange={(e) => setIntervenantForm({ ...intervenantForm, notes: e.target.value })}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateIntervenantModal(false);
+                    resetIntervenantForm();
+                  }}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingIntervenant}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingIntervenant && <Loader2 size={16} className="animate-spin" />}
                   Créer et sélectionner
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

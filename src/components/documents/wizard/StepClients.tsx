@@ -12,6 +12,7 @@ import {
   Check,
   ChevronDown,
   Users,
+  Briefcase,
 } from "lucide-react";
 import {
   SessionClient,
@@ -62,11 +63,46 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
   const [showApprenantModal, setShowApprenantModal] = useState(false);
   const [selectedEntreprise, setSelectedEntreprise] = useState<Entreprise | null>(null);
 
-  // Création rapide
+  // Modal création complète
+  const [showCreateEntrepriseModal, setShowCreateEntrepriseModal] = useState(false);
+  const [showCreateApprenantModal, setShowCreateApprenantModal] = useState(false);
   const [creatingEntreprise, setCreatingEntreprise] = useState(false);
   const [creatingApprenant, setCreatingApprenant] = useState(false);
-  const [newEntreprise, setNewEntreprise] = useState({ raisonSociale: "", siret: "", contactEmail: "" });
-  const [newApprenant, setNewApprenant] = useState({ nom: "", prenom: "", email: "", statut: "SALARIE" as "SALARIE" | "INDEPENDANT" | "PARTICULIER", entrepriseId: "" });
+
+  // Formulaire entreprise complet
+  const [entrepriseForm, setEntrepriseForm] = useState({
+    raisonSociale: "",
+    siret: "",
+    tvaIntracom: "",
+    contactCivilite: "",
+    contactNom: "",
+    contactPrenom: "",
+    contactFonction: "",
+    contactEmail: "",
+    contactTelephone: "",
+    adresse: "",
+    codePostal: "",
+    ville: "",
+    pays: "France",
+    notes: "",
+  });
+
+  // Formulaire apprenant complet
+  const [apprenantForm, setApprenantForm] = useState({
+    nom: "",
+    prenom: "",
+    email: "",
+    telephone: "",
+    raisonSociale: "",
+    siret: "",
+    adresse: "",
+    codePostal: "",
+    ville: "",
+    pays: "France",
+    statut: "PARTICULIER" as "SALARIE" | "INDEPENDANT" | "PARTICULIER",
+    entrepriseId: "",
+    notes: "",
+  });
 
   // Charger les données
   const fetchData = useCallback(async () => {
@@ -173,47 +209,93 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
     );
   };
 
-  // Créer une entreprise rapidement
-  const handleCreateEntreprise = async () => {
-    if (!newEntreprise.raisonSociale) return;
+  // Reset formulaire entreprise
+  const resetEntrepriseForm = () => {
+    setEntrepriseForm({
+      raisonSociale: "",
+      siret: "",
+      tvaIntracom: "",
+      contactCivilite: "",
+      contactNom: "",
+      contactPrenom: "",
+      contactFonction: "",
+      contactEmail: "",
+      contactTelephone: "",
+      adresse: "",
+      codePostal: "",
+      ville: "",
+      pays: "France",
+      notes: "",
+    });
+  };
+
+  // Reset formulaire apprenant
+  const resetApprenantForm = () => {
+    setApprenantForm({
+      nom: "",
+      prenom: "",
+      email: "",
+      telephone: "",
+      raisonSociale: "",
+      siret: "",
+      adresse: "",
+      codePostal: "",
+      ville: "",
+      pays: "France",
+      statut: "PARTICULIER",
+      entrepriseId: "",
+      notes: "",
+    });
+  };
+
+  // Créer une entreprise avec formulaire complet
+  const handleCreateEntreprise = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!entrepriseForm.raisonSociale) return;
     setCreatingEntreprise(true);
     try {
       const res = await fetch("/api/donnees/entreprises", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newEntreprise),
+        body: JSON.stringify(entrepriseForm),
       });
       if (res.ok) {
         const created = await res.json();
         setEntreprises([...entreprises, created]);
         addEntrepriseClient(created);
-        setNewEntreprise({ raisonSociale: "", siret: "", contactEmail: "" });
+        resetEntrepriseForm();
+        setShowCreateEntrepriseModal(false);
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la création");
       }
     } catch (error) {
       console.error("Erreur création entreprise:", error);
+      alert("Erreur lors de la création");
     } finally {
       setCreatingEntreprise(false);
     }
   };
 
-  // Créer un apprenant rapidement
-  const handleCreateApprenant = async () => {
-    if (!newApprenant.nom || !newApprenant.prenom || !newApprenant.email) return;
+  // Créer un apprenant avec formulaire complet
+  const handleCreateApprenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apprenantForm.nom || !apprenantForm.prenom || !apprenantForm.email) return;
     setCreatingApprenant(true);
     try {
       const res = await fetch("/api/donnees/apprenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...newApprenant,
-          entrepriseId: newApprenant.statut === "SALARIE" ? newApprenant.entrepriseId : null,
+          ...apprenantForm,
+          entrepriseId: apprenantForm.statut === "SALARIE" ? apprenantForm.entrepriseId : null,
         }),
       });
       if (res.ok) {
         const created = await res.json();
         setApprenants([...apprenants, created]);
 
-        if (newApprenant.statut === "SALARIE" && selectedEntreprise) {
+        if (apprenantForm.statut === "SALARIE" && selectedEntreprise) {
           // Ajouter à l'entreprise sélectionnée
           const clientIndex = clients.findIndex(
             (c) => c.type === "ENTREPRISE" && c.entrepriseId === selectedEntreprise.id
@@ -225,11 +307,16 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
           addApprenantClient(created, selectedType);
         }
 
-        setNewApprenant({ nom: "", prenom: "", email: "", statut: "SALARIE", entrepriseId: "" });
+        resetApprenantForm();
+        setShowCreateApprenantModal(false);
         setShowApprenantModal(false);
+      } else {
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la création");
       }
     } catch (error) {
       console.error("Erreur création apprenant:", error);
+      alert("Erreur lors de la création");
     } finally {
       setCreatingApprenant(false);
     }
@@ -301,7 +388,7 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
                     <button
                       onClick={() => {
                         setSelectedEntreprise(client.entreprise || null);
-                        setNewApprenant({ ...newApprenant, statut: "SALARIE", entrepriseId: client.entrepriseId || "" });
+                        setApprenantForm((prev) => ({ ...prev, statut: "SALARIE", entrepriseId: client.entrepriseId || "" }));
                         setShowApprenantModal(true);
                       }}
                       className="text-xs font-medium text-brand-500 hover:text-brand-600 flex items-center gap-1"
@@ -401,7 +488,7 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
                     setShowEntrepriseModal(true);
                   } else {
                     setShowApprenantModal(true);
-                    setNewApprenant({ ...newApprenant, statut: type });
+                    setApprenantForm((prev) => ({ ...prev, statut: type }));
                   }
                 }}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
@@ -545,33 +632,16 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
 
             {/* Créer une nouvelle entreprise */}
             <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-              <p className="text-xs text-gray-500 mb-3">Ou créer une nouvelle entreprise :</p>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Raison sociale *"
-                  value={newEntreprise.raisonSociale}
-                  onChange={(e) => setNewEntreprise({ ...newEntreprise, raisonSociale: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="SIRET"
-                    value={newEntreprise.siret}
-                    onChange={(e) => setNewEntreprise({ ...newEntreprise, siret: e.target.value })}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                  <button
-                    onClick={handleCreateEntreprise}
-                    disabled={!newEntreprise.raisonSociale || creatingEntreprise}
-                    className="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {creatingEntreprise && <Loader2 size={14} className="animate-spin" />}
-                    Créer
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={() => {
+                  resetEntrepriseForm();
+                  setShowCreateEntrepriseModal(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors dark:bg-brand-500/10 dark:border-brand-500/30 dark:text-brand-400 dark:hover:bg-brand-500/20"
+              >
+                <Plus size={18} />
+                Créer une nouvelle entreprise
+              </button>
             </div>
           </div>
         </div>
@@ -654,44 +724,17 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
 
             {/* Créer un nouvel apprenant */}
             <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-              <p className="text-xs text-gray-500 mb-3">
-                Ou créer un nouvel {selectedType === "INDEPENDANT" ? "indépendant" : "particulier"} :
-              </p>
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Prénom *"
-                    value={newApprenant.prenom}
-                    onChange={(e) => setNewApprenant({ ...newApprenant, prenom: e.target.value })}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Nom *"
-                    value={newApprenant.nom}
-                    onChange={(e) => setNewApprenant({ ...newApprenant, nom: e.target.value })}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    placeholder="Email *"
-                    value={newApprenant.email}
-                    onChange={(e) => setNewApprenant({ ...newApprenant, email: e.target.value })}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                  <button
-                    onClick={handleCreateApprenant}
-                    disabled={!newApprenant.nom || !newApprenant.prenom || !newApprenant.email || creatingApprenant}
-                    className="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {creatingApprenant && <Loader2 size={14} className="animate-spin" />}
-                    Créer
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={() => {
+                  resetApprenantForm();
+                  setApprenantForm((prev) => ({ ...prev, statut: selectedType as "INDEPENDANT" | "PARTICULIER" }));
+                  setShowCreateApprenantModal(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors dark:bg-brand-500/10 dark:border-brand-500/30 dark:text-brand-400 dark:hover:bg-brand-500/20"
+              >
+                <Plus size={18} />
+                Créer un nouvel {selectedType === "INDEPENDANT" ? "indépendant" : "particulier"}
+              </button>
             </div>
           </div>
         </div>
@@ -721,50 +764,514 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
             </p>
 
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="Prénom *"
-                  value={newApprenant.prenom}
-                  onChange={(e) => setNewApprenant({ ...newApprenant, prenom: e.target.value })}
-                  className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-                <input
-                  type="text"
-                  placeholder="Nom *"
-                  value={newApprenant.nom}
-                  onChange={(e) => setNewApprenant({ ...newApprenant, nom: e.target.value })}
-                  className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              <button
+                onClick={() => {
+                  resetApprenantForm();
+                  setApprenantForm((prev) => ({
+                    ...prev,
+                    statut: "SALARIE",
+                    entrepriseId: selectedEntreprise.id
+                  }));
+                  setShowCreateApprenantModal(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors dark:bg-brand-500/10 dark:border-brand-500/30 dark:text-brand-400 dark:hover:bg-brand-500/20"
+              >
+                <Plus size={18} />
+                Créer un nouveau salarié
+              </button>
+              <button
+                onClick={() => {
+                  setShowApprenantModal(false);
+                  setSelectedEntreprise(null);
+                }}
+                className="w-full px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création entreprise complète */}
+      {showCreateEntrepriseModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Nouvelle entreprise
+              </h2>
+              <button
+                onClick={() => {
+                  setShowCreateEntrepriseModal(false);
+                  resetEntrepriseForm();
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors dark:hover:bg-gray-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEntreprise} className="p-6 space-y-6">
+              {/* Informations principales */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Informations principales
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Raison sociale *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.raisonSociale}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, raisonSociale: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      SIRET *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.siret}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, siret: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      TVA Intracommunautaire *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.tvaIntracom}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, tvaIntracom: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Interlocuteur principal */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Interlocuteur principal
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Civilité *
+                    </label>
+                    <select
+                      required
+                      value={entrepriseForm.contactCivilite}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, contactCivilite: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    >
+                      <option value="">Sélectionner</option>
+                      <option value="M.">M.</option>
+                      <option value="Mme">Mme</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Fonction *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Gérant, PDG, DRH..."
+                      value={entrepriseForm.contactFonction}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, contactFonction: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Prénom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.contactPrenom}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, contactPrenom: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Nom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.contactNom}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, contactNom: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={entrepriseForm.contactEmail}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, contactEmail: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Téléphone *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={entrepriseForm.contactTelephone}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, contactTelephone: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Adresse de l'entreprise */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Adresse de l&apos;entreprise
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Adresse *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.adresse}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, adresse: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Code postal *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.codePostal}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, codePostal: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Ville *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.ville}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, ville: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Pays *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={entrepriseForm.pays}
+                      onChange={(e) => setEntrepriseForm({ ...entrepriseForm, pays: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Notes internes
+                </label>
+                <textarea
+                  rows={3}
+                  value={entrepriseForm.notes}
+                  onChange={(e) => setEntrepriseForm({ ...entrepriseForm, notes: e.target.value })}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
                 />
               </div>
-              <input
-                type="email"
-                placeholder="Email *"
-                value={newApprenant.email}
-                onChange={(e) => setNewApprenant({ ...newApprenant, email: e.target.value })}
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              />
-              <div className="flex gap-3 pt-2">
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
                 <button
+                  type="button"
                   onClick={() => {
-                    setShowApprenantModal(false);
-                    setSelectedEntreprise(null);
-                    setNewApprenant({ nom: "", prenom: "", email: "", statut: "SALARIE", entrepriseId: "" });
+                    setShowCreateEntrepriseModal(false);
+                    resetEntrepriseForm();
                   }}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400"
+                  className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors dark:text-gray-400 dark:hover:text-gray-200"
                 >
                   Annuler
                 </button>
                 <button
-                  onClick={handleCreateApprenant}
-                  disabled={!newApprenant.nom || !newApprenant.prenom || !newApprenant.email || creatingApprenant}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                  type="submit"
+                  disabled={creatingEntreprise}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {creatingApprenant && <Loader2 size={14} className="animate-spin" />}
-                  Créer et ajouter
+                  {creatingEntreprise && <Loader2 size={16} className="animate-spin" />}
+                  Créer et sélectionner
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal création apprenant complète */}
+      {showCreateApprenantModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {apprenantForm.statut === "SALARIE"
+                  ? "Nouveau salarié"
+                  : apprenantForm.statut === "INDEPENDANT"
+                  ? "Nouvel indépendant"
+                  : "Nouveau particulier"}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowCreateApprenantModal(false);
+                  resetApprenantForm();
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors dark:hover:bg-gray-800"
+              >
+                <X size={20} />
+              </button>
             </div>
+
+            <form onSubmit={handleCreateApprenant} className="p-6 space-y-6">
+              {/* Informations personnelles */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Informations personnelles
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Prénom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={apprenantForm.prenom}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, prenom: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Nom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={apprenantForm.nom}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, nom: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={apprenantForm.email}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, email: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Téléphone
+                    </label>
+                    <input
+                      type="tel"
+                      value={apprenantForm.telephone}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, telephone: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Statut - affiché pour info si pas SALARIE */}
+              {apprenantForm.statut !== "SALARIE" && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Statut
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["INDEPENDANT", "PARTICULIER"] as const).map((statut) => (
+                      <button
+                        key={statut}
+                        type="button"
+                        onClick={() => setApprenantForm({ ...apprenantForm, statut })}
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                          apprenantForm.statut === statut
+                            ? "border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                            : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                        }`}
+                      >
+                        {statut === "INDEPENDANT" && <Briefcase size={16} />}
+                        {statut === "PARTICULIER" && <User size={16} />}
+                        {statut === "INDEPENDANT" ? "Indépendant" : "Particulier"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Champs indépendant */}
+              {apprenantForm.statut === "INDEPENDANT" && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Informations professionnelles
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Raison sociale
+                      </label>
+                      <input
+                        type="text"
+                        value={apprenantForm.raisonSociale}
+                        onChange={(e) => setApprenantForm({ ...apprenantForm, raisonSociale: e.target.value })}
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Numéro SIRET
+                      </label>
+                      <input
+                        type="text"
+                        value={apprenantForm.siret}
+                        onChange={(e) => setApprenantForm({ ...apprenantForm, siret: e.target.value })}
+                        className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Entreprise pour salarié - affichée en info */}
+              {apprenantForm.statut === "SALARIE" && selectedEntreprise && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                    <Building2 size={18} />
+                    <span className="text-sm font-medium">
+                      Rattaché à : {selectedEntreprise.raisonSociale}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Adresse */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Adresse
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <input
+                      type="text"
+                      placeholder="Adresse"
+                      value={apprenantForm.adresse}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, adresse: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Code postal"
+                      value={apprenantForm.codePostal}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, codePostal: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Ville"
+                      value={apprenantForm.ville}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, ville: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <input
+                      type="text"
+                      placeholder="Pays"
+                      value={apprenantForm.pays}
+                      onChange={(e) => setApprenantForm({ ...apprenantForm, pays: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Notes internes
+                </label>
+                <textarea
+                  rows={3}
+                  value={apprenantForm.notes}
+                  onChange={(e) => setApprenantForm({ ...apprenantForm, notes: e.target.value })}
+                  placeholder="Notes internes (optionnel)"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateApprenantModal(false);
+                    resetApprenantForm();
+                  }}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingApprenant}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingApprenant && <Loader2 size={16} className="animate-spin" />}
+                  Créer et sélectionner
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

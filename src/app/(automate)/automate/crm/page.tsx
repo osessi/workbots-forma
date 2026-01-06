@@ -108,11 +108,12 @@ interface OpportuniteFormData {
 
 // Configuration par défaut des colonnes
 const DEFAULT_STAGES: PipelineStage[] = [
-  { id: "ENTRANT", label: "Entrant", color: "text-gray-600", bgColor: "bg-gray-100 dark:bg-gray-700", ordre: 0 },
-  { id: "DISCUSSION", label: "Discussion", color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30", ordre: 1 },
-  { id: "DEVIS", label: "Devis", color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30", ordre: 2 },
-  { id: "CONVENTION", label: "Convention", color: "text-orange-600", bgColor: "bg-orange-100 dark:bg-orange-900/30", ordre: 3 },
-  { id: "FACTURE", label: "Facture", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30", ordre: 4 },
+  { id: "A_TRAITER", label: "À traiter", color: "text-gray-600", bgColor: "bg-gray-100 dark:bg-gray-700", ordre: 0 },
+  { id: "EN_COURS", label: "En cours", color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30", ordre: 1 },
+  { id: "PROPOSITION_ENVOYEE", label: "Proposition envoyée", color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30", ordre: 2 },
+  { id: "RELANCE", label: "Relance", color: "text-orange-600", bgColor: "bg-orange-100 dark:bg-orange-900/30", ordre: 3 },
+  { id: "GAGNE", label: "Gagné", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30", ordre: 4 },
+  { id: "PERDU", label: "Perdu", color: "text-red-600", bgColor: "bg-red-100 dark:bg-red-900/30", ordre: 5 },
 ];
 
 // Sources d'opportunités
@@ -130,6 +131,7 @@ const SOURCES = [
 // Types de client
 const CLIENT_TYPES = [
   { id: "ENTREPRISE", label: "Entreprise" },
+  { id: "INDEPENDANT", label: "Indépendant" },
   { id: "PARTICULIER", label: "Particulier" },
 ];
 
@@ -498,7 +500,6 @@ function Column({
 function OpportuniteModal({
   opportunite,
   stage,
-  entreprises,
   formations,
   onClose,
   onSave,
@@ -507,14 +508,13 @@ function OpportuniteModal({
 }: {
   opportunite: Opportunite | null;
   stage: string;
-  entreprises: Entreprise[];
   formations: Formation[];
   onClose: () => void;
   onSave: (data: OpportuniteFormData) => void;
   onDelete?: () => void;
   isLoading: boolean;
 }) {
-  const [clientType, setClientType] = useState<"ENTREPRISE" | "PARTICULIER">(
+  const [clientType, setClientType] = useState<"ENTREPRISE" | "INDEPENDANT" | "PARTICULIER">(
     opportunite?.entreprise ? "ENTREPRISE" : "PARTICULIER"
   );
   const [formData, setFormData] = useState({
@@ -523,9 +523,10 @@ function OpportuniteModal({
     montantHT: opportunite?.montantHT?.toString() || "",
     probabilite: opportunite?.probabilite || 50,
     source: opportunite?.source || "AUTRE",
-    entrepriseId: opportunite?.entreprise?.id || "",
+    entrepriseNom: opportunite?.entreprise?.raisonSociale || "",
     formationId: opportunite?.formation?.id || "",
     contactNom: opportunite?.contactNom || "",
+    contactPrenom: "",
     contactEmail: opportunite?.contactEmail || "",
     contactTelephone: opportunite?.contactTelephone || "",
     contactFonction: opportunite?.contactFonction || "",
@@ -534,6 +535,12 @@ function OpportuniteModal({
     notes: opportunite?.notes || "",
     raisonPerte: opportunite?.raisonPerte || "",
   });
+
+  // Libellé du montant selon le type de client
+  const getMontantLabel = () => {
+    if (clientType === "PARTICULIER") return "Montant TTC";
+    return "Montant HT";
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -544,7 +551,7 @@ function OpportuniteModal({
       probabilite: formData.probabilite,
       source: formData.source,
       stage: opportunite?.stage || stage,
-      entrepriseId: clientType === "ENTREPRISE" && formData.entrepriseId ? formData.entrepriseId : null,
+      entrepriseId: null, // Plus de liaison BDD
       formationId: formData.formationId || null,
       contactNom: formData.contactNom || null,
       contactEmail: formData.contactEmail || null,
@@ -585,25 +592,7 @@ function OpportuniteModal({
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Type de client */}
-          <div className="flex gap-3">
-            {CLIENT_TYPES.map((type) => (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => setClientType(type.id as "ENTREPRISE" | "PARTICULIER")}
-                className={`flex-1 py-2.5 px-4 rounded-xl border-2 font-medium text-sm transition-all ${
-                  clientType === type.id
-                    ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400"
-                    : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300"
-                }`}
-              >
-                {type.id === "ENTREPRISE" ? "🏢" : "👤"} {type.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Titre */}
+          {/* Nom de l'opportunité */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Nom de l'opportunité *
@@ -618,56 +607,74 @@ function OpportuniteModal({
             />
           </div>
 
-          {/* Entreprise ou Contact */}
-          {clientType === "ENTREPRISE" ? (
+          {/* Type de client */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Type de client
+            </label>
+            <div className="flex gap-3">
+              {CLIENT_TYPES.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => setClientType(type.id as "ENTREPRISE" | "INDEPENDANT" | "PARTICULIER")}
+                  className={`flex-1 py-2.5 px-4 rounded-xl border-2 font-medium text-sm transition-all ${
+                    clientType === type.id
+                      ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400"
+                      : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300"
+                  }`}
+                >
+                  {type.id === "ENTREPRISE" ? "🏢" : type.id === "INDEPENDANT" ? "💼" : "👤"} {type.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Nom entreprise (champ libre) - affiché uniquement pour Entreprise/Indépendant */}
+          {(clientType === "ENTREPRISE" || clientType === "INDEPENDANT") && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Entreprise
+                {clientType === "ENTREPRISE" ? "Nom de l'entreprise" : "Nom de l'activité"}
               </label>
-              <select
-                value={formData.entrepriseId}
-                onChange={(e) => setFormData({ ...formData, entrepriseId: e.target.value })}
+              <input
+                type="text"
+                value={formData.entrepriseNom}
+                onChange={(e) => setFormData({ ...formData, entrepriseNom: e.target.value })}
                 className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-              >
-                <option value="">Sélectionner une entreprise...</option>
-                {entreprises.map((e) => (
-                  <option key={e.id} value={e.id}>{e.raisonSociale}</option>
-                ))}
-              </select>
-              <button type="button" className="mt-2 text-sm text-brand-500 hover:text-brand-600">
-                + Créer une nouvelle entreprise
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Nom du contact
-                </label>
-                <input
-                  type="text"
-                  value={formData.contactNom}
-                  onChange={(e) => setFormData({ ...formData, contactNom: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                  placeholder="Nom complet"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Fonction
-                </label>
-                <input
-                  type="text"
-                  value={formData.contactFonction}
-                  onChange={(e) => setFormData({ ...formData, contactFonction: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                  placeholder="Ex: Responsable RH"
-                />
-              </div>
+                placeholder={clientType === "ENTREPRISE" ? "Nom de l'entreprise" : "Nom de l'activité / SIRET"}
+              />
             </div>
           )}
 
-          {/* Contact infos */}
+          {/* Nom et Prénom */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Nom
+              </label>
+              <input
+                type="text"
+                value={formData.contactNom}
+                onChange={(e) => setFormData({ ...formData, contactNom: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                placeholder="Nom"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Prénom
+              </label>
+              <input
+                type="text"
+                value={formData.contactPrenom}
+                onChange={(e) => setFormData({ ...formData, contactPrenom: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                placeholder="Prénom"
+              />
+            </div>
+          </div>
+
+          {/* Email et Téléphone */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
@@ -695,7 +702,7 @@ function OpportuniteModal({
             </div>
           </div>
 
-          {/* Formation liée */}
+          {/* Formation associée */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Formation associée
@@ -712,24 +719,28 @@ function OpportuniteModal({
             </select>
           </div>
 
-          {/* Montant et dates */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Montant HT
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={formData.montantHT}
-                  onChange={(e) => setFormData({ ...formData, montantHT: e.target.value })}
-                  className="w-full px-4 py-2.5 pr-8 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                  placeholder="0"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">€</span>
-              </div>
+          {/* Montant (HT ou TTC selon type) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              {getMontantLabel()}
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                value={formData.montantHT}
+                onChange={(e) => setFormData({ ...formData, montantHT: e.target.value })}
+                className="w-full px-4 py-2.5 pr-8 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                placeholder="0"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">€</span>
             </div>
+            <p className="mt-1 text-xs text-gray-500">
+              {clientType === "PARTICULIER" ? "Montant toutes taxes comprises" : "Montant hors taxes"}
+            </p>
+          </div>
 
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Date de relance
@@ -741,10 +752,9 @@ function OpportuniteModal({
                 className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Date de clôture
+                Date de clôture prévue
               </label>
               <input
                 type="date"
@@ -958,7 +968,7 @@ export default function CRMPipelinePage() {
   }>({
     isOpen: false,
     opportunite: null,
-    stage: "ENTRANT",
+    stage: "A_TRAITER",
   });
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1145,7 +1155,7 @@ export default function CRMPipelinePage() {
 
       if (!res.ok) throw new Error("Erreur");
 
-      setModalState({ isOpen: false, opportunite: null, stage: "ENTRANT" });
+      setModalState({ isOpen: false, opportunite: null, stage: "A_TRAITER" });
       loadData();
     } catch (error) {
       console.error("Erreur:", error);
@@ -1166,7 +1176,7 @@ export default function CRMPipelinePage() {
 
       if (!res.ok) throw new Error("Erreur");
 
-      setModalState({ isOpen: false, opportunite: null, stage: "ENTRANT" });
+      setModalState({ isOpen: false, opportunite: null, stage: "A_TRAITER" });
       loadData();
     } catch (error) {
       console.error("Erreur:", error);
@@ -1201,7 +1211,7 @@ export default function CRMPipelinePage() {
               Tunnel de vente
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Gérez vos opportunités commerciales par glisser-déposer
+              Suivez vos opportunités commerciales grâce à un pipeline en glisser-déposer.
             </p>
           </div>
           <div className="flex items-center gap-6">
@@ -1217,12 +1227,6 @@ export default function CRMPipelinePage() {
               </p>
               <p className="text-xs text-gray-500">Total</p>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-brand-600">
-                {formatCurrency(stats?.montantPondere || 0)}
-              </p>
-              <p className="text-xs text-gray-500">Pondéré</p>
-            </div>
             <Link
               href="/automate/crm/dashboard"
               className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 font-medium transition-colors"
@@ -1233,7 +1237,7 @@ export default function CRMPipelinePage() {
               Dashboard
             </Link>
             <button
-              onClick={() => setModalState({ isOpen: true, opportunite: null, stage: "ENTRANT" })}
+              onClick={() => setModalState({ isOpen: true, opportunite: null, stage: "A_TRAITER" })}
               className="flex items-center gap-2 px-5 py-2.5 bg-brand-500 text-white rounded-xl hover:bg-brand-600 font-medium shadow-lg shadow-brand-500/25"
             >
               <PlusIcon />
@@ -1409,9 +1413,8 @@ export default function CRMPipelinePage() {
           <OpportuniteModal
             opportunite={modalState.opportunite}
             stage={modalState.stage}
-            entreprises={entreprises}
             formations={formations}
-            onClose={() => setModalState({ isOpen: false, opportunite: null, stage: "ENTRANT" })}
+            onClose={() => setModalState({ isOpen: false, opportunite: null, stage: "A_TRAITER" })}
             onSave={handleSave}
             onDelete={modalState.opportunite ? handleDelete : undefined}
             isLoading={isSaving}

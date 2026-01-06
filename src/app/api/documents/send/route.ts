@@ -129,11 +129,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Chercher dans SessionDocumentNew (nouveau système)
     if (!documentInfo) {
-      return NextResponse.json(
-        { error: "Document non trouvé" },
-        { status: 404 }
-      );
+      const sessionDocNew = await prisma.sessionDocumentNew.findFirst({
+        where: {
+          id: documentId,
+          session: {
+            organization: {
+              id: user.organizationId,
+            },
+          },
+        },
+      });
+
+      if (sessionDocNew) {
+        let titre = sessionDocNew.titre || sessionDocNew.type;
+        titre = titre.replace(/\.html$/i, "");
+        documentInfo = { id: sessionDocNew.id, titre, type: sessionDocNew.type };
+      }
+    }
+
+    // Si document pas trouvé en base, accepter quand même (document généré en local non sauvegardé)
+    // Dans ce cas, utiliser le documentId comme titre
+    if (!documentInfo) {
+      // Si on a reçu un titre dans la requête, l'utiliser
+      const { documentTitre } = body;
+      if (documentTitre) {
+        documentInfo = { id: documentId, titre: documentTitre, type: "DOCUMENT" };
+      } else {
+        return NextResponse.json(
+          { error: "Document non trouvé" },
+          { status: 404 }
+        );
+      }
     }
 
     // Envoyer l'email avec le document

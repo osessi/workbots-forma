@@ -13,16 +13,12 @@ from models.sql.template import PptxTemplateModel, TemplateModel
 from models.sql.presentation import PresentationModel
 from services.pptx_presentation_creator import PptxPresentationCreator
 from services.pptx_template_service import PPTX_TEMPLATE_SERVICE
-from services.smart_pptx_builder import build_presentation_from_content
 from services.temp_file_service import TEMP_FILE_SERVICE
 from utils.asset_directory_utils import get_exports_directory
 from services.database import engine
 
 # Get the Next.js app URL from environment variable or default to localhost:4000
 NEXTJS_URL = os.getenv("NEXTJS_URL", "http://localhost:4000")
-
-# Use the new smart builder for better visual quality
-USE_SMART_BUILDER = True
 
 
 async def export_presentation(
@@ -36,19 +32,19 @@ async def export_presentation(
 
     If template_id is provided, uses the professional template-based export
     which preserves the original PPTX template's quality.
-    Otherwise, falls back to the basic PPTX generation.
+    Otherwise, uses the default PPTX generation with template-specific styling.
     """
     if export_as == "pptx":
-        # Check if we should use template-based export
+        # Check if we should use template-based export (custom uploaded templates)
         if template_id:
             return await export_with_template(presentation_id, title, template_id)
 
-        # Try to find a matching template automatically
+        # Try to find a matching custom template automatically
         auto_template = await find_matching_template(presentation_id)
         if auto_template:
             return await export_with_template(presentation_id, title, str(auto_template.id))
 
-        # Fall back to basic PPTX generation
+        # Use default PPTX generation (now with template-specific colors)
         return await export_basic_pptx(presentation_id, title)
 
     else:
@@ -75,8 +71,10 @@ async def export_with_template(
     template_id: str
 ) -> PresentationAndPath:
     """
-    Export using a professional PPTX template.
-    Preserves original template design and only replaces content.
+    Export using a custom uploaded PPTX template.
+
+    This opens the ORIGINAL PPTX template file and ONLY replaces text content.
+    All design elements (shapes, images, colors, fonts, positions) are preserved.
     """
     # Get the template
     with Session(engine) as session:
@@ -85,15 +83,18 @@ async def export_with_template(
             raise HTTPException(status_code=404, detail="Template not found")
         template_path = template.file_path
 
-    # Get presentation data from Next.js
+    # Get presentation data formatted for template replacement
     slides_content = await get_presentation_content(presentation_id)
 
-    # Generate using template
+    # Use PptxTemplateService to generate from template
+    # This preserves the original PPTX design and only replaces content
     output_filename = sanitize_filename(title or str(uuid.uuid4()))
+
     output_path = await PPTX_TEMPLATE_SERVICE.generate_from_template(
         template_path=template_path,
         slides_content=slides_content,
-        output_filename=output_filename
+        output_filename=output_filename,
+        options={}
     )
 
     return PresentationAndPath(
@@ -107,50 +108,13 @@ async def export_basic_pptx(
     title: str
 ) -> PresentationAndPath:
     """
-    PPTX export with professional styling.
-    Uses SmartPptxBuilder for high-quality output.
+    PPTX export using the built-in templates (General, Modern, Standard, Swift).
+
+    The template-specific colors are now applied in the Next.js API
+    (presentation_to_pptx_model) based on the layout_group of each slide.
     """
-    # Get presentation data to determine template
-    presentation_data = None
-    template_name = "general"
-
-    try:
-        with Session(engine) as session:
-            presentation = session.get(PresentationModel, presentation_id)
-            if presentation and presentation.layout:
-                layout_name = presentation.layout.get("name", "general")
-                # Map layout name to template
-                if layout_name.lower() in ["general", "modern", "standard", "swift"]:
-                    template_name = layout_name.lower()
-    except Exception as e:
-        print(f"Could not get presentation template: {e}")
-
-    # Get presentation content
-    slides_content = await get_presentation_content(presentation_id)
-
-    if USE_SMART_BUILDER and slides_content:
-        # Use the new smart builder for professional quality
-        try:
-            export_directory = get_exports_directory()
-            output_filename = sanitize_filename(title or str(uuid.uuid4()))
-            pptx_path = os.path.join(export_directory, f"{output_filename}.pptx")
-
-            pptx_path = await build_presentation_from_content(
-                slides_content=slides_content,
-                template_name=template_name,
-                title=output_filename,
-                output_path=pptx_path
-            )
-
-            return PresentationAndPath(
-                presentation_id=presentation_id,
-                path=pptx_path,
-            )
-        except Exception as e:
-            print(f"SmartPptxBuilder failed, falling back to basic: {e}")
-            # Fall through to basic method
-
-    # Fallback: Get the converted PPTX model from the Next.js service
+    # Get the converted PPTX model from the Next.js service
+    # This now includes template-specific colors based on layout_group
     async with aiohttp.ClientSession() as session:
         async with session.get(
             f"{NEXTJS_URL}/api/presentation_to_pptx_model?id={presentation_id}"
@@ -232,8 +196,12 @@ async def get_presentation_content(presentation_id: uuid.UUID) -> list:
 async def find_matching_template(presentation_id: uuid.UUID) -> Optional[PptxTemplateModel]:
     """
     Try to find a matching PPTX template for the presentation.
-    Looks for the pptx_template_id linked to the React template used.
-    Returns None if no suitable template is found.
+
+    Looks for:
+    1. Custom templates uploaded via Smart Templates (format: "custom-{uuid}")
+    2. Built-in templates stored in Smart Templates (general, modern, standard, swift)
+
+    Returns None only if no matching template is found.
     """
     with Session(engine) as session:
         # Get the presentation to find its layout
@@ -260,4 +228,27 @@ async def find_matching_template(presentation_id: uuid.UUID) -> Optional[PptxTem
                 # Invalid UUID format
                 pass
 
+        # Check for built-in templates (general, modern, standard, swift)
+        # These are stored in Smart Templates with category="builtin"
+        builtin_names = {
+            "general": "Général",
+            "modern": "Moderne",
+            "standard": "Standard",
+            "swift": "Swift"
+        }
+
+        if layout_name.lower() in builtin_names:
+            template_display_name = builtin_names[layout_name.lower()]
+            # Look for the built-in PPTX template
+            pptx_template = session.exec(
+                select(PptxTemplateModel).where(
+                    PptxTemplateModel.name == template_display_name,
+                    PptxTemplateModel.is_active == True
+                )
+            ).first()
+
+            if pptx_template:
+                return pptx_template
+
+        # No matching template found
         return None

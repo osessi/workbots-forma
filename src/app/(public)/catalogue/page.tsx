@@ -480,7 +480,7 @@ function FormationCard({
               {formation.tarif.toLocaleString("fr-FR")} € HT
             </span>
           ) : (
-            <span className="text-sm text-gray-500">Tarif sur demande</span>
+            <span className="text-sm text-gray-500">Fiche pédagogique</span>
           )}
           <span
             className="inline-flex items-center text-sm font-medium group-hover:translate-x-1 transition-transform"

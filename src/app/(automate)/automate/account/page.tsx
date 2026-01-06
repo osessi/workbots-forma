@@ -246,7 +246,7 @@ export default function MonComptePage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
-                  Prenom
+                  Prénom
                 </label>
                 <input
                   type="text"
@@ -282,7 +282,7 @@ export default function MonComptePage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">
-                Telephone
+                Téléphone
               </label>
               <input
                 type="tel"
@@ -301,11 +301,11 @@ export default function MonComptePage() {
           {/* Sécurité */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] card-hover-glow">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-500/10">
+              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <LockIcon />
               </div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Securite
+                Sécurité
               </h2>
             </div>
             <div className="flex items-center justify-between">
@@ -314,7 +314,7 @@ export default function MonComptePage() {
                   Mot de passe
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Derniere modification il y a 3 mois
+                  Dernière modification il y a 3 mois
                 </p>
               </div>
               <Link
@@ -329,7 +329,7 @@ export default function MonComptePage() {
           {/* Notifications */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] card-hover-glow">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-500/10">
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <BellIcon />
               </div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -342,7 +342,7 @@ export default function MonComptePage() {
                   Notifications par email
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Mises a jour sur vos formations
+                  Alertes et informations sur vos formations
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -360,7 +360,7 @@ export default function MonComptePage() {
           {/* Paramètres organisme */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] card-hover-glow">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-500/10">
+              <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400">
                 <SettingsIcon />
               </div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -370,7 +370,7 @@ export default function MonComptePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Parametres de l&apos;organisme
+                  Paramètres de l&apos;organisme
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   Logo, signature, cachet et informations
@@ -380,7 +380,7 @@ export default function MonComptePage() {
                 href="/automate/settings"
                 className="px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-xl active:scale-[0.98] transition-all dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
               >
-                Acceder
+                Accéder
               </Link>
             </div>
           </div>

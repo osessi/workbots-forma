@@ -29,6 +29,7 @@ import {
   FileCheck,
   Rocket,
   PartyPopper,
+  MessageSquareText,
 } from "lucide-react";
 import {
   SessionClient,
@@ -82,6 +83,24 @@ type DocumentType =
   | "certificat_realisation"
   | "emargement"
   | "facture";
+
+// Types pour les évaluations en ligne (formulaires)
+type EvaluationSatisfactionType = "CHAUD" | "FROID";
+type EvaluationOtherType = "INTERVENANT" | "FINANCEUR";
+type EvaluationType = EvaluationSatisfactionType | EvaluationOtherType;
+
+interface CreatedEvaluation {
+  id: string;
+  type: EvaluationType;
+  apprenantId?: string;
+  apprenantName?: string;
+  intervenantId?: string;
+  intervenantName?: string;
+  financeurId?: string;
+  financeurName?: string;
+  token: string;
+  status: string;
+}
 
 interface DocumentConfig {
   id: DocumentType;
@@ -165,6 +184,67 @@ const documentsConfig: DocumentConfig[] = [
     color: "text-red-600 dark:text-red-400",
     bgColor: "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/30",
   },
+];
+
+// Configuration des évaluations en ligne (formulaires)
+interface EvaluationConfig {
+  id: EvaluationType;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+  targetType: "apprenant" | "intervenant" | "financeur";
+}
+
+// Évaluations de satisfaction (apprenants)
+const evaluationsSatisfactionConfig: EvaluationConfig[] = [
+  {
+    id: "CHAUD",
+    label: "Évaluation à chaud",
+    description: "Questionnaire de satisfaction à remplir en fin de formation",
+    icon: <MessageSquareText size={20} />,
+    color: "text-pink-600 dark:text-pink-400",
+    bgColor: "bg-pink-50 border-pink-200 dark:bg-pink-500/10 dark:border-pink-500/30",
+    targetType: "apprenant",
+  },
+  {
+    id: "FROID",
+    label: "Évaluation à froid",
+    description: "Questionnaire de suivi à remplir quelques semaines après la formation",
+    icon: <MessageSquareText size={20} />,
+    color: "text-cyan-600 dark:text-cyan-400",
+    bgColor: "bg-cyan-50 border-cyan-200 dark:bg-cyan-500/10 dark:border-cyan-500/30",
+    targetType: "apprenant",
+  },
+];
+
+// Évaluations autres (intervenants, financeurs)
+const evaluationsOtherConfig: EvaluationConfig[] = [
+  {
+    id: "INTERVENANT",
+    label: "Évaluation intervenant",
+    description: "Questionnaire d'évaluation du formateur par les apprenants",
+    icon: <MessageSquareText size={20} />,
+    color: "text-violet-600 dark:text-violet-400",
+    bgColor: "bg-violet-50 border-violet-200 dark:bg-violet-500/10 dark:border-violet-500/30",
+    targetType: "intervenant",
+  },
+  {
+    id: "FINANCEUR",
+    label: "Évaluation financeur",
+    description: "Questionnaire de satisfaction pour les financeurs (OPCO, CPF, etc.)",
+    icon: <MessageSquareText size={20} />,
+    color: "text-amber-600 dark:text-amber-400",
+    bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30",
+    targetType: "financeur",
+  },
+];
+
+// Toutes les évaluations combinées
+const evaluationsConfig: EvaluationConfig[] = [
+  ...evaluationsSatisfactionConfig,
+  ...evaluationsOtherConfig,
 ];
 
 // Dimensions A4 en mm converties en pixels (96 DPI)
@@ -375,6 +455,20 @@ export default function StepDocuments({
   const [isPublished, setIsPublished] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Évaluations en ligne (formulaires)
+  const [createdEvaluations, setCreatedEvaluations] = useState<CreatedEvaluation[]>([]);
+  const [creatingEvalType, setCreatingEvalType] = useState<string | null>(null);
+  const [expandedEvalSection, setExpandedEvalSection] = useState<string | null>(null);
+
+  // Modal d'envoi email
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailDoc, setEmailDoc] = useState<GeneratedDocument | null>(null);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState<Set<string>>(new Set());
+
   // Synchroniser avec initialGeneratedDocs quand ils changent (rechargement)
   useEffect(() => {
     if (initialGeneratedDocs.length > 0 && generatedDocs.length === 0) {
@@ -554,6 +648,7 @@ export default function StepDocuments({
         // Convention pour entreprises ET indépendants (ils ont un SIRET)
         return clients.filter((c) => c.type === "ENTREPRISE" || c.type === "INDEPENDANT").map((c) => ({
           id: c.id,
+          uniqueKey: `convention-${c.id}`, // Clé unique pour React
           name: c.type === "ENTREPRISE"
             ? c.entreprise?.raisonSociale || "Entreprise"
             : c.apprenant ? `${c.apprenant.prenom} ${c.apprenant.nom}` : "Indépendant",
@@ -564,15 +659,29 @@ export default function StepDocuments({
         // Contrat uniquement pour les particuliers (sans SIRET)
         return clients.filter((c) => c.type === "PARTICULIER").map((c) => ({
           id: c.id,
+          uniqueKey: `contrat-${c.id}`, // Clé unique pour React
           name: c.apprenant ? `${c.apprenant.prenom} ${c.apprenant.nom}` : "Particulier",
           type: "client" as const,
           clientType: c.type,
         }));
       case "convocation":
       case "attestation":
+        // Utiliser une combinaison client+apprenant pour éviter les doublons
         return clients.flatMap((c) =>
-          c.apprenants.map((a) => ({
+          c.apprenants.map((a, index) => ({
             id: a.id,
+            uniqueKey: `${docType}-${c.id}-${a.id}-${index}`, // Clé unique pour React
+            name: `${a.prenom} ${a.nom}`,
+            type: "apprenant" as const,
+            clientId: c.id,
+            clientName: c.type === "ENTREPRISE" ? c.entreprise?.raisonSociale : undefined,
+          }))
+        );
+      case "certificat_realisation":
+        return clients.flatMap((c) =>
+          c.apprenants.map((a, index) => ({
+            id: a.id,
+            uniqueKey: `certificat-${c.id}-${a.id}-${index}`, // Clé unique pour React
             name: `${a.prenom} ${a.nom}`,
             type: "apprenant" as const,
             clientId: c.id,
@@ -582,15 +691,280 @@ export default function StepDocuments({
       case "facture":
         return clients.map((c) => ({
           id: c.id,
+          uniqueKey: `facture-${c.id}`, // Clé unique pour React
           name: c.type === "ENTREPRISE" ? c.entreprise?.raisonSociale || "Entreprise" : c.apprenant ? `${c.apprenant.prenom} ${c.apprenant.nom}` : "Client",
           type: "client" as const,
           clientType: c.type,
         }));
       case "emargement":
-        return [{ id: "session", name: "Session complète", type: "session" as const }];
+        return [{ id: "session", uniqueKey: "emargement-session", name: "Session complète", type: "session" as const }];
       default:
         return [];
     }
+  };
+
+  // Créer une évaluation de satisfaction (CHAUD/FROID) pour un apprenant
+  const createSatisfactionEvaluation = async (evalType: EvaluationSatisfactionType, apprenantId: string, apprenantName: string) => {
+    if (!formation.sessionId) {
+      setError("Aucune session associée. Veuillez d'abord planifier la session.");
+      return;
+    }
+
+    setCreatingEvalType(`${evalType}-${apprenantId}`);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/evaluation-satisfaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: formation.sessionId,
+          apprenantId,
+          type: evalType,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la création de l'évaluation");
+      }
+
+      const result = await response.json();
+
+      // Ajouter à la liste des évaluations créées
+      setCreatedEvaluations((prev) => {
+        const exists = prev.find((e) => e.id === result.id);
+        if (exists) return prev;
+        return [...prev, {
+          id: result.id,
+          type: evalType,
+          apprenantId,
+          apprenantName,
+          token: result.token,
+          status: result.status,
+        }];
+      });
+    } catch (err) {
+      console.error("Erreur création évaluation satisfaction:", err);
+      setError(err instanceof Error ? err.message : "Erreur lors de la création de l'évaluation");
+    } finally {
+      setCreatingEvalType(null);
+    }
+  };
+
+  // Créer une évaluation intervenant
+  const createIntervenantEvaluation = async (intervenantId: string, intervenantName: string) => {
+    if (!formation.sessionId) {
+      setError("Aucune session associée. Veuillez d'abord planifier la session.");
+      return;
+    }
+
+    setCreatingEvalType(`INTERVENANT-${intervenantId}`);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/evaluation-intervenant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: formation.sessionId,
+          intervenantId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la création de l'évaluation intervenant");
+      }
+
+      const result = await response.json();
+
+      // Ajouter à la liste des évaluations créées
+      setCreatedEvaluations((prev) => {
+        const exists = prev.find((e) => e.id === result.id);
+        if (exists) return prev;
+        return [...prev, {
+          id: result.id,
+          type: "INTERVENANT" as EvaluationType,
+          intervenantId,
+          intervenantName,
+          token: result.token,
+          status: result.status,
+        }];
+      });
+    } catch (err) {
+      console.error("Erreur création évaluation intervenant:", err);
+      setError(err instanceof Error ? err.message : "Erreur lors de la création de l'évaluation");
+    } finally {
+      setCreatingEvalType(null);
+    }
+  };
+
+  // Créer une évaluation financeur
+  const createFinanceurEvaluation = async (financeurId: string, financeurName: string) => {
+    if (!formation.sessionId) {
+      setError("Aucune session associée. Veuillez d'abord planifier la session.");
+      return;
+    }
+
+    setCreatingEvalType(`FINANCEUR-${financeurId}`);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/evaluation-financeur", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: formation.sessionId,
+          financeurId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la création de l'évaluation financeur");
+      }
+
+      const result = await response.json();
+
+      // Ajouter à la liste des évaluations créées
+      setCreatedEvaluations((prev) => {
+        const exists = prev.find((e) => e.id === result.id);
+        if (exists) return prev;
+        return [...prev, {
+          id: result.id,
+          type: "FINANCEUR" as EvaluationType,
+          financeurId,
+          financeurName,
+          token: result.token,
+          status: result.status,
+        }];
+      });
+    } catch (err) {
+      console.error("Erreur création évaluation financeur:", err);
+      setError(err instanceof Error ? err.message : "Erreur lors de la création de l'évaluation");
+    } finally {
+      setCreatingEvalType(null);
+    }
+  };
+
+  // Fonction générique pour créer une évaluation selon son type
+  const createEvaluation = async (evalConfig: EvaluationConfig, targetId: string, targetName: string) => {
+    if (evalConfig.targetType === "apprenant") {
+      await createSatisfactionEvaluation(evalConfig.id as EvaluationSatisfactionType, targetId, targetName);
+    } else if (evalConfig.targetType === "intervenant") {
+      await createIntervenantEvaluation(targetId, targetName);
+    } else if (evalConfig.targetType === "financeur") {
+      await createFinanceurEvaluation(targetId, targetName);
+    }
+  };
+
+  // Créer toutes les évaluations d'un type
+  const createAllEvaluations = async (evalConfig: EvaluationConfig) => {
+    if (!formation.sessionId) {
+      setError("Aucune session associée. Veuillez d'abord planifier la session.");
+      return;
+    }
+
+    if (evalConfig.targetType === "apprenant") {
+      const allApprenants = clients.flatMap((c) =>
+        c.apprenants.map((a) => ({
+          id: a.id,
+          name: `${a.prenom} ${a.nom}`,
+        }))
+      );
+
+      for (const apprenant of allApprenants) {
+        const alreadyCreated = createdEvaluations.find(
+          (e) => e.type === evalConfig.id && e.apprenantId === apprenant.id
+        );
+        if (!alreadyCreated) {
+          await createSatisfactionEvaluation(evalConfig.id as EvaluationSatisfactionType, apprenant.id, apprenant.name);
+        }
+      }
+    } else if (evalConfig.targetType === "intervenant") {
+      // Créer pour tous les formateurs de la session
+      if (formateurs.formateurPrincipal) {
+        const alreadyCreated = createdEvaluations.find(
+          (e) => e.type === "INTERVENANT" && e.intervenantId === formateurs.formateurPrincipal?.id
+        );
+        if (!alreadyCreated) {
+          await createIntervenantEvaluation(
+            formateurs.formateurPrincipal.id,
+            `${formateurs.formateurPrincipal.prenom} ${formateurs.formateurPrincipal.nom}`
+          );
+        }
+      }
+    } else if (evalConfig.targetType === "financeur") {
+      // Créer pour tous les financeurs des tarifs
+      // Le type SessionTarif n'a pas forcément financeur/financeurId, on skip cette logique pour l'instant
+      // Cette partie sera mise à jour quand les financeurs seront ajoutés aux tarifs
+      const financeurs: { id: string; name: string }[] = [];
+
+      const uniqueFinanceurs = Array.from(
+        new Map(financeurs.map((f) => [f.id, f])).values()
+      );
+
+      for (const financeur of uniqueFinanceurs) {
+        const alreadyCreated = createdEvaluations.find(
+          (e) => e.type === "FINANCEUR" && e.financeurId === financeur.id
+        );
+        if (!alreadyCreated) {
+          await createFinanceurEvaluation(financeur.id, financeur.name);
+        }
+      }
+    }
+  };
+
+  // Vérifier si une évaluation a été créée (selon le type de cible)
+  const isEvalCreated = (evalConfig: EvaluationConfig, targetId: string) => {
+    if (evalConfig.targetType === "apprenant") {
+      return createdEvaluations.some((e) => e.type === evalConfig.id && e.apprenantId === targetId);
+    } else if (evalConfig.targetType === "intervenant") {
+      return createdEvaluations.some((e) => e.type === "INTERVENANT" && e.intervenantId === targetId);
+    } else if (evalConfig.targetType === "financeur") {
+      return createdEvaluations.some((e) => e.type === "FINANCEUR" && e.financeurId === targetId);
+    }
+    return false;
+  };
+
+  // Obtenir l'évaluation créée (selon le type de cible)
+  const getCreatedEval = (evalConfig: EvaluationConfig, targetId: string) => {
+    if (evalConfig.targetType === "apprenant") {
+      return createdEvaluations.find((e) => e.type === evalConfig.id && e.apprenantId === targetId);
+    } else if (evalConfig.targetType === "intervenant") {
+      return createdEvaluations.find((e) => e.type === "INTERVENANT" && e.intervenantId === targetId);
+    } else if (evalConfig.targetType === "financeur") {
+      return createdEvaluations.find((e) => e.type === "FINANCEUR" && e.financeurId === targetId);
+    }
+    return undefined;
+  };
+
+  // Obtenir les cibles pour un type d'évaluation
+  const getEvalTargets = (evalConfig: EvaluationConfig) => {
+    if (evalConfig.targetType === "apprenant") {
+      return clients.flatMap((c) =>
+        c.apprenants.map((a, index) => ({
+          id: a.id,
+          uniqueKey: `${evalConfig.id}-${c.id}-${a.id}-${index}`,
+          name: `${a.prenom} ${a.nom}`,
+          clientId: c.id,
+          clientName: c.type === "ENTREPRISE" ? c.entreprise?.raisonSociale : undefined,
+        }))
+      );
+    } else if (evalConfig.targetType === "intervenant") {
+      if (!formateurs.formateurPrincipal) return [];
+      return [{
+        id: formateurs.formateurPrincipal.id,
+        uniqueKey: `INTERVENANT-${formateurs.formateurPrincipal.id}`,
+        name: `${formateurs.formateurPrincipal.prenom} ${formateurs.formateurPrincipal.nom}`,
+      }];
+    } else if (evalConfig.targetType === "financeur") {
+      // Pour l'instant, les financeurs ne sont pas dans SessionTarif
+      // Cette partie sera mise à jour quand les financeurs seront ajoutés
+      return [];
+    }
+    return [];
   };
 
   // Générer un document
@@ -703,6 +1077,67 @@ export default function StepDocuments({
       </html>
     `);
     printWindow.document.close();
+  };
+
+  // Ouvrir le modal d'envoi email
+  const openEmailModal = (doc: GeneratedDocument) => {
+    setEmailDoc(doc);
+    // Pré-remplir l'email si disponible (apprenant ou contact entreprise)
+    let defaultEmail = "";
+    if (doc.apprenantId) {
+      const apprenant = clients
+        .flatMap(c => c.apprenants)
+        .find(a => a.id === doc.apprenantId);
+      defaultEmail = apprenant?.email || "";
+    } else if (doc.clientId) {
+      const client = clients.find(c => c.id === doc.clientId);
+      if (client?.entreprise?.contactEmail) {
+        defaultEmail = client.entreprise.contactEmail;
+      } else if (client?.apprenant?.email) {
+        defaultEmail = client.apprenant.email;
+      }
+    }
+    setEmailAddress(defaultEmail);
+    setEmailSubject(`Document: ${doc.titre}`);
+    setEmailMessage("");
+    setShowEmailModal(true);
+  };
+
+  // Envoyer un document par email
+  const sendDocumentEmail = async () => {
+    if (!emailDoc || !emailAddress) return;
+
+    setIsSendingEmail(true);
+    try {
+      const response = await fetch("/api/documents/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: emailDoc.id,
+          documentTitre: emailDoc.titre, // Envoyer le titre pour les documents non sauvegardés
+          email: emailAddress,
+          subject: emailSubject,
+          message: emailMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de l'envoi");
+      }
+
+      // Marquer comme envoyé
+      setEmailSent(prev => new Set([...prev, emailDoc.id]));
+      setShowEmailModal(false);
+      setEmailDoc(null);
+      setEmailAddress("");
+      setEmailSubject("");
+      setEmailMessage("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'envoi de l'email");
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   // État pour le téléchargement en masse
@@ -872,16 +1307,32 @@ export default function StepDocuments({
 
   // Vérifier si un document a été généré pour un destinataire
   const isDocGenerated = (docType: DocumentType, targetId: string) => {
-    return generatedDocs.some(
-      (d) => d.type === docType && (d.clientId === targetId || d.apprenantId === targetId || (docType === "emargement" && d.type === "emargement"))
-    );
+    return generatedDocs.some((d) => {
+      if (d.type !== docType) return false;
+      // Documents pour toute la session
+      if (docType === "emargement") return true;
+      // Pour les documents par apprenant (convocation, attestation, certificat_realisation)
+      if (["convocation", "attestation", "certificat_realisation"].includes(docType)) {
+        return d.apprenantId === targetId;
+      }
+      // Pour les documents par client (convention, contrat, facture)
+      return d.clientId === targetId;
+    });
   };
 
   // Obtenir le document généré
   const getGeneratedDoc = (docType: DocumentType, targetId: string) => {
-    return generatedDocs.find(
-      (d) => d.type === docType && (d.clientId === targetId || d.apprenantId === targetId || (docType === "emargement" && d.type === "emargement"))
-    );
+    return generatedDocs.find((d) => {
+      if (d.type !== docType) return false;
+      // Documents pour toute la session
+      if (docType === "emargement") return true;
+      // Pour les documents par apprenant (convocation, attestation, certificat_realisation)
+      if (["convocation", "attestation", "certificat_realisation"].includes(docType)) {
+        return d.apprenantId === targetId;
+      }
+      // Pour les documents par client (convention, contrat, facture)
+      return d.clientId === targetId;
+    });
   };
 
   return (
@@ -1035,7 +1486,7 @@ export default function StepDocuments({
 
                       return (
                         <div
-                          key={dest.id}
+                          key={dest.uniqueKey}
                           className={`flex items-center justify-between p-3 rounded-lg border ${
                             isGenerated
                               ? "bg-green-50 border-green-200 dark:bg-green-500/10 dark:border-green-500/30"
@@ -1101,40 +1552,281 @@ export default function StepDocuments({
         </div>
       </div>
 
+      {/* Section Évaluations en ligne */}
+      {formation.sessionId && (
+        <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+            <MessageSquareText size={18} className="text-pink-500" />
+            Évaluations en ligne (formulaires)
+          </h3>
+
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Les évaluations sont des formulaires en ligne accessibles via un lien ou QR code.
+            Elles sont automatiquement visibles dans Catalogue → Évaluations.
+          </p>
+
+          <div className="space-y-3">
+            {evaluationsConfig.map((evalConfig) => {
+              const targets = getEvalTargets(evalConfig);
+              if (targets.length === 0) return null;
+
+              const isExpanded = expandedEvalSection === evalConfig.id;
+              const createdCount = targets.filter((t) => isEvalCreated(evalConfig, t.id)).length;
+              const allCreated = createdCount === targets.length;
+
+              // Libellé selon le type de cible
+              const targetLabel = evalConfig.targetType === "apprenant"
+                ? `apprenant${targets.length > 1 ? "s" : ""}`
+                : evalConfig.targetType === "intervenant"
+                  ? `formateur${targets.length > 1 ? "s" : ""}`
+                  : `financeur${targets.length > 1 ? "s" : ""}`;
+
+              return (
+                <div
+                  key={evalConfig.id}
+                  className={`rounded-xl border overflow-hidden ${evalConfig.bgColor}`}
+                >
+                  {/* Header du type d'évaluation */}
+                  <div
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors"
+                    onClick={() => setExpandedEvalSection(isExpanded ? null : evalConfig.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${evalConfig.color} bg-white dark:bg-gray-800`}>
+                        {evalConfig.icon}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${evalConfig.color}`}>
+                            {evalConfig.label}
+                          </p>
+                          <span className="px-1.5 py-0.5 text-xs bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded">
+                            {targets.length} {targetLabel}
+                          </span>
+                          {createdCount > 0 && (
+                            <span className="px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded flex items-center gap-1">
+                              <Check size={10} />
+                              {createdCount} créé{createdCount > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">{evalConfig.description}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {!allCreated && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            createAllEvaluations(evalConfig);
+                          }}
+                          disabled={creatingEvalType !== null}
+                          className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${evalConfig.color} bg-white dark:bg-gray-800 hover:opacity-80 disabled:opacity-50`}
+                        >
+                          {creatingEvalType?.startsWith(evalConfig.id) ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Play size={14} />
+                          )}
+                          Créer tous
+                        </button>
+                      )}
+                      {isExpanded ? <ChevronDown size={18} className="text-gray-400" /> : <ChevronRight size={18} className="text-gray-400" />}
+                    </div>
+                  </div>
+
+                  {/* Liste des cibles (si déplié) */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-4 space-y-2">
+                      {targets.map((target) => {
+                        const isCreated = isEvalCreated(evalConfig, target.id);
+                        const createdEval = getCreatedEval(evalConfig, target.id);
+                        const isCreating = creatingEvalType === `${evalConfig.id}-${target.id}`;
+
+                        // Déterminer le lien d'évaluation selon le type
+                        const evalLink = evalConfig.targetType === "intervenant"
+                          ? `/evaluation-intervenant/${createdEval?.token}`
+                          : evalConfig.targetType === "financeur"
+                            ? `/evaluation-financeur/${createdEval?.token}`
+                            : `/evaluation/${createdEval?.token}`;
+
+                        return (
+                          <div
+                            key={target.uniqueKey}
+                            className={`flex items-center justify-between p-3 rounded-lg border ${
+                              isCreated
+                                ? "bg-green-50 border-green-200 dark:bg-green-500/10 dark:border-green-500/30"
+                                : "bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {isCreated && <CheckCircle2 size={16} className="text-green-500" />}
+                              <div>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {target.name}
+                                </p>
+                                {"clientName" in target && (target as { clientName?: string }).clientName && (
+                                  <p className="text-xs text-gray-500">{(target as { clientName?: string }).clientName}</p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {isCreated && createdEval ? (
+                                <>
+                                  <span className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full ${
+                                    createdEval.status === "COMPLETED"
+                                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                      : createdEval.status === "IN_PROGRESS"
+                                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400"
+                                        : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                                  }`}>
+                                    <span className={`w-2 h-2 rounded-full ${
+                                      createdEval.status === "COMPLETED"
+                                        ? "bg-green-500"
+                                        : createdEval.status === "IN_PROGRESS"
+                                          ? "bg-yellow-500 animate-pulse"
+                                          : "bg-gray-400"
+                                    }`} />
+                                    {createdEval.status === "COMPLETED" ? "Complété" :
+                                     createdEval.status === "IN_PROGRESS" ? "En cours" : "En attente"}
+                                  </span>
+                                  <a
+                                    href={evalLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                  >
+                                    <Eye size={12} />
+                                    Voir
+                                  </a>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => createEvaluation(evalConfig, target.id, target.name)}
+                                  disabled={isCreating}
+                                  className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${evalConfig.color} bg-white dark:bg-gray-700 border border-current hover:opacity-80 disabled:opacity-50`}
+                                >
+                                  {isCreating ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <Play size={12} />
+                                  )}
+                                  Créer
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Message si pas de session pour les évaluations */}
+      {!formation.sessionId && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertCircle size={18} />
+            <p className="text-sm font-medium">
+              Planifiez la session pour pouvoir créer les évaluations en ligne
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Documents générés */}
       {generatedDocs.length > 0 && (
         <div className="rounded-xl border border-green-200 bg-green-50 p-5 dark:border-green-500/30 dark:bg-green-500/10">
-          <h3 className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-2 mb-4">
-            <CheckCircle2 size={16} />
-            {generatedDocs.length} document{generatedDocs.length > 1 ? "s" : ""} généré{generatedDocs.length > 1 ? "s" : ""}
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
+              <CheckCircle2 size={16} />
+              {generatedDocs.length} document{generatedDocs.length > 1 ? "s" : ""} généré{generatedDocs.length > 1 ? "s" : ""}
+            </h3>
+            <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Complet
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                Partiel
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                En attente
+              </span>
+            </div>
+          </div>
 
           <div className="flex flex-wrap gap-2">
-            {generatedDocs.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-500/30"
-              >
-                <span className="text-sm text-gray-700 dark:text-gray-300 max-w-[200px] truncate">
-                  {doc.titre}
-                </span>
-                <button
-                  onClick={() => {
-                    setPreviewDoc(doc);
-                    setShowPreviewModal(true);
-                  }}
-                  className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            {generatedDocs.map((doc) => {
+              const isSaved = doc.savedToDrive;
+              const isSent = emailSent.has(doc.id);
+              return (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-500/30"
                 >
-                  <Eye size={14} />
-                </button>
-                <button
-                  onClick={() => downloadPDF(doc)}
-                  className="p-1 text-red-500 hover:text-red-600"
-                >
-                  <Download size={14} />
-                </button>
-              </div>
-            ))}
+                  {/* Pastille de statut */}
+                  <span
+                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      isSaved && isSent
+                        ? "bg-green-500"
+                        : isSaved || isSent
+                          ? "bg-yellow-500"
+                          : "bg-gray-400"
+                    }`}
+                    title={
+                      isSaved && isSent
+                        ? "Sauvegardé et envoyé"
+                        : isSaved
+                          ? "Sauvegardé (non envoyé)"
+                          : isSent
+                            ? "Envoyé (non sauvegardé)"
+                            : "En attente"
+                    }
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300 max-w-[180px] truncate">
+                    {doc.titre}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setPreviewDoc(doc);
+                      setShowPreviewModal(true);
+                    }}
+                    className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    title="Prévisualiser"
+                  >
+                    <Eye size={14} />
+                  </button>
+                  <button
+                    onClick={() => downloadPDF(doc)}
+                    className="p-1 text-red-500 hover:text-red-600"
+                    title="Télécharger PDF"
+                  >
+                    <Download size={14} />
+                  </button>
+                  <button
+                    onClick={() => openEmailModal(doc)}
+                    className={`p-1 transition-colors ${
+                      isSent
+                        ? "text-green-500"
+                        : "text-blue-500 hover:text-blue-600"
+                    }`}
+                    title={isSent ? "Email envoyé" : "Envoyer par email"}
+                  >
+                    {isSent ? <CheckCircle2 size={14} /> : <Mail size={14} />}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1212,32 +1904,26 @@ export default function StepDocuments({
             </>
           )}
 
-          {/* Bouton Publier la formation */}
-          {formation.id && !isPublished && (
+          {/* Bouton Planifier la session */}
+          {formation.sessionId && !isPublished && (
             <button
-              onClick={publishFormation}
+              onClick={() => {
+                setIsPublished(true);
+                onPublish?.();
+              }}
               disabled={isPublishing}
               className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-xl hover:from-brand-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              {isPublishing ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Publication...
-                </>
-              ) : (
-                <>
-                  <Rocket size={18} />
-                  Publier la formation
-                </>
-              )}
+              <Calendar size={18} />
+              Planifier la session
             </button>
           )}
 
-          {/* Badge Formation publiée */}
+          {/* Badge Session planifiée */}
           {isPublished && (
             <span className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
               <CheckCircle2 size={16} />
-              Formation publiée
+              Session planifiée
             </span>
           )}
         </div>
@@ -1266,7 +1952,7 @@ export default function StepDocuments({
 
                 return (
                   <button
-                    key={dest.id}
+                    key={dest.uniqueKey}
                     onClick={() => {
                       if (isAlreadyGenerated) return;
                       const newSet = new Set(selectedForGeneration);
@@ -1574,6 +2260,103 @@ export default function StepDocuments({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'envoi par email */}
+      {showEmailModal && emailDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Mail size={20} className="text-blue-500" />
+                Envoyer par email
+              </h3>
+              <button
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailDoc(null);
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Document :</p>
+                <p className="font-medium text-gray-900 dark:text-white">{emailDoc.titre}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Email du destinataire *
+                </label>
+                <input
+                  type="email"
+                  value={emailAddress}
+                  onChange={(e) => setEmailAddress(e.target.value)}
+                  placeholder="email@exemple.com"
+                  className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Sujet
+                </label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Message personnalisé (optionnel)
+                </label>
+                <textarea
+                  value={emailMessage}
+                  onChange={(e) => setEmailMessage(e.target.value)}
+                  rows={3}
+                  placeholder="Ajoutez un message personnalisé..."
+                  className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-5 border-t border-gray-200 dark:border-gray-800">
+              <button
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailDoc(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={sendDocumentEmail}
+                disabled={!emailAddress || isSendingEmail}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSendingEmail ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Envoi...
+                  </>
+                ) : (
+                  <>
+                    <Mail size={16} />
+                    Envoyer
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

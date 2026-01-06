@@ -17,6 +17,8 @@ interface FormationData {
   numeroFicheRS: string;
   referentielRSUrl: string;
   lienFranceCompetences: string;
+  // Éligibilité CPF
+  estEligibleCPF: boolean;
 }
 
 interface StepContexteProps {
@@ -25,6 +27,7 @@ interface StepContexteProps {
   onNext: () => void;
   onGenerateFiche?: (contexte: FormationData) => Promise<void>;
   isGenerating?: boolean;
+  hasAdvancedProgress?: boolean; // True si la formation a déjà des slides/évaluations générés
 }
 
 // Icon pour enrichir
@@ -189,24 +192,108 @@ function ReferentielRSUpload({
   );
 }
 
+// Icône d'alerte pour la modal
+const AlertTriangleIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18C1.64 18.3 1.55 18.64 1.55 19C1.55 19.36 1.64 19.7 1.82 20C2 20.3 2.26 20.56 2.57 20.73C2.88 20.91 3.23 21 3.59 21H20.41C20.77 21 21.12 20.91 21.43 20.73C21.74 20.56 22 20.3 22.18 20C22.36 19.7 22.45 19.36 22.45 19C22.45 18.64 22.36 18.3 22.18 18L13.71 3.86C13.53 3.56 13.27 3.32 12.96 3.15C12.65 2.98 12.31 2.89 11.96 2.89C11.61 2.89 11.27 2.98 10.96 3.15C10.65 3.32 10.39 3.56 10.21 3.86H10.29Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Modal de confirmation pour régénération
+function RegenerationConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Modal */}
+      <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full mx-4 p-6">
+        {/* Icône d'alerte */}
+        <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-amber-100 dark:bg-amber-900/30">
+          <div className="text-amber-600 dark:text-amber-400">
+            <AlertTriangleIcon />
+          </div>
+        </div>
+
+        {/* Titre */}
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-3">
+          Attention
+        </h3>
+
+        {/* Message */}
+        <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-6 leading-relaxed">
+          Vous êtes sur le point de régénérer la fiche pédagogique. Cette action remplacera la fiche pédagogique actuelle et peut rendre les slides et les évaluations déjà générés incohérents.
+          <br /><br />
+          Après régénération, vous devrez probablement régénérer les slides et les évaluations pour rester aligné avec la nouvelle fiche pédagogique.
+          <br /><br />
+          <strong>Souhaitez-vous continuer ?</strong>
+        </p>
+
+        {/* Boutons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors"
+          >
+            Continuer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const StepContexte: React.FC<StepContexteProps> = ({
   data,
   onChange,
   onNext,
   onGenerateFiche,
   isGenerating = false,
+  hasAdvancedProgress = false,
 }) => {
   const [isEnriching, setIsEnriching] = useState(false);
+  const [showRegenerationModal, setShowRegenerationModal] = useState(false);
 
   const handleChange = (field: keyof FormationData, value: string | string[]) => {
     onChange({ ...data, [field]: value });
   };
 
   const handleGenerateClick = async () => {
+    // Si la formation a déjà des slides/évaluations, demander confirmation
+    if (hasAdvancedProgress && onGenerateFiche) {
+      setShowRegenerationModal(true);
+      return;
+    }
+
     if (onGenerateFiche) {
       await onGenerateFiche(data);
     } else {
       onNext();
+    }
+  };
+
+  const handleConfirmRegeneration = async () => {
+    setShowRegenerationModal(false);
+    if (onGenerateFiche) {
+      await onGenerateFiche(data);
     }
   };
 
@@ -408,6 +495,22 @@ export const StepContexte: React.FC<StepContexteProps> = ({
               </span>
             </div>
 
+            {/* Éligible CPF */}
+            <div className="flex items-center gap-2 mb-4">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={data.estEligibleCPF || false}
+                  onChange={(e) => handleChange("estEligibleCPF", e.target.checked as unknown as string)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 dark:peer-focus:ring-brand-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-500"></div>
+              </label>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Éligible CPF
+              </span>
+            </div>
+
             {data.isCertifiante && (
               <div className="space-y-4 pl-2 border-l-2 border-brand-200 dark:border-brand-800">
                 {/* Numéro fiche RS */}
@@ -493,7 +596,7 @@ export const StepContexte: React.FC<StepContexteProps> = ({
             </div>
             <div className="relative">
               <textarea
-                placeholder="Decrivez le plus clairement possible la formation que vous avez en tete : de quoi il s'agit, ce que vous souhaitez y aborder, a qui elle s'adresse et dans quel but vous la mettez en place. Plus vous donnez d'elements, plus la fiche pedagogique generee correspondra a votre projet."
+                placeholder="Décrivez le plus clairement possible la formation que vous avez en tête : de quoi il s'agit, ce que vous souhaitez y aborder, à qui elle s'adresse et dans quel but vous la mettez en place. Plus vous donnez d'éléments, plus la fiche pédagogique générée correspondra à votre projet."
                 value={data.description}
                 onChange={(e) => handleChange("description", e.target.value)}
                 maxLength={3000}
@@ -518,12 +621,12 @@ export const StepContexte: React.FC<StepContexteProps> = ({
           {isGenerating ? (
             <>
               <SpinnerIcon />
-              <span>Generation en cours...</span>
+              <span>Génération en cours...</span>
             </>
           ) : (
             <>
               <SparklesIcon />
-              <span>Generer la fiche pedagogique</span>
+              <span>Générer la fiche pédagogique</span>
             </>
           )}
         </button>
@@ -532,9 +635,16 @@ export const StepContexte: React.FC<StepContexteProps> = ({
       {/* Message d'aide */}
       {!canGenerate && (
         <p className="text-sm text-amber-600 dark:text-amber-400 text-right">
-          Veuillez decrire la formation en au moins 20 caracteres pour generer la fiche.
+          Veuillez décrire la formation en au moins 20 caractères pour générer la fiche.
         </p>
       )}
+
+      {/* Modal de confirmation pour régénération */}
+      <RegenerationConfirmModal
+        isOpen={showRegenerationModal}
+        onClose={() => setShowRegenerationModal(false)}
+        onConfirm={handleConfirmRegeneration}
+      />
     </div>
   );
 };

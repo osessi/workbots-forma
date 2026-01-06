@@ -10,6 +10,17 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import { renderTemplate } from "@/lib/templates";
 import { DocumentType, FileCategory } from "@prisma/client";
+import { generatePDFFromHtml } from "@/lib/services/pdf-generator";
+import { createClient } from "@supabase/supabase-js";
+import { DEFAULT_TEMPLATES } from "@/lib/templates/default-templates";
+
+// Client Supabase admin pour le stockage
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // Types pour les données de la requête
 interface SessionClient {
@@ -138,8 +149,14 @@ function mapDocumentType(wizardType: string): DocumentType | null {
     contrat: "CONTRAT_FORMATION",
     convocation: "CONVOCATION",
     attestation: "ATTESTATION_FIN",
-    emargement: "ATTESTATION_PRESENCE",
+    certificat_realisation: "CERTIFICAT",
+    emargement: "FEUILLE_EMARGEMENT",
     facture: "FACTURE",
+    evaluation_chaud: "EVALUATION_CHAUD",
+    evaluation_froid: "EVALUATION_FROID",
+    evaluation_entreprise: "EVALUATION_ENTREPRISE",
+    evaluation_financeur: "EVALUATION_FINANCEUR",
+    evaluation_intervenant: "EVALUATION_INTERVENANT",
   };
   return mapping[wizardType] || null;
 }
@@ -154,11 +171,17 @@ function mapToFileCategory(docType: string): FileCategory {
     emargement: "DOCUMENT",
     facture: "DOCUMENT",
     certificat_realisation: "DOCUMENT",
+    evaluation_chaud: "EVALUATION",
+    evaluation_froid: "EVALUATION",
+    evaluation_entreprise: "EVALUATION",
+    evaluation_financeur: "EVALUATION",
+    evaluation_intervenant: "EVALUATION",
   };
   return mapping[docType] || "DOCUMENT";
 }
 
 // Sauvegarder un document dans le Drive avec structure Formation > Entreprise > Apprenant
+// Si copyToAllApprenants est true, le document sera copié dans tous les dossiers des apprenants concernés
 async function saveDocumentToDrive(params: {
   organizationId: string;
   userId: string;
@@ -169,9 +192,12 @@ async function saveDocumentToDrive(params: {
   content: string;
   entrepriseId?: string;
   apprenantId?: string;
-}): Promise<{ success: boolean; fileId?: string; folderId?: string }> {
+  // Nouveaux paramètres pour la duplication
+  copyToAllApprenants?: boolean; // Copier dans tous les dossiers des apprenants de l'entreprise
+  allApprenantIds?: string[]; // Liste des IDs des apprenants pour la duplication (pour documents session-wide)
+}): Promise<{ success: boolean; fileId?: string; folderId?: string; fileIds?: string[] }> {
   try {
-    const { organizationId, userId, formationId, formationTitre, documentType, titre, content, entrepriseId, apprenantId } = params;
+    const { organizationId, userId, formationId, formationTitre, documentType, titre, content, entrepriseId, apprenantId, copyToAllApprenants, allApprenantIds } = params;
 
     // S'assurer qu'un dossier racine existe pour la formation
     let formationFolder = await prisma.folder.findFirst({
@@ -293,26 +319,189 @@ async function saveDocumentToDrive(params: {
     // Générer un nom de fichier unique
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const sanitizedTitre = titre.replace(/[^a-zA-Z0-9àâäéèêëïîôùûüç\s-]/g, "").substring(0, 50);
-    const fileName = `${sanitizedTitre}_${timestamp}.html`;
 
-    // Créer l'enregistrement du fichier
-    const file = await prisma.file.create({
-      data: {
-        name: fileName,
-        originalName: `${titre}.html`,
-        mimeType: "text/html",
-        size: Buffer.byteLength(content, "utf-8"),
-        category: mapToFileCategory(documentType),
-        storagePath: `documents/${organizationId}/${formationId}/${fileName}`,
-        publicUrl: null,
-        organizationId,
-        userId,
-        formationId,
-        folderId: targetFolderId,
-      },
-    });
+    // Liste pour stocker les IDs des fichiers créés
+    const createdFileIds: string[] = [];
 
-    return { success: true, fileId: file.id, folderId: targetFolderId };
+    // Générer le PDF une seule fois pour ce document
+    let pdfBuffer: Buffer;
+    let mimeType: string;
+    let fileExtension: string;
+
+    try {
+      pdfBuffer = await generatePDFFromHtml(content, titre);
+      mimeType = "application/pdf";
+      fileExtension = "pdf";
+    } catch (pdfError) {
+      console.error("Erreur génération PDF, fallback HTML:", pdfError);
+      pdfBuffer = Buffer.from(content, "utf-8");
+      mimeType = "text/html";
+      fileExtension = "html";
+    }
+
+    const fileName = `${sanitizedTitre}_${timestamp}.${fileExtension}`;
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Fonction helper pour créer un fichier dans un dossier
+    const createFileInFolder = async (folderId: string, fileNameSuffix?: string) => {
+      const finalFileName = fileNameSuffix
+        ? `${sanitizedTitre}_${fileNameSuffix}_${timestamp}.${fileExtension}`
+        : fileName;
+      const storagePath = `documents/${organizationId}/${formationId}/${finalFileName}`;
+
+      // Upload vers Supabase Storage
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("files")
+        .upload(storagePath, pdfBuffer, {
+          contentType: mimeType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Erreur upload Supabase Storage:", uploadError);
+      }
+
+      // URL proxy pour accéder au fichier
+      const proxyUrl = `/api/fichiers/${storagePath}`;
+
+      const file = await prisma.file.create({
+        data: {
+          name: finalFileName,
+          originalName: `${titre}.${fileExtension}`,
+          mimeType: mimeType,
+          size: pdfBuffer.length,
+          category: mapToFileCategory(documentType),
+          storagePath: storagePath,
+          publicUrl: proxyUrl,
+          organizationId,
+          userId,
+          formationId,
+          folderId,
+        },
+      });
+
+      // Sauvegarder le contenu HTML original pour édition future
+      await prisma.fileContent.create({
+        data: {
+          fileId: file.id,
+          content: content,
+        },
+      });
+
+      createdFileIds.push(file.id);
+      return file;
+    };
+
+    // Cas 1: Document session-wide (émargement) - copier dans tous les dossiers apprenants
+    if (allApprenantIds && allApprenantIds.length > 0) {
+      for (const apprId of allApprenantIds) {
+        const apprenant = await prisma.apprenant.findFirst({
+          where: { id: apprId, organizationId },
+          include: { entreprise: true },
+        });
+
+        if (apprenant) {
+          // Trouver ou créer le dossier apprenant
+          let parentFolderId = formationFolder.id;
+
+          // Si l'apprenant a une entreprise, créer d'abord le dossier entreprise
+          if (apprenant.entrepriseId) {
+            let entrepriseFolder = await prisma.folder.findFirst({
+              where: {
+                parentId: formationFolder.id,
+                entrepriseId: apprenant.entrepriseId,
+                organizationId,
+              },
+            });
+
+            if (!entrepriseFolder) {
+              entrepriseFolder = await prisma.folder.create({
+                data: {
+                  name: apprenant.entreprise?.raisonSociale || "Entreprise",
+                  color: "#F59E0B",
+                  parentId: formationFolder.id,
+                  entrepriseId: apprenant.entrepriseId,
+                  folderType: "entreprise",
+                  organizationId,
+                },
+              });
+            }
+            parentFolderId = entrepriseFolder.id;
+          }
+
+          // Créer ou trouver le dossier apprenant
+          let apprenantFolder = await prisma.folder.findFirst({
+            where: {
+              parentId: parentFolderId,
+              apprenantId: apprenant.id,
+              organizationId,
+            },
+          });
+
+          if (!apprenantFolder) {
+            apprenantFolder = await prisma.folder.create({
+              data: {
+                name: `${apprenant.prenom} ${apprenant.nom}`,
+                color: "#10B981",
+                parentId: parentFolderId,
+                apprenantId: apprenant.id,
+                folderType: "apprenant",
+                organizationId,
+              },
+            });
+          }
+
+          // Créer le fichier dans ce dossier
+          await createFileInFolder(apprenantFolder.id, apprenant.id.substring(0, 6));
+        }
+      }
+
+      return { success: true, fileIds: createdFileIds };
+    }
+
+    // Cas 2: Document entreprise - copier dans les dossiers de tous les apprenants de l'entreprise
+    if (copyToAllApprenants && entrepriseId) {
+      // Récupérer tous les apprenants de cette entreprise dans cette session
+      const apprenants = await prisma.apprenant.findMany({
+        where: { entrepriseId, organizationId },
+      });
+
+      // Créer d'abord le fichier principal dans le dossier entreprise
+      const mainFile = await createFileInFolder(targetFolderId);
+
+      // Ensuite, copier dans chaque dossier apprenant
+      for (const apprenant of apprenants) {
+        let apprenantFolder = await prisma.folder.findFirst({
+          where: {
+            parentId: targetFolderId, // Le dossier entreprise
+            apprenantId: apprenant.id,
+            organizationId,
+          },
+        });
+
+        if (!apprenantFolder) {
+          apprenantFolder = await prisma.folder.create({
+            data: {
+              name: `${apprenant.prenom} ${apprenant.nom}`,
+              color: "#10B981",
+              parentId: targetFolderId,
+              apprenantId: apprenant.id,
+              folderType: "apprenant",
+              organizationId,
+            },
+          });
+        }
+
+        await createFileInFolder(apprenantFolder.id, apprenant.id.substring(0, 6));
+      }
+
+      return { success: true, fileId: mainFile.id, folderId: targetFolderId, fileIds: createdFileIds };
+    }
+
+    // Cas 3: Comportement normal - un seul fichier
+    const file = await createFileInFolder(targetFolderId);
+
+    return { success: true, fileId: file.id, folderId: targetFolderId, fileIds: [file.id] };
   } catch (error) {
     console.error("Erreur sauvegarde document Drive:", error);
     return { success: false };
@@ -361,7 +550,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: GenerateSessionRequest = await request.json();
-    const { formation, clients, tarifs, lieu, formateurs, selectedDocuments, autoSaveToDrive = true } = body;
+    const { formation, clients, tarifs, lieu, formateurs, selectedDocuments, autoSaveToDrive = true, targetId } = body;
 
     if (!selectedDocuments || selectedDocuments.length === 0) {
       return NextResponse.json(
@@ -473,8 +662,8 @@ export async function POST(request: NextRequest) {
       const prismaDocType = mapDocumentType(docType);
       if (!prismaDocType) continue;
 
-      // Trouver le template pour ce type de document
-      const template = await prisma.template.findFirst({
+      // Trouver le template pour ce type de document (d'abord en base, puis par défaut)
+      let template = await prisma.template.findFirst({
         where: {
           documentType: prismaDocType,
           isActive: true,
@@ -489,17 +678,77 @@ export async function POST(request: NextRequest) {
         ],
       });
 
+      // Si pas de template en base, utiliser le template par défaut
       if (!template) {
-        console.warn(`Aucun template trouvé pour ${docType}`);
+        console.warn(`Aucun template en base pour ${docType}, utilisation du template par défaut`);
+
+        // Chercher dans les templates par défaut
+        const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.documentType === prismaDocType);
+        if (!defaultTemplate) {
+          console.warn(`Aucun template par défaut trouvé pour ${docType}`);
+          continue;
+        }
+
+        // Créer un objet template factice compatible avec le type attendu
+        template = {
+          id: `default-${docType}`,
+          name: defaultTemplate.name,
+          description: defaultTemplate.description,
+          documentType: prismaDocType,
+          category: defaultTemplate.category as never,
+          content: defaultTemplate.content as never,
+          headerContent: defaultTemplate.headerContent || null,
+          footerContent: defaultTemplate.footerContent || null,
+          variables: defaultTemplate.variables || [],
+          isActive: true,
+          isSystem: true,
+          organizationId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      }
+
+      if (!template) {
+        console.warn(`Impossible de générer ${docType} - aucun template disponible`);
         continue;
       }
 
       // Selon le type de document, générer pour chaque entité concernée
       switch (docType) {
         case "convention":
-          // Convention = une par entreprise
-          for (const client of clients.filter(c => c.type === "ENTREPRISE")) {
+          // Convention = une par entreprise (ou indépendant)
+          // Filtrer par targetId si fourni
+          const conventionClients = clients.filter(c =>
+            (c.type === "ENTREPRISE" || c.type === "INDEPENDANT") &&
+            (!targetId || c.id === targetId)
+          );
+          for (const client of conventionClients) {
             const tarif = tarifs.find(t => t.clientId === client.id);
+
+            // Récupérer les données complètes de l'entreprise depuis la base de données
+            let entrepriseComplete = null;
+            if (client.entrepriseId) {
+              entrepriseComplete = await prisma.entreprise.findUnique({
+                where: { id: client.entrepriseId },
+              });
+            }
+
+            // Construire la liste des apprenants avec leurs données complètes
+            const apprenantsComplets = await Promise.all(
+              client.apprenants.map(async (a) => {
+                const apprenantDb = await prisma.apprenant.findUnique({
+                  where: { id: a.id },
+                });
+                return {
+                  nom: apprenantDb?.nom || a.nom,
+                  prenom: apprenantDb?.prenom || a.prenom,
+                  nom_complet: `${apprenantDb?.prenom || a.prenom} ${apprenantDb?.nom || a.nom}`,
+                  email: apprenantDb?.email || a.email,
+                  telephone: apprenantDb?.telephone || a.telephone || "",
+                };
+              })
+            );
+
             const doc = await generateDocument(
               template,
               {
@@ -508,29 +757,41 @@ export async function POST(request: NextRequest) {
                   type: "entreprise",
                   type_label: "Entreprise",
                 },
+                // Format entreprise_ pour le nouveau système de variables
                 entreprise: {
-                  nom: client.entreprise?.raisonSociale || "",
-                  siret: client.entreprise?.siret || "",
-                  adresse: client.entreprise?.adresse || "",
-                  code_postal: client.entreprise?.codePostal || "",
-                  ville: client.entreprise?.ville || "",
+                  raison_sociale: entrepriseComplete?.raisonSociale || client.entreprise?.raisonSociale || "",
+                  nom: entrepriseComplete?.raisonSociale || client.entreprise?.raisonSociale || "",
+                  siret: entrepriseComplete?.siret || client.entreprise?.siret || "",
+                  adresse: entrepriseComplete?.adresse || client.entreprise?.adresse || "",
+                  code_postal: entrepriseComplete?.codePostal || client.entreprise?.codePostal || "",
+                  ville: entrepriseComplete?.ville || client.entreprise?.ville || "",
+                  pays: entrepriseComplete?.pays || "France",
                   adresse_complete: formatAdresse(
-                    client.entreprise?.adresse,
-                    client.entreprise?.codePostal,
-                    client.entreprise?.ville
+                    entrepriseComplete?.adresse || client.entreprise?.adresse,
+                    entrepriseComplete?.codePostal || client.entreprise?.codePostal,
+                    entrepriseComplete?.ville || client.entreprise?.ville
                   ),
-                  representant: client.entreprise?.contactNom
-                    ? `${client.entreprise.contactPrenom || ""} ${client.entreprise.contactNom}`.trim()
-                    : "",
-                  email: client.entreprise?.contactEmail || "",
+                  representant_civilite: entrepriseComplete?.contactCivilite || "",
+                  representant_nom: entrepriseComplete?.contactNom || client.entreprise?.contactNom || "",
+                  representant_prenom: entrepriseComplete?.contactPrenom || client.entreprise?.contactPrenom || "",
+                  representant_fonction: entrepriseComplete?.contactFonction || "",
+                  representant: entrepriseComplete?.contactNom
+                    ? `${entrepriseComplete.contactPrenom || ""} ${entrepriseComplete.contactNom}`.trim()
+                    : client.entreprise?.contactNom
+                      ? `${client.entreprise.contactPrenom || ""} ${client.entreprise.contactNom}`.trim()
+                      : "",
+                  email: entrepriseComplete?.contactEmail || client.entreprise?.contactEmail || "",
+                  telephone: entrepriseComplete?.contactTelephone || "",
+                  tva_intracom: entrepriseComplete?.tvaIntracom || "",
+                  // Données calculées
+                  nombre_apprenants: client.apprenants.length,
+                  liste_apprenants: apprenantsComplets.map(a => `${a.prenom} ${a.nom}`).join(", "),
                 },
-                participants: client.apprenants.map(a => ({
-                  nom: a.nom,
-                  prenom: a.prenom,
-                  nom_complet: `${a.prenom} ${a.nom}`,
-                  email: a.email,
-                  telephone: a.telephone || "",
-                })),
+                participants: apprenantsComplets,
+                // Liste des apprenants pour les boucles {{#each apprenants}}
+                apprenants: apprenantsComplets,
+                apprenants_liste: apprenantsComplets.map(a => `${a.prenom} ${a.nom}`).join(", "),
+                // Ancien format tarif pour compatibilité
                 tarif: {
                   ht: tarif?.tarifHT || 0,
                   ht_format: `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} € HT`,
@@ -539,6 +800,17 @@ export async function POST(request: NextRequest) {
                   montant_finance_format: `${(tarif?.montantFinance || 0).toLocaleString("fr-FR")} €`,
                   reste_a_charge: tarif?.resteACharge || 0,
                   reste_a_charge_format: `${(tarif?.resteACharge || 0).toLocaleString("fr-FR")} €`,
+                },
+                // Nouveau format tarifs_ pour le système de variables
+                tarifs: {
+                  tarif_entreprise_ht_documents: `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} € HT`,
+                  entreprise_montant_tva: `${((tarif?.tarifHT || 0) * 0.2).toLocaleString("fr-FR")} €`,
+                  entreprise_prix_ttc: `${((tarif?.tarifHT || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
+                  entreprise_montant_financeur_ht: `${(tarif?.montantFinance || 0).toLocaleString("fr-FR")} € HT`,
+                  entreprise_montant_financeur_ttc: `${((tarif?.montantFinance || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
+                  entreprise_reste_a_charge_ht: `${(tarif?.resteACharge || 0).toLocaleString("fr-FR")} € HT`,
+                  entreprise_reste_a_charge_ttc: `${((tarif?.resteACharge || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
+                  entreprise_a_financeur: tarif?.financeurId ? true : false,
                 },
                 document: {
                   type: "convention",
@@ -557,7 +829,7 @@ export async function POST(request: NextRequest) {
               renderedContent: doc,
             };
 
-            // Auto-save to Drive if enabled
+            // Auto-save to Drive if enabled - copier dans les dossiers de chaque apprenant de l'entreprise
             if (autoSaveToDrive && formation.id) {
               const saveResult = await saveDocumentToDrive({
                 organizationId: user.organizationId!,
@@ -568,6 +840,7 @@ export async function POST(request: NextRequest) {
                 titre: docEntry.titre,
                 content: doc,
                 entrepriseId: client.entrepriseId,
+                copyToAllApprenants: true, // Copier dans tous les dossiers des apprenants de l'entreprise
               });
               docEntry.savedToDrive = saveResult.success;
               docEntry.fileId = saveResult.fileId;
@@ -578,10 +851,24 @@ export async function POST(request: NextRequest) {
           break;
 
         case "contrat":
-          // Contrat = un par indépendant ou particulier
-          for (const client of clients.filter(c => c.type === "INDEPENDANT" || c.type === "PARTICULIER")) {
+          // Contrat = un par particulier (les indépendants ont des conventions)
+          // Filtrer par targetId si fourni
+          const contratClients = clients.filter(c =>
+            c.type === "PARTICULIER" &&
+            (!targetId || c.id === targetId)
+          );
+          for (const client of contratClients) {
             const tarif = tarifs.find(t => t.clientId === client.id);
             const isParticulier = client.type === "PARTICULIER";
+
+            // Récupérer les données complètes de l'apprenant depuis la base de données
+            let apprenantComplet = null;
+            if (client.apprenantId) {
+              apprenantComplet = await prisma.apprenant.findUnique({
+                where: { id: client.apprenantId },
+              });
+            }
+
             const doc = await generateDocument(
               template,
               {
@@ -590,25 +877,45 @@ export async function POST(request: NextRequest) {
                   type: client.type.toLowerCase(),
                   type_label: client.type === "INDEPENDANT" ? "Indépendant" : "Particulier",
                 },
+                // Nouveau format apprenant_ (utilisé par les templates)
+                apprenant: {
+                  nom: apprenantComplet?.nom || client.apprenant?.nom || "",
+                  prenom: apprenantComplet?.prenom || client.apprenant?.prenom || "",
+                  statut: apprenantComplet?.statut || client.apprenant?.statut || "",
+                  raison_sociale: apprenantComplet?.raisonSociale || "",
+                  siret: apprenantComplet?.siret || "",
+                  adresse: apprenantComplet?.adresse || "",
+                  code_postal: apprenantComplet?.codePostal || "",
+                  ville: apprenantComplet?.ville || "",
+                  pays: apprenantComplet?.pays || "France",
+                  email: apprenantComplet?.email || client.apprenant?.email || "",
+                  telephone: apprenantComplet?.telephone || client.apprenant?.telephone || "",
+                },
+                // Ancien format particulier pour compatibilité
                 particulier: {
-                  nom: client.apprenant?.nom || "",
-                  prenom: client.apprenant?.prenom || "",
-                  nom_complet: client.apprenant
-                    ? `${client.apprenant.prenom} ${client.apprenant.nom}`
-                    : "",
-                  email: client.apprenant?.email || "",
-                  telephone: client.apprenant?.telephone || "",
-                  statut: client.apprenant?.statut || "",
+                  nom: apprenantComplet?.nom || client.apprenant?.nom || "",
+                  prenom: apprenantComplet?.prenom || client.apprenant?.prenom || "",
+                  nom_complet: apprenantComplet
+                    ? `${apprenantComplet.prenom} ${apprenantComplet.nom}`
+                    : client.apprenant
+                      ? `${client.apprenant.prenom} ${client.apprenant.nom}`
+                      : "",
+                  email: apprenantComplet?.email || client.apprenant?.email || "",
+                  telephone: apprenantComplet?.telephone || client.apprenant?.telephone || "",
+                  statut: apprenantComplet?.statut || client.apprenant?.statut || "",
                 },
                 participants: [{
-                  nom: client.apprenant?.nom || "",
-                  prenom: client.apprenant?.prenom || "",
-                  nom_complet: client.apprenant
-                    ? `${client.apprenant.prenom} ${client.apprenant.nom}`
-                    : "",
-                  email: client.apprenant?.email || "",
-                  telephone: client.apprenant?.telephone || "",
+                  nom: apprenantComplet?.nom || client.apprenant?.nom || "",
+                  prenom: apprenantComplet?.prenom || client.apprenant?.prenom || "",
+                  nom_complet: apprenantComplet
+                    ? `${apprenantComplet.prenom} ${apprenantComplet.nom}`
+                    : client.apprenant
+                      ? `${client.apprenant.prenom} ${client.apprenant.nom}`
+                      : "",
+                  email: apprenantComplet?.email || client.apprenant?.email || "",
+                  telephone: apprenantComplet?.telephone || client.apprenant?.telephone || "",
                 }],
+                // Ancien format tarif pour compatibilité
                 tarif: {
                   ht: tarif?.tarifHT || 0,
                   ht_format: isParticulier
@@ -619,6 +926,19 @@ export async function POST(request: NextRequest) {
                   montant_finance_format: `${(tarif?.montantFinance || 0).toLocaleString("fr-FR")} €`,
                   reste_a_charge: tarif?.resteACharge || 0,
                   reste_a_charge_format: `${(tarif?.resteACharge || 0).toLocaleString("fr-FR")} €`,
+                },
+                // Nouveau format tarifs_ pour le système de variables
+                tarifs: isParticulier ? {
+                  particulier_prix_ttc: `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} € TTC`,
+                } : {
+                  tarif_independant_ht_documents: `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} € HT`,
+                  independant_montant_tva: `${((tarif?.tarifHT || 0) * 0.2).toLocaleString("fr-FR")} €`,
+                  independant_prix_ttc: `${((tarif?.tarifHT || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
+                  independant_montant_financeur_ht: `${(tarif?.montantFinance || 0).toLocaleString("fr-FR")} € HT`,
+                  independant_montant_financeur_ttc: `${((tarif?.montantFinance || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
+                  independant_reste_a_charge_ht: `${(tarif?.resteACharge || 0).toLocaleString("fr-FR")} € HT`,
+                  independant_reste_a_charge_ttc: `${((tarif?.resteACharge || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
+                  independant_a_financeur: tarif?.financeurId ? true : false,
                 },
                 document: {
                   type: "contrat",
@@ -662,8 +982,25 @@ export async function POST(request: NextRequest) {
 
         case "convocation":
           // Convocation = une par apprenant
+          // Filtrer par targetId si fourni (targetId est l'ID de l'apprenant)
           for (const client of clients) {
-            for (const apprenant of client.apprenants) {
+            const apprenantsFiltres = targetId
+              ? client.apprenants.filter(a => a.id === targetId)
+              : client.apprenants;
+            for (const apprenant of apprenantsFiltres) {
+              // Récupérer les données complètes de l'apprenant
+              const apprenantDb = await prisma.apprenant.findUnique({
+                where: { id: apprenant.id },
+              });
+
+              // Récupérer les données complètes de l'entreprise si présente
+              let entrepriseDb = null;
+              if (client.entrepriseId) {
+                entrepriseDb = await prisma.entreprise.findUnique({
+                  where: { id: client.entrepriseId },
+                });
+              }
+
               const doc = await generateDocument(
                 template,
                 {
@@ -673,16 +1010,41 @@ export async function POST(request: NextRequest) {
                     type_label: client.type === "ENTREPRISE" ? "Entreprise"
                                : client.type === "INDEPENDANT" ? "Indépendant" : "Particulier",
                   },
-                  entreprise: client.entreprise ? {
+                  // Nouveau format entreprise_ pour les templates
+                  entreprise: entrepriseDb ? {
+                    raison_sociale: entrepriseDb.raisonSociale,
+                    nom: entrepriseDb.raisonSociale,
+                    siret: entrepriseDb.siret || "",
+                    adresse: entrepriseDb.adresse || "",
+                    code_postal: entrepriseDb.codePostal || "",
+                    ville: entrepriseDb.ville || "",
+                    pays: entrepriseDb.pays || "France",
+                  } : client.entreprise ? {
+                    raison_sociale: client.entreprise.raisonSociale,
                     nom: client.entreprise.raisonSociale,
                     siret: client.entreprise.siret || "",
                   } : undefined,
+                  // Ancien format participant pour compatibilité
                   participant: {
-                    nom: apprenant.nom,
-                    prenom: apprenant.prenom,
-                    nom_complet: `${apprenant.prenom} ${apprenant.nom}`,
-                    email: apprenant.email,
-                    telephone: apprenant.telephone || "",
+                    nom: apprenantDb?.nom || apprenant.nom,
+                    prenom: apprenantDb?.prenom || apprenant.prenom,
+                    nom_complet: `${apprenantDb?.prenom || apprenant.prenom} ${apprenantDb?.nom || apprenant.nom}`,
+                    email: apprenantDb?.email || apprenant.email,
+                    telephone: apprenantDb?.telephone || apprenant.telephone || "",
+                  },
+                  // Nouveau format apprenant_ pour les templates
+                  apprenant: {
+                    nom: apprenantDb?.nom || apprenant.nom,
+                    prenom: apprenantDb?.prenom || apprenant.prenom,
+                    statut: apprenantDb?.statut || "",
+                    raison_sociale: apprenantDb?.raisonSociale || "",
+                    siret: apprenantDb?.siret || "",
+                    adresse: apprenantDb?.adresse || "",
+                    code_postal: apprenantDb?.codePostal || "",
+                    ville: apprenantDb?.ville || "",
+                    pays: apprenantDb?.pays || "France",
+                    email: apprenantDb?.email || apprenant.email,
+                    telephone: apprenantDb?.telephone || apprenant.telephone || "",
                   },
                   document: {
                     type: "convocation",
@@ -726,8 +1088,25 @@ export async function POST(request: NextRequest) {
 
         case "attestation":
           // Attestation = une par apprenant
+          // Filtrer par targetId si fourni (targetId est l'ID de l'apprenant)
           for (const client of clients) {
-            for (const apprenant of client.apprenants) {
+            const apprenantsFiltrésAttest = targetId
+              ? client.apprenants.filter(a => a.id === targetId)
+              : client.apprenants;
+            for (const apprenant of apprenantsFiltrésAttest) {
+              // Récupérer les données complètes de l'apprenant
+              const apprenantDbAttest = await prisma.apprenant.findUnique({
+                where: { id: apprenant.id },
+              });
+
+              // Récupérer les données complètes de l'entreprise si présente
+              let entrepriseDbAttest = null;
+              if (client.entrepriseId) {
+                entrepriseDbAttest = await prisma.entreprise.findUnique({
+                  where: { id: client.entrepriseId },
+                });
+              }
+
               const doc = await generateDocument(
                 template,
                 {
@@ -737,14 +1116,39 @@ export async function POST(request: NextRequest) {
                     type_label: client.type === "ENTREPRISE" ? "Entreprise"
                                : client.type === "INDEPENDANT" ? "Indépendant" : "Particulier",
                   },
-                  entreprise: client.entreprise ? {
+                  // Nouveau format entreprise_ pour les templates
+                  entreprise: entrepriseDbAttest ? {
+                    raison_sociale: entrepriseDbAttest.raisonSociale,
+                    nom: entrepriseDbAttest.raisonSociale,
+                    siret: entrepriseDbAttest.siret || "",
+                    adresse: entrepriseDbAttest.adresse || "",
+                    code_postal: entrepriseDbAttest.codePostal || "",
+                    ville: entrepriseDbAttest.ville || "",
+                    pays: entrepriseDbAttest.pays || "France",
+                  } : client.entreprise ? {
+                    raison_sociale: client.entreprise.raisonSociale,
                     nom: client.entreprise.raisonSociale,
                   } : undefined,
+                  // Ancien format participant pour compatibilité
                   participant: {
-                    nom: apprenant.nom,
-                    prenom: apprenant.prenom,
-                    nom_complet: `${apprenant.prenom} ${apprenant.nom}`,
-                    email: apprenant.email,
+                    nom: apprenantDbAttest?.nom || apprenant.nom,
+                    prenom: apprenantDbAttest?.prenom || apprenant.prenom,
+                    nom_complet: `${apprenantDbAttest?.prenom || apprenant.prenom} ${apprenantDbAttest?.nom || apprenant.nom}`,
+                    email: apprenantDbAttest?.email || apprenant.email,
+                  },
+                  // Nouveau format apprenant_ pour les templates
+                  apprenant: {
+                    nom: apprenantDbAttest?.nom || apprenant.nom,
+                    prenom: apprenantDbAttest?.prenom || apprenant.prenom,
+                    statut: apprenantDbAttest?.statut || "",
+                    raison_sociale: apprenantDbAttest?.raisonSociale || "",
+                    siret: apprenantDbAttest?.siret || "",
+                    adresse: apprenantDbAttest?.adresse || "",
+                    code_postal: apprenantDbAttest?.codePostal || "",
+                    ville: apprenantDbAttest?.ville || "",
+                    pays: apprenantDbAttest?.pays || "France",
+                    email: apprenantDbAttest?.email || apprenant.email,
+                    telephone: apprenantDbAttest?.telephone || apprenant.telephone || "",
                   },
                   document: {
                     type: "attestation",
@@ -772,6 +1176,110 @@ export async function POST(request: NextRequest) {
                   formationId: formation.id,
                   formationTitre: formation.titre,
                   documentType: "attestation",
+                  titre: docEntry.titre,
+                  content: doc,
+                  entrepriseId: client.entrepriseId,
+                  apprenantId: apprenant.id,
+                });
+                docEntry.savedToDrive = saveResult.success;
+                docEntry.fileId = saveResult.fileId;
+              }
+
+              generatedDocuments.push(docEntry);
+            }
+          }
+          break;
+
+        case "certificat_realisation":
+          // Certificat de réalisation = un par apprenant
+          // Filtrer par targetId si fourni (targetId est l'ID de l'apprenant)
+          for (const client of clients) {
+            const apprenantsFiltrésCertif = targetId
+              ? client.apprenants.filter(a => a.id === targetId)
+              : client.apprenants;
+            for (const apprenant of apprenantsFiltrésCertif) {
+              // Récupérer les données complètes de l'apprenant
+              const apprenantDbCertif = await prisma.apprenant.findUnique({
+                where: { id: apprenant.id },
+              });
+
+              // Récupérer les données complètes de l'entreprise si présente
+              let entrepriseDbCertif = null;
+              if (client.entrepriseId) {
+                entrepriseDbCertif = await prisma.entreprise.findUnique({
+                  where: { id: client.entrepriseId },
+                });
+              }
+
+              const doc = await generateDocument(
+                template,
+                {
+                  ...baseContext,
+                  client: {
+                    type: client.type.toLowerCase(),
+                    type_label: client.type === "ENTREPRISE" ? "Entreprise"
+                               : client.type === "INDEPENDANT" ? "Indépendant" : "Particulier",
+                  },
+                  // Nouveau format entreprise_ pour les templates
+                  entreprise: entrepriseDbCertif ? {
+                    raison_sociale: entrepriseDbCertif.raisonSociale,
+                    nom: entrepriseDbCertif.raisonSociale,
+                    siret: entrepriseDbCertif.siret || "",
+                    adresse: entrepriseDbCertif.adresse || "",
+                    code_postal: entrepriseDbCertif.codePostal || "",
+                    ville: entrepriseDbCertif.ville || "",
+                    pays: entrepriseDbCertif.pays || "France",
+                  } : client.entreprise ? {
+                    raison_sociale: client.entreprise.raisonSociale,
+                    nom: client.entreprise.raisonSociale,
+                  } : undefined,
+                  // Ancien format participant pour compatibilité
+                  participant: {
+                    nom: apprenantDbCertif?.nom || apprenant.nom,
+                    prenom: apprenantDbCertif?.prenom || apprenant.prenom,
+                    nom_complet: `${apprenantDbCertif?.prenom || apprenant.prenom} ${apprenantDbCertif?.nom || apprenant.nom}`,
+                    email: apprenantDbCertif?.email || apprenant.email,
+                  },
+                  // Nouveau format apprenant_ pour les templates
+                  apprenant: {
+                    nom: apprenantDbCertif?.nom || apprenant.nom,
+                    prenom: apprenantDbCertif?.prenom || apprenant.prenom,
+                    statut: apprenantDbCertif?.statut || "",
+                    raison_sociale: apprenantDbCertif?.raisonSociale || "",
+                    siret: apprenantDbCertif?.siret || "",
+                    adresse: apprenantDbCertif?.adresse || "",
+                    code_postal: apprenantDbCertif?.codePostal || "",
+                    ville: apprenantDbCertif?.ville || "",
+                    pays: apprenantDbCertif?.pays || "France",
+                    email: apprenantDbCertif?.email || apprenant.email,
+                    telephone: apprenantDbCertif?.telephone || apprenant.telephone || "",
+                  },
+                  document: {
+                    type: "certificat_realisation",
+                    titre: template.name,
+                  },
+                },
+                false
+              );
+              const docEntry: GeneratedDocument = {
+                id: `certificat_realisation-${apprenant.id}`,
+                type: "certificat_realisation",
+                titre: `Certificat de réalisation - ${apprenant.prenom} ${apprenant.nom}`,
+                clientId: client.id,
+                apprenantId: apprenant.id,
+                apprenantName: `${apprenant.prenom} ${apprenant.nom}`,
+                entrepriseId: client.entrepriseId,
+                renderedContent: doc,
+              };
+
+              // Auto-save to Drive if enabled
+              if (autoSaveToDrive && formation.id) {
+                const saveResult = await saveDocumentToDrive({
+                  organizationId: user.organizationId!,
+                  userId: user.id,
+                  formationId: formation.id,
+                  formationTitre: formation.titre,
+                  documentType: "certificat_realisation",
                   titre: docEntry.titre,
                   content: doc,
                   entrepriseId: client.entrepriseId,
@@ -868,8 +1376,11 @@ export async function POST(request: NextRequest) {
             renderedContent: emargementHtml,
           };
 
-          // Auto-save emargement to Drive if enabled (saved at formation level)
+          // Auto-save emargement to Drive - copier dans TOUS les dossiers des apprenants de la session
           if (autoSaveToDrive && formation.id) {
+            // Collecter tous les IDs d'apprenants de la session
+            const allApprenantIds = clients.flatMap(c => c.apprenants.map(a => a.id));
+
             const saveResult = await saveDocumentToDrive({
               organizationId: user.organizationId!,
               userId: user.id,
@@ -878,9 +1389,10 @@ export async function POST(request: NextRequest) {
               documentType: "emargement",
               titre: emargementEntry.titre,
               content: emargementHtml,
+              allApprenantIds, // Copier dans tous les dossiers des apprenants
             });
             emargementEntry.savedToDrive = saveResult.success;
-            emargementEntry.fileId = saveResult.fileId;
+            emargementEntry.fileId = saveResult.fileIds?.[0];
           }
 
           generatedDocuments.push(emargementEntry);
@@ -888,14 +1400,37 @@ export async function POST(request: NextRequest) {
 
         case "facture":
           // Facture = une par client
-          for (const client of clients) {
+          // Filtrer par targetId si fourni
+          const factureClients = targetId
+            ? clients.filter(c => c.id === targetId)
+            : clients;
+          for (const client of factureClients) {
             const tarif = tarifs.find(t => t.clientId === client.id);
             const isParticulier = client.type === "PARTICULIER";
+
+            // Récupérer les données complètes de l'entreprise
+            let entrepriseDbFacture = null;
+            if (client.entrepriseId) {
+              entrepriseDbFacture = await prisma.entreprise.findUnique({
+                where: { id: client.entrepriseId },
+              });
+            }
+
+            // Récupérer les données complètes de l'apprenant si pas une entreprise
+            let apprenantDbFacture = null;
+            if (client.apprenantId && client.type !== "ENTREPRISE") {
+              apprenantDbFacture = await prisma.apprenant.findUnique({
+                where: { id: client.apprenantId },
+              });
+            }
+
             const clientName = client.type === "ENTREPRISE"
-              ? client.entreprise?.raisonSociale
-              : client.apprenant
-                ? `${client.apprenant.prenom} ${client.apprenant.nom}`
-                : "Client";
+              ? entrepriseDbFacture?.raisonSociale || client.entreprise?.raisonSociale
+              : apprenantDbFacture
+                ? `${apprenantDbFacture.prenom} ${apprenantDbFacture.nom}`
+                : client.apprenant
+                  ? `${client.apprenant.prenom} ${client.apprenant.nom}`
+                  : "Client";
 
             const doc = await generateDocument(
               template,
@@ -907,7 +1442,29 @@ export async function POST(request: NextRequest) {
                              : client.type === "INDEPENDANT" ? "Indépendant" : "Particulier",
                   nom: clientName,
                 },
-                entreprise: client.entreprise ? {
+                // Nouveau format entreprise_ pour les templates
+                entreprise: entrepriseDbFacture ? {
+                  raison_sociale: entrepriseDbFacture.raisonSociale,
+                  nom: entrepriseDbFacture.raisonSociale,
+                  siret: entrepriseDbFacture.siret || "",
+                  adresse: entrepriseDbFacture.adresse || "",
+                  code_postal: entrepriseDbFacture.codePostal || "",
+                  ville: entrepriseDbFacture.ville || "",
+                  pays: entrepriseDbFacture.pays || "France",
+                  adresse_complete: formatAdresse(
+                    entrepriseDbFacture.adresse,
+                    entrepriseDbFacture.codePostal,
+                    entrepriseDbFacture.ville
+                  ),
+                  representant_civilite: entrepriseDbFacture.contactCivilite || "",
+                  representant_nom: entrepriseDbFacture.contactNom || "",
+                  representant_prenom: entrepriseDbFacture.contactPrenom || "",
+                  representant_fonction: entrepriseDbFacture.contactFonction || "",
+                  email: entrepriseDbFacture.contactEmail || "",
+                  telephone: entrepriseDbFacture.contactTelephone || "",
+                  tva_intracom: entrepriseDbFacture.tvaIntracom || "",
+                } : client.entreprise ? {
+                  raison_sociale: client.entreprise.raisonSociale,
                   nom: client.entreprise.raisonSociale,
                   siret: client.entreprise.siret || "",
                   adresse: client.entreprise.adresse || "",
@@ -919,11 +1476,37 @@ export async function POST(request: NextRequest) {
                     client.entreprise.ville
                   ),
                 } : undefined,
-                particulier: client.apprenant && client.type !== "ENTREPRISE" ? {
+                // Ancien format particulier pour compatibilité
+                particulier: apprenantDbFacture ? {
+                  nom: apprenantDbFacture.nom,
+                  prenom: apprenantDbFacture.prenom,
+                  nom_complet: `${apprenantDbFacture.prenom} ${apprenantDbFacture.nom}`,
+                  email: apprenantDbFacture.email,
+                } : client.apprenant && client.type !== "ENTREPRISE" ? {
                   nom: client.apprenant.nom,
                   prenom: client.apprenant.prenom,
                   nom_complet: `${client.apprenant.prenom} ${client.apprenant.nom}`,
                   email: client.apprenant.email,
+                } : undefined,
+                // Nouveau format apprenant_ pour les templates
+                apprenant: apprenantDbFacture ? {
+                  nom: apprenantDbFacture.nom,
+                  prenom: apprenantDbFacture.prenom,
+                  statut: apprenantDbFacture.statut || "",
+                  raison_sociale: apprenantDbFacture.raisonSociale || "",
+                  siret: apprenantDbFacture.siret || "",
+                  adresse: apprenantDbFacture.adresse || "",
+                  code_postal: apprenantDbFacture.codePostal || "",
+                  ville: apprenantDbFacture.ville || "",
+                  pays: apprenantDbFacture.pays || "France",
+                  email: apprenantDbFacture.email,
+                  telephone: apprenantDbFacture.telephone || "",
+                } : client.apprenant && client.type !== "ENTREPRISE" ? {
+                  nom: client.apprenant.nom,
+                  prenom: client.apprenant.prenom,
+                  statut: client.apprenant.statut || "",
+                  email: client.apprenant.email,
+                  telephone: client.apprenant.telephone || "",
                 } : undefined,
                 participants: client.apprenants.map(a => ({
                   nom: a.nom,
@@ -940,6 +1523,18 @@ export async function POST(request: NextRequest) {
                     ? `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} €`
                     : `${(((tarif?.tarifHT || 0) * 1.2)).toLocaleString("fr-FR")} €`,
                   nombre_participants: client.apprenants.length,
+                },
+                // Nouveau format tarifs_ pour le système de variables
+                tarifs: client.type === "ENTREPRISE" ? {
+                  tarif_entreprise_ht_documents: `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} € HT`,
+                  entreprise_montant_tva: `${((tarif?.tarifHT || 0) * 0.2).toLocaleString("fr-FR")} €`,
+                  entreprise_prix_ttc: `${((tarif?.tarifHT || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
+                } : isParticulier ? {
+                  particulier_prix_ttc: `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} € TTC`,
+                } : {
+                  tarif_independant_ht_documents: `${(tarif?.tarifHT || 0).toLocaleString("fr-FR")} € HT`,
+                  independant_montant_tva: `${((tarif?.tarifHT || 0) * 0.2).toLocaleString("fr-FR")} €`,
+                  independant_prix_ttc: `${((tarif?.tarifHT || 0) * 1.2).toLocaleString("fr-FR")} € TTC`,
                 },
                 facture: {
                   numero: `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
@@ -983,6 +1578,10 @@ export async function POST(request: NextRequest) {
             generatedDocuments.push(factureEntry);
           }
           break;
+
+        // Note: Les évaluations (à chaud, à froid, entreprise, financeur, intervenant)
+        // sont maintenant gérées comme des formulaires en ligne via l'API /api/evaluation-satisfaction
+        // et /api/evaluation-intervenant. Elles ne sont plus générées comme des documents PDF.
       }
     }
 

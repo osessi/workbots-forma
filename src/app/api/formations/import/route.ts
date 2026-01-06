@@ -9,6 +9,8 @@ import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import mammoth from "mammoth";
 import { generateFreeText, isAIConfigured } from "@/lib/ai";
+// pdf-parse v2.x utilise un export nommé PDFParse
+import { PDFParse } from "pdf-parse";
 
 // Interface pour les données extraites
 interface ExtractedData {
@@ -106,21 +108,34 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     let textContent = "";
 
-    if (file.type === "application/pdf") {
-      // Extraction PDF avec pdf-parse
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require("pdf-parse");
-      const pdfData = await pdfParse(buffer);
-      textContent = pdfData.text;
-    } else {
-      // Extraction DOCX avec mammoth
-      const result = await mammoth.extractRawText({ buffer });
-      textContent = result.value;
+    try {
+      if (file.type === "application/pdf") {
+        // Extraction PDF avec pdf-parse v2.x
+        console.log(`[Import] Extraction PDF: ${file.name} (${file.size} bytes)`);
+        const pdfParser = new PDFParse(buffer);
+        const pdfResult = await pdfParser.getText();
+        // getText() retourne un objet avec pages, on concat le texte de toutes les pages
+        textContent = pdfResult.pages.map(page => page.text).join("\n") || "";
+        console.log(`[Import] PDF extrait: ${textContent.length} caractères`);
+      } else {
+        // Extraction DOCX/DOC avec mammoth
+        console.log(`[Import] Extraction Word: ${file.name} (${file.size} bytes)`);
+        const result = await mammoth.extractRawText({ buffer });
+        textContent = result.value || "";
+        console.log(`[Import] Word extrait: ${textContent.length} caractères`);
+      }
+    } catch (extractionError) {
+      console.error("[Import] Erreur d'extraction du contenu:", extractionError);
+      return NextResponse.json(
+        { error: `Impossible de lire le contenu du fichier. Vérifiez que le fichier n'est pas corrompu ou protégé par mot de passe.` },
+        { status: 400 }
+      );
     }
 
     if (!textContent || textContent.trim().length < 50) {
+      console.log("[Import] Contenu trop court ou vide:", textContent.length, "caractères");
       return NextResponse.json(
-        { error: "Le document semble vide ou ne contient pas assez de texte." },
+        { error: "Le document semble vide ou ne contient pas assez de texte. Vérifiez que le fichier contient du texte lisible (pas uniquement des images)." },
         { status: 400 }
       );
     }
@@ -150,9 +165,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(extractedData);
   } catch (error) {
-    console.error("Erreur extraction document:", error);
+    console.error("[Import] Erreur extraction document:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return NextResponse.json(
-      { error: "Erreur lors de l'extraction du document" },
+      { error: `Erreur lors de l'extraction du document: ${errorMessage}` },
       { status: 500 }
     );
   }

@@ -7,7 +7,7 @@
 // - Informations personnelles
 // - Pré-inscriptions liées
 // - Sessions de formation
-// - Évaluations
+// - Documents
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -23,7 +23,6 @@ import {
   Briefcase,
   Calendar,
   BookOpen,
-  ClipboardCheck,
   GraduationCap,
   Edit,
   Send,
@@ -36,6 +35,12 @@ import {
   ChevronRight,
   MessageSquarePlus,
   StickyNote,
+  FolderOpen,
+  Upload,
+  File,
+  Trash2,
+  Download,
+  Eye,
 } from "lucide-react";
 
 // Types
@@ -111,16 +116,19 @@ interface LMSInscription {
   formation: Formation;
 }
 
-interface EvaluationResultat {
+interface ApprenantDocument {
   id: string;
-  score: number | null;
-  reussi: boolean | null;
+  nom: string;
+  type: string;
+  taille: number;
+  url: string;
   createdAt: string;
-  evaluation: {
+  createdBy: {
     id: string;
-    titre: string;
-    type: string;
-  };
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }
 
 // Qualiopi IND 5 - Type pour les notes avec historique
@@ -157,7 +165,6 @@ interface Apprenant {
   preInscriptions: PreInscription[];
   sessionParticipationsNew: SessionParticipation[];
   lmsInscriptions: LMSInscription[];
-  evaluationResultats: EvaluationResultat[];
 }
 
 interface Stats {
@@ -167,7 +174,7 @@ interface Stats {
   sessionsEnCours: number;
   sessionsTerminees: number;
   totalFormationsLMS: number;
-  totalEvaluations: number;
+  totalDocuments: number;
 }
 
 // Configuration
@@ -233,7 +240,7 @@ export default function ApprenantDetailPage() {
   const [apprenant, setApprenant] = useState<Apprenant | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"info" | "preinscriptions" | "sessions" | "evaluations">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "preinscriptions" | "sessions" | "documents">("info");
   const [selectedPreInscription, setSelectedPreInscription] = useState<PreInscription | null>(null);
 
   // Qualiopi IND 5 - États pour les notes avec historique
@@ -242,6 +249,13 @@ export default function ApprenantDetailPage() {
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+
+  // États pour les documents
+  const [documents, setDocuments] = useState<ApprenantDocument[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const loadApprenant = useCallback(async () => {
     try {
@@ -317,6 +331,104 @@ export default function ApprenantDetailPage() {
     } finally {
       setAddingNote(false);
     }
+  };
+
+  // Supprimer une note
+  const handleDeleteNote = async (noteId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette note ?")) return;
+
+    setDeletingNoteId(noteId);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/notes/${noteId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      }
+    } catch (error) {
+      console.error("Erreur suppression note:", error);
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
+
+  // Charger les documents de l'apprenant
+  const loadDocuments = useCallback(async () => {
+    if (!apprenantId) return;
+    setDocumentsLoading(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/documents`);
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments(data.documents || []);
+      }
+    } catch (error) {
+      console.error("Erreur chargement documents:", error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }, [apprenantId]);
+
+  // Charger les documents quand l'onglet Documents est actif
+  useEffect(() => {
+    if (activeTab === "documents" && apprenantId) {
+      loadDocuments();
+    }
+  }, [activeTab, apprenantId, loadDocuments]);
+
+  // Upload d'un document
+  const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || uploadingDocument) return;
+
+    setUploadingDocument(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/documents`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments((prev) => [data.document, ...prev]);
+      }
+    } catch (error) {
+      console.error("Erreur upload document:", error);
+    } finally {
+      setUploadingDocument(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Supprimer un document
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) return;
+
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/documents/${documentId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+      }
+    } catch (error) {
+      console.error("Erreur suppression document:", error);
+    }
+  };
+
+  // Formater la taille du fichier
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   // Auto-sélectionner la première pré-inscription
@@ -461,11 +573,11 @@ export default function ApprenantDetailPage() {
 
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm mb-1">
-                <ClipboardCheck size={16} />
-                Évaluations
+                <FolderOpen size={16} />
+                Documents
               </div>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {stats.totalEvaluations}
+                {stats.totalDocuments}
               </p>
             </div>
           </div>
@@ -480,7 +592,7 @@ export default function ApprenantDetailPage() {
             { id: "info", label: "Informations", icon: <User size={16} /> },
             { id: "preinscriptions", label: "Pré-inscriptions", icon: <FileText size={16} />, count: stats?.totalPreInscriptions },
             { id: "sessions", label: "Sessions", icon: <Calendar size={16} />, count: stats?.totalSessions },
-            { id: "evaluations", label: "Évaluations", icon: <ClipboardCheck size={16} />, count: stats?.totalEvaluations },
+            { id: "documents", label: "Documents", icon: <FolderOpen size={16} />, count: stats?.totalDocuments },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -715,9 +827,22 @@ export default function ApprenantDetailPage() {
                         {notes.map((note) => (
                           <div
                             key={note.id}
-                            className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800/30"
+                            className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800/30 group relative"
                           >
-                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                            {/* Bouton supprimer */}
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              disabled={deletingNoteId === note.id}
+                              className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                              title="Supprimer cette note"
+                            >
+                              {deletingNoteId === note.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap pr-8">
                               {note.content}
                             </p>
                             <div className="flex items-center gap-2 mt-3 pt-2 border-t border-yellow-200 dark:border-yellow-800/30 text-xs text-gray-500 dark:text-gray-400">
@@ -1044,71 +1169,112 @@ export default function ApprenantDetailPage() {
             </motion.div>
           )}
 
-          {activeTab === "evaluations" && (
+          {activeTab === "documents" && (
             <motion.div
-              key="evaluations"
+              key="documents"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               className="p-6"
             >
-              {apprenant.evaluationResultats.length > 0 ? (
+              {/* Zone d'upload */}
+              <div className="mb-6">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleDocumentUpload}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingDocument}
+                  className="w-full border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center hover:border-brand-400 dark:hover:border-brand-500 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
+                >
+                  {uploadingDocument ? (
+                    <div className="flex items-center justify-center gap-2 text-gray-500">
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <span>Envoi en cours...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-10 h-10 mx-auto mb-3 text-gray-400 group-hover:text-brand-500 transition-colors" />
+                      <p className="text-gray-600 dark:text-gray-300 font-medium">
+                        Cliquez pour importer un document
+                      </p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                        PDF, Word, Excel, Images (max 10 MB)
+                      </p>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Liste des documents */}
+              {documentsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+                </div>
+              ) : documents.length > 0 ? (
                 <div className="space-y-3">
-                  {apprenant.evaluationResultats.map((resultat) => (
+                  {documents.map((doc) => (
                     <div
-                      key={resultat.id}
-                      className="p-4 rounded-xl border border-gray-200 dark:border-gray-700"
+                      key={doc.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {resultat.evaluation.titre}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            {resultat.evaluation.type === "POSITIONNEMENT" && "Test de positionnement"}
-                            {resultat.evaluation.type === "FINALE" && "Évaluation finale"}
-                            {resultat.evaluation.type === "QCM_MODULE" && "QCM de module"}
-                            {resultat.evaluation.type === "ATELIER_MODULE" && "Atelier pratique"}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-2">
-                            Passée le {formatDateShort(resultat.createdAt)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          {resultat.score !== null && (
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                              {resultat.score}%
-                            </p>
-                          )}
-                          {resultat.reussi !== null && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
-                              resultat.reussi
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                            }`}>
-                              {resultat.reussi ? (
-                                <>
-                                  <CheckCircle2 size={12} />
-                                  Réussi
-                                </>
-                              ) : (
-                                <>
-                                  <XCircle size={12} />
-                                  Non réussi
-                                </>
-                              )}
-                            </span>
+                      <div className="w-10 h-10 rounded-lg bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center flex-shrink-0">
+                        <File className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">
+                          {doc.nom}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <span>{formatFileSize(doc.taille)}</span>
+                          <span>•</span>
+                          <span>{formatDateShort(doc.createdAt)}</span>
+                          {doc.createdBy && (
+                            <>
+                              <span>•</span>
+                              <span>par {doc.createdBy.firstName || doc.createdBy.email.split("@")[0]}</span>
+                            </>
                           )}
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          title="Voir"
+                        >
+                          <Eye size={18} />
+                        </a>
+                        <a
+                          href={doc.url}
+                          download={doc.nom}
+                          className="p-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          title="Télécharger"
+                        >
+                          <Download size={18} />
+                        </a>
+                        <button
+                          onClick={() => handleDeleteDocument(doc.id)}
+                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          title="Supprimer"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">
-                  <ClipboardCheck className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg mb-2">Aucune évaluation</p>
-                  <p className="text-sm">Cet apprenant n'a pas encore passé d'évaluation.</p>
+                  <FolderOpen className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <p className="text-lg mb-2">Aucun document</p>
+                  <p className="text-sm">Importez des documents liés à cet apprenant (pièces justificatives, attestations, etc.)</p>
                 </div>
               )}
             </motion.div>

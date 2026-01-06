@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import FilePreviewModal from "@/components/files/FilePreviewModal";
@@ -76,6 +77,15 @@ interface FileNode {
   createdAt: string;
 }
 
+interface SubFolderNode {
+  id: string;
+  name: string;
+  filesCount: number;
+  childrenCount: number;
+  files: FileNode[];
+  children: SubFolderNode[];
+}
+
 interface FormationNode {
   id: string;
   titre: string;
@@ -86,6 +96,8 @@ interface FormationNode {
   documentsCount: number;
   sessionDocuments: SessionDoc[];
   files: FileNode[];
+  folderId?: string | null;
+  subFolders?: SubFolderNode[];
 }
 
 interface TreeStats {
@@ -345,7 +357,40 @@ const XIcon = () => (
   </svg>
 );
 
+const TrashIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 4H14M5.33333 4V2.66667C5.33333 2.29848 5.63181 2 6 2H10C10.3682 2 10.6667 2.29848 10.6667 2.66667V4M6.66667 7.33333V11.3333M9.33333 7.33333V11.3333M12.6667 4V13.3333C12.6667 13.7015 12.3682 14 12 14H4C3.63181 14 3.33333 13.7015 3.33333 13.3333V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Types pour dossiers indépendants
+interface RootFolder {
+  id: string;
+  name: string;
+  type: "folder";
+  filesCount: number;
+  childrenCount: number;
+  createdAt: string;
+  files: FileNode[];
+  children: {
+    id: string;
+    name: string;
+    filesCount: number;
+    files: FileNode[];
+    children: {
+      id: string;
+      name: string;
+      filesCount: number;
+      files: FileNode[];
+    }[];
+  }[];
+}
+
 export default function FileManagerPage() {
+  // Router for detecting navigation
+  const pathname = usePathname();
+  const initialRenderRef = useRef(true);
+
   // State
   const [tree, setTree] = useState<FormationNode[]>([]);
   const [stats, setStats] = useState<TreeStats | null>(null);
@@ -353,10 +398,35 @@ export default function FileManagerPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
+  // Dossiers et fichiers indépendants (à la racine)
+  const [rootFolders, setRootFolders] = useState<RootFolder[]>([]);
+  const [rootFiles, setRootFiles] = useState<FileNode[]>([]);
+  const [selectedRootFolder, setSelectedRootFolder] = useState<RootFolder | null>(null);
+  const [selectedSubFolder, setSelectedSubFolder] = useState<RootFolder["children"][0] | null>(null);
+
   // Navigation state
   const [currentView, setCurrentView] = useState<ViewType>("formations");
   const [selectedFormation, setSelectedFormation] = useState<FormationNode | null>(null);
   const [selectedApprenant, setSelectedApprenant] = useState<ApprenantNode | null>(null);
+
+  // Reset navigation state when navigating to this page (for menu clicks)
+  useEffect(() => {
+    // Skip on initial render
+    if (initialRenderRef.current) {
+      initialRenderRef.current = false;
+      return;
+    }
+
+    // When pathname changes to /automate/files, reset navigation state
+    if (pathname === "/automate/files") {
+      setSelectedFormation(null);
+      setSelectedApprenant(null);
+      setSelectedRootFolder(null);
+      setSelectedSubFolder(null);
+      setCurrentView("formations");
+      setSearchQuery("");
+    }
+  }, [pathname]);
 
   // Modal preview pour fichiers
   const [previewFile, setPreviewFile] = useState<FileNode | null>(null);
@@ -385,6 +455,30 @@ export default function FileManagerPage() {
   const [totalPages, setTotalPages] = useState(1);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Import de fichiers
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Nouveau dossier
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
+
+  // Sélection de dossier pour import
+  const [availableFolders, setAvailableFolders] = useState<{ id: string; name: string; depth: number; path: string }[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [isLoadingFolders, setIsLoadingFolders] = useState(false);
+  const [showCreateFolderInImport, setShowCreateFolderInImport] = useState(false);
+  const [newFolderNameInImport, setNewFolderNameInImport] = useState("");
+
+  // Suppression de fichiers/dossiers
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "file" | "folder"; id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Charger l'arborescence
   const fetchTree = useCallback(async () => {
     setIsLoading(true);
@@ -394,7 +488,10 @@ export default function FileManagerPage() {
         const data = await response.json();
         setTree(data.tree);
         setStats(data.stats);
-        return data.tree; // Retourner les données pour usage ultérieur
+        // Charger aussi les dossiers et fichiers racine
+        setRootFolders(data.rootFolders || []);
+        setRootFiles(data.rootFiles || []);
+        return data; // Retourner les données pour usage ultérieur
       }
       return null;
     } catch (error) {
@@ -407,9 +504,9 @@ export default function FileManagerPage() {
 
   // Rafraîchir et préserver la sélection
   const refreshAndPreserveSelection = useCallback(async () => {
-    const newTree = await fetchTree();
-    if (newTree && selectedFormation) {
-      const updatedFormation = newTree.find((f: FormationNode) => f.id === selectedFormation.id);
+    const data = await fetchTree();
+    if (data && data.tree && selectedFormation) {
+      const updatedFormation = data.tree.find((f: FormationNode) => f.id === selectedFormation.id);
       if (updatedFormation) {
         setSelectedFormation(updatedFormation);
 
@@ -421,17 +518,267 @@ export default function FileManagerPage() {
         }
       }
     }
-  }, [fetchTree, selectedFormation, selectedApprenant]);
+    // Rafraîchir aussi les dossiers racine sélectionnés
+    if (data && data.rootFolders && selectedRootFolder) {
+      const updatedFolder = data.rootFolders.find((f: RootFolder) => f.id === selectedRootFolder.id);
+      if (updatedFolder) {
+        setSelectedRootFolder(updatedFolder);
+      }
+    }
+  }, [fetchTree, selectedFormation, selectedApprenant, selectedRootFolder]);
 
   useEffect(() => {
     fetchTree();
   }, [fetchTree]);
 
+  // Gérer l'import de fichiers
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((file) => {
+        formData.append("files", file);
+      });
+
+      // Ajouter le dossier cible sélectionné
+      if (selectedFolderId) {
+        formData.append("folderId", selectedFolderId);
+      }
+
+      // Ajouter le contexte si on est dans une formation ou un apprenant (pour rétrocompatibilité)
+      if (selectedFormation) {
+        formData.append("formationId", selectedFormation.id);
+      }
+      if (selectedApprenant) {
+        formData.append("apprenantId", selectedApprenant.id);
+      }
+
+      const response = await fetch("/api/files/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        // Rafraîchir l'arborescence
+        await refreshAndPreserveSelection();
+        setShowImportModal(false);
+        setSelectedFolderId(null);
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erreur lors de l'import");
+      }
+    } catch (error) {
+      console.error("Erreur upload:", error);
+      alert("Erreur lors de l'import des fichiers");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      // Reset l'input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Charger les dossiers disponibles
+  const fetchFolders = useCallback(async () => {
+    setIsLoadingFolders(true);
+    try {
+      const response = await fetch("/api/folders");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableFolders(data.flatList || []);
+      }
+    } catch (error) {
+      console.error("Erreur chargement dossiers:", error);
+    } finally {
+      setIsLoadingFolders(false);
+    }
+  }, []);
+
+  const openImportModal = () => {
+    setShowImportModal(true);
+    setShowCreateFolderInImport(false);
+    setNewFolderNameInImport("");
+    // Pré-sélectionner le dossier de la formation courante si disponible
+    if (selectedFormation?.folderId) {
+      setSelectedFolderId(selectedFormation.folderId);
+    } else {
+      setSelectedFolderId(null);
+    }
+    // Charger les dossiers disponibles
+    fetchFolders();
+  };
+
+  // Créer un dossier depuis le modal d'import
+  const handleCreateFolderInImport = async () => {
+    if (!newFolderNameInImport.trim()) return;
+
+    setIsCreatingFolder(true);
+    try {
+      const body: { name: string; parentId?: string } = {
+        name: newFolderNameInImport.trim(),
+      };
+
+      // Si un dossier est sélectionné, créer le nouveau dossier dedans
+      if (selectedFolderId) {
+        body.parentId = selectedFolderId;
+      }
+
+      const response = await fetch("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Rafraîchir la liste des dossiers
+        await fetchFolders();
+        // Sélectionner le nouveau dossier créé
+        setSelectedFolderId(data.folder.id);
+        setShowCreateFolderInImport(false);
+        setNewFolderNameInImport("");
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erreur lors de la création du dossier");
+      }
+    } catch (error) {
+      console.error("Erreur création dossier:", error);
+      alert("Erreur lors de la création du dossier");
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
+  // Créer un nouveau dossier
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) {
+      return;
+    }
+
+    setIsCreatingFolder(true);
+    try {
+      const body: {
+        name: string;
+        formationId?: string;
+        parentId?: string | null;
+      } = {
+        name: newFolderName.trim(),
+      };
+
+      // Utiliser le dossier parent sélectionné s'il existe
+      if (newFolderParentId) {
+        body.parentId = newFolderParentId;
+      } else if (selectedFormation) {
+        // Sinon, si on est dans une formation, lier le dossier à cette formation
+        body.formationId = selectedFormation.id;
+        // Si la formation a un folderId, utiliser comme parent
+        if (selectedFormation.folderId) {
+          body.parentId = selectedFormation.folderId;
+        }
+      }
+
+      const response = await fetch("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        await refreshAndPreserveSelection();
+        // Rafraîchir aussi la liste des dossiers pour le modal d'import
+        await fetchFolders();
+        setShowNewFolderModal(false);
+        setNewFolderName("");
+        setNewFolderParentId(null);
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erreur lors de la création du dossier");
+      }
+    } catch (error) {
+      console.error("Erreur création dossier:", error);
+      alert("Erreur lors de la création du dossier");
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
+  // Ouvrir le modal de création de dossier
+  const openNewFolderModal = (defaultParentId?: string | null) => {
+    setShowNewFolderModal(true);
+    setNewFolderName("");
+    setNewFolderParentId(defaultParentId || null);
+    // Charger la liste des dossiers disponibles
+    fetchFolders();
+  };
+
+  // Ouvrir le modal de suppression
+  const openDeleteModal = (type: "file" | "folder", id: string, name: string) => {
+    setDeleteTarget({ type, id, name });
+    setShowDeleteModal(true);
+  };
+
+  // Supprimer un fichier ou dossier
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    try {
+      const endpoint = deleteTarget.type === "file"
+        ? `/api/files/${deleteTarget.id}`
+        : `/api/folders/${deleteTarget.id}`;
+
+      const response = await fetch(endpoint, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Rafraîchir l'arborescence
+        await refreshAndPreserveSelection();
+
+        // Si on a supprimé le dossier actuellement sélectionné, revenir à la racine
+        if (deleteTarget.type === "folder") {
+          if (selectedRootFolder?.id === deleteTarget.id) {
+            setSelectedRootFolder(null);
+            setSelectedSubFolder(null);
+          } else if (selectedSubFolder?.id === deleteTarget.id) {
+            setSelectedSubFolder(null);
+          }
+        }
+
+        setShowDeleteModal(false);
+        setDeleteTarget(null);
+      } else {
+        const error = await response.json();
+        alert(error.error || `Erreur lors de la suppression du ${deleteTarget.type === "file" ? "fichier" : "dossier"}`);
+      }
+    } catch (error) {
+      console.error("Erreur suppression:", error);
+      alert(`Erreur lors de la suppression du ${deleteTarget?.type === "file" ? "fichier" : "dossier"}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Navigation
   const navigateToFormation = (formation: FormationNode) => {
     setSelectedFormation(formation);
     setSelectedApprenant(null);
+    setSelectedRootFolder(null);
+    setSelectedSubFolder(null);
     setCurrentView("apprenants");
+  };
+
+  // Ouvrir un fichier pour prévisualisation (images, PDF, etc.)
+  const openFilePreview = (file: FileNode) => {
+    setPreviewFile(file);
+    setShowPreviewModal(true);
   };
 
   // Ouvrir un document dans le modal de preview
@@ -441,23 +788,82 @@ export default function FileManagerPage() {
     setIsLoadingDoc(true);
     setIsEditMode(false);
 
+    // Si c'est un PDF avec une URL directe, on ne charge pas le contenu HTML
+    if (doc.fileUrl && doc.mimeType === "application/pdf") {
+      // Pour les PDFs, on affiche directement via iframe ou on propose le téléchargement
+      setDocContent("");
+      setEditedDocContent("");
+      setIsLoadingDoc(false);
+      return;
+    }
+
     try {
       // Charger le contenu du fichier depuis l'API
       const response = await fetch(`/api/files/${doc.id}/content`);
       if (response.ok) {
         const data = await response.json();
+
+        // Si c'est un PDF retourné par l'API, rediriger vers le fichier
+        if (data.mimeType === "application/pdf" && data.fileUrl) {
+          setDocContent("");
+          setEditedDocContent("");
+          // Mettre à jour le doc avec l'URL pour l'affichage PDF
+          setPreviewDoc({...doc, fileUrl: data.fileUrl, mimeType: "application/pdf"});
+          setIsLoadingDoc(false);
+          return;
+        }
+
         const content = data.content || "";
-        setDocContent(content);
-        setEditedDocContent(content);
+        if (content && content.trim() !== "") {
+          setDocContent(content);
+          setEditedDocContent(content);
+        } else {
+          // Contenu vide - afficher un message informatif
+          const emptyMessage = `
+            <div style="text-align: center; padding: 60px 20px; color: #666;">
+              <svg style="width: 64px; height: 64px; margin: 0 auto 16px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+              <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #333;">Document en attente de génération</h3>
+              <p style="margin: 0; font-size: 14px;">Ce document n'a pas encore été généré ou son contenu n'est pas encore disponible.</p>
+            </div>
+          `;
+          setDocContent(emptyMessage);
+          setEditedDocContent(emptyMessage);
+        }
       } else {
-        // Si pas de contenu, afficher un message
-        setDocContent("<p>Contenu non disponible pour ce document.</p>");
-        setEditedDocContent("<p>Contenu non disponible pour ce document.</p>");
+        // Erreur 404 ou autre - afficher un message d'erreur
+        const errorMessage = `
+          <div style="text-align: center; padding: 60px 20px; color: #666;">
+            <svg style="width: 64px; height: 64px; margin: 0 auto 16px; opacity: 0.5; color: #EF4444;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #333;">Document non trouvé</h3>
+            <p style="margin: 0; font-size: 14px;">Le contenu de ce document n'a pas pu être chargé. Il a peut-être été supprimé ou déplacé.</p>
+          </div>
+        `;
+        setDocContent(errorMessage);
+        setEditedDocContent(errorMessage);
       }
     } catch (error) {
       console.error("Erreur chargement contenu:", error);
-      setDocContent("<p>Erreur lors du chargement du contenu.</p>");
-      setEditedDocContent("<p>Erreur lors du chargement du contenu.</p>");
+      const errorMessage = `
+        <div style="text-align: center; padding: 60px 20px; color: #666;">
+          <svg style="width: 64px; height: 64px; margin: 0 auto 16px; opacity: 0.5; color: #EF4444;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #333;">Erreur de chargement</h3>
+          <p style="margin: 0; font-size: 14px;">Une erreur est survenue lors du chargement du document. Veuillez réessayer.</p>
+        </div>
+      `;
+      setDocContent(errorMessage);
+      setEditedDocContent(errorMessage);
     } finally {
       setIsLoadingDoc(false);
     }
@@ -791,14 +1197,24 @@ export default function FileManagerPage() {
       setSelectedApprenant(null);
       setCurrentView("apprenants");
     } else if (currentView === "apprenants") {
-      setSelectedFormation(null);
-      setCurrentView("formations");
+      // Si on est dans un sous-dossier, revenir au dossier parent
+      if (selectedSubFolder) {
+        setSelectedSubFolder(null);
+      } else if (selectedRootFolder) {
+        setSelectedRootFolder(null);
+        setCurrentView("formations");
+      } else {
+        setSelectedFormation(null);
+        setCurrentView("formations");
+      }
     }
   };
 
   const navigateHome = () => {
     setSelectedFormation(null);
     setSelectedApprenant(null);
+    setSelectedRootFolder(null);
+    setSelectedSubFolder(null);
     setCurrentView("formations");
   };
 
@@ -813,6 +1229,20 @@ export default function FileManagerPage() {
         setSelectedApprenant(null);
         setCurrentView("apprenants");
       }
+    });
+  }
+  if (selectedRootFolder) {
+    breadcrumbs.push({
+      label: selectedRootFolder.name,
+      onClick: () => {
+        setSelectedSubFolder(null);
+      }
+    });
+  }
+  if (selectedSubFolder) {
+    breadcrumbs.push({
+      label: selectedSubFolder.name,
+      onClick: () => {}
     });
   }
   if (selectedApprenant) {
@@ -858,7 +1288,7 @@ export default function FileManagerPage() {
               Mes Fichiers
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Gérez vos documents organisés par formation et par apprenant
+              Retrouvez vos documents, classés par formation et par apprenant.
             </p>
           </div>
 
@@ -888,7 +1318,22 @@ export default function FileManagerPage() {
               </span>
             </button>
 
-            <button className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:scale-[0.98] transition-all shadow-sm hover:shadow-md">
+            <button
+              onClick={() => openNewFolderModal()}
+              className="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.98] transition-all dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              title="Nouveau dossier"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.5 5C2.5 3.89543 3.39543 3 4.5 3H7.17157C7.70201 3 8.21071 3.21071 8.58579 3.58579L9.41421 4.41421C9.78929 4.78929 10.298 5 10.8284 5H15.5C16.6046 5 17.5 5.89543 17.5 7V14C17.5 15.1046 16.6046 16 15.5 16H4.5C3.39543 16 2.5 15.1046 2.5 14V5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 8.5V13.5M7.5 11H12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Nouveau dossier
+            </button>
+
+            <button
+              onClick={openImportModal}
+              className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:scale-[0.98] transition-all shadow-sm hover:shadow-md"
+            >
               <UploadIcon />
               Importer
             </button>
@@ -898,30 +1343,46 @@ export default function FileManagerPage() {
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        {/* Breadcrumbs */}
-        <nav className="flex items-center gap-1 text-sm overflow-x-auto">
-          <button
-            onClick={navigateHome}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-          >
-            <HomeIcon />
-          </button>
-          {breadcrumbs.map((crumb, index) => (
-            <React.Fragment key={index}>
-              <ChevronRightIcon />
-              <button
-                onClick={crumb.onClick}
-                className={`px-2 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                  index === breadcrumbs.length - 1
-                    ? "font-medium text-gray-900 dark:text-white"
-                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                {crumb.label}
-              </button>
-            </React.Fragment>
-          ))}
-        </nav>
+        {/* Back button + Breadcrumbs */}
+        <div className="flex items-center gap-2">
+          {/* Back button - visible only when not at root */}
+          {currentView !== "formations" && (
+            <button
+              onClick={navigateBack}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 transition-all text-sm font-medium"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Retour
+            </button>
+          )}
+
+          {/* Breadcrumbs */}
+          <nav className="flex items-center gap-1 text-sm overflow-x-auto">
+            <button
+              onClick={navigateHome}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            >
+              <HomeIcon />
+            </button>
+            {breadcrumbs.map((crumb, index) => (
+              <React.Fragment key={index}>
+                <ChevronRightIcon />
+                <button
+                  onClick={crumb.onClick}
+                  className={`px-2 py-1 rounded-lg transition-colors whitespace-nowrap ${
+                    index === breadcrumbs.length - 1
+                      ? "font-medium text-gray-900 dark:text-white"
+                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  {crumb.label}
+                </button>
+              </React.Fragment>
+            ))}
+          </nav>
+        </div>
 
         {/* Search and View toggle */}
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -987,11 +1448,11 @@ export default function FileManagerPage() {
             animate="show"
             exit="hidden"
           >
-            {filteredFormations.length === 0 ? (
+            {filteredFormations.length === 0 && rootFolders.length === 0 && rootFiles.length === 0 ? (
               <div className="text-center py-24">
                 <FolderClosedIcon className="mx-auto mb-4" color="#CBD5E1" />
                 <p className="text-gray-500 dark:text-gray-400">
-                  {searchQuery ? "Aucun résultat trouvé" : "Aucune formation avec documents"}
+                  {searchQuery ? "Aucun résultat trouvé" : "Aucune formation ou fichier"}
                 </p>
                 <Link
                   href="/automate/create"
@@ -1002,6 +1463,54 @@ export default function FileManagerPage() {
               </div>
             ) : viewMode === "grid" ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {/* Dossiers racine indépendants */}
+                {rootFolders
+                  .filter((folder) =>
+                    !searchQuery || folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map((folder) => (
+                    <motion.div
+                      key={`folder-${folder.id}`}
+                      variants={itemVariants}
+                      className="group relative flex flex-col items-center p-4 rounded-2xl border border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-amber-700 dark:hover:bg-amber-500/10 transition-all duration-200 text-center cursor-pointer"
+                      onClick={() => {
+                        setSelectedRootFolder(folder);
+                        setSelectedSubFolder(null);
+                        setCurrentView("apprenants"); // Réutiliser la vue apprenants pour afficher le contenu
+                      }}
+                    >
+                      {/* Bouton de suppression */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteModal("folder", folder.id, folder.name);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover:opacity-100 transition-all z-10"
+                        title="Supprimer le dossier"
+                      >
+                        <TrashIcon />
+                      </button>
+                      <div className="relative mb-3 transform group-hover:scale-105 transition-transform">
+                        <FolderClosedIcon color="#F59E0B" />
+                        {/* Badge count */}
+                        {folder.filesCount > 0 && (
+                          <div className="absolute -top-1 -right-1 w-6 h-6 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                            {folder.filesCount}
+                          </div>
+                        )}
+                      </div>
+                      <h3 className="font-medium text-gray-900 dark:text-white text-sm line-clamp-2 mb-1">
+                        {folder.name}
+                      </h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {folder.childrenCount > 0 ? `${folder.childrenCount} sous-dossiers` : `${folder.filesCount} fichiers`}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+
+                {/* Formations */}
                 {filteredFormations.map((formation) => (
                   <motion.button
                     key={formation.id}
@@ -1027,6 +1536,43 @@ export default function FileManagerPage() {
                     </div>
                   </motion.button>
                 ))}
+
+                {/* Fichiers racine */}
+                {rootFiles
+                  .filter((file) =>
+                    !searchQuery || file.originalName.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map((file) => (
+                    <motion.div
+                      key={`file-${file.id}`}
+                      variants={itemVariants}
+                      onClick={() => openFilePreview(file)}
+                      className="group relative flex flex-col items-center p-4 rounded-2xl border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700 dark:hover:bg-gray-500/10 transition-all duration-200 text-center cursor-pointer"
+                    >
+                      {/* Bouton de suppression */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteModal("file", file.id, file.originalName);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover:opacity-100 transition-all z-10"
+                        title="Supprimer le fichier"
+                      >
+                        <TrashIcon />
+                      </button>
+                      <div className="relative mb-3 transform group-hover:scale-105 transition-transform">
+                        <DocumentIcon type={file.category} />
+                      </div>
+                      <h3 className="font-medium text-gray-900 dark:text-white text-sm line-clamp-2 mb-1">
+                        {file.originalName}
+                      </h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatFileSize(file.size)}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
               </div>
             ) : (
               // List view
@@ -1096,16 +1642,30 @@ export default function FileManagerPage() {
                     </p>
                   </div>
                 </div>
-                <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_CONFIG[selectedFormation.status]?.bg || "bg-gray-100"} ${STATUS_CONFIG[selectedFormation.status]?.color || "text-gray-600"}`}>
-                  {STATUS_CONFIG[selectedFormation.status]?.label || selectedFormation.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  {/* Bouton Nouveau dossier */}
+                  {selectedFormation.folderId && (
+                    <button
+                      onClick={() => openNewFolderModal(selectedFormation.folderId)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Nouveau dossier
+                    </button>
+                  )}
+                  <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${STATUS_CONFIG[selectedFormation.status]?.bg || "bg-gray-100"} ${STATUS_CONFIG[selectedFormation.status]?.color || "text-gray-600"}`}>
+                    {STATUS_CONFIG[selectedFormation.status]?.label || selectedFormation.status}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {selectedFormation.apprenants.length === 0 ? (
+            {selectedFormation.apprenants.length === 0 && selectedFormation.files.length === 0 ? (
               <div className="text-center py-16">
                 <UserFolderIcon className="mx-auto mb-4 w-20 h-20 opacity-50" />
-                <p className="text-gray-500 dark:text-gray-400">Aucun apprenant inscrit à cette formation</p>
+                <p className="text-gray-500 dark:text-gray-400">Aucun apprenant ni fichier dans cette formation</p>
               </div>
             ) : viewMode === "grid" ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -1124,6 +1684,126 @@ export default function FileManagerPage() {
                     </span>
                   </motion.div>
                 )}
+
+                {/* Fichiers de la formation (PDFs générés, fichiers uploadés, etc.) */}
+                {selectedFormation.files.map((file) => {
+                  const config = DOCTYPE_CONFIG[file.category] || DOCTYPE_CONFIG.DOCUMENT;
+                  // Nettoyer le nom de fichier (supprimer .html)
+                  let displayName = file.originalName || file.name;
+                  displayName = displayName.replace(/\.html$/i, "");
+                  return (
+                    <motion.div
+                      key={file.id}
+                      variants={itemVariants}
+                      className="group relative flex flex-col items-center p-4 rounded-2xl border border-gray-200 bg-white hover:border-blue-300 hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-blue-700 transition-all duration-200"
+                    >
+                      <DocumentIcon type={file.category} className="mb-3 transform group-hover:scale-105 transition-transform" />
+                      <h3 className="font-medium text-gray-900 dark:text-white text-sm text-center line-clamp-2 mb-1">
+                        {displayName}
+                      </h3>
+                      <span className="text-xs text-gray-500">
+                        {config.label}
+                      </span>
+                      <span className="text-xs text-gray-400 mt-1">
+                        {new Date(file.createdAt).toLocaleDateString('fr-FR')}
+                      </span>
+                      {/* Actions on hover */}
+                      <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-white via-white dark:from-gray-900 dark:via-gray-900 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => {
+                              setPreviewFile(file);
+                              setShowPreviewModal(true);
+                            }}
+                            className="p-1.5 text-gray-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:bg-brand-900/20"
+                            title="Voir"
+                          >
+                            <EyeIcon />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (file.publicUrl) {
+                                window.open(file.publicUrl, "_blank");
+                              }
+                            }}
+                            className="p-1.5 text-gray-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:bg-brand-900/20"
+                            title="Télécharger"
+                          >
+                            <DownloadIcon />
+                          </button>
+                          <button
+                            onClick={() => {
+                              // Préparer l'envoi du fichier
+                              setSendEmail("");
+                              setSendSubject(`Document: ${displayName}`);
+                              setSendMessage(`Bonjour,\n\nVeuillez trouver ci-joint le document "${displayName}".\n\nCordialement`);
+                              setSendSuccess(false);
+                              setShowSendModal(true);
+                            }}
+                            className="p-1.5 text-gray-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:bg-brand-900/20"
+                            title="Partager par email"
+                          >
+                            <SendIcon />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+
+                {/* Sous-dossiers créés par l'utilisateur (orange) */}
+                {selectedFormation.subFolders?.map((folder) => (
+                  <motion.div
+                    key={`subfolder-${folder.id}`}
+                    variants={itemVariants}
+                    onClick={() => {
+                      // Naviguer vers ce sous-dossier
+                      setSelectedRootFolder({
+                        id: folder.id,
+                        name: folder.name,
+                        type: "folder",
+                        filesCount: folder.filesCount,
+                        childrenCount: folder.childrenCount,
+                        createdAt: new Date().toISOString(),
+                        files: folder.files as FileNode[],
+                        children: folder.children.map(c => ({
+                          ...c,
+                          children: c.children || [],
+                        })),
+                      });
+                      setSelectedSubFolder(null);
+                      setSelectedFormation(null); // Sortir de la vue formation
+                      setCurrentView("apprenants");
+                    }}
+                    className="group relative flex flex-col items-center p-4 rounded-2xl border border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-amber-700 dark:hover:bg-amber-500/10 transition-all duration-200 text-center cursor-pointer"
+                  >
+                    {/* Bouton de suppression */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeleteModal("folder", folder.id, folder.name);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover:opacity-100 transition-all z-10"
+                      title="Supprimer le dossier"
+                    >
+                      <TrashIcon />
+                    </button>
+                    <div className="relative mb-3 transform group-hover:scale-105 transition-transform">
+                      <FolderClosedIcon color="#F59E0B" />
+                      {folder.filesCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {folder.filesCount}
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="font-medium text-gray-900 dark:text-white text-sm line-clamp-2 mb-1">
+                      {folder.name}
+                    </h3>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {folder.childrenCount > 0 ? `${folder.childrenCount} sous-dossiers` : `${folder.filesCount} fichiers`}
+                    </span>
+                  </motion.div>
+                ))}
 
                 {/* Apprenants */}
                 {selectedFormation.apprenants.map((apprenant) => (
@@ -1164,19 +1844,112 @@ export default function FileManagerPage() {
               </div>
             ) : (
               // List view
-              <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-800/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apprenant</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signés</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">En attente</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {selectedFormation.apprenants.map((apprenant) => (
+              <div className="space-y-4">
+                {/* Fichiers de la formation (liste) */}
+                {selectedFormation.files.length > 0 && (
+                  <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-hidden">
+                    <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="font-medium text-blue-700 dark:text-blue-300">Fichiers de la formation</h3>
+                    </div>
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-800/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                        {selectedFormation.files.map((file) => {
+                          const config = DOCTYPE_CONFIG[file.category] || DOCTYPE_CONFIG.DOCUMENT;
+                          // Nettoyer le nom de fichier (supprimer .html)
+                          let displayName = file.originalName || file.name;
+                          displayName = displayName.replace(/\.html$/i, "");
+                          return (
+                            <motion.tr
+                              key={file.id}
+                              variants={itemVariants}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xl">{config.icon}</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {displayName}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{config.label}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                                {new Date(file.createdAt).toLocaleDateString('fr-FR')}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setPreviewFile(file);
+                                      setShowPreviewModal(true);
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                    title="Voir"
+                                  >
+                                    <EyeIcon />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (file.publicUrl) {
+                                        window.open(file.publicUrl, "_blank");
+                                      }
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                    title="Télécharger"
+                                  >
+                                    <DownloadIcon />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSendEmail("");
+                                      setSendSubject(`Document: ${displayName}`);
+                                      setSendMessage(`Bonjour,\n\nVeuillez trouver ci-joint le document "${displayName}".\n\nCordialement`);
+                                      setSendSuccess(false);
+                                      setShowSendModal(true);
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                    title="Partager par email"
+                                  >
+                                    <SendIcon />
+                                  </button>
+                                </div>
+                              </td>
+                            </motion.tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Apprenants (liste) */}
+                {selectedFormation.apprenants.length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-hidden">
+                  {selectedFormation.files.length > 0 && (
+                    <div className="px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="font-medium text-amber-700 dark:text-amber-300">Apprenants</h3>
+                    </div>
+                  )}
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apprenant</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signés</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">En attente</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                      {selectedFormation.apprenants.map((apprenant) => (
                       <motion.tr
                         key={apprenant.id}
                         variants={itemVariants}
@@ -1207,8 +1980,110 @@ export default function FileManagerPage() {
                         </td>
                       </motion.tr>
                     ))}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        ) : currentView === "apprenants" && selectedRootFolder ? (
+          // Vue du contenu d'un dossier racine
+          <motion.div
+            key="root-folder"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+          >
+            {/* Folder header info */}
+            <div className="rounded-xl border border-gray-200 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 dark:border-gray-800 p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <FolderOpenIcon color="#F59E0B" className="w-12 h-12" />
+                  <div>
+                    <h2 className="font-semibold text-gray-900 dark:text-white">{selectedRootFolder.name}</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {selectedRootFolder.childrenCount} sous-dossier(s) • {selectedRootFolder.filesCount} fichier(s)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {selectedRootFolder.children.length === 0 && selectedRootFolder.files.length === 0 ? (
+              <div className="text-center py-16">
+                <FolderClosedIcon className="mx-auto mb-4 w-20 h-20 opacity-50" color="#F59E0B" />
+                <p className="text-gray-500 dark:text-gray-400">Ce dossier est vide</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {/* Sous-dossiers */}
+                {selectedRootFolder.children.map((child) => (
+                  <motion.div
+                    key={`subfolder-${child.id}`}
+                    variants={itemVariants}
+                    onClick={() => setSelectedSubFolder(child)}
+                    className="group relative flex flex-col items-center p-4 rounded-2xl border border-gray-200 bg-white hover:border-amber-300 hover:bg-amber-50/50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-amber-700 dark:hover:bg-amber-500/10 transition-all duration-200 text-center cursor-pointer"
+                  >
+                    {/* Bouton de suppression */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeleteModal("folder", child.id, child.name);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover:opacity-100 transition-all z-10"
+                      title="Supprimer le dossier"
+                    >
+                      <TrashIcon />
+                    </button>
+                    <div className="relative mb-3 transform group-hover:scale-105 transition-transform">
+                      <FolderClosedIcon color="#F59E0B" />
+                      {child.filesCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {child.filesCount}
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="font-medium text-gray-900 dark:text-white text-sm line-clamp-2 mb-1">
+                      {child.name}
+                    </h3>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {child.filesCount} fichier(s)
+                    </span>
+                  </motion.div>
+                ))}
+
+                {/* Fichiers du dossier */}
+                {selectedRootFolder.files.map((file) => (
+                  <motion.div
+                    key={`file-${file.id}`}
+                    variants={itemVariants}
+                    onClick={() => openFilePreview(file)}
+                    className="group relative flex flex-col items-center p-4 rounded-2xl border border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700 dark:hover:bg-gray-500/10 transition-all duration-200 text-center cursor-pointer"
+                  >
+                    {/* Bouton de suppression */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeleteModal("file", file.id, file.originalName);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover:opacity-100 transition-all z-10"
+                      title="Supprimer le fichier"
+                    >
+                      <TrashIcon />
+                    </button>
+                    <div className="relative mb-3 transform group-hover:scale-105 transition-transform">
+                      <DocumentIcon type={file.category} />
+                    </div>
+                    <h3 className="font-medium text-gray-900 dark:text-white text-sm line-clamp-2 mb-1">
+                      {file.originalName}
+                    </h3>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatFileSize(file.size)}
+                    </span>
+                  </motion.div>
+                ))}
               </div>
             )}
           </motion.div>
@@ -1591,6 +2466,52 @@ export default function FileManagerPage() {
                       <span className="text-gray-500 dark:text-gray-400">Chargement du document...</span>
                     </div>
                   </div>
+                ) : previewDoc?.mimeType === "application/pdf" && previewDoc?.fileUrl ? (
+                  /* Affichage PDF via iframe */
+                  <div className="h-full flex flex-col items-center justify-center p-8">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center max-w-md">
+                      <div className="w-20 h-20 mx-auto mb-6 bg-red-50 dark:bg-red-900/20 rounded-2xl flex items-center justify-center">
+                        <svg className="w-10 h-10 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14,2 14,8 20,8"/>
+                          <path d="M9 15h6M9 11h6"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        Document PDF
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                        Ce document est disponible au format PDF. Cliquez ci-dessous pour le visualiser ou le télécharger.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <a
+                          href={previewDoc.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-500 text-white rounded-xl hover:bg-brand-600 transition-colors font-medium text-sm"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                          </svg>
+                          Ouvrir
+                        </a>
+                        <a
+                          href={previewDoc.fileUrl}
+                          download
+                          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                          Télécharger
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 ) : isEditMode ? (
                   /* Mode édition avec TipTap */
                   <div className="h-full">
@@ -1904,7 +2825,468 @@ export default function FileManagerPage() {
             </motion.div>
           </motion.div>
         )}
+
+        {/* Modal d'import de fichiers */}
+        {showImportModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => !isUploading && !isCreatingFolder && setShowImportModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Importer des fichiers
+                </h3>
+                <button
+                  onClick={() => !isUploading && !isCreatingFolder && setShowImportModal(false)}
+                  disabled={isUploading || isCreatingFolder}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 space-y-4">
+                {/* Sélecteur de dossier de destination */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Dossier de destination
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <select
+                        value={selectedFolderId || ""}
+                        onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                        disabled={isUploading || isLoadingFolders}
+                        className="w-full px-4 py-2.5 pr-10 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent appearance-none cursor-pointer disabled:opacity-50"
+                      >
+                        <option value="">Racine (Mes fichiers)</option>
+                        {availableFolders.map((folder) => (
+                          <option key={folder.id} value={folder.id}>
+                            {"  ".repeat(folder.depth)}{folder.depth > 0 ? "└ " : ""}{folder.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        {isLoadingFolders ? (
+                          <svg className="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowCreateFolderInImport(!showCreateFolderInImport)}
+                      disabled={isUploading}
+                      className="px-3 py-2.5 text-sm font-medium text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 rounded-xl hover:bg-brand-100 dark:hover:bg-brand-900/30 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                      title="Créer un nouveau dossier"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="hidden sm:inline">Nouveau</span>
+                    </button>
+                  </div>
+
+                  {/* Info sur le dossier sélectionné */}
+                  {selectedFolderId && (
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      {availableFolders.find(f => f.id === selectedFolderId)?.path || "Dossier sélectionné"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Formulaire de création de dossier inline */}
+                {showCreateFolderInImport && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Créer un nouveau dossier
+                        {selectedFolderId && (
+                          <span className="font-normal text-gray-500">
+                            {" "}dans {availableFolders.find(f => f.id === selectedFolderId)?.name}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newFolderNameInImport}
+                        onChange={(e) => setNewFolderNameInImport(e.target.value)}
+                        placeholder="Nom du dossier"
+                        disabled={isCreatingFolder}
+                        className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newFolderNameInImport.trim()) {
+                            handleCreateFolderInImport();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleCreateFolderInImport}
+                        disabled={!newFolderNameInImport.trim() || isCreatingFolder}
+                        className="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      >
+                        {isCreatingFolder ? (
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        Créer
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCreateFolderInImport(false);
+                          setNewFolderNameInImport("");
+                        }}
+                        disabled={isCreatingFolder}
+                        className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Zone de drop / sélection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Fichiers à importer
+                  </label>
+                  <label
+                    className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                      isUploading
+                        ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20"
+                        : "border-gray-300 dark:border-gray-700 hover:border-brand-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      disabled={isUploading}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif"
+                    />
+
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-3">
+                        <svg className="animate-spin h-10 w-10 text-brand-500" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span className="text-sm text-brand-600 dark:text-brand-400 font-medium">
+                          Import en cours...
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center mb-3">
+                          <UploadIcon />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                          Cliquez pour sélectionner des fichiers
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          ou glissez-déposez vos fichiers ici
+                        </span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                          PDF, Word, Excel, Images (max 10MB)
+                        </span>
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 p-5 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setSelectedFolderId(null);
+                    setShowCreateFolderInImport(false);
+                    setNewFolderNameInImport("");
+                  }}
+                  disabled={isUploading}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Modal de création de dossier */}
+        {showNewFolderModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => !isCreatingFolder && setShowNewFolderModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Nouveau dossier
+                </h3>
+                <button
+                  onClick={() => !isCreatingFolder && setShowNewFolderModal(false)}
+                  disabled={isCreatingFolder}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 space-y-4">
+                {/* Sélecteur de dossier parent */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Créer dans
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={newFolderParentId || ""}
+                      onChange={(e) => setNewFolderParentId(e.target.value || null)}
+                      disabled={isCreatingFolder || isLoadingFolders}
+                      className="w-full px-4 py-2.5 pr-10 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent appearance-none cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="">Racine (Mes fichiers)</option>
+                      {availableFolders.map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {"  ".repeat(folder.depth)}{folder.depth > 0 ? "└ " : ""}{folder.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      {isLoadingFolders ? (
+                        <svg className="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  {/* Info sur le dossier parent sélectionné */}
+                  {newFolderParentId && (
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      {availableFolders.find(f => f.id === newFolderParentId)?.path || "Dossier parent"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Nom du dossier */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nom du dossier
+                  </label>
+                  <input
+                    type="text"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="Entrez le nom du dossier..."
+                    disabled={isCreatingFolder}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all disabled:opacity-50"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newFolderName.trim()) {
+                        handleCreateFolder();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 p-5 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  onClick={() => {
+                    setShowNewFolderModal(false);
+                    setNewFolderName("");
+                    setNewFolderParentId(null);
+                  }}
+                  disabled={isCreatingFolder}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleCreateFolder}
+                  disabled={isCreatingFolder || !newFolderName.trim()}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isCreatingFolder ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Création...
+                    </>
+                  ) : (
+                    "Créer le dossier"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Modal de confirmation de suppression */}
+        {showDeleteModal && deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => !isDeleting && setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Confirmer la suppression
+                </h3>
+                <button
+                  onClick={() => !isDeleting && setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-gray-900 dark:text-white font-medium">
+                      Supprimer {deleteTarget.type === "file" ? "le fichier" : "le dossier"} &quot;{deleteTarget.name}&quot; ?
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {deleteTarget.type === "folder"
+                        ? "Tous les fichiers et sous-dossiers seront également supprimés."
+                        : "Cette action est irréversible."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 p-5 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteTarget(null);
+                  }}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Suppression...
+                    </>
+                  ) : (
+                    "Supprimer"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
+
+      {/* Input file caché */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        onChange={handleFileSelect}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.gif"
+      />
     </div>
   );
 }

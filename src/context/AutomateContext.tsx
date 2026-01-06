@@ -84,6 +84,11 @@ export interface UserProfile {
   logoUrl?: string | null;
   signatureUrl?: string | null;
   primaryColor?: string;
+  // Organisation extended
+  organizationSlug?: string;
+  plan?: string;
+  customDomain?: string | null;
+  customDomainVerified?: boolean;
 }
 
 export interface Formation {
@@ -264,6 +269,11 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           logoUrl: org?.logo || null,
           signatureUrl: org?.signature || null,
           primaryColor: orgColor,
+          // Organisation extended
+          organizationSlug: org?.slug || "",
+          plan: org?.plan || "",
+          customDomain: org?.customDomain || null,
+          customDomainVerified: org?.customDomainVerified || false,
         });
 
         // Appliquer la couleur immédiatement

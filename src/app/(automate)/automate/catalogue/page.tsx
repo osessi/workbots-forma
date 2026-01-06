@@ -21,11 +21,11 @@ import {
   AlertCircle,
   TrendingUp,
   Users,
-  FileText,
   Upload,
   Award,
   ChevronRight,
   Clock,
+  Trash2,
 } from "lucide-react";
 
 interface CatalogueStats {
@@ -73,6 +73,7 @@ export default function CataloguePage() {
   const [copied, setCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [uploadingCertificat, setUploadingCertificat] = useState(false);
+  const [deletingCertificat, setDeletingCertificat] = useState(false);
   const [savingCategorie, setSavingCategorie] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -206,6 +207,36 @@ export default function CataloguePage() {
     }
   };
 
+  // Supprimer le certificat Qualiopi
+  const handleDeleteCertificat = async () => {
+    if (!organization || !organization.certificatQualiopiUrl) return;
+
+    if (!confirm("Êtes-vous sûr de vouloir supprimer le certificat Qualiopi ?")) {
+      return;
+    }
+
+    try {
+      setDeletingCertificat(true);
+
+      const response = await fetch("/api/user/organization", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ certificatQualiopiUrl: null }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la suppression");
+      }
+
+      setOrganization({ ...organization, certificatQualiopiUrl: null });
+    } catch (err) {
+      console.error("Erreur suppression certificat:", err);
+      alert("Erreur lors de la suppression du certificat");
+    } finally {
+      setDeletingCertificat(false);
+    }
+  };
+
   // Sauvegarder la catégorie Qualiopi
   const handleCategorieChange = async (categorie: string) => {
     if (!organization) return;
@@ -260,7 +291,7 @@ export default function CataloguePage() {
             Catalogue Public
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Gérez votre catalogue de formations accessible au public
+            Publiez et gérez votre catalogue de formations en ligne.
           </p>
         </div>
 
@@ -488,6 +519,20 @@ export default function CataloguePage() {
                   {organization.certificatQualiopiUrl ? "Remplacer" : "Importer"}
                 </span>
               </label>
+              {organization.certificatQualiopiUrl && (
+                <button
+                  onClick={handleDeleteCertificat}
+                  disabled={deletingCertificat}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {deletingCertificat ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Supprimer
+                </button>
+              )}
             </div>
           </div>
 
@@ -612,50 +657,26 @@ export default function CataloguePage() {
         )}
       </div>
 
-      {/* Actions rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Gérer les formations */}
-        <Link
-          href="/automate/formations"
-          className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-brand-300 dark:hover:border-brand-600 transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <FileText className="w-6 h-6 text-brand-600 dark:text-brand-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                Gérer les formations
-              </h3>
-              <p className="text-sm text-gray-500">
-                Publiez ou dépubliez vos formations du catalogue
-              </p>
-            </div>
-            <ExternalLink className="w-5 h-5 text-gray-400 group-hover:text-brand-500 transition-colors" />
+      {/* Action rapide - Paramètres organisation */}
+      <Link
+        href="/automate/settings"
+        className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-brand-300 dark:hover:border-brand-600 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
           </div>
-        </Link>
-
-        {/* Paramètres organisation */}
-        <Link
-          href="/automate/settings"
-          className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-brand-300 dark:hover:border-brand-600 transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                Paramètres organisation
-              </h3>
-              <p className="text-sm text-gray-500">
-                Logo, couleurs et informations de contact
-              </p>
-            </div>
-            <ExternalLink className="w-5 h-5 text-gray-400 group-hover:text-brand-500 transition-colors" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900 dark:text-white">
+              Paramètres organisation
+            </h3>
+            <p className="text-sm text-gray-500">
+              Logo, couleurs et informations de contact
+            </p>
           </div>
-        </Link>
-      </div>
+          <ExternalLink className="w-5 h-5 text-gray-400 group-hover:text-brand-500 transition-colors" />
+        </div>
+      </Link>
 
       {/* Information Qualiopi */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-5">

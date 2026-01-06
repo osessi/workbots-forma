@@ -818,8 +818,14 @@ function tiptapJsonToHtml(json: unknown): string {
       return childrenHtml;
     case "paragraph":
       const align = attrs?.textAlign as string;
-      const style = align ? ` style="text-align: ${align}"` : "";
-      return `<p${style}>${childrenHtml}</p>`;
+      // Style de base pour les paragraphes avec marge pour les sauts de ligne
+      let pStyle = "margin: 0; padding: 0; min-height: 1.2em;";
+      if (align) {
+        pStyle += ` text-align: ${align};`;
+      }
+      // Si le paragraphe est vide, ajouter un espace insécable pour préserver l'espacement
+      const pContent = childrenHtml.trim() === "" ? "&nbsp;" : childrenHtml;
+      return `<p style="${pStyle}">${pContent}</p>`;
     case "heading":
       const level = attrs?.level || 1;
       return `<h${level}>${childrenHtml}</h${level}>`;

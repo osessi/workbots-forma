@@ -60,10 +60,16 @@ export async function GET(
 
     const { id } = await params;
 
-    // D'abord chercher dans les fichiers
+    // Extraire l'ID de base si c'est un ID composite (pour les documents dupliqués)
+    // Format: originalId-apprenantId
+    const baseId = id.includes("-") && !id.startsWith("emargement-")
+      ? id.split("-").slice(0, -1).join("-") || id.split("-")[0]
+      : id;
+
+    // D'abord chercher dans les fichiers (avec ID original ou baseId pour documents dupliqués)
     const file = await prisma.file.findFirst({
       where: {
-        id,
+        id: { in: [id, baseId] },
         organizationId: user.organizationId,
       },
       include: {
@@ -86,7 +92,7 @@ export async function GET(
     // Ensuite chercher dans les documents de signature
     const signatureDoc = await prisma.signatureDocument.findFirst({
       where: {
-        id,
+        id: { in: [id, baseId] },
         organizationId: user.organizationId,
       },
     });
@@ -104,10 +110,10 @@ export async function GET(
       });
     }
 
-    // Ensuite chercher dans les documents de session (générés par wizard)
+    // Ensuite chercher dans les documents de session (générés par wizard - ancien système)
     const sessionDoc = await prisma.sessionDocument.findFirst({
       where: {
-        id,
+        id: { in: [id, baseId] },
         session: {
           formation: {
             organizationId: user.organizationId,
@@ -133,6 +139,80 @@ export async function GET(
         type: "session",
         status: sessionDoc.status,
       });
+    }
+
+    // Chercher dans les documents de session du NOUVEAU système (SessionDocumentNew)
+    const sessionDocNew = await prisma.sessionDocumentNew.findFirst({
+      where: {
+        id: { in: [id, baseId] },
+        session: {
+          organization: {
+            id: user.organizationId,
+          },
+        },
+      },
+    });
+
+    if (sessionDocNew) {
+      // Le contenu est stocké comme JSON TipTap
+      const contentData = sessionDocNew.content as { html?: string; json?: unknown } | null;
+      const content = contentData?.html || null;
+
+      // Nettoyer le titre (retirer .html)
+      let name = sessionDocNew.titre || `Document ${sessionDocNew.type}`;
+      name = name.replace(/\.html$/i, "");
+
+      return NextResponse.json({
+        id: sessionDocNew.id,
+        name,
+        content,
+        mimeType: "text/html",
+        type: "session_new",
+        isGenerated: sessionDocNew.isGenerated,
+      });
+    }
+
+    // Vérifier si c'est un ID composite pour les feuilles d'émargement (emargement-{feuilleId}-{apprenantId})
+    if (id.startsWith("emargement-")) {
+      const parts = id.split("-");
+      if (parts.length >= 3) {
+        const feuilleId = parts[1];
+
+        const feuille = await prisma.feuilleEmargementNew.findFirst({
+          where: {
+            id: feuilleId,
+            journee: {
+              session: {
+                organization: {
+                  id: user.organizationId,
+                },
+              },
+            },
+          },
+          include: {
+            journee: {
+              include: {
+                session: {
+                  include: {
+                    formation: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (feuille && feuille.pdfUrl) {
+          return NextResponse.json({
+            id,
+            name: `Feuille d'émargement - ${new Date(feuille.journee.date).toLocaleDateString("fr-FR")}`,
+            content: null, // C'est un PDF, pas de contenu HTML
+            fileUrl: feuille.pdfUrl,
+            mimeType: "application/pdf",
+            type: "emargement",
+          });
+        }
+      }
     }
 
     return NextResponse.json({ error: "Document non trouvé" }, { status: 404 });

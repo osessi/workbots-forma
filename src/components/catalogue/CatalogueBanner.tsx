@@ -120,8 +120,7 @@ export function CatalogueBanner({ organization, stats }: CatalogueBannerProps) {
               Catalogue de formations
             </h1>
             <p className="text-lg md:text-xl opacity-90 max-w-xl">
-              Découvrez nos formations professionnelles et développez vos
-              compétences avec {organization.name}
+              Découvrez nos formations professionnelles et choisissez celle qui correspond à vos objectifs.
             </p>
           </div>
 

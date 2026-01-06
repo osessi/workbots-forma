@@ -107,6 +107,17 @@ export async function GET(
   }
 }
 
+// Helper pour parser les tarifs
+function parseTarif(value: unknown): number | null {
+  if (!value) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const match = value.match(/(\d+(?:[.,]\d+)?)/);
+    if (match) return parseFloat(match[1].replace(',', '.'));
+  }
+  return null;
+}
+
 // PATCH - Mettre à jour une formation
 export async function PATCH(
   request: NextRequest,
@@ -167,21 +178,119 @@ export async function PATCH(
       if (ctx.numeroFicheRS) updateData.numeroFicheRS = ctx.numeroFicheRS;
       if (ctx.referentielRSUrl) updateData.referentielRSUrl = ctx.referentielRSUrl;
       if (ctx.lienFranceCompetences) updateData.lienFranceCompetences = ctx.lienFranceCompetences;
+      // Éligibilité CPF
+      if (ctx.estEligibleCPF !== undefined) updateData.estEligibleCPF = Boolean(ctx.estEligibleCPF);
     }
 
-    const updatedFormation = await prisma.formation.update({
-      where: { id },
-      data: updateData,
-      include: {
-        modules: {
-          orderBy: { ordre: "asc" },
-        },
-        _count: {
-          select: {
-            documents: true,
+    // ===========================================
+    // SYNCHRONISATION fichePedagogique -> champs Formation
+    // Pour que le catalogue public affiche les données à jour
+    // ===========================================
+    if (body.fichePedagogique) {
+      const fiche = body.fichePedagogique as Record<string, unknown>;
+
+      // Synchroniser les champs Qualiopi pour le catalogue public
+      if (fiche.publicVise) updateData.publicVise = fiche.publicVise;
+      if (fiche.publicCible) updateData.publicVise = fiche.publicCible;
+      if (fiche.prerequis) updateData.prerequis = fiche.prerequis;
+      if (fiche.accessibilite) updateData.accessibiliteHandicap = fiche.accessibilite;
+      if (fiche.accessibiliteHandicap) updateData.accessibiliteHandicap = fiche.accessibiliteHandicap;
+      if (fiche.delaiAcces) updateData.delaiAcces = fiche.delaiAcces;
+      if (fiche.modalitesEvaluation) updateData.modalitesEvaluation = fiche.modalitesEvaluation;
+
+      // Synchroniser le tarif affiché (priorité: tarifEntreprise > tarif existant)
+      const tarifEntreprise = parseTarif(fiche.tarifEntreprise);
+      if (tarifEntreprise) {
+        updateData.tarifAffiche = tarifEntreprise;
+      }
+
+      // Synchroniser certification
+      if (fiche.isCertifiante !== undefined) {
+        updateData.isCertifiante = Boolean(fiche.isCertifiante);
+      }
+      if (fiche.numeroFicheRS) updateData.numeroFicheRS = fiche.numeroFicheRS;
+      if (fiche.lienFranceCompetences) updateData.lienFranceCompetences = fiche.lienFranceCompetences;
+
+      // Synchroniser CPF
+      if (fiche.estEligibleCPF !== undefined) {
+        updateData.estEligibleCPF = Boolean(fiche.estEligibleCPF);
+      }
+    }
+
+    // ===========================================
+    // MISE À JOUR DES MODULES depuis fichePedagogique
+    // ===========================================
+    let modulesToSync: Array<{ titre: string; ordre: number; contenu?: object; duree?: number }> | null = null;
+
+    // Vérifier si des modules sont fournis directement ou dans fichePedagogique
+    if (body.modules && Array.isArray(body.modules) && body.modules.length > 0) {
+      modulesToSync = body.modules;
+    } else if (body.fichePedagogique) {
+      const fiche = body.fichePedagogique as Record<string, unknown>;
+      // Extraire les modules depuis fichePedagogique.contenu ou fichePedagogique.modules
+      if (fiche.modules && Array.isArray(fiche.modules)) {
+        modulesToSync = (fiche.modules as Array<{ titre?: string; ordre?: number; contenu?: object; duree?: number }>).map((m, idx) => ({
+          titre: m.titre || `Module ${idx + 1}`,
+          ordre: m.ordre ?? idx + 1,
+          contenu: m.contenu || {},
+          duree: m.duree || undefined,
+        }));
+      } else if (fiche.contenu && Array.isArray(fiche.contenu)) {
+        // Format alternatif: contenu est un tableau de modules
+        modulesToSync = (fiche.contenu as Array<{ titre?: string; items?: string[]; sousModules?: Array<{ titre: string }> }>).map((m, idx) => ({
+          titre: m.titre || `Module ${idx + 1}`,
+          ordre: idx + 1,
+          contenu: { items: m.items || (m.sousModules?.map(s => s.titre) || []) },
+          duree: undefined,
+        }));
+      }
+    }
+
+    // Exécuter la mise à jour dans une transaction
+    const updatedFormation = await prisma.$transaction(async (tx) => {
+      // 1. Mettre à jour la formation
+      const formation = await tx.formation.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // 2. Mettre à jour les modules si fournis
+      if (modulesToSync && modulesToSync.length > 0) {
+        // Supprimer les anciens modules (sauf Module 0)
+        await tx.module.deleteMany({
+          where: {
+            formationId: id,
+            isModuleZero: false,
+          },
+        });
+
+        // Créer les nouveaux modules
+        await tx.module.createMany({
+          data: modulesToSync.map((m) => ({
+            formationId: id,
+            titre: m.titre,
+            ordre: m.ordre,
+            contenu: m.contenu || {},
+            duree: m.duree || null,
+            isModuleZero: false,
+          })),
+        });
+      }
+
+      // 3. Retourner la formation avec ses modules
+      return tx.formation.findUnique({
+        where: { id },
+        include: {
+          modules: {
+            orderBy: { ordre: "asc" },
+          },
+          _count: {
+            select: {
+              documents: true,
+            },
           },
         },
-      },
+      });
     });
 
     return NextResponse.json(updatedFormation);

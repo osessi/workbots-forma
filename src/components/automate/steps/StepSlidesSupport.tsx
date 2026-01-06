@@ -591,9 +591,14 @@ export const StepSlidesSupport: React.FC<StepSlidesSupportProps> = ({
                         {module.titre}
                       </h4>
                       {module.isModuleZero && (
-                        <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded-full dark:bg-amber-500/20 dark:text-amber-300">
-                          Mise à niveau
-                        </span>
+                        <>
+                          <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded-full dark:bg-amber-500/20 dark:text-amber-300">
+                            Mise à niveau
+                          </span>
+                          <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-medium text-blue-700 bg-blue-100 rounded-full dark:bg-blue-500/20 dark:text-blue-300">
+                            Qualiopi - IND 10
+                          </span>
+                        </>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">

@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import OrganigrammeTab from "@/components/automate/settings/OrganigrammeTab";
 import ProceduresTab from "@/components/automate/settings/ProceduresTab";
+import CustomDomainSection from "@/components/automate/settings/CustomDomainSection";
 
 // Icons
 const BuildingIcon = () => (
@@ -68,15 +69,25 @@ const ProceduresIcon = () => (
   </svg>
 );
 
+// Icon for integrations
+const IntegrationsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M16.6667 10H17.5M2.5 10H3.33333M10 16.6667V17.5M10 2.5V3.33333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M14.1667 5.83333L14.7083 5.29167M5.29167 14.7083L5.83333 14.1667M14.1667 14.1667L14.7083 14.7083M5.29167 5.29167L5.83333 5.83333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
 // Tabs
-type TabType = "organisme" | "organigramme" | "procedures" | "members" | "branding" | "billing";
+type TabType = "organisme" | "organigramme" | "procedures" | "members" | "integrations" | "branding" | "billing";
 
 const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
   { id: "organisme", label: "Organisme de formation", icon: <BuildingIcon /> },
   { id: "organigramme", label: "Organigramme", icon: <OrganigrammeIcon /> },
   { id: "procedures", label: "Procédures Qualité", icon: <ProceduresIcon /> },
   { id: "members", label: "Membres", icon: <UsersIcon /> },
-  { id: "branding", label: "Marque blanche", icon: <PaletteIcon /> },
+  { id: "integrations", label: "Intégrations", icon: <IntegrationsIcon /> },
+  { id: "branding", label: "Branding", icon: <PaletteIcon /> },
   { id: "billing", label: "Facturation", icon: <CreditCardIcon /> },
 ];
 
@@ -256,7 +267,11 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
-        setOrganismeMessage({ type: "success", text: "Informations enregistrees avec succes" });
+        setOrganismeMessage({ type: "success", text: "Informations enregistrées avec succès" });
+        // Auto-dismiss après 5 secondes
+        setTimeout(() => {
+          setOrganismeMessage(null);
+        }, 5000);
         await refreshUser();
       } else {
         const data = await response.json();
@@ -390,7 +405,7 @@ export default function SettingsPage() {
                   Organisme de formation
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Renseignez les informations de votre organisme de formation. Elles sont indispensables pour generer correctement vos documents officiels.
+                  Renseignez les informations relatives à votre organisme de formation. Elles seront utilisées pour générer correctement l&apos;ensemble de vos documents officiels.
                 </p>
               </div>
 
@@ -414,7 +429,7 @@ export default function SettingsPage() {
                   {/* Informations legales */}
                   <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-4">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Informations legales
+                      Informations légales
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -439,7 +454,7 @@ export default function SettingsPage() {
                           type="text"
                           value={organisme.nomCommercial}
                           onChange={(e) => handleOrganismeChange("nomCommercial", e.target.value)}
-                          placeholder="Nom commercial (si different)"
+                          placeholder="Nom commercial (si différent)"
                           className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
                         />
                       </div>
@@ -448,7 +463,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Numero SIRET
+                          Numéro SIRET *
                         </label>
                         <input
                           type="text"
@@ -461,7 +476,7 @@ export default function SettingsPage() {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Ville d&apos;immatriculation RCS
+                          Ville d&apos;immatriculation RCS *
                         </label>
                         <input
                           type="text"
@@ -476,7 +491,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Numero de declaration d&apos;activite (NDA)
+                          Numéro de déclaration d&apos;activité (NDA) *
                         </label>
                         <input
                           type="text"
@@ -486,13 +501,13 @@ export default function SettingsPage() {
                           className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Delivre par la DREETS (ex-DIRECCTE)
+                          Délivré par la DREETS (ex-DIRECCTE)
                         </p>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Region d&apos;enregistrement
+                          Région d&apos;enregistrement *
                         </label>
                         <input
                           type="text"
@@ -508,13 +523,13 @@ export default function SettingsPage() {
                   {/* Representant legal */}
                   <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-4">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Representant legal
+                      Représentant légal
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Nom du representant legal
+                          Nom du représentant légal *
                         </label>
                         <input
                           type="text"
@@ -527,7 +542,7 @@ export default function SettingsPage() {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Prenom du representant legal
+                          Prénom du représentant légal *
                         </label>
                         <input
                           type="text"
@@ -541,13 +556,13 @@ export default function SettingsPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                        Fonction du representant legal
+                        Fonction du représentant légal *
                       </label>
                       <input
                         type="text"
                         value={organisme.representantFonction}
                         onChange={(e) => handleOrganismeChange("representantFonction", e.target.value)}
-                        placeholder="Gerant, PDG, Directeur General..."
+                        placeholder="Gérant, PDG, Directeur Général..."
                         className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
                       />
                     </div>
@@ -556,12 +571,12 @@ export default function SettingsPage() {
                   {/* Coordonnees */}
                   <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-4">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Coordonnees du siege / lieu d&apos;exercice
+                      Coordonnées
                     </h3>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                        Adresse
+                        Adresse *
                       </label>
                       <input
                         type="text"
@@ -575,7 +590,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Code postal
+                          Code postal *
                         </label>
                         <input
                           type="text"
@@ -588,7 +603,7 @@ export default function SettingsPage() {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Ville
+                          Ville *
                         </label>
                         <input
                           type="text"
@@ -603,7 +618,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Email de contact
+                          Email de contact *
                         </label>
                         <input
                           type="email"
@@ -616,7 +631,7 @@ export default function SettingsPage() {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                          Telephone
+                          Téléphone *
                         </label>
                         <input
                           type="tel"
@@ -648,7 +663,7 @@ export default function SettingsPage() {
                       Logo, Signature et Cachet
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Ces elements apparaitront sur vos documents officiels (conventions, attestations, etc.)
+                      Ces éléments apparaîtront sur vos documents officiels (conventions, attestations, etc.)
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -961,6 +976,9 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Integrations Tab */}
+          {activeTab === "integrations" && <IntegrationsTab />}
+
           {/* Branding Tab */}
           {activeTab === "branding" && (
             <div className="space-y-6">
@@ -1021,31 +1039,13 @@ export default function SettingsPage() {
               </div>
 
               {/* Custom domain */}
-              <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-                      Domaine personnalisé
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Utilisez votre propre domaine pour accéder à votre espace
-                    </p>
-                  </div>
-                  <span className="px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 rounded-full">
-                    Plan Pro requis
-                  </span>
-                </div>
-                <div className="mt-4">
-                  <input
-                    type="text"
-                    value=""
-                    placeholder="formation.votre-domaine.com"
-                    disabled
-                    className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-100 dark:bg-gray-900 dark:border-gray-700 text-gray-400 cursor-not-allowed"
-                    readOnly
-                  />
-                </div>
-              </div>
+              <CustomDomainSection
+                organizationSlug={user.organizationSlug || ""}
+                currentDomain={user.customDomain}
+                customDomainVerified={user.customDomainVerified}
+                isPro={user.plan === "PRO" || user.plan === "ENTERPRISE"}
+                onDomainUpdate={refreshUser}
+              />
 
               {/* Preview */}
               <div className="p-6 border border-gray-200 dark:border-gray-700 rounded-xl">
@@ -1053,9 +1053,9 @@ export default function SettingsPage() {
                   Aperçu
                 </h3>
                 <div className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800">
-                  {user.logoUrl ? (
+                  {organisme.logo ? (
                     <Image
-                      src={user.logoUrl}
+                      src={organisme.logo}
                       alt="Logo"
                       width={48}
                       height={48}
@@ -1067,13 +1067,13 @@ export default function SettingsPage() {
                       style={{ backgroundColor: primaryColor + "20" }}
                     >
                       <span style={{ color: primaryColor }} className="text-lg font-bold">
-                        {user.entreprise?.charAt(0) || "A"}
+                        {(organisme.nomCommercial || organisme.name)?.charAt(0) || "A"}
                       </span>
                     </div>
                   )}
                   <div>
                     <p className="font-semibold text-gray-900 dark:text-white">
-                      {user.entreprise || "Votre Organisation"}
+                      {organisme.nomCommercial || organisme.name || "Votre Organisation"}
                     </p>
                     <p className="text-sm text-gray-500">
                       Organisme de formation
@@ -1367,6 +1367,290 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Composant Onglet Intégrations
+function IntegrationsTab() {
+  const [providers, setProviders] = useState<{
+    id: string;
+    name: string;
+    connected: boolean;
+    integration: {
+      id: string;
+      accountEmail: string | null;
+      accountName: string | null;
+    } | null;
+    authUrl: string;
+  }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+
+  // Configuration des providers avec couleurs officielles
+  const providerConfig: Record<string, {
+    bgColor: string;
+    hoverColor: string;
+    disabledBg: string;
+    iconBg: string;
+  }> = {
+    ZOOM: {
+      bgColor: "bg-[#0B5CFF]",
+      hoverColor: "hover:bg-[#0047CC]",
+      disabledBg: "bg-[#0B5CFF]/20",
+      iconBg: "bg-[#0B5CFF]/40",
+    },
+    GOOGLE_MEET: {
+      bgColor: "bg-[#1EA362]",
+      hoverColor: "hover:bg-[#178F53]",
+      disabledBg: "bg-[#1EA362]/20",
+      iconBg: "bg-[#1EA362]/40",
+    },
+    MICROSOFT_TEAMS: {
+      bgColor: "bg-[#5558AF]",
+      hoverColor: "hover:bg-[#444791]",
+      disabledBg: "bg-[#5558AF]/20",
+      iconBg: "bg-[#5558AF]/40",
+    },
+  };
+
+  useEffect(() => {
+    fetchIntegrations();
+  }, []);
+
+  const fetchIntegrations = async () => {
+    try {
+      setError(null);
+      const res = await fetch("/api/video/integrations");
+      const data = await res.json();
+
+      console.log("[IntegrationsTab] API Response:", { status: res.status, data });
+
+      if (res.ok) {
+        setProviders(data.providers || []);
+      } else {
+        setError(data.error || "Erreur lors du chargement");
+      }
+    } catch (err) {
+      console.error("Erreur:", err);
+      setError("Erreur de connexion au serveur");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnect = (authUrl: string) => {
+    if (authUrl) {
+      window.location.href = authUrl;
+    }
+  };
+
+  const handleDisconnect = async (integrationId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir déconnecter cette intégration ?")) return;
+
+    setDisconnecting(integrationId);
+    try {
+      const res = await fetch(`/api/video/integrations?id=${integrationId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchIntegrations();
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+    } finally {
+      setDisconnecting(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Connexion aux services de visioconférence
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Connectez votre compte pour créer des classes virtuelles en un clic
+        </p>
+      </div>
+
+      {/* Liste des providers */}
+      <div className="space-y-4">
+        {providers.map((provider) => {
+          const config = providerConfig[provider.id];
+          const isConfigured = !!provider.authUrl;
+
+          // Logos officiels inline - blanc si configuré, couleur marque si non configuré
+          const renderLogo = () => {
+            const fillColor = isConfigured ? "white" : (
+              provider.id === "ZOOM" ? "#0B5CFF"
+              : provider.id === "GOOGLE_MEET" ? "#1EA362"
+              : "#5558AF"
+            );
+
+            if (provider.id === "ZOOM") {
+              return (
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 7.5C4 6.67 4.67 6 5.5 6H13.5C14.33 6 15 6.67 15 7.5V13.5C15 14.33 14.33 15 13.5 15H5.5C4.67 15 4 14.33 4 13.5V7.5Z" fill={fillColor}/>
+                  <path d="M15 9L20 6V15L15 12V9Z" fill={fillColor}/>
+                </svg>
+              );
+            }
+            if (provider.id === "GOOGLE_MEET") {
+              return (
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 7C5 6.45 5.45 6 6 6H13C13.55 6 14 6.45 14 7V17C14 17.55 13.55 18 13 18H6C5.45 18 5 17.55 5 17V7Z" fill={fillColor}/>
+                  <path d="M14 9.5L19 6.5V17.5L14 14.5V9.5Z" fill={fillColor}/>
+                </svg>
+              );
+            }
+            if (provider.id === "MICROSOFT_TEAMS") {
+              return (
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path d="M16 7.5C17.1 7.5 18 6.6 18 5.5C18 4.4 17.1 3.5 16 3.5C14.9 3.5 14 4.4 14 5.5C14 6.6 14.9 7.5 16 7.5Z" fill={fillColor} fillOpacity="0.7"/>
+                  <path d="M18 9H14C13.45 9 13 9.45 13 10V16C13 16.55 13.45 17 14 17H18C18.55 17 19 16.55 19 16V10C19 9.45 18.55 9 18 9Z" fill={fillColor} fillOpacity="0.7"/>
+                  <path d="M10 8C11.66 8 13 6.66 13 5C13 3.34 11.66 2 10 2C8.34 2 7 3.34 7 5C7 6.66 8.34 8 10 8Z" fill={fillColor}/>
+                  <path d="M14 10H6C5.45 10 5 10.45 5 11V19C5 19.55 5.45 20 6 20H14C14.55 20 15 19.55 15 19V11C15 10.45 14.55 10 14 10Z" fill={fillColor}/>
+                </svg>
+              );
+            }
+            return null;
+          };
+
+          return (
+            <div key={provider.id}>
+              {provider.connected ? (
+                // Provider connecté
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${config.bgColor}`}>
+                      {renderLogo()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {provider.name}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                          </svg>
+                          Connecté
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                        {provider.integration?.accountEmail || provider.integration?.accountName}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => provider.integration && handleDisconnect(provider.integration.id)}
+                    disabled={disconnecting === provider.integration?.id}
+                    className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {disconnecting === provider.integration?.id ? "..." : "Déconnecter"}
+                  </button>
+                </div>
+              ) : (
+                // Provider non connecté - avec couleur de marque (saturée si configuré, atténuée sinon)
+                <button
+                  onClick={() => handleConnect(provider.authUrl)}
+                  disabled={!isConfigured}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${
+                    isConfigured
+                      ? `${config.bgColor} ${config.hoverColor} shadow-sm hover:shadow-md`
+                      : `${config.disabledBg} cursor-not-allowed`
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    isConfigured ? "bg-white/20" : config.iconBg
+                  }`}>
+                    {renderLogo()}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <span className={`font-medium ${
+                      isConfigured
+                        ? "text-white"
+                        : provider.id === "ZOOM" ? "text-[#0B5CFF]"
+                        : provider.id === "GOOGLE_MEET" ? "text-[#1EA362]"
+                        : "text-[#5558AF]"
+                    }`}>
+                      {isConfigured ? `Se connecter avec ${provider.name}` : provider.name}
+                    </span>
+                    {!isConfigured && (
+                      <p className={`text-xs mt-0.5 ${
+                        provider.id === "ZOOM" ? "text-[#0B5CFF]/60"
+                        : provider.id === "GOOGLE_MEET" ? "text-[#1EA362]/60"
+                        : "text-[#5558AF]/60"
+                      }`}>
+                        Non configuré
+                      </p>
+                    )}
+                  </div>
+                  {isConfigured && (
+                    <svg className="w-5 h-5 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Message d'erreur */}
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-medium">{error}</span>
+          </div>
+          <button
+            onClick={fetchIntegrations}
+            className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {/* Message si aucun provider disponible */}
+      {!error && providers.length === 0 && (
+        <div className="text-center py-8">
+          <svg className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <p className="text-gray-500 dark:text-gray-400">
+            Aucun service de visioconférence disponible
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Vérifiez la configuration des variables d&apos;environnement
+          </p>
+        </div>
+      )}
+
+      {/* Note sur la sécurité */}
+      <div className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-800/30 rounded-xl text-sm">
+        <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        <p className="text-gray-600 dark:text-gray-400">
+          Vos identifiants restent sécurisés. Workbots utilise OAuth pour se connecter à vos comptes sans jamais stocker vos mots de passe.
+          Vous pouvez révoquer l&apos;accès à tout moment.
+        </p>
       </div>
     </div>
   );

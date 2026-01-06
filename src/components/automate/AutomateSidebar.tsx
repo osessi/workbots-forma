@@ -79,7 +79,7 @@ const mainNavItems: NavItem[] = [
     subItems: [
       {
         icon: <Users size={18} strokeWidth={1.5} />,
-        name: "Gestion sessions",
+        name: "Mes sessions",
         path: "/automate/sessions",
       },
       {
@@ -101,7 +101,7 @@ const mainNavItems: NavItem[] = [
   },
   {
     icon: <TrendingUp size={20} strokeWidth={1.5} />,
-    name: "CRM Pipeline",
+    name: "CRM",
     path: "/automate/crm",
   },
   {
@@ -204,13 +204,6 @@ const mainNavItems: NavItem[] = [
   },
 ];
 
-const isActiveOrChild = (path: string, pathname: string) => {
-  if (path === "/automate") {
-    return pathname === "/automate";
-  }
-  return pathname.startsWith(path);
-};
-
 const bottomNavItems: NavItem[] = [
   {
     icon: <Settings size={20} strokeWidth={1.5} />,
@@ -231,8 +224,17 @@ const AutomateSidebar: React.FC = () => {
     // Séparer le chemin et les query params
     const [basePath, queryString] = path.split("?");
 
-    // Si le pathname ne correspond pas au basePath, ce n'est pas actif
-    if (!isActiveOrChild(basePath, pathname)) {
+    // Correspondance exacte du chemin
+    const isExactMatch = pathname === basePath;
+
+    // Vérifier si c'est un vrai sous-chemin (pas juste un préfixe)
+    // Ex: /automate/catalogue/evaluations est un sous-chemin de /automate/catalogue
+    // mais /automate/catalogueX n'est pas un sous-chemin de /automate/catalogue
+    const isChildPath = pathname.startsWith(basePath + "/");
+
+    // Pour les liens de sous-menu, on veut une correspondance exacte
+    // sauf pour certains cas spéciaux
+    if (!isExactMatch && !isChildPath) {
       return false;
     }
 
@@ -244,7 +246,7 @@ const AutomateSidebar: React.FC = () => {
           return false;
         }
       }
-      return true;
+      return isExactMatch; // Pour les liens avec query params, correspondance exacte seulement
     }
 
     // Pour le calendrier sans tab, vérifier qu'on n'a pas ?tab=emargement
@@ -253,7 +255,14 @@ const AutomateSidebar: React.FC = () => {
       return !tab || tab === "calendrier";
     }
 
-    return true;
+    // Pour éviter la double surbrillance: si on est sur un sous-chemin,
+    // seul le sous-chemin doit être actif, pas le parent
+    // Ex: sur /automate/catalogue/evaluations, /automate/catalogue ne doit pas être actif
+    if (isChildPath && !isExactMatch) {
+      return false;
+    }
+
+    return isExactMatch;
   };
 
   // Vérifier si un sous-menu contient la page active
@@ -264,18 +273,23 @@ const AutomateSidebar: React.FC = () => {
     });
   };
 
-  // Toggle sous-menu
+  // Toggle sous-menu - un seul menu ouvert à la fois
   const toggleSubMenu = (menuName: string) => {
     setOpenSubMenu(openSubMenu === menuName ? null : menuName);
   };
 
-  // Ouvrir automatiquement le sous-menu si une page enfant est active
+  // Ouvrir automatiquement le sous-menu qui contient la page active
+  // et fermer les autres quand on navigue
   React.useEffect(() => {
+    // Trouver le menu qui contient la page active
+    let activeMenu: string | null = null;
     mainNavItems.forEach((nav) => {
       if (nav.subItems && isSubMenuActive(nav.subItems)) {
-        setOpenSubMenu(nav.name);
+        activeMenu = nav.name;
       }
     });
+    // Mettre à jour le menu ouvert (ferme les autres automatiquement)
+    setOpenSubMenu(activeMenu);
   }, [pathname]);
 
   const renderNavItem = (nav: NavItem, isDisabled?: boolean) => {

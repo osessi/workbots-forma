@@ -38,13 +38,12 @@ interface DashboardStats {
   }[];
 }
 
-// Configuration des stages
+// Configuration des stages (synchronisé avec le pipeline CRM)
 const STAGES: Record<string, { label: string; color: string; bgColor: string }> = {
-  ENTRANT: { label: "Entrant", color: "text-gray-600", bgColor: "bg-gray-500" },
-  DISCUSSION: { label: "Discussion", color: "text-blue-600", bgColor: "bg-blue-500" },
-  DEVIS: { label: "Devis", color: "text-purple-600", bgColor: "bg-purple-500" },
-  CONVENTION: { label: "Convention", color: "text-orange-600", bgColor: "bg-orange-500" },
-  FACTURE: { label: "Facture", color: "text-green-600", bgColor: "bg-green-500" },
+  A_TRAITER: { label: "À traiter", color: "text-gray-600", bgColor: "bg-gray-500" },
+  EN_COURS: { label: "En cours", color: "text-blue-600", bgColor: "bg-blue-500" },
+  PROPOSITION_ENVOYEE: { label: "Proposition envoyée", color: "text-purple-600", bgColor: "bg-purple-500" },
+  RELANCE: { label: "Relance", color: "text-orange-600", bgColor: "bg-orange-500" },
   GAGNE: { label: "Gagné", color: "text-emerald-600", bgColor: "bg-emerald-500" },
   PERDU: { label: "Perdu", color: "text-red-600", bgColor: "bg-red-500" },
 };
@@ -320,7 +319,7 @@ export default function CRMDashboard() {
   const funnelData = Object.entries(defaultStats.parStage)
     .filter(([stage]) => !["GAGNE", "PERDU"].includes(stage))
     .sort((a, b) => {
-      const order = ["ENTRANT", "DISCUSSION", "DEVIS", "CONVENTION", "FACTURE"];
+      const order = ["A_TRAITER", "EN_COURS", "PROPOSITION_ENVOYEE", "RELANCE"];
       return order.indexOf(a[0]) - order.indexOf(b[0]);
     })
     .map(([stage, data]) => ({

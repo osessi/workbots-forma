@@ -574,15 +574,23 @@ Tu dois créer un document de corrélation entre les objectifs pédagogiques d'u
 ⚠️ OBJECTIF QUALIOPI INDICATEUR 11:
 "Le prestataire évalue l'atteinte par les publics bénéficiaires des objectifs de la prestation."
 
-Ce document PROUVE que:
-1. Chaque objectif pédagogique est évalué par au moins une question
-2. Les critères de validation sont définis pour chaque objectif
-3. Il n'y a pas d'objectif "orphelin" (non évalué)
+🔴 EXIGENCE ABSOLUE - COUVERTURE 100% DES OBJECTIFS:
+- TOUS les objectifs pédagogiques DOIVENT être marqués comme "complete" ou "partielle"
+- Il ne peut y avoir AUCUN objectif "non_couverte" car chaque question peut généralement évaluer plusieurs objectifs
+- Le taux de couverture DOIT toujours être 100% (tous les objectifs sont couverts)
+- Si une question évalue même partiellement un objectif, l'objectif est couvert
+- Cherche TOUTES les questions qui peuvent valider chaque objectif, même indirectement
 
-Règles de corrélation:
-- Chaque objectif doit être lié à au moins une question de l'évaluation
+Ce document PROUVE que:
+1. Chaque objectif pédagogique est évalué par au moins une question (OBLIGATOIRE)
+2. Les critères de validation sont définis pour chaque objectif
+3. Il n'y a AUCUN objectif "orphelin" - tous sont couverts
+
+Règles de corrélation STRICTES:
+- CHAQUE objectif DOIT être lié à au moins une question (pas d'exception)
+- Pour chaque objectif, identifier TOUTES les questions qui l'évaluent
 - Les critères de validation doivent être mesurables et vérifiables
-- Si un objectif n'est pas couvert, proposer une question complémentaire
+- La couverture doit TOUJOURS être "complete" ou "partielle", JAMAIS "non_couverte"
 - Utiliser un langage professionnel et conforme aux exigences Qualiopi
 
 Format de sortie JSON obligatoire:
@@ -632,7 +640,7 @@ Ne retourne RIEN d'autre que le JSON. Pas de texte avant ou après.`,
 **Titre:** {{formation.titre}}
 **Description:** {{formation.description}}
 
-# OBJECTIFS PÉDAGOGIQUES À ÉVALUER
+# OBJECTIFS PÉDAGOGIQUES À ÉVALUER (TOUS DOIVENT ÊTRE COUVERTS)
 {{formation.objectifs}}
 
 # QUESTIONS DE L'ÉVALUATION FINALE
@@ -641,16 +649,21 @@ Ne retourne RIEN d'autre que le JSON. Pas de texte avant ou après.`,
 # MODULES DE LA FORMATION
 {{modules}}
 
-Analyse chaque objectif pédagogique et identifie:
-1. Quelle(s) question(s) de l'évaluation finale permettent de valider cet objectif
-2. Le critère de validation mesurable
-3. Les objectifs qui ne sont pas évalués (proposer des questions complémentaires)
+🔴 INSTRUCTIONS IMPÉRATIVES:
+1. Pour CHAQUE objectif, trouve AU MOINS UNE question qui l'évalue (directement ou indirectement)
+2. TOUS les objectifs doivent avoir couverture = "complete" ou "partielle"
+3. Le taux de couverture dans la synthèse DOIT être 100%
+4. objectifsNonCouverts doit être un tableau VIDE []
 
-Génère un document de corrélation complet et professionnel conforme aux exigences Qualiopi IND 11.`,
+Analyse chaque objectif pédagogique et identifie TOUTES les questions qui peuvent le valider, même partiellement.
+Une question peut évaluer plusieurs objectifs.
+Un objectif peut être évalué par plusieurs questions.
+
+Génère un document de corrélation complet avec 100% de couverture des objectifs.`,
     requiredVariables: ["formation.titre", "formation.objectifs", "evaluationFinale"],
     optionalVariables: ["formation.description", "modules"],
     model: "claude-sonnet-4-20250514",
-    temperature: 0.5,
+    temperature: 0.3,
     maxTokens: 8192,
   },
   {

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Users,
   Plus,
@@ -52,10 +53,22 @@ interface Apprenant {
   ville: string | null;
   pays: string;
   statut: "SALARIE" | "INDEPENDANT" | "PARTICULIER";
+  situationActuelle: string | null;
   entrepriseId: string | null;
   entreprise: Entreprise | null;
   notes: string | null;
 }
+
+// Options de situation actuelle pour les particuliers
+const situationActuelleOptions = [
+  { value: "CDI", label: "En poste (CDI)" },
+  { value: "CDD", label: "En poste (CDD)" },
+  { value: "INTERIM", label: "Intérim" },
+  { value: "ALTERNANCE", label: "Alternance" },
+  { value: "RECHERCHE_EMPLOI", label: "En recherche d'emploi" },
+  { value: "RECONVERSION", label: "En reconversion professionnelle" },
+  { value: "AUTRE", label: "Autre" },
+];
 
 const statutLabels = {
   SALARIE: "Salarié",
@@ -70,11 +83,16 @@ const statutColors = {
 };
 
 export default function ApprenantsPage() {
+  const searchParams = useSearchParams();
+  const entrepriseIdFromUrl = searchParams.get("entreprise");
+
   const [apprenants, setApprenants] = useState<Apprenant[]>([]);
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatut, setFilterStatut] = useState<string>("");
+  const [filterEntreprise, setFilterEntreprise] = useState<string>(entrepriseIdFromUrl || "");
+  const [selectedEntrepriseName, setSelectedEntrepriseName] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingApprenant, setEditingApprenant] = useState<Apprenant | null>(null);
   const [saving, setSaving] = useState(false);
@@ -86,6 +104,7 @@ export default function ApprenantsPage() {
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     nom: "",
@@ -99,6 +118,7 @@ export default function ApprenantsPage() {
     ville: "",
     pays: "France",
     statut: "PARTICULIER" as "SALARIE" | "INDEPENDANT" | "PARTICULIER",
+    situationActuelle: "",
     entrepriseId: "",
     notes: "",
   });
@@ -107,6 +127,7 @@ export default function ApprenantsPage() {
     try {
       let url = `/api/donnees/apprenants?search=${encodeURIComponent(searchQuery)}`;
       if (filterStatut) url += `&statut=${filterStatut}`;
+      if (filterEntreprise) url += `&entrepriseId=${filterEntreprise}`;
 
       const res = await fetch(url);
       if (res.ok) {
@@ -118,7 +139,7 @@ export default function ApprenantsPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filterStatut]);
+  }, [searchQuery, filterStatut, filterEntreprise]);
 
   const fetchEntreprises = async () => {
     try {
@@ -137,6 +158,22 @@ export default function ApprenantsPage() {
     fetchEntreprises();
   }, [fetchApprenants]);
 
+  // Synchroniser le filtre entreprise avec l'URL et récupérer le nom
+  useEffect(() => {
+    if (entrepriseIdFromUrl) {
+      setFilterEntreprise(entrepriseIdFromUrl);
+      // Récupérer le nom de l'entreprise
+      fetch(`/api/donnees/entreprises/${entrepriseIdFromUrl}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data?.raisonSociale) {
+            setSelectedEntrepriseName(data.raisonSociale);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [entrepriseIdFromUrl]);
+
   const resetForm = () => {
     setFormData({
       nom: "",
@@ -150,6 +187,7 @@ export default function ApprenantsPage() {
       ville: "",
       pays: "France",
       statut: "PARTICULIER",
+      situationActuelle: "",
       entrepriseId: "",
       notes: "",
     });
@@ -199,6 +237,25 @@ export default function ApprenantsPage() {
     }
   };
 
+  // Supprimer une note
+  const handleDeleteNote = async (noteId: string) => {
+    if (!editingApprenant || !confirm("Êtes-vous sûr de vouloir supprimer cette note ?")) return;
+
+    setDeletingNoteId(noteId);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${editingApprenant.id}/notes/${noteId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      }
+    } catch (error) {
+      console.error("Erreur suppression note:", error);
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
+
   const openModal = (apprenant?: Apprenant) => {
     if (apprenant) {
       setEditingApprenant(apprenant);
@@ -214,6 +271,7 @@ export default function ApprenantsPage() {
         ville: apprenant.ville || "",
         pays: apprenant.pays || "France",
         statut: apprenant.statut,
+        situationActuelle: apprenant.situationActuelle || "",
         entrepriseId: apprenant.entrepriseId || "",
         notes: apprenant.notes || "",
       });
@@ -325,7 +383,11 @@ export default function ApprenantsPage() {
           <select
             value={filterStatut}
             onChange={(e) => setFilterStatut(e.target.value)}
-            className="px-4 py-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            className="min-w-[180px] pl-4 pr-10 py-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white appearance-none bg-no-repeat bg-right"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+              backgroundPosition: "right 12px center",
+            }}
           >
             <option value="">Tous les statuts</option>
             <option value="SALARIE">Salariés</option>
@@ -333,6 +395,31 @@ export default function ApprenantsPage() {
             <option value="PARTICULIER">Particuliers</option>
           </select>
         </div>
+
+        {/* Filtre entreprise actif */}
+        {filterEntreprise && (
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-gray-400">Filtré par :</span>
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <Building2 size={14} className="text-blue-500" />
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                {selectedEntrepriseName || "Entreprise"}
+              </span>
+              <button
+                onClick={() => {
+                  setFilterEntreprise("");
+                  setSelectedEntrepriseName("");
+                  // Nettoyer l'URL
+                  window.history.replaceState({}, "", "/automate/donnees/apprenants");
+                }}
+                className="p-0.5 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded"
+                title="Effacer le filtre"
+              >
+                <X size={14} className="text-blue-500" />
+              </button>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Liste */}
@@ -344,15 +431,33 @@ export default function ApprenantsPage() {
         <div className="text-center py-12 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
           <Users className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
           <p className="text-gray-500 dark:text-gray-400">
-            {searchQuery ? `Aucun apprenant trouvé pour "${searchQuery}"` : "Aucun apprenant enregistré"}
+            {filterEntreprise && selectedEntrepriseName
+              ? `Aucun apprenant rattaché à ${selectedEntrepriseName}`
+              : searchQuery
+              ? `Aucun apprenant trouvé pour "${searchQuery}"`
+              : "Aucun apprenant enregistré"}
           </p>
-          <button
-            onClick={() => openModal()}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-500 hover:text-brand-600 transition-colors"
-          >
-            <Plus size={16} />
-            Ajouter votre premier apprenant
-          </button>
+          {filterEntreprise ? (
+            <button
+              onClick={() => {
+                setFilterEntreprise("");
+                setSelectedEntrepriseName("");
+                window.history.replaceState({}, "", "/automate/donnees/apprenants");
+              }}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-500 hover:text-brand-600 transition-colors"
+            >
+              <X size={16} />
+              Effacer le filtre
+            </button>
+          ) : (
+            <button
+              onClick={() => openModal()}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-500 hover:text-brand-600 transition-colors"
+            >
+              <Plus size={16} />
+              Ajouter votre premier apprenant
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -569,6 +674,27 @@ export default function ApprenantsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Champs particulier - Situation actuelle */}
+                {formData.statut === "PARTICULIER" && (
+                  <div className="mt-4">
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                      Situation actuelle
+                    </label>
+                    <select
+                      value={formData.situationActuelle}
+                      onChange={(e) => setFormData({ ...formData, situationActuelle: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    >
+                      <option value="">Sélectionner une situation</option>
+                      {situationActuelleOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Adresse */}
@@ -687,9 +813,22 @@ export default function ApprenantsPage() {
                       {notes.map((note) => (
                         <div
                           key={note.id}
-                          className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/30"
+                          className="bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800/30 group relative"
                         >
-                          <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                          {/* Bouton supprimer */}
+                          <button
+                            onClick={() => handleDeleteNote(note.id)}
+                            disabled={deletingNoteId === note.id}
+                            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors opacity-0 group-hover:opacity-100"
+                            title="Supprimer cette note"
+                          >
+                            {deletingNoteId === note.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap pr-6">
                             {note.content}
                           </p>
                           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-yellow-200 dark:border-yellow-800/30 text-xs text-gray-500 dark:text-gray-400">

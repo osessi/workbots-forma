@@ -23,34 +23,16 @@ interface KanbanBoardProps {
   onEditTitle: (id: string, title: string) => void;
 }
 
-// Configuration des colonnes Kanban
+// Configuration des colonnes Kanban - 3 colonnes simplifiées
 const KANBAN_COLUMNS = [
   {
-    id: "brouillon",
-    label: "Brouillon",
-    color: "bg-gray-100 dark:bg-gray-800",
-    headerColor: "bg-gray-200 dark:bg-gray-700",
-    textColor: "text-gray-700 dark:text-gray-300",
-    borderColor: "border-gray-300 dark:border-gray-600",
-    badgeColor: "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400",
-  },
-  {
     id: "en_cours",
-    label: "Fiche Péda",
+    label: "En cours",
     color: "bg-yellow-50 dark:bg-yellow-500/10",
     headerColor: "bg-yellow-100 dark:bg-yellow-500/20",
     textColor: "text-yellow-700 dark:text-yellow-400",
     borderColor: "border-yellow-300 dark:border-yellow-500/30",
     badgeColor: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400",
-  },
-  {
-    id: "documents",
-    label: "Documents",
-    color: "bg-blue-50 dark:bg-blue-500/10",
-    headerColor: "bg-blue-100 dark:bg-blue-500/20",
-    textColor: "text-blue-700 dark:text-blue-400",
-    borderColor: "border-blue-300 dark:border-blue-500/30",
-    badgeColor: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
   },
   {
     id: "complete",
@@ -61,27 +43,40 @@ const KANBAN_COLUMNS = [
     borderColor: "border-green-300 dark:border-green-500/30",
     badgeColor: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400",
   },
+  {
+    id: "published",
+    label: "Publiée sur le catalogue",
+    color: "bg-brand-50 dark:bg-brand-500/10",
+    headerColor: "bg-brand-100 dark:bg-brand-500/20",
+    textColor: "text-brand-700 dark:text-brand-400",
+    borderColor: "border-brand-300 dark:border-brand-500/30",
+    badgeColor: "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400",
+  },
 ];
 
 // Mapper le status de la formation vers la colonne Kanban
-function mapStatusToColumn(status: string, hasDocuments: boolean = false): string {
-  switch (status) {
-    case "brouillon":
-      return "brouillon";
-    case "en_cours":
-      return hasDocuments ? "documents" : "en_cours";
-    case "complete":
-      return "complete";
-    default:
-      return "brouillon";
+// Logique simplifiée : En cours (brouillon/en_cours) | Terminée (complete non publiée) | Publiée sur le catalogue
+function mapStatusToColumn(status: string, estPublieCatalogue: boolean = false): string {
+  // Si la formation est publiée sur le catalogue public
+  if (estPublieCatalogue) {
+    return "published";
   }
+
+  // Si la formation est terminée mais pas encore publiée
+  if (status === "complete") {
+    return "complete";
+  }
+
+  // Tout le reste (brouillon, en_cours) = En cours
+  return "en_cours";
 }
 
 export default function KanbanBoard({ formations }: KanbanBoardProps) {
   // Grouper les formations par colonne
+  // Utilise estPublieCatalogue pour savoir si la formation est publiée sur le catalogue public
   const formationsByColumn = KANBAN_COLUMNS.reduce((acc, column) => {
     acc[column.id] = formations.filter(
-      (f) => mapStatusToColumn(f.status, (f.documentsCount || 0) > 0) === column.id
+      (f) => mapStatusToColumn(f.status, f.estPublieCatalogue || false) === column.id
     );
     return acc;
   }, {} as Record<string, Formation[]>);

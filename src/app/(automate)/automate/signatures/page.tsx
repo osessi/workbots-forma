@@ -40,6 +40,7 @@ interface GeneratedDocument {
   apprenantNom?: string;
   signatureStatus?: "UNSIGNED" | "PENDING" | "SIGNED";
   signedAt?: string;
+  content?: string; // Contenu HTML du document
 }
 
 interface SignatureRequest {
@@ -423,13 +424,32 @@ export default function SignaturesPage() {
     try {
       // Créer la demande de signature pour chaque document
       for (const doc of selectedDocuments) {
+        // Récupérer le vrai contenu du document depuis l'API
+        let contenuHtml = doc.content || "";
+        if (!contenuHtml) {
+          try {
+            const contentResponse = await fetch(`/api/files/${doc.id}/content`);
+            if (contentResponse.ok) {
+              const contentData = await contentResponse.json();
+              contenuHtml = contentData.content || "";
+            }
+          } catch (e) {
+            console.warn("Impossible de récupérer le contenu du document:", e);
+          }
+        }
+
+        // Si toujours pas de contenu, utiliser un placeholder informatif
+        if (!contenuHtml) {
+          contenuHtml = `<p>Document "${doc.titre}" généré pour ${apprenantFullName}</p>`;
+        }
+
         const response = await fetch("/api/signatures", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             titre: doc.titre,
             documentType: doc.type,
-            contenuHtml: `<p>Document généré pour ${apprenantFullName}</p>`,
+            contenuHtml,
             destinataireNom: apprenantFullName,
             destinataireEmail: destinataireEmail,
             authMethod: "EMAIL_CODE",

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { DocumentsWizard, FormationInfo, InitialSessionData } from "@/components/documents/wizard";
 
 // Types
 interface Apprenant {
@@ -65,6 +66,8 @@ interface Session {
     isCertifiante: boolean;
     numeroFicheRS: string | null;
     lienFranceCompetences: string | null;
+    // Pour le DocumentsWizard
+    fichePedagogique: Record<string, unknown> | null;
   };
   lieu: {
     id: string;
@@ -82,6 +85,11 @@ interface Session {
   clients: SessionClient[];
   // Qualiopi IND 3 - Certification par session
   delivreCertification: boolean | null;
+  // Pour le DocumentsWizard
+  lieuTexteLibre: string | null;
+  lienConnexion: string | null;
+  tarifParDefautHT: number | null;
+  tauxTVA: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -557,6 +565,111 @@ export default function SessionDetailPage() {
     }
   };
 
+  // Get formation info for the DocumentsWizard
+  const getFormationInfo = useCallback((): FormationInfo => {
+    if (!session) {
+      return {
+        id: undefined,
+        titre: "Formation",
+        tarifEntreprise: 0,
+        tarifIndependant: 0,
+        tarifParticulier: 0,
+        dureeHeures: 14,
+        dureeJours: 2,
+      };
+    }
+
+    // Extract tarifs from fichePedagogique if available
+    const fiche = session.formation.fichePedagogique || {};
+    const parseTarif = (val: unknown): number => {
+      if (typeof val === "number") return val;
+      if (typeof val === "string") {
+        const match = val.match(/(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      }
+      return 0;
+    };
+
+    return {
+      id: session.formation.id,
+      titre: session.formation.titre,
+      tarifEntreprise: parseTarif(fiche.tarifEntreprise) || session.tarifParDefautHT || 0,
+      tarifIndependant: parseTarif(fiche.tarifIndependant) || session.tarifParDefautHT || 0,
+      tarifParticulier: parseTarif(fiche.tarifParticulier) || session.tarifParDefautHT || 0,
+      dureeHeures: session.formation.dureeHeures || 14,
+      dureeJours: session.journees.length || 2,
+      // Pass session-specific data
+      sessionId: session.id,
+      sessionReference: session.reference,
+    };
+  }, [session]);
+
+  // Get initial session data for pre-filling the wizard (lieu, dates, formateur)
+  const getInitialSessionData = useCallback((): InitialSessionData | undefined => {
+    if (!session) return undefined;
+
+    // Convertir la modalité
+    const modaliteMap: Record<string, "PRESENTIEL" | "DISTANCIEL" | "MIXTE"> = {
+      PRESENTIEL: "PRESENTIEL",
+      DISTANCIEL: "DISTANCIEL",
+      MIXTE: "MIXTE",
+    };
+
+    return {
+      lieu: {
+        modalite: modaliteMap[session.modalite] || "PRESENTIEL",
+        lieuId: session.lieu?.id || null,
+        lieu: session.lieu ? {
+          id: session.lieu.id,
+          nom: session.lieu.nom,
+          typeLieu: session.lieu.typeLieu,
+          lieuFormation: session.lieu.lieuFormation,
+        } : undefined,
+        adresseLibre: session.lieuTexteLibre || "",
+        lienConnexion: session.lienConnexion || "",
+        journees: session.journees.map((j) => ({
+          id: j.id,
+          date: j.date.split("T")[0], // Format YYYY-MM-DD
+          horaireMatin: j.heureDebutMatin && j.heureFinMatin
+            ? `${j.heureDebutMatin} - ${j.heureFinMatin}`
+            : "09:00 - 12:30",
+          horaireApresMidi: j.heureDebutAprem && j.heureFinAprem
+            ? `${j.heureDebutAprem} - ${j.heureFinAprem}`
+            : "14:00 - 17:30",
+        })),
+      },
+      formateurs: {
+        formateurPrincipalId: session.formateur?.id || null,
+        formateurPrincipal: session.formateur ? {
+          id: session.formateur.id,
+          nom: session.formateur.nom,
+          prenom: session.formateur.prenom,
+          email: session.formateur.email || undefined,
+        } : undefined,
+        coformateursIds: [],
+        coformateurs: [],
+      },
+    };
+  }, [session]);
+
+  // Callback when wizard is complete
+  const handleWizardComplete = useCallback(async () => {
+    // Update session status to PLANIFIEE if it was BROUILLON
+    if (session?.status === "BROUILLON") {
+      try {
+        await fetch(`/api/training-sessions/${sessionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "PLANIFIEE" }),
+        });
+      } catch (err) {
+        console.error("Erreur mise à jour statut:", err);
+      }
+    }
+    // Refresh session data
+    fetchSession();
+  }, [session, sessionId, fetchSession]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -642,15 +755,6 @@ export default function SessionDetailPage() {
 
         {/* Status actions */}
         <div className="flex gap-2">
-          {/* Configure / Documents button */}
-          <Link
-            href={`/automate/sessions/${session.id}/configure`}
-            className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-medium transition-colors inline-flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
-            Documents
-          </Link>
-
           {session.status === "BROUILLON" && (
             <button
               onClick={() => updateStatus("PLANIFIEE")}
@@ -674,101 +778,6 @@ export default function SessionDetailPage() {
             >
               Terminer
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Info cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Dates */}
-        <div className="p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
-              <CalendarIcon />
-            </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Dates</h3>
-          </div>
-          {session.journees.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Aucune journée planifiée</p>
-          ) : (
-            <div className="space-y-2">
-              {session.journees.map((journee) => (
-                <div key={journee.id} className="text-sm">
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {format(new Date(journee.date), "EEEE d MMMM yyyy", { locale: fr })}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400 ml-2">
-                    {journee.heureDebutMatin} - {journee.heureFinAprem}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Lieu */}
-        <div className="p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
-                <MapPinIcon />
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white">Lieu</h3>
-            </div>
-            <button
-              onClick={() => {
-                setSelectedLieuId(session.lieu?.id || "");
-                setShowEditLieuModal(true);
-              }}
-              className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-              title="Modifier le lieu"
-            >
-              <EditIcon />
-            </button>
-          </div>
-          {session.lieu ? (
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">{session.lieu.nom}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{session.lieu.lieuFormation}</p>
-            </div>
-          ) : (
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
-              {session.modalite === "DISTANCIEL" ? "Formation à distance" : "Non défini"}
-            </p>
-          )}
-        </div>
-
-        {/* Formateur */}
-        <div className="p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
-                <UserIcon />
-              </div>
-              <h3 className="font-semibold text-gray-900 dark:text-white">Formateur</h3>
-            </div>
-            <button
-              onClick={() => {
-                setSelectedFormateurId(session.formateur?.id || "");
-                setShowEditFormateurModal(true);
-              }}
-              className="p-1.5 text-gray-400 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-              title="Modifier le formateur"
-            >
-              <EditIcon />
-            </button>
-          </div>
-          {session.formateur ? (
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">
-                {session.formateur.prenom} {session.formateur.nom}
-              </p>
-              {session.formateur.email && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">{session.formateur.email}</p>
-              )}
-            </div>
-          ) : (
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Non assigné</p>
           )}
         </div>
       </div>
@@ -817,138 +826,12 @@ export default function SessionDetailPage() {
         </div>
       )}
 
-      {/* Participants section */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
-        <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-100 dark:bg-brand-900/30 rounded-lg text-brand-600 dark:text-brand-400">
-              <UsersIcon />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white">Participants</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{getTotalParticipants()} inscrit(s)</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowAddClientModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white font-medium rounded-xl transition-colors"
-          >
-            <PlusIcon />
-            Ajouter
-          </button>
-        </div>
-
-        {session.clients.length === 0 ? (
-          <div className="p-8 text-center">
-            <UsersIcon />
-            <p className="text-gray-500 dark:text-gray-400 mt-2">Aucun participant inscrit</p>
-            <button
-              onClick={() => setShowAddClientModal(true)}
-              className="mt-4 text-brand-500 hover:text-brand-600 font-medium"
-            >
-              Ajouter des participants
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {session.clients.map((client) => (
-              <div key={client.id} className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                    <BuildingIcon />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {client.entreprise?.raisonSociale || `${client.contactPrenom} ${client.contactNom}` || "Client individuel"}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {client.participants.length} participant(s)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 pl-11">
-                  {client.participants.map((participant) => (
-                    <div
-                      key={participant.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-sm font-medium">
-                          {participant.apprenant.prenom[0]}{participant.apprenant.nom[0]}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {participant.apprenant.prenom} {participant.apprenant.nom}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{participant.apprenant.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {participant.estConfirme && (
-                          <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs rounded-full flex items-center gap-1">
-                            <CheckIcon />
-                            Confirmé
-                          </span>
-                        )}
-                        {/* Badge certification (Qualiopi IND 3) */}
-                        {sessionDeliversCertification() && participant.certificationObtenue && (
-                          <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs rounded-full flex items-center gap-1">
-                            <AwardIcon />
-                            Certifié
-                          </span>
-                        )}
-                        {/* Boutons prévisualisation/téléchargement certificat (Qualiopi IND 3) */}
-                        {sessionDeliversCertification() && participant.certificationObtenue && (
-                          <>
-                            <a
-                              href={`/api/apprenant/certificate/${participant.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                              title="Prévisualiser le certificat"
-                            >
-                              <EyeIcon />
-                            </a>
-                            <a
-                              href={`/api/apprenant/certificate/${participant.id}`}
-                              download={`certificat-${participant.numeroCertificat || participant.id}.html`}
-                              className="p-1.5 text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                              title="Télécharger le certificat"
-                            >
-                              <DownloadIcon />
-                            </a>
-                          </>
-                        )}
-                        {/* Bouton certification (Qualiopi IND 3) - visible si session certifiante et terminée */}
-                        {sessionDeliversCertification() && session.status === "TERMINEE" && (
-                          <button
-                            onClick={() => openCertificationModal(participant)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              participant.certificationObtenue
-                                ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                                : "text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                            }`}
-                            title="Gérer la certification"
-                          >
-                            <AwardIcon />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => removeParticipant(client.id, participant.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Documents Wizard - Configuration de la session */}
+      <DocumentsWizard
+        formation={getFormationInfo()}
+        initialSessionData={getInitialSessionData()}
+        onComplete={handleWizardComplete}
+      />
 
       {/* Add Client Modal */}
       {showAddClientModal && (

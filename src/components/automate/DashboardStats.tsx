@@ -175,7 +175,13 @@ export default function DashboardStats() {
     yaxis: {
       labels: {
         style: { colors: "#9CA3AF", fontSize: "12px" },
+        formatter: (val) => Math.floor(val).toString(),
       },
+      tickAmount: 5,
+      min: 0,
+      forceNiceScale: false,
+      decimalsInFloat: 0,
+      stepSize: 1,
     },
     grid: {
       borderColor: "#E5E7EB",
@@ -192,8 +198,8 @@ export default function DashboardStats() {
       type: "donut",
       fontFamily: "inherit",
     },
-    colors: ["#22C55E", "#F59E0B", "#6B7280"],
-    labels: ["Terminées", "En cours", "Brouillons"],
+    colors: ["#F59E0B", "#22C55E", "#4277FF"],
+    labels: ["En cours", "Terminées", "Publiées sur le catalogue"],
     legend: {
       position: "bottom",
       fontSize: "13px",
@@ -235,9 +241,9 @@ export default function DashboardStats() {
   }
 
   const statusData = [
-    data.formations.byStatus.TERMINEE || 0,
     data.formations.byStatus.EN_COURS || 0,
-    data.formations.byStatus.BROUILLON || 0,
+    data.formations.byStatus.TERMINEE || 0,
+    data.formations.byStatus.PUBLIEE || 0,
   ];
 
   return (
@@ -248,7 +254,7 @@ export default function DashboardStats() {
           icon={<FormationIcon />}
           label="Formations"
           value={data.formations.total}
-          subValue={`sur ${data.formations.max} max`}
+          subValue={`sur ${data.formations.max}`}
           color="bg-blue-50 text-blue-600 dark:bg-blue-900/30"
         />
         <StatCard
@@ -302,7 +308,7 @@ export default function DashboardStats() {
         {/* Graphique statuts */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Répartition par statut
+            État des formations
           </h3>
           <ReactApexChart
             options={statusChartOptions}

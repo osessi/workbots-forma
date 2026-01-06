@@ -167,17 +167,23 @@ export default function WorkbotsTemplateSelector({
             onSelectTemplate(data.templates[0]);
           }
         } else {
+          // Utiliser les templates par défaut si aucun retourné
           setTemplates(DEFAULT_TEMPLATES);
           if (!selectedTemplateId) {
             onSelectTemplate(DEFAULT_TEMPLATES[0]);
           }
         }
       } else {
-        throw new Error("Impossible de charger les templates");
+        // En cas d'erreur HTTP, utiliser les templates par défaut sans afficher d'erreur
+        console.warn("API templates indisponible, utilisation des templates par défaut");
+        setTemplates(DEFAULT_TEMPLATES);
+        if (!selectedTemplateId) {
+          onSelectTemplate(DEFAULT_TEMPLATES[0]);
+        }
       }
     } catch (err) {
-      console.error("Erreur chargement templates:", err);
-      setError("Erreur de chargement");
+      // Erreur réseau ou autre - utiliser les templates par défaut silencieusement
+      console.warn("Erreur chargement templates, utilisation des defaults:", err);
       setTemplates(DEFAULT_TEMPLATES);
       if (!selectedTemplateId) {
         onSelectTemplate(DEFAULT_TEMPLATES[0]);

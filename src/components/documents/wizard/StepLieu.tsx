@@ -274,6 +274,29 @@ export default function StepLieu({
         l.lieuFormation.toLowerCase().includes(searchLieu.toLowerCase()))
   );
 
+  // Fonction pour parser les heures depuis un format "HH:MM - HH:MM"
+  const parseHoursFromRange = (range: string): number => {
+    if (!range) return 0;
+    const match = range.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+    if (!match) return 0;
+    const startHour = parseInt(match[1]) + parseInt(match[2]) / 60;
+    const endHour = parseInt(match[3]) + parseInt(match[4]) / 60;
+    return Math.max(0, endHour - startHour);
+  };
+
+  // Calculer le total des heures planifiées
+  const totalHeuresPlanifiees = lieu.journees.reduce((acc, j) => {
+    const heuresMatin = parseHoursFromRange(j.horaireMatin);
+    const heuresApresMidi = parseHoursFromRange(j.horaireApresMidi);
+    return acc + heuresMatin + heuresApresMidi;
+  }, 0);
+
+  // Vérifier si le nombre de jours correspond
+  const joursMatch = lieu.journees.length === formation.dureeJours;
+
+  // Vérifier le total d'heures (tolérance de 0.5h)
+  const heuresMatch = Math.abs(totalHeuresPlanifiees - formation.dureeHeures) < 0.5;
+
   // Filtrer les lieux distanciel
   const distancielLieux = lieux.filter((l) => l.typeLieu === "VISIOCONFERENCE");
 
@@ -400,7 +423,7 @@ export default function StepLieu({
                 className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 hover:border-brand-300 hover:text-brand-500 transition-colors dark:border-gray-700 dark:hover:border-brand-500"
               >
                 <MapPin size={18} />
-                Sélectionner un lieu de la base
+                Sélectionner un lieu dans la base de données
               </button>
 
               <div className="text-center text-xs text-gray-400">ou</div>
@@ -451,7 +474,7 @@ export default function StepLieu({
             {distancielLieux.length > 0 && (
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
-                  Lien depuis votre base
+                  Lien depuis votre base de données
                 </label>
                 <select
                   value={lieu.lieuId && distancielLieux.some((l) => l.id === lieu.lieuId) ? lieu.lieuId : ""}
@@ -602,10 +625,31 @@ export default function StepLieu({
           ))}
         </div>
 
-        {/* Info durée formation */}
-        <p className="text-xs text-gray-400 mt-3">
-          Durée formation: {formation.dureeJours} jour(s) / {formation.dureeHeures}h
-        </p>
+        {/* Contrôle visuel durée/jours */}
+        <div className="flex items-center gap-4 mt-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Jours :</span>
+            <span className={`text-sm font-medium px-2 py-0.5 rounded ${
+              joursMatch
+                ? "text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-500/20"
+                : "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-500/20"
+            }`}>
+              {lieu.journees.length} / {formation.dureeJours}
+            </span>
+            {joursMatch && <Check size={14} className="text-green-500" />}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Heures :</span>
+            <span className={`text-sm font-medium px-2 py-0.5 rounded ${
+              heuresMatch
+                ? "text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-500/20"
+                : "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-500/20"
+            }`}>
+              {totalHeuresPlanifiees.toFixed(1)}h / {formation.dureeHeures}h
+            </span>
+            {heuresMatch && <Check size={14} className="text-green-500" />}
+          </div>
+        </div>
       </div>
 
       {/* Boutons navigation */}

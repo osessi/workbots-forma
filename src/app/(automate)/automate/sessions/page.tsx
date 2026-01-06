@@ -154,12 +154,19 @@ function SessionsPageContent() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  // Delete state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
     formationId: "",
     nom: "",
     modalite: "PRESENTIEL",
     lieuId: "",
+    lienConnexion: "",
     formateurId: "",
     journees: [{ date: "", heureDebutMatin: "09:00", heureFinMatin: "12:30", heureDebutAprem: "14:00", heureFinAprem: "17:30" }],
   });
@@ -286,6 +293,7 @@ function SessionsPageContent() {
           nom: formData.nom || undefined,
           modalite: formData.modalite,
           lieuId: formData.lieuId || undefined,
+          lienConnexion: formData.lienConnexion || undefined,
           formateurId: formData.formateurId || undefined,
           journees: formData.journees.filter(j => j.date).map((j, i) => ({
             ordre: i + 1,
@@ -316,6 +324,7 @@ function SessionsPageContent() {
           nom: "",
           modalite: "PRESENTIEL",
           lieuId: "",
+          lienConnexion: "",
           formateurId: "",
           journees: [{ date: "", heureDebutMatin: "09:00", heureFinMatin: "12:30", heureDebutAprem: "14:00", heureFinAprem: "17:30" }],
         });
@@ -344,6 +353,44 @@ function SessionsPageContent() {
     return session.clients.reduce((acc, client) => acc + client.participants.length, 0);
   };
 
+  // Open delete modal
+  const openDeleteModal = (e: React.MouseEvent, session: Session) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSessionToDelete(session);
+    setDeleteError(null);
+    setShowDeleteModal(true);
+  };
+
+  // Delete session
+  const handleDelete = async () => {
+    if (!sessionToDelete) return;
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/training-sessions/${sessionToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors de la suppression");
+      }
+
+      // Fermer le modal et rafraîchir la liste
+      setShowDeleteModal(false);
+      setSessionToDelete(null);
+      fetchSessions();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Get date range
   const getDateRange = (journees: Session["journees"]) => {
     if (journees.length === 0) return "Non planifiée";
@@ -369,7 +416,7 @@ function SessionsPageContent() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sessions de formation</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Gérez vos sessions de formation et leurs participants
+            Suivez et organisez vos sessions de formation.
           </p>
         </div>
         <button
@@ -384,7 +431,9 @@ function SessionsPageContent() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <SearchIcon />
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <SearchIcon />
+          </div>
           <input
             type="text"
             placeholder="Rechercher une session..."
@@ -396,7 +445,8 @@ function SessionsPageContent() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="px-4 pr-10 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-no-repeat bg-[right_0.75rem_center] bg-[length:16px_16px]"
+          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")` }}
         >
           <option value="all">Tous les statuts</option>
           {Object.entries(statusLabels).map(([value, label]) => (
@@ -439,52 +489,66 @@ function SessionsPageContent() {
           {filteredSessions.map((session) => {
             const statusStyle = statusColors[session.status] || statusColors.BROUILLON;
             return (
-              <Link
+              <div
                 key={session.id}
-                href={`/automate/sessions/${session.id}`}
-                className="block p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
+                className="group relative block p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-sm font-mono text-gray-500 dark:text-gray-400">{session.reference}</span>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
-                        {statusLabels[session.status]}
-                      </span>
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                        {modaliteLabels[session.modalite]}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      {session.formation.titre}
-                    </h3>
-                    {session.nom && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{session.nom}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                    <div className="flex items-center gap-1.5">
-                      <CalendarIcon />
-                      <span>{getDateRange(session.journees)}</span>
-                      {session.journees.length > 1 && (
-                        <span className="text-xs">({session.journees.length} jours)</span>
+                <Link
+                  href={`/automate/sessions/${session.id}`}
+                  className="block"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-sm font-mono text-gray-500 dark:text-gray-400">{session.reference}</span>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
+                          {statusLabels[session.status]}
+                        </span>
+                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                          {modaliteLabels[session.modalite]}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                        {session.formation.titre}
+                      </h3>
+                      {session.nom && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{session.nom}</p>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <UsersIcon />
-                      <span>{getParticipantCount(session)} participant{getParticipantCount(session) > 1 ? "s" : ""}</span>
-                    </div>
-                    {session.lieu && (
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center gap-1.5">
-                        <MapPinIcon />
-                        <span>{session.lieu.nom}</span>
+                        <CalendarIcon />
+                        <span>{getDateRange(session.journees)}</span>
+                        {session.journees.length > 1 && (
+                          <span className="text-xs">({session.journees.length} jours)</span>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-1.5">
+                        <UsersIcon />
+                        <span>{getParticipantCount(session)} participant{getParticipantCount(session) > 1 ? "s" : ""}</span>
+                      </div>
+                      {session.lieu && (
+                        <div className="flex items-center gap-1.5">
+                          <MapPinIcon />
+                          <span>{session.lieu.nom}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+                {/* Delete button - hidden for completed sessions */}
+                {session.status !== "TERMINEE" && (
+                  <button
+                    onClick={(e) => openDeleteModal(e, session)}
+                    className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                    title="Supprimer la session"
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
@@ -571,8 +635,43 @@ function SessionsPageContent() {
                 </div>
               </div>
 
-              {/* Lieu (if presentiel) */}
-              {formData.modalite !== "DISTANCIEL" && (
+              {/* Lieu / Lien de connexion selon la modalité */}
+              {formData.modalite === "DISTANCIEL" ? (
+                <div className="space-y-4">
+                  {/* Sélection d'une salle virtuelle existante */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Salle virtuelle
+                    </label>
+                    <select
+                      value={formData.lieuId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lieuId: e.target.value }))}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    >
+                      <option value="">Sélectionner une salle virtuelle</option>
+                      {lieux.filter(l => l.typeLieu === "VISIOCONFERENCE").map((l) => (
+                        <option key={l.id} value={l.id}>{l.nom}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Ou saisie libre du lien */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Ou lien de connexion
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.lienConnexion}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lienConnexion: e.target.value }))}
+                      placeholder="https://meet.google.com/... ou https://zoom.us/..."
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Laissez vide si vous avez sélectionné une salle virtuelle
+                    </p>
+                  </div>
+                </div>
+              ) : (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Lieu
@@ -583,7 +682,7 @@ function SessionsPageContent() {
                     className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">Sélectionner un lieu</option>
-                    {lieux.map((l) => (
+                    {lieux.filter(l => l.typeLieu !== "VISIOCONFERENCE").map((l) => (
                       <option key={l.id} value={l.id}>{l.nom}</option>
                     ))}
                   </select>
@@ -707,6 +806,76 @@ function SessionsPageContent() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && sessionToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400">
+                  <TrashIcon />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Supprimer la session
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {sessionToDelete.reference}
+                  </p>
+                </div>
+              </div>
+
+              {getParticipantCount(sessionToDelete) > 0 ? (
+                <div className="p-3 mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                  <p className="text-amber-700 dark:text-amber-400 font-medium mb-1">
+                    Attention : cette session contient {getParticipantCount(sessionToDelete)} participant{getParticipantCount(sessionToDelete) > 1 ? "s" : ""}
+                  </p>
+                  <p className="text-amber-600 dark:text-amber-500 text-sm">
+                    La suppression entraînera également la suppression de tous les participants et clients associés.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Êtes-vous sûr de vouloir supprimer cette session ?
+                </p>
+              )}
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                Cette action est irréversible.
+              </p>
+
+              {deleteError && (
+                <div className="p-3 mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setSessionToDelete(null);
+                    setDeleteError(null);
+                  }}
+                  className="px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                  disabled={deleting}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
+                >
+                  {deleting && <LoaderIcon />}
+                  Supprimer
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -261,16 +261,53 @@ export async function DELETE(
       return NextResponse.json({ error: "Session non trouvée" }, { status: 404 });
     }
 
-    // Vérifier qu'il n'y a pas de participants
-    const hasParticipants = existingSession.clients.some(c => c.participants.length > 0);
-    if (hasParticipants) {
+    // Vérifier que la session n'est pas terminée
+    if (existingSession.status === "TERMINEE") {
       return NextResponse.json(
-        { error: "Impossible de supprimer une session avec des participants" },
+        { error: "Impossible de supprimer une session terminée" },
         { status: 400 }
       );
     }
 
-    // Supprimer la session (cascade delete géré par Prisma)
+    // Compter les participants pour info
+    const participantCount = existingSession.clients.reduce(
+      (acc, client) => acc + client.participants.length,
+      0
+    );
+
+    // Si la session a des participants, supprimer d'abord les participants et clients
+    if (participantCount > 0) {
+      // Supprimer tous les participants de cette session
+      for (const client of existingSession.clients) {
+        if (client.participants.length > 0) {
+          await prisma.sessionParticipant.deleteMany({
+            where: { clientId: client.id },
+          });
+        }
+      }
+
+      // Supprimer tous les clients de cette session
+      await prisma.sessionClient.deleteMany({
+        where: { sessionId: id },
+      });
+    }
+
+    // Supprimer les journées de la session
+    await prisma.sessionJournee.deleteMany({
+      where: { sessionId: id },
+    });
+
+    // Supprimer les co-formateurs
+    await prisma.sessionCoFormateur.deleteMany({
+      where: { sessionId: id },
+    });
+
+    // Supprimer les documents générés
+    await prisma.sessionDocument.deleteMany({
+      where: { sessionId: id },
+    });
+
+    // Supprimer la session
     await prisma.session.delete({
       where: { id },
     });

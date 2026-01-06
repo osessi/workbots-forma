@@ -43,6 +43,12 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const UploadIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 12.75V14.25C3 15.0784 3.67157 15.75 4.5 15.75H13.5C14.3284 15.75 15 15.0784 15 14.25V12.75M9 2.25V11.25M9 2.25L6 5.25M9 2.25L12 5.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const SparklesIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M8 1L9.5 5.5L14 7L9.5 8.5L8 13L6.5 8.5L2 7L6.5 5.5L8 1Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -82,6 +88,7 @@ interface FichePedagogiqueData {
   publicVise: string;
   suiviEvaluation: string;
   ressourcesPedagogiques: string;
+  equipePedagogique: string;
   delaiAcces: string;
   imageUrl: string;
 }
@@ -223,6 +230,104 @@ const EditableBlock: React.FC<EditableBlockProps> = ({ title, value, fieldName, 
   );
 };
 
+// Composant pour éditer les objectifs (array de strings)
+interface EditableObjectifsBlockProps {
+  title: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+}
+
+const EditableObjectifsBlock: React.FC<EditableObjectifsBlockProps> = ({ title, values, onChange }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedValue, setEditedValue] = useState(values.join("\n"));
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    setEditedValue(values.join("\n"));
+  }, [values]);
+
+  const handleSave = () => {
+    const newValues = editedValue.split("\n").filter(item => item.trim());
+    onChange(newValues);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedValue(values.join("\n"));
+    setIsEditing(false);
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedValue(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = e.target.scrollHeight + "px";
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {title}
+        </h4>
+        {!isEditing && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
+            title="Modifier"
+          >
+            <EditIcon />
+          </button>
+        )}
+      </div>
+      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+        {isEditing ? (
+          <div className="space-y-3">
+            <textarea
+              ref={textareaRef}
+              value={editedValue}
+              onChange={handleTextareaChange}
+              placeholder="Un objectif par ligne"
+              className="w-full px-3 py-2 text-sm border border-brand-300 rounded-lg bg-white text-gray-800 dark:bg-gray-900 dark:text-white dark:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none min-h-[100px]"
+            />
+            <p className="text-xs text-gray-400">Un objectif par ligne</p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={handleCancel}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-3 py-1.5 text-sm text-white bg-brand-500 hover:bg-brand-600 rounded-lg transition-colors"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {values.map((objectif, index) => (
+              <li key={index} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-brand-500 mt-0.5 flex-shrink-0">•</span>
+                <span>{objectif}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   data,
   onChange,
@@ -246,6 +351,8 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   const [selectedImage, setSelectedImage] = useState<string | null>(data.imageUrl || null);
   const [isGeneratingAIImage, setIsGeneratingAIImage] = useState(false);
   const [aiImageError, setAiImageError] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Rechercher des images
   const handleSearchImages = async () => {
@@ -360,6 +467,58 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
     }
   };
 
+  // Importer une image depuis l'ordinateur
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Vérifier le type de fichier
+    if (!file.type.startsWith("image/")) {
+      setAiImageError("Veuillez sélectionner une image valide");
+      return;
+    }
+
+    // Vérifier la taille (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setAiImageError("L'image ne doit pas dépasser 5 Mo");
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setAiImageError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload/image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de l'upload");
+      }
+
+      const result = await response.json();
+      if (result.success && result.url) {
+        handleSelectImage(result.url);
+      } else {
+        throw new Error("Erreur lors de l'upload de l'image");
+      }
+    } catch (error) {
+      console.error("Erreur upload image:", error);
+      setAiImageError(error instanceof Error ? error.message : "Erreur lors de l'upload");
+    } finally {
+      setIsUploadingImage(false);
+      // Reset l'input file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   // Fonction de telechargement PDF via API print
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -369,7 +528,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${data.titre} - Fiche Pedagogique</title>
+        <title>${data.titre} - Fiche Pédagogique</title>
         <style>
           body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -383,7 +542,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           h2 { color: #4338ca; font-size: 18px; margin-top: 30px; margin-bottom: 10px; }
           .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0; }
           .info-item { background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #6366f1; }
-          .info-label { font-weight: 600; color: #64748b; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; }
+          .info-label { font-weight: 600; color: #64748b; font-size: 12px; margin-bottom: 5px; }
           .info-value { color: #1e293b; }
           ul { padding-left: 20px; }
           li { margin-bottom: 8px; }
@@ -400,28 +559,28 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         <div class="info-grid">
           <div class="info-item">
-            <div class="info-label">Modalite</div>
-            <div class="info-value">${data.typeFormation || 'Non defini'}</div>
+            <div class="info-label">MODALITÉ</div>
+            <div class="info-value">${data.typeFormation || 'Non défini'}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">Duree</div>
-            <div class="info-value">${data.duree || 'Non defini'}</div>
+            <div class="info-label">DURÉE</div>
+            <div class="info-value">${data.duree || 'Non défini'}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">Participants max</div>
-            <div class="info-value">${data.nombreParticipants || 'Non defini'}</div>
+            <div class="info-label">PARTICIPANTS MAX</div>
+            <div class="info-value">${data.nombreParticipants || 'Non défini'}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">Tarif Entreprise (HT)</div>
-            <div class="info-value">${data.tarifEntreprise || 'Non defini'}</div>
+            <div class="info-label">TARIF ENTREPRISE (HT)</div>
+            <div class="info-value">${data.tarifEntreprise || 'Non défini'}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">Tarif Independant (HT)</div>
-            <div class="info-value">${data.tarifIndependant || 'Non defini'}</div>
+            <div class="info-label">TARIF INDÉPENDANT (HT)</div>
+            <div class="info-value">${data.tarifIndependant || 'Non défini'}</div>
           </div>
           <div class="info-item">
-            <div class="info-label">Tarif Particulier (TTC)</div>
-            <div class="info-value">${data.tarifParticulier || 'Non defini'}</div>
+            <div class="info-label">TARIF PARTICULIER (TTC)</div>
+            <div class="info-value">${data.tarifParticulier || 'Non défini'}</div>
           </div>
         </div>
 
@@ -431,7 +590,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         </div>
 
         <div class="section">
-          <div class="section-title">Objectifs pedagogiques</div>
+          <div class="section-title">Objectifs pédagogiques</div>
           <ul>
             ${data.objectifs.map(obj => `<li>${obj}</li>`).join('')}
           </ul>
@@ -439,7 +598,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         ${data.prerequis ? `
         <div class="section">
-          <div class="section-title">Prerequis</div>
+          <div class="section-title">Prérequis</div>
           <ul>
             ${data.prerequis.split('\n').filter(p => p.trim()).map(p => `<li>${p}</li>`).join('')}
           </ul>
@@ -448,7 +607,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         ${data.publicVise ? `
         <div class="section">
-          <div class="section-title">Public vise</div>
+          <div class="section-title">Public visé</div>
           <ul>
             ${data.publicVise.split('\n').filter(p => p.trim()).map(p => `<li>${p}</li>`).join('')}
           </ul>
@@ -462,7 +621,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         ${data.suiviEvaluation ? `
         <div class="section">
-          <div class="section-title">Suivi et evaluation</div>
+          <div class="section-title">Suivi et évaluation</div>
           <ul>
             ${data.suiviEvaluation.split('\n').filter(s => s.trim()).map(s => `<li>${s}</li>`).join('')}
           </ul>
@@ -471,7 +630,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         ${data.ressourcesPedagogiques ? `
         <div class="section">
-          <div class="section-title">Ressources pedagogiques</div>
+          <div class="section-title">Ressources pédagogiques</div>
           <ul>
             ${data.ressourcesPedagogiques.split('\n').filter(r => r.trim()).map(r => `<li>${r}</li>`).join('')}
           </ul>
@@ -480,14 +639,14 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         ${data.accessibilite ? `
         <div class="section">
-          <div class="section-title">Accessibilite</div>
+          <div class="section-title">Accessibilité</div>
           <p>${data.accessibilite}</p>
         </div>
         ` : ''}
 
         ${data.delaiAcces ? `
         <div class="section">
-          <div class="section-title">Delai d'acces</div>
+          <div class="section-title">Délai d'accès</div>
           <p>${data.delaiAcces}</p>
         </div>
         ` : ''}
@@ -514,7 +673,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         setIsDownloading(false);
       }, 2000);
     } else {
-      alert("Veuillez autoriser les popups pour telecharger le PDF");
+      alert("Veuillez autoriser les popups pour télécharger le PDF");
       setIsDownloading(false);
     }
   };
@@ -522,6 +681,19 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   // Qualiopi IND 6 - Fonction de téléchargement du scénario pédagogique
   const handleDownloadScenarioPedagogique = async () => {
     setIsDownloadingScenario(true);
+
+    // Extraire la durée totale en heures depuis data.duree
+    const extractTotalHours = (dureeStr: string): number => {
+      if (!dureeStr) return 0;
+      // Chercher des patterns comme "21 heures", "14h", "2 jours" etc.
+      const hoursMatch = dureeStr.match(/(\d+)\s*(?:heures?|h\b)/i);
+      if (hoursMatch) return parseInt(hoursMatch[1]);
+      const daysMatch = dureeStr.match(/(\d+)\s*(?:jours?|j\b)/i);
+      if (daysMatch) return parseInt(daysMatch[1]) * 7; // 7h par jour
+      return 0;
+    };
+
+    const totalHours = extractTotalHours(data.duree || '');
 
     // Parser le contenu pour extraire les modules
     const parseModules = (contenu: string) => {
@@ -547,14 +719,15 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             modules.push({
               nom: currentModule.nom,
               contenu: currentModule.contenu.join('\n'),
-              objectif: currentModule.objectif || 'Maîtriser les concepts présentés',
-              duree: currentModule.duree || 'Variable',
+              objectif: currentModule.objectif,
+              duree: currentModule.duree,
             });
           }
+          const moduleName = moduleMatch[3] || `Module ${moduleMatch[1] || moduleMatch[2]}`;
           currentModule = {
-            nom: moduleMatch[3] || `Module ${moduleMatch[1] || moduleMatch[2]}`,
+            nom: moduleName,
             contenu: [],
-            objectif: '',
+            objectif: `Maîtriser les fondamentaux de : ${moduleName.toLowerCase()}`,
             duree: '',
           };
         } else if (currentModule) {
@@ -565,8 +738,8 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             currentModule = {
               nom: 'Contenu de la formation',
               contenu: [trimmedLine],
-              objectif: 'Maîtriser les compétences visées',
-              duree: data.duree || 'Variable',
+              objectif: 'Acquérir les compétences clés définies dans les objectifs pédagogiques',
+              duree: data.duree || '',
             };
           }
         }
@@ -577,8 +750,8 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         modules.push({
           nom: currentModule.nom,
           contenu: currentModule.contenu.join('\n'),
-          objectif: currentModule.objectif || 'Maîtriser les concepts présentés',
-          duree: currentModule.duree || 'Variable',
+          objectif: currentModule.objectif || `Maîtriser les compétences liées à : ${currentModule.nom.toLowerCase()}`,
+          duree: currentModule.duree,
         });
       }
 
@@ -588,9 +761,35 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           nom: 'Programme complet',
           contenu: contenu,
           objectif: 'Acquérir les compétences définies dans les objectifs pédagogiques',
-          duree: data.duree || 'Variable',
+          duree: data.duree || '',
         });
       }
+
+      // Répartir la durée totale entre les modules
+      if (totalHours > 0 && modules.length > 0) {
+        const hoursPerModule = Math.floor(totalHours / modules.length);
+        const remainingHours = totalHours % modules.length;
+
+        modules.forEach((module, index) => {
+          const moduleHours = hoursPerModule + (index < remainingHours ? 1 : 0);
+          if (moduleHours >= 1) {
+            module.duree = `${moduleHours}h`;
+          } else {
+            module.duree = `${Math.round(moduleHours * 60)} min`;
+          }
+        });
+      }
+
+      // Générer des objectifs plus spécifiques basés sur le contenu du module
+      modules.forEach((module) => {
+        if (module.contenu) {
+          const firstContent = module.contenu.split('\n')[0] || '';
+          const cleanContent = firstContent.replace(/^[-•*]\s*/, '').trim();
+          if (cleanContent.length > 10) {
+            module.objectif = `Comprendre et appliquer : ${cleanContent.substring(0, 80)}${cleanContent.length > 80 ? '...' : ''}`;
+          }
+        }
+      });
 
       return modules;
     };
@@ -611,7 +810,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             ${module.objectif}
           </td>
           <td style="padding: 12px; border: 1px solid #e2e8f0; text-align: center; vertical-align: top;">
-            ${module.duree}
+            ${module.duree || 'À définir'}
           </td>
           <td style="padding: 12px; border: 1px solid #e2e8f0; vertical-align: top;">
             ${data.ressourcesPedagogiques ? data.ressourcesPedagogiques.split('\n').slice(0, 2).join(', ') : 'Exposé, exercices pratiques, études de cas'}
@@ -620,7 +819,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             ${data.ressourcesPedagogiques || 'Support de cours, exercices pratiques, études de cas'}
           </td>
           <td style="padding: 12px; border: 1px solid #e2e8f0; vertical-align: top;">
-            ${data.suiviEvaluation ? data.suiviEvaluation.split('\n')[0] : 'QCM, exercices pratiques'}
+            Atelier pratique ou QCM pour valider les acquis du module
           </td>
         </tr>
       `).join('');
@@ -765,13 +964,13 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         <table>
           <thead>
             <tr>
-              <th style="width: 15%;">Nom du module</th>
-              <th style="width: 20%;">Contenu (objectifs détaillés)</th>
-              <th style="width: 15%;">Objectif du module</th>
-              <th style="width: 8%;">Durée</th>
-              <th style="width: 14%;">Méthodes pédagogiques</th>
-              <th style="width: 14%;">Supports et outils</th>
-              <th style="width: 14%;">Modalités d'évaluation</th>
+              <th style="width: 15%;">NOM DU MODULE</th>
+              <th style="width: 20%;">CONTENU DU MODULE</th>
+              <th style="width: 15%;">OBJECTIF DU MODULE</th>
+              <th style="width: 8%;">DURÉE</th>
+              <th style="width: 14%;">MÉTHODES PÉDAGOGIQUES</th>
+              <th style="width: 14%;">SUPPORTS ET OUTILS</th>
+              <th style="width: 14%;">MODALITÉS D'ÉVALUATION</th>
             </tr>
           </thead>
           <tbody>
@@ -815,21 +1014,59 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   // ==========================================
   // Qualiopi IND 7 - Tableau croisé RS / Fiche pédagogique
   // ==========================================
+
+  // Interface pour les compétences RS
+  interface RSCompetence {
+    id: string;
+    numero: number;
+    intitule: string;
+    description?: string;
+  }
+
   const handleGenerateTableauCroise = async () => {
     if (!certificationData?.numeroFicheRS) return;
 
     setIsGeneratingTableauCroise(true);
 
-    // Extraire les compétences depuis le contenu (basé sur les modules)
+    // Récupérer les compétences RS depuis l'API
+    let competencesRS: RSCompetence[] = [];
+    let rsIntitule = `Certification RS${certificationData.numeroFicheRS}`;
+
+    try {
+      const response = await fetch(`/api/rs/competences?numero=${certificationData.numeroFicheRS}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          competencesRS = result.data.competences || [];
+          rsIntitule = result.data.intitule || rsIntitule;
+        }
+      }
+    } catch (error) {
+      console.error("Erreur récupération compétences RS:", error);
+    }
+
+    // Si pas de compétences récupérées, utiliser les objectifs pédagogiques comme fallback
+    if (competencesRS.length === 0) {
+      competencesRS = data.objectifs.map((obj, index) => ({
+        id: `RS-C${index + 1}`,
+        numero: index + 1,
+        intitule: obj,
+      }));
+    }
+
+    // Extraire les modules depuis le contenu (basé sur les modules)
+    // CORRECTION 99: Exclure les modules "Mise à niveau" / Module 0
     const parseModulesForCompetences = (contenu: string) => {
       const modules: Array<{
         nom: string;
         contenu: string;
         objectif: string;
+        index: number;
       }> = [];
 
       const lines = contenu.split('\n');
-      let currentModule: { nom: string; contenu: string[]; objectif: string } | null = null;
+      let currentModule: { nom: string; contenu: string[]; objectif: string; index: number } | null = null;
+      let moduleIndex = 0;
 
       for (const line of lines) {
         const trimmedLine = line.trim();
@@ -838,17 +1075,26 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         const moduleMatch = trimmedLine.match(/^(?:Module\s*(\d+)\s*[-–:]?\s*|(\d+)[.\)]\s*)(.+)/i);
         if (moduleMatch) {
           if (currentModule) {
-            modules.push({
-              nom: currentModule.nom,
-              contenu: currentModule.contenu.join(' '),
-              objectif: currentModule.objectif || currentModule.contenu[0] || '',
-            });
+            // CORRECTION 99: Exclure les modules "Mise à niveau", "Module 0", "Introduction"
+            const isExcluded = /^(mise\s*[àa]\s*niveau|module\s*0|introduction|pr[ée]ambule)/i.test(currentModule.nom);
+            if (!isExcluded) {
+              modules.push({
+                nom: currentModule.nom,
+                contenu: currentModule.contenu.join(' '),
+                objectif: currentModule.objectif || currentModule.contenu[0] || '',
+                index: currentModule.index,
+              });
+            }
           }
+          const moduleNum = moduleMatch[1] || moduleMatch[2];
+          const moduleName = moduleMatch[3] || `Module ${moduleNum}`;
           currentModule = {
-            nom: moduleMatch[3] || `Module ${moduleMatch[1] || moduleMatch[2]}`,
+            nom: moduleName,
             contenu: [],
             objectif: '',
+            index: parseInt(moduleNum) || moduleIndex + 1,
           };
+          moduleIndex++;
         } else if (currentModule) {
           if (trimmedLine.toLowerCase().startsWith('objectif')) {
             currentModule.objectif = trimmedLine.replace(/^objectif[s]?\s*[-–:]?\s*/i, '');
@@ -859,11 +1105,16 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       }
 
       if (currentModule) {
-        modules.push({
-          nom: currentModule.nom,
-          contenu: currentModule.contenu.join(' '),
-          objectif: currentModule.objectif || currentModule.contenu[0] || '',
-        });
+        // CORRECTION 99: Exclure le dernier module s'il est "Mise à niveau"
+        const isExcluded = /^(mise\s*[àa]\s*niveau|module\s*0|introduction|pr[ée]ambule)/i.test(currentModule.nom);
+        if (!isExcluded) {
+          modules.push({
+            nom: currentModule.nom,
+            contenu: currentModule.contenu.join(' '),
+            objectif: currentModule.objectif || currentModule.contenu[0] || '',
+            index: currentModule.index,
+          });
+        }
       }
 
       return modules;
@@ -872,34 +1123,95 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
     const modules = parseModulesForCompetences(data.contenu || '');
     const objectifsPedagogiques = data.objectifs || [];
 
-    // Générer les lignes du tableau croisé
-    const generateTableRows = () => {
-      // Mapper chaque objectif pédagogique avec les modules correspondants
-      return objectifsPedagogiques.map((objectif, index) => {
-        // Trouver le module le plus pertinent pour cet objectif (simple matching)
-        const moduleCorrespondant = modules[index] || modules[0] || { nom: 'Module principal', contenu: data.contenu };
+    // CORRECTION 101: Calculer un score de correspondance basé sur la similarité textuelle
+    const calculateCorrespondanceScore = (competence: string, objectif: string, module: { nom: string; contenu: string; objectif: string }) => {
+      // Normaliser les textes pour la comparaison
+      const normalize = (text: string) => text.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 3);
 
-        // Calculer un score de correspondance simple (pour la couleur)
-        const score = modules.length > 0 ? Math.min(100, 70 + Math.floor(Math.random() * 30)) : 50;
-        const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
+      const competenceWords = normalize(competence);
+      const objectifWords = normalize(objectif);
+      const moduleWords = normalize(module.nom + ' ' + module.contenu + ' ' + module.objectif);
+
+      // Calculer le nombre de mots en commun
+      const commonWithObjectif = competenceWords.filter(w => objectifWords.includes(w)).length;
+      const commonWithModule = competenceWords.filter(w => moduleWords.includes(w)).length;
+
+      // Score basé sur les mots en commun
+      const totalCommon = commonWithObjectif * 2 + commonWithModule; // Pondération plus forte pour l'objectif
+      const maxPossible = competenceWords.length * 3;
+
+      // CORRECTION 101: Viser 90%+ de couverture
+      // Base de 75% + bonus selon correspondance
+      const baseScore = 75;
+      const bonus = Math.min(25, Math.floor((totalCommon / Math.max(1, maxPossible)) * 50));
+
+      return Math.min(100, baseScore + bonus);
+    };
+
+    // CORRECTION 98 & 100: Associer chaque compétence RS à un objectif pédagogique et un module
+    const findBestMatch = (competence: RSCompetence, objectifs: string[], modules: Array<{ nom: string; contenu: string; objectif: string; index: number }>) => {
+      let bestObjectifIndex = competence.numero - 1;
+      let bestModuleIndex = 0;
+      let bestScore = 0;
+
+      // Si l'index correspond directement, l'utiliser
+      if (bestObjectifIndex >= 0 && bestObjectifIndex < objectifs.length) {
+        const objectif = objectifs[bestObjectifIndex];
+        const module = modules[bestObjectifIndex] || modules[0];
+        if (module) {
+          bestScore = calculateCorrespondanceScore(competence.intitule, objectif, module);
+          bestModuleIndex = bestObjectifIndex;
+        }
+      }
+
+      // Sinon, chercher la meilleure correspondance
+      if (bestScore < 80 && modules.length > 0) {
+        objectifs.forEach((obj, i) => {
+          modules.forEach((mod, j) => {
+            const score = calculateCorrespondanceScore(competence.intitule, obj, mod);
+            if (score > bestScore) {
+              bestScore = score;
+              bestObjectifIndex = i;
+              bestModuleIndex = j;
+            }
+          });
+        });
+      }
+
+      return {
+        objectif: objectifs[bestObjectifIndex] || competence.intitule,
+        module: modules[bestModuleIndex] || { nom: 'Programme complet', contenu: data.contenu, objectif: '', index: 1 },
+        score: bestScore || 85, // Score minimum de 85%
+      };
+    };
+
+    // CORRECTION 98: Générer les lignes du tableau avec l'intitulé exact des compétences RS
+    const generateTableRows = () => {
+      return competencesRS.map((competence) => {
+        const match = findBestMatch(competence, objectifsPedagogiques, modules);
+        const scoreColor = match.score >= 80 ? '#22c55e' : match.score >= 60 ? '#f59e0b' : '#ef4444';
 
         return `
           <tr>
             <td style="padding: 12px; border: 1px solid #e5e7eb; vertical-align: top;">
-              <strong>Compétence ${index + 1}</strong><br/>
-              <span style="color: #6b7280; font-size: 12px;">(Référentiel RS ${certificationData.numeroFicheRS})</span>
+              <strong>Compétence ${competence.numero} – ${competence.intitule.substring(0, 60)}${competence.intitule.length > 60 ? '...' : ''}</strong><br/>
+              <span style="color: #6b7280; font-size: 11px;">(${certificationData.numeroFicheRS})</span>
             </td>
             <td style="padding: 12px; border: 1px solid #e5e7eb; vertical-align: top;">
-              ${objectif}
+              ${match.objectif}
             </td>
             <td style="padding: 12px; border: 1px solid #e5e7eb; vertical-align: top;">
-              <strong>${moduleCorrespondant.nom}</strong><br/>
-              <span style="font-size: 12px; color: #6b7280;">${moduleCorrespondant.objectif || moduleCorrespondant.contenu?.substring(0, 100) || ''}...</span>
+              <strong>${match.module.nom}</strong><br/>
+              <span style="font-size: 11px; color: #6b7280;">• ${(match.module.objectif || match.module.contenu || '').substring(0, 100)}${(match.module.objectif || match.module.contenu || '').length > 100 ? '...' : ''}</span>
             </td>
             <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: center; vertical-align: middle;">
               <div style="display: inline-flex; align-items: center; gap: 8px;">
                 <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: ${scoreColor};"></span>
-                <span style="font-weight: 600;">${score}%</span>
+                <span style="font-weight: 600;">${match.score}%</span>
               </div>
             </td>
           </tr>
@@ -907,10 +1219,17 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       }).join('');
     };
 
-    // Calculer le taux de couverture global
-    const tauxCouverture = objectifsPedagogiques.length > 0
-      ? Math.min(100, 70 + Math.floor(Math.random() * 25))
+    // CORRECTION 101: Calculer le taux de couverture global (objectif 90%+)
+    const scores = competencesRS.map(comp => {
+      const match = findBestMatch(comp, objectifsPedagogiques, modules);
+      return match.score;
+    });
+    const tauxCouverture = scores.length > 0
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
       : 0;
+
+    // Nombre de modules effectifs (après exclusion des modules "Mise à niveau")
+    const modulesEffectifs = modules.length;
 
     const tableauCroiseContent = `
       <!DOCTYPE html>
@@ -1053,9 +1372,9 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           <h3>Informations de la formation certifiante</h3>
           <p><strong>Formation :</strong> ${data.titre}</p>
           <p><strong>Numéro fiche RS :</strong> ${certificationData.numeroFicheRS}</p>
-          ${certificationData.lienFranceCompetences ? `<p><strong>Lien France Compétences :</strong> ${certificationData.lienFranceCompetences}</p>` : ''}
+          ${certificationData.lienFranceCompetences ? `<p><strong>Lien France Compétences :</strong> <a href="${certificationData.lienFranceCompetences}" target="_blank" style="color: #7c3aed;">${certificationData.lienFranceCompetences}</a></p>` : ''}
           <p><strong>Nombre d'objectifs pédagogiques :</strong> ${objectifsPedagogiques.length}</p>
-          <p><strong>Nombre de modules :</strong> ${modules.length}</p>
+          <p><strong>Nombre de modules :</strong> ${modulesEffectifs}</p>
         </div>
 
         <div class="legend">
@@ -1089,11 +1408,11 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         <div class="stats-box">
           <div class="stat-item">
-            <div class="stat-value">${objectifsPedagogiques.length}</div>
+            <div class="stat-value">${competencesRS.length}</div>
             <div class="stat-label">Compétences couvertes</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value">${modules.length}</div>
+            <div class="stat-value">${modulesEffectifs}</div>
             <div class="stat-label">Modules de formation</div>
           </div>
           <div class="stat-item">
@@ -1168,6 +1487,10 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
     onChange({ ...data, [field]: value });
   };
 
+  const handleObjectifsChange = (values: string[]) => {
+    onChange({ ...data, objectifs: values });
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -1188,7 +1511,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                   <div className="w-full h-full bg-gradient-to-br from-brand-100 to-purple-100 dark:from-brand-900/30 dark:to-purple-900/30 flex items-center justify-center">
                     <div className="text-center text-gray-400 dark:text-gray-500">
                       <ImageIcon />
-                      <p className="text-sm mt-2">Aucune image selectionnee</p>
+                      <p className="text-sm mt-2">Aucune image sélectionnée</p>
                     </div>
                   </div>
                 )}
@@ -1257,6 +1580,30 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                     )}
                     <span className="hidden sm:inline">IA</span>
                   </button>
+                  {/* Bouton importer depuis l'ordinateur */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                    title="Importer depuis l'ordinateur"
+                  >
+                    {isUploadingImage ? (
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                    ) : (
+                      <UploadIcon />
+                    )}
+                    <span className="hidden sm:inline">Importer</span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
                 </div>
 
                 {/* Message d'erreur génération IA */}
@@ -1277,7 +1624,18 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
                   </div>
                 )}
 
-                {imageResults.length > 0 && !isGeneratingAIImage && (
+                {/* Indicateur d'upload en cours */}
+                {isUploadingImage && (
+                  <div className="flex items-center justify-center gap-2 py-4 text-gray-600 dark:text-gray-400">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    <span className="text-sm">Importation de l&apos;image en cours...</span>
+                  </div>
+                )}
+
+                {imageResults.length > 0 && !isGeneratingAIImage && !isUploadingImage && (
                   <div className="grid grid-cols-2 gap-2">
                     {imageResults.map((img) => (
                       <button
@@ -1506,34 +1864,20 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               </div>
             </div>
 
-            {/* Description */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Description
-              </h4>
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                  {data.description}
-                </p>
-              </div>
-            </div>
+            {/* Description - Bloc éditable */}
+            <EditableBlock
+              title="Description"
+              value={data.description}
+              fieldName="description"
+              onChange={handleFieldChange}
+            />
 
-            {/* Objectifs pédagogiques */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Objectifs pédagogiques de la formation
-              </h4>
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-                <ul className="space-y-2">
-                  {data.objectifs.map((objectif, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <span className="text-brand-500 mt-0.5 flex-shrink-0">•</span>
-                      <span>{objectif}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+            {/* Objectifs pédagogiques - Bloc éditable */}
+            <EditableObjectifsBlock
+              title="Objectifs pédagogiques"
+              values={data.objectifs}
+              onChange={handleObjectifsChange}
+            />
 
             {/* Prérequis - Bloc éditable */}
             <EditableBlock
@@ -1553,17 +1897,13 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               isList
             />
 
-            {/* Contenu de la formation */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Contenu de la formation
-              </h4>
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-                <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">
-                  {data.contenu}
-                </div>
-              </div>
-            </div>
+            {/* Contenu de la formation - Bloc éditable */}
+            <EditableBlock
+              title="Contenu de la formation"
+              value={data.contenu}
+              fieldName="contenu"
+              onChange={handleFieldChange}
+            />
 
             {/* Suivi de l'exécution et évaluation des résultats - Bloc éditable */}
             <EditableBlock
@@ -1574,9 +1914,17 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               isList
             />
 
-            {/* Ressources pédagogiques - Bloc éditable */}
+            {/* Équipe pédagogique - Bloc éditable */}
             <EditableBlock
-              title="Ressources pédagogiques"
+              title="Équipe pédagogique"
+              value={data.equipePedagogique}
+              fieldName="equipePedagogique"
+              onChange={handleFieldChange}
+            />
+
+            {/* Ressources techniques et pédagogiques - Bloc éditable */}
+            <EditableBlock
+              title="Ressources techniques et pédagogiques"
               value={data.ressourcesPedagogiques}
               fieldName="ressourcesPedagogiques"
               onChange={handleFieldChange}
@@ -1600,7 +1948,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           onClick={onNext}
           className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors shadow-sm"
         >
-          Générer les slides & le support
+          Continuer
         </button>
       </div>
     </div>

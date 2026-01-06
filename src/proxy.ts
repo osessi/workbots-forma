@@ -1,6 +1,6 @@
 // ===========================================
 // PROXY - Next.js 16 (replaces middleware.ts)
-// Handles: Supabase Auth + API proxying with extended timeout
+// Handles: Supabase Auth + API proxying + Custom Domain
 // ===========================================
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -11,6 +11,16 @@ const DEV_MODE =
   process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("YOUR_PROJECT_REF") ||
   !process.env.NEXT_PUBLIC_SUPABASE_URL;
 
+// Domaines internes (ne pas traiter comme domaine personnalisé)
+const INTERNAL_DOMAINS = [
+  "localhost",
+  "127.0.0.1",
+  "automate-forma.com",
+  "www.automate-forma.com",
+  "app.automate-forma.com",
+  "automate-forma.vercel.app",
+];
+
 // Routes publiques (accessibles sans authentification)
 const publicRoutes = [
   "/",
@@ -20,6 +30,11 @@ const publicRoutes = [
   "/admin-login",
   "/api/auth/callback",
   "/api/webhooks",
+  "/intervenant/login",
+  "/intervenant/register",
+  "/apprenant/login",
+  "/apprenant/register",
+  "/catalogue",
 ];
 
 // Routes qui nécessitent une authentification
@@ -44,6 +59,15 @@ const LONG_RUNNING_ROUTES = [
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostname = request.headers.get("host") || "";
+
+  // Extraire le domaine sans le port
+  const domain = hostname.split(":")[0];
+
+  // Vérifier si c'est un domaine personnalisé
+  const isCustomDomain = !INTERNAL_DOMAINS.some(
+    (internalDomain) => domain === internalDomain || domain.endsWith(`.${internalDomain}`)
+  );
 
   // Check if this is a slides API route that needs proxying
   const isSlidesRoute = SLIDES_PROXY_ROUTES.some((route) =>
@@ -54,8 +78,8 @@ export async function proxy(request: NextRequest) {
     return handleSlidesProxy(request, pathname);
   }
 
-  // Handle authentication for other routes
-  return handleAuth(request, pathname);
+  // Handle authentication for other routes (with custom domain support)
+  return handleAuth(request, pathname, isCustomDomain, domain);
 }
 
 async function handleSlidesProxy(
@@ -141,15 +165,45 @@ async function handleSlidesProxy(
 
 async function handleAuth(
   request: NextRequest,
-  pathname: string
+  pathname: string,
+  isCustomDomain: boolean = false,
+  customDomainValue: string = ""
 ): Promise<Response> {
   // En mode dev sans Supabase configuré, autoriser toutes les routes
   if (DEV_MODE) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+
+    // Gérer le cookie custom-domain
+    if (isCustomDomain) {
+      response.cookies.set("custom-domain", customDomainValue, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      });
+      response.headers.set("x-custom-domain", customDomainValue);
+    } else {
+      response.cookies.delete("custom-domain");
+    }
+
+    return response;
   }
 
   // Mettre à jour la session Supabase (refresh tokens)
   const { supabaseResponse, user } = await updateSession(request);
+
+  // Gérer le cookie custom-domain
+  if (isCustomDomain) {
+    supabaseResponse.cookies.set("custom-domain", customDomainValue, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+    supabaseResponse.headers.set("x-custom-domain", customDomainValue);
+  } else {
+    supabaseResponse.cookies.delete("custom-domain");
+  }
 
   // Vérifier si c'est une route publique (prioritaire)
   const isPublicRoute = publicRoutes.some(

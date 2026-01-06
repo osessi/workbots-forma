@@ -12,7 +12,18 @@ import {
   Phone,
   MapPin,
   Loader2,
+  ChevronRight,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
+
+interface Apprenant {
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string | null;
+  telephone: string | null;
+}
 
 interface Entreprise {
   id: string;
@@ -33,6 +44,7 @@ interface Entreprise {
   _count?: {
     apprenants: number;
   };
+  apprenants?: Apprenant[];
 }
 
 export default function EntreprisesPage() {
@@ -43,6 +55,12 @@ export default function EntreprisesPage() {
   const [editingEntreprise, setEditingEntreprise] = useState<Entreprise | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // État pour le modal des apprenants
+  const [showApprenantsModal, setShowApprenantsModal] = useState(false);
+  const [selectedEntreprise, setSelectedEntreprise] = useState<Entreprise | null>(null);
+  const [apprenantsLoading, setApprenantsLoading] = useState(false);
+  const [apprenantsList, setApprenantsList] = useState<Apprenant[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -184,6 +202,31 @@ export default function EntreprisesPage() {
     }
   };
 
+  // Ouvrir le modal des apprenants rattachés
+  const openApprenantsModal = async (entreprise: Entreprise) => {
+    setSelectedEntreprise(entreprise);
+    setShowApprenantsModal(true);
+    setApprenantsLoading(true);
+
+    try {
+      const res = await fetch(`/api/donnees/entreprises/${entreprise.id}/apprenants`);
+      if (res.ok) {
+        const data = await res.json();
+        setApprenantsList(data.apprenants || []);
+      }
+    } catch (error) {
+      console.error("Erreur chargement apprenants:", error);
+    } finally {
+      setApprenantsLoading(false);
+    }
+  };
+
+  const closeApprenantsModal = () => {
+    setShowApprenantsModal(false);
+    setSelectedEntreprise(null);
+    setApprenantsList([]);
+  };
+
   return (
     <div className="space-y-6">
       {/* En-tête */}
@@ -319,9 +362,14 @@ export default function EntreprisesPage() {
 
               {entreprise._count && entreprise._count.apprenants > 0 && (
                 <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                  <span className="text-xs text-brand-500 font-medium">
+                  <button
+                    onClick={() => openApprenantsModal(entreprise)}
+                    className="group flex items-center gap-1 text-xs text-brand-500 font-medium hover:text-brand-600 transition-colors"
+                  >
+                    <Users size={12} />
                     {entreprise._count.apprenants} apprenant{entreprise._count.apprenants > 1 ? "s" : ""} rattaché{entreprise._count.apprenants > 1 ? "s" : ""}
-                  </span>
+                    <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
                 </div>
               )}
             </div>
@@ -366,10 +414,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      SIRET
+                      SIRET *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.siret}
                       onChange={(e) => setFormData({ ...formData, siret: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -377,10 +426,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      TVA Intracommunautaire
+                      TVA Intracommunautaire *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.tvaIntracom}
                       onChange={(e) => setFormData({ ...formData, tvaIntracom: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -389,17 +439,18 @@ export default function EntreprisesPage() {
                 </div>
               </div>
 
-              {/* Représentant légal */}
+              {/* Interlocuteur principal */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Représentant légal
+                  Interlocuteur principal
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Civilité
+                      Civilité *
                     </label>
                     <select
+                      required
                       value={formData.contactCivilite}
                       onChange={(e) => setFormData({ ...formData, contactCivilite: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -411,10 +462,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Fonction
+                      Fonction *
                     </label>
                     <input
                       type="text"
+                      required
                       placeholder="Ex: Gérant, PDG, DRH..."
                       value={formData.contactFonction}
                       onChange={(e) => setFormData({ ...formData, contactFonction: e.target.value })}
@@ -423,10 +475,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Prénom
+                      Prénom *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.contactPrenom}
                       onChange={(e) => setFormData({ ...formData, contactPrenom: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -434,10 +487,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Nom
+                      Nom *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.contactNom}
                       onChange={(e) => setFormData({ ...formData, contactNom: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -445,10 +499,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Email
+                      Email *
                     </label>
                     <input
                       type="email"
+                      required
                       value={formData.contactEmail}
                       onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -456,10 +511,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Téléphone
+                      Téléphone *
                     </label>
                     <input
                       type="tel"
+                      required
                       value={formData.contactTelephone}
                       onChange={(e) => setFormData({ ...formData, contactTelephone: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -476,10 +532,11 @@ export default function EntreprisesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Adresse
+                      Adresse *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.adresse}
                       onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -487,10 +544,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Code postal
+                      Code postal *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.codePostal}
                       onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -498,10 +556,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Ville
+                      Ville *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.ville}
                       onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -509,10 +568,11 @@ export default function EntreprisesPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      Pays
+                      Pays *
                     </label>
                     <input
                       type="text"
+                      required
                       value={formData.pays}
                       onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -553,6 +613,97 @@ export default function EntreprisesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Apprenants rattachés */}
+      {showApprenantsModal && selectedEntreprise && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Apprenants rattachés
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  {selectedEntreprise.raisonSociale}
+                </p>
+              </div>
+              <button
+                onClick={closeApprenantsModal}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors dark:hover:bg-gray-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[60vh]">
+              {apprenantsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+                </div>
+              ) : apprenantsList.length === 0 ? (
+                <div className="text-center py-12 px-6">
+                  <Users className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Aucun apprenant rattaché à cette entreprise
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {apprenantsList.map((apprenant) => (
+                    <div
+                      key={apprenant.id}
+                      className="px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center">
+                            <span className="text-sm font-medium text-brand-600 dark:text-brand-400">
+                              {apprenant.prenom?.[0]}{apprenant.nom?.[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {apprenant.prenom} {apprenant.nom}
+                            </p>
+                            {apprenant.email && (
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {apprenant.email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Link
+                          href={`/automate/donnees/apprenants?id=${apprenant.id}`}
+                          className="p-2 text-gray-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors dark:hover:bg-brand-500/10"
+                          title="Voir la fiche"
+                        >
+                          <ExternalLink size={16} />
+                        </Link>
+                      </div>
+                      {apprenant.telephone && (
+                        <p className="mt-1 ml-13 text-sm text-gray-400 flex items-center gap-1">
+                          <Phone size={12} />
+                          {apprenant.telephone}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+              <Link
+                href={`/automate/donnees/apprenants?entreprise=${selectedEntreprise.id}`}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-medium text-brand-600 hover:text-brand-700 bg-white dark:bg-gray-800 border border-brand-200 dark:border-brand-800 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+              >
+                Voir tous les apprenants
+                <ExternalLink size={14} />
+              </Link>
+            </div>
           </div>
         </div>
       )}

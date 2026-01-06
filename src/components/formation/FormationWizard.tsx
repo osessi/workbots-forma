@@ -274,7 +274,7 @@ export default function FormationWizard() {
                 {/* Objectifs */}
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    Objectifs pédagogiques de la formation
+                    Objectifs pédagogiques
                   </h2>
                   <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-200 dark:border-gray-600">
                     <ul className="space-y-2">

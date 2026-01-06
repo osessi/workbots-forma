@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       ville,
       pays,
       statut,
+      situationActuelle,
       entrepriseId,
       notes,
     } = body;
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
         ville,
         pays: pays || "France",
         statut: statut || "PARTICULIER",
+        situationActuelle: statut === "PARTICULIER" ? situationActuelle : null,
         entrepriseId: statut === "SALARIE" ? entrepriseId : null,
         notes,
         organizationId: user.organizationId,

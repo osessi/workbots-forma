@@ -40,8 +40,113 @@ import {
   Settings,
   X,
   Briefcase,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { CatalogueFooter, FormationBadges, SatisfactionBadge } from "@/components/catalogue";
+
+// Composant DatePicker avec sélection rapide année/mois/jour
+interface DatePickerBirthProps {
+  value: string; // format YYYY-MM-DD
+  onChange: (value: string) => void;
+  className?: string;
+}
+
+function DatePickerBirth({ value, onChange, className = "" }: DatePickerBirthProps) {
+  // Parser la valeur actuelle
+  const [year, month, day] = value ? value.split("-") : ["", "", ""];
+
+  // Générer les options
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+  const months = [
+    { value: "01", label: "Janvier" },
+    { value: "02", label: "Février" },
+    { value: "03", label: "Mars" },
+    { value: "04", label: "Avril" },
+    { value: "05", label: "Mai" },
+    { value: "06", label: "Juin" },
+    { value: "07", label: "Juillet" },
+    { value: "08", label: "Août" },
+    { value: "09", label: "Septembre" },
+    { value: "10", label: "Octobre" },
+    { value: "11", label: "Novembre" },
+    { value: "12", label: "Décembre" },
+  ];
+
+  // Calculer le nombre de jours dans le mois sélectionné
+  const getDaysInMonth = (y: string, m: string) => {
+    if (!y || !m) return 31;
+    return new Date(parseInt(y), parseInt(m), 0).getDate();
+  };
+  const daysInMonth = getDaysInMonth(year, month);
+  const days = Array.from({ length: daysInMonth }, (_, i) => String(i + 1).padStart(2, "0"));
+
+  const handleChange = (type: "year" | "month" | "day", newValue: string) => {
+    let newYear = year;
+    let newMonth = month;
+    let newDay = day;
+
+    if (type === "year") newYear = newValue;
+    if (type === "month") newMonth = newValue;
+    if (type === "day") newDay = newValue;
+
+    // Si tous les champs sont remplis, construire la date
+    if (newYear && newMonth && newDay) {
+      // Ajuster le jour si nécessaire (ex: 31 février -> 28)
+      const maxDays = getDaysInMonth(newYear, newMonth);
+      if (parseInt(newDay) > maxDays) {
+        newDay = String(maxDays).padStart(2, "0");
+      }
+      onChange(`${newYear}-${newMonth}-${newDay}`);
+    } else if (newYear || newMonth || newDay) {
+      // Construire une date partielle pour préserver les sélections
+      onChange(`${newYear || ""}-${newMonth || ""}-${newDay || ""}`);
+    } else {
+      onChange("");
+    }
+  };
+
+  const selectClassName = "px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent bg-white appearance-none cursor-pointer";
+
+  return (
+    <div className={`grid grid-cols-3 gap-2 ${className}`}>
+      <select
+        value={day}
+        onChange={(e) => handleChange("day", e.target.value)}
+        className={selectClassName}
+        aria-label="Jour"
+      >
+        <option value="">Jour</option>
+        {days.map((d) => (
+          <option key={d} value={d}>{parseInt(d)}</option>
+        ))}
+      </select>
+      <select
+        value={month}
+        onChange={(e) => handleChange("month", e.target.value)}
+        className={selectClassName}
+        aria-label="Mois"
+      >
+        <option value="">Mois</option>
+        {months.map((m) => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </select>
+      <select
+        value={year}
+        onChange={(e) => handleChange("year", e.target.value)}
+        className={selectClassName}
+        aria-label="Année"
+      >
+        <option value="">Année</option>
+        {years.map((y) => (
+          <option key={y} value={y}>{y}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 // Types
 interface SousModule {
@@ -96,6 +201,7 @@ interface FormationDetail {
   tarif: number | null;
   tarifs?: {
     particulier: number | null;
+    independant: number | null;
     entreprise: number | null;
   };
   certification: {
@@ -177,7 +283,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [showPreInscription, setShowPreInscription] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
-  const [clientType, setClientType] = useState<"particulier" | "entreprise">("entreprise");
+  const [clientType, setClientType] = useState<"particulier" | "independant" | "entreprise">("entreprise");
 
   const fetchFormation = useCallback(async () => {
     try {
@@ -250,9 +356,20 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
 
   const primaryColor = formation.organization.primaryColor || "#4277FF";
   const dureeJours = formation.duree.totalJours || Math.ceil(formation.duree.totalHeures / 7);
-  const currentTarif = clientType === "particulier"
-    ? formation.tarifs?.particulier || formation.tarif
-    : formation.tarifs?.entreprise || formation.tarif;
+
+  // Calcul du tarif selon le type de client
+  const getCurrentTarif = () => {
+    switch (clientType) {
+      case "particulier":
+        return formation.tarifs?.particulier || formation.tarif;
+      case "independant":
+        return formation.tarifs?.independant || formation.tarif;
+      case "entreprise":
+      default:
+        return formation.tarifs?.entreprise || formation.tarif;
+    }
+  };
+  const currentTarif = getCurrentTarif();
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -260,21 +377,31 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
-            {/* Logo */}
-            <Link href={`/catalogue?org=${orgSlug}`} className="flex items-center gap-3">
+            {/* Logo - Reprend le design de la page d'accueil du catalogue */}
+            <Link href={`/catalogue?org=${orgSlug}`} className="flex items-center gap-4">
               {formation.organization.logo ? (
-                <Image
-                  src={formation.organization.logo}
-                  alt={formation.organization.name}
-                  width={150}
-                  height={50}
-                  className="h-12 w-auto object-contain"
-                />
+                <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-100 shadow-sm">
+                  <Image
+                    src={formation.organization.logo}
+                    alt={formation.organization.name}
+                    fill
+                    className="object-contain"
+                  />
+                </div>
               ) : (
-                <span className="text-xl font-bold" style={{ color: primaryColor }}>
-                  {formation.organization.name}
-                </span>
+                <div
+                  className="w-16 h-16 rounded-lg flex items-center justify-center text-white text-2xl font-bold shadow-sm"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  {formation.organization.name.charAt(0).toUpperCase()}
+                </div>
               )}
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {formation.organization.name}
+                </h1>
+                <p className="text-sm text-gray-500">Catalogue de formation</p>
+              </div>
             </Link>
 
             {/* Contact */}
@@ -303,11 +430,15 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
               )}
               {formation.organization.siteWeb && (
                 <a
-                  href={formation.organization.siteWeb}
+                  href={
+                    formation.organization.siteWeb.startsWith("http")
+                      ? formation.organization.siteWeb
+                      : `https://${formation.organization.siteWeb}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 border rounded-full text-sm hover:bg-gray-50"
-                  style={{ borderColor: primaryColor, color: primaryColor }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
+                  style={{ backgroundColor: primaryColor }}
                 >
                   <Globe className="w-4 h-4" />
                   Notre site web
@@ -349,43 +480,6 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
           <h1 className="text-2xl md:text-3xl font-bold text-white">
             {formation.titre}
           </h1>
-
-          {/* Badges sur la bannière - style blanc pour contraste */}
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            {formation.modalites.length > 0 && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/90 backdrop-blur-sm" style={{ color: primaryColor }}>
-                {formation.modalites.map(m => modaliteLabels[m] || m).join(", ")}
-              </span>
-            )}
-            {formation.duree.totalHeures > 0 && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-white/90 backdrop-blur-sm" style={{ color: primaryColor }}>
-                {formation.duree.totalHeures}h ({dureeJours} jour{dureeJours > 1 ? "s" : ""})
-              </span>
-            )}
-            {formation.accessibiliteHandicap && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-teal-500/90 text-white backdrop-blur-sm flex items-center gap-1">
-                <Accessibility className="w-3.5 h-3.5" />
-                Accessible PMR
-              </span>
-            )}
-            {formation.certification?.isCertifiante && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium text-white backdrop-blur-sm" style={{ backgroundColor: `${primaryColor}cc` }}>
-                Certifiante
-              </span>
-            )}
-            {formation.cpf?.estEligible && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-500/90 text-white backdrop-blur-sm">
-                Éligible CPF
-              </span>
-            )}
-            {formation.indicateurs?.tauxSatisfaction && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/90 text-white backdrop-blur-sm flex items-center gap-1">
-                <Star className="w-3.5 h-3.5" />
-                {(formation.indicateurs.tauxSatisfaction / 10).toFixed(1)}/10
-                {formation.indicateurs.nombreAvis > 0 && ` (${formation.indicateurs.nombreAvis} avis)`}
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -427,24 +521,6 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                   <div className="text-xs text-gray-500 mb-4 space-y-1">
                     <p>Formation créée le {new Date(formation.createdAt).toLocaleDateString("fr-FR")}</p>
                     <p>Dernière mise à jour le {new Date(formation.updatedAt).toLocaleDateString("fr-FR")}</p>
-                  </div>
-
-                  {/* Badges avec couleur primaire */}
-                  <div className="mb-4">
-                    <FormationBadges
-                      formation={{
-                        modalites: formation.modalites,
-                        dureeHeures: formation.duree.totalHeures,
-                        dureeJours: formation.duree.totalJours || dureeJours,
-                        isCertifiante: formation.certification?.isCertifiante || false,
-                        numeroFicheRS: formation.certification?.numeroFicheRS,
-                        estEligibleCPF: formation.cpf?.estEligible,
-                        accessibiliteHandicap: formation.accessibiliteHandicap,
-                        nombreModules: formation.duree.nombreModules,
-                      }}
-                      primaryColor={primaryColor}
-                      size="sm"
-                    />
                   </div>
 
                   {/* Taux de satisfaction des apprenants - Encadré dédié */}
@@ -557,28 +633,49 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                       <div>
                         <p className="text-xs text-gray-500 mb-1.5">Accessibilité</p>
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border bg-teal-50 text-teal-700 border-teal-200">
-                          {formation.accessibiliteHandicap ? "Accessible PMR" : "Accessible"}
+                          {formation.accessibiliteHandicap ? "Accessible PSH" : "Accessible PSH"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Éligible CPF */}
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 mt-0.5 text-green-500" />
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1.5">Éligible CPF</p>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border ${
+                          formation.cpf?.estEligible
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-gray-50 text-gray-600 border-gray-200"
+                        }`}>
+                          {formation.cpf?.estEligible ? "Oui" : "Non"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Formation certifiante */}
+                    <div className="flex items-start gap-3">
+                      <Award className="w-5 h-5 mt-0.5" style={{ color: primaryColor }} />
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1.5">Formation certifiante</p>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border ${
+                          formation.certification?.isCertifiante
+                            ? "text-white"
+                            : "bg-gray-50 text-gray-600 border-gray-200"
+                        }`}
+                        style={formation.certification?.isCertifiante ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
+                        >
+                          {formation.certification?.isCertifiante ? "Oui" : "Non"}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Type client toggle */}
+                  {/* Type client toggle - Ordre: Entreprise, Indépendant, Particulier */}
                   <div className="flex items-center gap-2 py-4">
                     <button
-                      onClick={() => setClientType("particulier")}
-                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        clientType === "particulier"
-                          ? "text-white"
-                          : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                      }`}
-                      style={clientType === "particulier" ? { backgroundColor: primaryColor } : undefined}
-                    >
-                      Particulier
-                    </button>
-                    <button
                       onClick={() => setClientType("entreprise")}
-                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                         clientType === "entreprise"
                           ? "text-white"
                           : "text-gray-600 bg-gray-100 hover:bg-gray-200"
@@ -587,13 +684,35 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                     >
                       Entreprise
                     </button>
+                    <button
+                      onClick={() => setClientType("independant")}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        clientType === "independant"
+                          ? "text-white"
+                          : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                      }`}
+                      style={clientType === "independant" ? { backgroundColor: primaryColor } : undefined}
+                    >
+                      Indépendant
+                    </button>
+                    <button
+                      onClick={() => setClientType("particulier")}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        clientType === "particulier"
+                          ? "text-white"
+                          : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                      }`}
+                      style={clientType === "particulier" ? { backgroundColor: primaryColor } : undefined}
+                    >
+                      Particulier
+                    </button>
                   </div>
 
-                  {/* Tarif selon le type de client */}
+                  {/* Tarif selon le type de client - TTC pour particulier, HT pour entreprise/indépendant */}
                   <div className="text-center py-4">
                     {currentTarif ? (
                       <p className="text-2xl font-bold text-gray-900">
-                        {currentTarif.toLocaleString("fr-FR")} € <span className="text-sm font-normal text-gray-500">HT</span>
+                        {currentTarif.toLocaleString("fr-FR")} € <span className="text-sm font-normal text-gray-500">{clientType === "particulier" ? "TTC" : "HT"}</span>
                       </p>
                     ) : (
                       <p className="text-lg text-gray-600">Tarif sur demande</p>
@@ -629,7 +748,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
               {/* ========================================= */}
               {/* OBJECTIFS DE LA FORMATION */}
               {/* ========================================= */}
-              <SectionCard title="Objectifs de la formation" icon={Target} primaryColor={primaryColor}>
+              <SectionCard title="Objectifs pédagogiques" icon={Target} primaryColor={primaryColor}>
                 {formation.objectifsPedagogiques.length > 0 ? (
                   <ul className="space-y-3">
                     {formation.objectifsPedagogiques.map((objectif, index) => (
@@ -880,59 +999,6 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
               </div>
 
               {/* ========================================= */}
-              {/* QUALITÉ ET SATISFACTION */}
-              {/* ========================================= */}
-              <SectionCard title="Qualité et satisfaction" icon={Star} primaryColor={primaryColor}>
-                <div className="space-y-6">
-                  {/* Texte sur toute la largeur */}
-                  <div className="text-sm text-gray-600 space-y-3">
-                    {formation.qualiteSatisfaction ? (
-                      <p>{formation.qualiteSatisfaction}</p>
-                    ) : (
-                      <>
-                        <p>
-                          Chez {formation.organization.name}, nous plaçons la satisfaction de nos apprenants au cœur de nos préoccupations, en mesurant régulièrement leur progression tout au long de nos formations pour garantir un apprentissage de qualité et un accompagnement personnalisé vers la réussite.
-                        </p>
-                        <p>
-                          Dans le cadre de notre démarche d&apos;amélioration continue, une enquête de satisfaction sera envoyée en fin de formation aux apprenants, formateurs et prescripteurs, le cas échéant.
-                        </p>
-                        <p>
-                          Une évaluation différée est également envoyée trois mois après la formation afin de mesurer l&apos;impact de la formation sur le projet professionnel et l&apos;application des compétences acquises.
-                        </p>
-                      </>
-                    )}
-                  </div>
-                  {/* Indicateurs en dessous, centrés - Toujours affiché */}
-                  <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-500 mb-3">Taux de satisfaction des apprenants</p>
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${formation.indicateurs?.tauxSatisfaction
-                              ? Math.min(formation.indicateurs.tauxSatisfaction, 100)
-                              : 0}%`,
-                            backgroundColor: primaryColor,
-                          }}
-                        />
-                      </div>
-                      <span className="text-2xl font-bold" style={{ color: primaryColor }}>
-                        {formation.indicateurs?.tauxSatisfaction
-                          ? `${(formation.indicateurs.tauxSatisfaction / 10).toFixed(1)}/10`
-                          : "N/A"}
-                      </span>
-                      {formation.indicateurs?.nombreAvis && formation.indicateurs.nombreAvis > 0 && (
-                        <span className="text-sm text-gray-500">
-                          ({formation.indicateurs.nombreAvis} avis)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
-
-              {/* ========================================= */}
               {/* DÉLAI D'ACCÈS */}
               {/* ========================================= */}
               <SectionCard title="Délai d'accès" icon={Calendar} primaryColor={primaryColor}>
@@ -1018,31 +1084,62 @@ function PreInscriptionModal({
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profileType, setProfileType] = useState<"particulier" | "entreprise" | null>(null);
+  const [profileType, setProfileType] = useState<"particulier" | "independant" | "entreprise" | null>(null);
+
+  // Type pour un apprenant (profil Entreprise)
+  interface Apprenant {
+    id: string;
+    civilite: string;
+    nom: string;
+    prenom: string;
+    email: string;
+    telephone: string;
+    dateNaissance: string;
+    lieuNaissance: string;
+    poste: string;
+  }
+
+  const [apprenants, setApprenants] = useState<Apprenant[]>([
+    { id: crypto.randomUUID(), civilite: "", nom: "", prenom: "", email: "", telephone: "", dateNaissance: "", lieuNaissance: "", poste: "" }
+  ]);
 
   const [formData, setFormData] = useState({
     // Étape 1: Analyse du besoin (Qualiopi)
-    objectifsProfessionnels: "",
-    contexte: "",
-    experiencePrealable: "",
-    attentesSpecifiques: "",
-    contraintes: "",
-    // Étape 2: Identité
+    objectifPrincipal: "",
+    utiliteFormation: "",
+    niveauActuel: "",
+    besoinAccessibilite: "",
+    besoinAccessibiliteDetails: "",
+    // Étape 2 - Entreprise: Informations entreprise
+    raisonSociale: "",
+    siret: "",
+    numeroTVA: "",
+    // Étape 2 - Entreprise: Représentant légal / contact
+    representantCivilite: "",
+    representantNom: "",
+    representantPrenom: "",
+    representantEmail: "",
+    representantTelephone: "",
+    representantFonction: "",
+    // Étape 2 - Indépendant / Particulier: Informations personnelles
     civilite: "",
     nom: "",
     prenom: "",
-    dateNaissance: "",
-    lieuNaissance: "",
     email: "",
     telephone: "",
-    // Étape 3: Adresse & Situation
+    dateNaissance: "",
+    lieuNaissance: "",
+    // Étape 2 - Indépendant: Informations entreprise
+    nomCommercial: "",
+    // Étape 2 - Particulier: Situation
+    situationActuelle: "",
+    // Étape 3: Adresse
     adresse: "",
     codePostal: "",
     ville: "",
     situationProfessionnelle: "",
     entreprise: "",
     poste: "",
-    siret: "",
     // Étape 4: Handicap & Financement
     situationHandicap: false,
     besoinsAmenagements: "",
@@ -1059,6 +1156,31 @@ function PreInscriptionModal({
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
+  };
+
+  // Gestion des apprenants (profil Entreprise)
+  const handleApprenantChange = (id: string, field: keyof Apprenant, value: string) => {
+    setApprenants(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+  };
+
+  const addApprenant = () => {
+    setApprenants(prev => [...prev, {
+      id: crypto.randomUUID(),
+      civilite: "",
+      nom: "",
+      prenom: "",
+      email: "",
+      telephone: "",
+      dateNaissance: "",
+      lieuNaissance: "",
+      poste: ""
+    }]);
+  };
+
+  const removeApprenant = (id: string) => {
+    if (apprenants.length > 1) {
+      setApprenants(prev => prev.filter(a => a.id !== id));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1090,7 +1212,7 @@ function PreInscriptionModal({
     }
   };
 
-  const totalSteps = 4;
+  const totalSteps = 3;
   const progress = (step / totalSteps) * 100;
 
   // Validation par étape
@@ -1099,11 +1221,23 @@ function PreInscriptionModal({
       case 1:
         return true; // Analyse du besoin optionnelle
       case 2:
-        return formData.nom && formData.prenom && formData.email;
+        if (profileType === "entreprise") {
+          // Entreprise: raison sociale, SIRET, représentant, adresse, et au moins 1 apprenant complet
+          const hasCompanyInfo = formData.raisonSociale && formData.siret;
+          const hasRepresentant = formData.representantNom && formData.representantPrenom && formData.representantEmail && formData.representantTelephone;
+          const hasAddress = formData.adresse && formData.codePostal && formData.ville;
+          const hasValidApprenant = apprenants.some(a => a.nom && a.prenom && a.email);
+          return hasCompanyInfo && hasRepresentant && hasAddress && hasValidApprenant;
+        } else if (profileType === "independant") {
+          // Indépendant: nom commercial, SIRET, infos personnelles, adresse
+          return formData.nomCommercial && formData.siret && formData.nom && formData.prenom && formData.email && formData.telephone && formData.adresse && formData.codePostal && formData.ville;
+        } else if (profileType === "particulier") {
+          // Particulier: infos personnelles + situation + adresse
+          return formData.nom && formData.prenom && formData.email && formData.telephone && formData.situationActuelle && formData.adresse && formData.codePostal && formData.ville;
+        }
+        return false;
       case 3:
-        return true; // Adresse optionnelle
-      case 4:
-        return true; // Handicap/financement optionnel
+        return true; // Accessibilité/financement optionnel
       default:
         return true;
     }
@@ -1186,6 +1320,7 @@ function PreInscriptionModal({
             </div>
 
             <div className="space-y-3">
+              {/* Particulier */}
               <button
                 onClick={() => {
                   setProfileType("particulier");
@@ -1198,13 +1333,34 @@ function PreInscriptionModal({
                     <User className="w-6 h-6 text-blue-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900">Je m&apos;inscris individuellement</p>
-                    <p className="text-sm text-gray-500">En tant que particulier ou indépendant (profession libérale)</p>
+                    <p className="font-medium text-gray-900">Je m&apos;inscris en tant que particulier</p>
+                    <p className="text-sm text-gray-500">Je finance ma formation à titre personnel</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
                 </div>
               </button>
 
+              {/* Indépendant */}
+              <button
+                onClick={() => {
+                  setProfileType("independant");
+                  setFormData(prev => ({ ...prev, situationProfessionnelle: "INDEPENDANT" }));
+                }}
+                className="w-full p-4 border-2 rounded-xl hover:border-gray-300 transition-all text-left group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center group-hover:bg-teal-200 transition-colors">
+                    <Briefcase className="w-6 h-6 text-teal-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Je m&apos;inscris en tant qu&apos;indépendant</p>
+                    <p className="text-sm text-gray-500">Je suis freelance / auto-entrepreneur et je m&apos;inscris pour moi</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
+                </div>
+              </button>
+
+              {/* Entreprise */}
               <button
                 onClick={() => {
                   setProfileType("entreprise");
@@ -1217,18 +1373,13 @@ function PreInscriptionModal({
                     <Building2 className="w-6 h-6 text-purple-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900">Je fais une demande pour une structure</p>
-                    <p className="text-sm text-gray-500">Entreprise, association, collectivité...</p>
+                    <p className="font-medium text-gray-900">Je m&apos;inscris en tant qu&apos;entreprise</p>
+                    <p className="text-sm text-gray-500">J&apos;inscris un ou plusieurs salariés de mon organisation</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
                 </div>
               </button>
             </div>
-
-            <p className="text-xs text-gray-400 text-center mt-6">
-              Sélectionnez ce mode si c&apos;est votre entreprise qui finance votre formation
-              ou si vous souhaitez programmer une formation pour vos collaborateurs.
-            </p>
           </div>
         </div>
       </div>
@@ -1261,8 +1412,7 @@ function PreInscriptionModal({
                 <h2 className="font-semibold text-gray-900">
                   {step === 1 && "Analyse du besoin"}
                   {step === 2 && "Vos informations"}
-                  {step === 3 && (profileType === "entreprise" ? "Informations entreprise" : "Adresse & Situation")}
-                  {step === 4 && "Accessibilité & Financement"}
+                  {step === 3 && "Financement"}
                 </h2>
               </div>
             </div>
@@ -1273,7 +1423,7 @@ function PreInscriptionModal({
 
           {/* Indicateurs d'étapes */}
           <div className="px-6 pb-4 flex items-center justify-center gap-2">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div
                 key={s}
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
@@ -1314,84 +1464,643 @@ function PreInscriptionModal({
                   </p>
                 </div>
 
+                {/* Question 1 : Objectif principal */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quels sont vos objectifs professionnels ? *
+                    Quel est votre objectif principal en suivant cette formation ?
                   </label>
                   <textarea
-                    name="objectifsProfessionnels"
-                    value={formData.objectifsProfessionnels}
+                    name="objectifPrincipal"
+                    value={formData.objectifPrincipal}
                     onChange={handleChange}
                     rows={3}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
                     style={{ "--tw-ring-color": primaryColor } as React.CSSProperties}
-                    placeholder="Ex: Développer mes compétences en gestion de projet pour évoluer vers un poste de chef de projet..."
+                    placeholder="Ex. : Gagner en autonomie sur…, améliorer mes résultats sur…, préparer une évolution de poste…"
                   />
                 </div>
 
+                {/* Question 2 : Utilité pour l'activité */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quel est le contexte de votre demande ?
+                    En quoi cette formation est-elle utile pour votre activité actuelle ou votre projet ?
                   </label>
                   <textarea
-                    name="contexte"
-                    value={formData.contexte}
+                    name="utiliteFormation"
+                    value={formData.utiliteFormation}
                     onChange={handleChange}
                     rows={3}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                    placeholder="Ex: Évolution professionnelle, reconversion, montée en compétences..."
+                    style={{ "--tw-ring-color": primaryColor } as React.CSSProperties}
+                    placeholder="Ex. : Je dois mettre en place…, je veux structurer…, je rencontre des difficultés sur…"
                   />
                 </div>
 
+                {/* Question 3 : Niveau actuel */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quelle est votre expérience préalable dans ce domaine ?
+                    Comment décririez-vous votre niveau actuel sur ce sujet ?
                   </label>
-                  <textarea
-                    name="experiencePrealable"
-                    value={formData.experiencePrealable}
+                  <select
+                    name="niveauActuel"
+                    value={formData.niveauActuel}
                     onChange={handleChange}
-                    rows={2}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                    placeholder="Ex: Débutant, quelques notions, expérience professionnelle de X ans..."
-                  />
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent bg-white transition-all"
+                    style={{ "--tw-ring-color": primaryColor } as React.CSSProperties}
+                  >
+                    <option value="">Sélectionnez votre niveau</option>
+                    <option value="DEBUTANT">Débutant</option>
+                    <option value="INTERMEDIAIRE">Intermédiaire</option>
+                    <option value="AVANCE">Avancé</option>
+                    <option value="EXPERT">Expert</option>
+                  </select>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
+                {/* Question 4 : Accessibilité - Style violet */}
+                <div className="p-5 border-2 border-purple-200 rounded-xl bg-purple-50/50">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Accessibility className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Accessibilité</h3>
+                      <p className="text-sm text-gray-500">Information pour adapter votre parcours</p>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Attentes spécifiques
+                      Avez-vous des besoins particuliers ou une situation de handicap nécessitant des aménagements ?
                     </label>
-                    <textarea
-                      name="attentesSpecifiques"
-                      value={formData.attentesSpecifiques}
+                    <select
+                      name="besoinAccessibilite"
+                      value={formData.besoinAccessibilite}
                       onChange={handleChange}
-                      rows={2}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                      placeholder="Vos attentes particulières..."
-                    />
+                      className="w-full px-4 py-3 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white transition-all"
+                    >
+                      <option value="">Sélectionnez</option>
+                      <option value="NON">Non</option>
+                      <option value="OUI">Oui</option>
+                    </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contraintes éventuelles
-                    </label>
-                    <textarea
-                      name="contraintes"
-                      value={formData.contraintes}
-                      onChange={handleChange}
-                      rows={2}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                      placeholder="Horaires, lieu, disponibilités..."
-                    />
-                  </div>
+
+                  {formData.besoinAccessibilite === "OUI" && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Si oui, précisez vos besoins
+                      </label>
+                      <textarea
+                        name="besoinAccessibiliteDetails"
+                        value={formData.besoinAccessibiliteDetails}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        placeholder="Ex. : Accessibilité du lieu, support adapté, rythme, horaires, sous-titrage…"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
             {/* ========================================= */}
-            {/* ÉTAPE 2: INFORMATIONS PERSONNELLES */}
+            {/* ÉTAPE 2: FORMULAIRES DYNAMIQUES SELON PROFIL */}
             {/* ========================================= */}
-            {step === 2 && (
+            {step === 2 && profileType === "entreprise" && (
+              <div className="space-y-6">
+                {/* Section Informations entreprise */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: `${primaryColor}15` }}
+                  >
+                    <Building2 className="w-5 h-5" style={{ color: primaryColor }} />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">Informations entreprise</h3>
+                    <p className="text-sm text-gray-500">Structure qui inscrit les apprenants</p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Raison sociale *</label>
+                    <input
+                      type="text"
+                      name="raisonSociale"
+                      value={formData.raisonSociale}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="Nom de l'entreprise"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">SIRET *</label>
+                    <input
+                      type="text"
+                      name="siret"
+                      value={formData.siret}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="123 456 789 00012"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Numéro de TVA intracommunautaire *</label>
+                  <input
+                    type="text"
+                    name="numeroTVA"
+                    value={formData.numeroTVA}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                    placeholder="FR 12 345678901"
+                  />
+                </div>
+
+                {/* Section Représentant légal / Contact */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${primaryColor}15` }}
+                    >
+                      <UserCheck className="w-5 h-5" style={{ color: primaryColor }} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Représentant légal / Contact</h3>
+                      <p className="text-sm text-gray-500">Personne en charge de l&apos;inscription</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Civilité *</label>
+                      <select
+                        name="representantCivilite"
+                        value={formData.representantCivilite}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent bg-white"
+                      >
+                        <option value="">Choisir</option>
+                        <option value="M.">M.</option>
+                        <option value="Mme">Mme</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+                      <input
+                        type="text"
+                        name="representantNom"
+                        value={formData.representantNom}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Nom"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                      <input
+                        type="text"
+                        name="representantPrenom"
+                        value={formData.representantPrenom}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Prénom"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                      <input
+                        type="email"
+                        name="representantEmail"
+                        value={formData.representantEmail}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="contact@entreprise.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+                      <input
+                        type="tel"
+                        name="representantTelephone"
+                        value={formData.representantTelephone}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="01 23 45 67 89"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Fonction *</label>
+                    <input
+                      type="text"
+                      name="representantFonction"
+                      value={formData.representantFonction}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="Ex: Responsable RH, Directeur..."
+                    />
+                  </div>
+                </div>
+
+                {/* Section Apprenants */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: `${primaryColor}15` }}
+                      >
+                        <Users className="w-5 h-5" style={{ color: primaryColor }} />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Apprenants à inscrire</h3>
+                        <p className="text-sm text-gray-500">{apprenants.length} apprenant{apprenants.length > 1 ? "s" : ""}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addApprenant}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                      style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Ajouter un apprenant
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {apprenants.map((apprenant, index) => (
+                      <div key={apprenant.id} className="p-4 border rounded-xl bg-gray-50">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-sm font-medium text-gray-700">Apprenant {index + 1}</span>
+                          {apprenants.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeApprenant(apprenant.id)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Civilité *</label>
+                            <select
+                              value={apprenant.civilite}
+                              onChange={(e) => handleApprenantChange(apprenant.id, "civilite", e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent bg-white"
+                            >
+                              <option value="">Choisir</option>
+                              <option value="M.">M.</option>
+                              <option value="Mme">Mme</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+                            <input
+                              type="text"
+                              value={apprenant.nom}
+                              onChange={(e) => handleApprenantChange(apprenant.id, "nom", e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                              placeholder="Nom"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Prénom *</label>
+                            <input
+                              type="text"
+                              value={apprenant.prenom}
+                              onChange={(e) => handleApprenantChange(apprenant.id, "prenom", e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                              placeholder="Prénom"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
+                            <input
+                              type="email"
+                              value={apprenant.email}
+                              onChange={(e) => handleApprenantChange(apprenant.id, "email", e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                              placeholder="email@exemple.com"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone *</label>
+                            <input
+                              type="tel"
+                              value={apprenant.telephone}
+                              onChange={(e) => handleApprenantChange(apprenant.id, "telephone", e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                              placeholder="06 00 00 00 00"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Date de naissance *</label>
+                            <DatePickerBirth
+                              value={apprenant.dateNaissance}
+                              onChange={(val) => handleApprenantChange(apprenant.id, "dateNaissance", val)}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Lieu de naissance *</label>
+                              <input
+                                type="text"
+                                value={apprenant.lieuNaissance}
+                                onChange={(e) => handleApprenantChange(apprenant.id, "lieuNaissance", e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                                placeholder="Ville"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Poste *</label>
+                              <input
+                                type="text"
+                                value={apprenant.poste}
+                              onChange={(e) => handleApprenantChange(apprenant.id, "poste", e.target.value)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                              placeholder="Fonction"
+                            />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section Adresse de l'entreprise */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${primaryColor}15` }}
+                    >
+                      <MapPin className="w-5 h-5" style={{ color: primaryColor }} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Adresse de l&apos;entreprise</h3>
+                      <p className="text-sm text-gray-500">Siège social de la structure</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Adresse *</label>
+                    <input
+                      type="text"
+                      name="adresse"
+                      value={formData.adresse}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="Numéro et nom de rue"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Code postal *</label>
+                      <input
+                        type="text"
+                        name="codePostal"
+                        value={formData.codePostal}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="75000"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Ville *</label>
+                      <input
+                        type="text"
+                        name="ville"
+                        value={formData.ville}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Ville"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ÉTAPE 2: INDÉPENDANT */}
+            {step === 2 && profileType === "independant" && (
+              <div className="space-y-6">
+                {/* Informations entreprise */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: `${primaryColor}15` }}
+                  >
+                    <Briefcase className="w-5 h-5" style={{ color: primaryColor }} />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">Informations professionnelles</h3>
+                    <p className="text-sm text-gray-500">Votre activité indépendante</p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nom commercial / Raison sociale *</label>
+                    <input
+                      type="text"
+                      name="nomCommercial"
+                      value={formData.nomCommercial}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="Nom de votre activité"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">SIRET *</label>
+                    <input
+                      type="text"
+                      name="siret"
+                      value={formData.siret}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="123 456 789 00012"
+                    />
+                  </div>
+                </div>
+
+                {/* Informations personnelles */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${primaryColor}15` }}
+                    >
+                      <User className="w-5 h-5" style={{ color: primaryColor }} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Vos informations personnelles</h3>
+                      <p className="text-sm text-gray-500">Identité et coordonnées</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Civilité *</label>
+                      <select
+                        name="civilite"
+                        value={formData.civilite}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent bg-white"
+                      >
+                        <option value="">Choisir</option>
+                        <option value="M.">M.</option>
+                        <option value="Mme">Mme</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Nom *</label>
+                      <input
+                        type="text"
+                        name="nom"
+                        value={formData.nom}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Votre nom"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Prénom *</label>
+                      <input
+                        type="text"
+                        name="prenom"
+                        value={formData.prenom}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Votre prénom"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="votre@email.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Téléphone *</label>
+                      <input
+                        type="tel"
+                        name="telephone"
+                        value={formData.telephone}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="06 00 00 00 00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date de naissance *</label>
+                      <DatePickerBirth
+                        value={formData.dateNaissance}
+                        onChange={(val) => setFormData(prev => ({ ...prev, dateNaissance: val }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Lieu de naissance *</label>
+                      <input
+                        type="text"
+                        name="lieuNaissance"
+                        value={formData.lieuNaissance}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Ville de naissance"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Adresse */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${primaryColor}15` }}
+                    >
+                      <MapPin className="w-5 h-5" style={{ color: primaryColor }} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Adresse professionnelle</h3>
+                      <p className="text-sm text-gray-500">Siège de votre activité</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Adresse *</label>
+                    <input
+                      type="text"
+                      name="adresse"
+                      value={formData.adresse}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="Numéro et nom de rue"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Code postal *</label>
+                      <input
+                        type="text"
+                        name="codePostal"
+                        value={formData.codePostal}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="75000"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Ville *</label>
+                      <input
+                        type="text"
+                        name="ville"
+                        value={formData.ville}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Ville"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ÉTAPE 2: PARTICULIER */}
+            {step === 2 && profileType === "particulier" && (
               <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div
@@ -1401,14 +2110,14 @@ function PreInscriptionModal({
                     <User className="w-5 h-5" style={{ color: primaryColor }} />
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-900">Informations personnelles</h3>
-                    <p className="text-sm text-gray-500">Les champs marqués * sont obligatoires</p>
+                    <h3 className="font-medium text-gray-900">Vos informations personnelles</h3>
+                    <p className="text-sm text-gray-500">Identité et coordonnées</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Civilité</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Civilité *</label>
                     <select
                       name="civilite"
                       value={formData.civilite}
@@ -1427,7 +2136,6 @@ function PreInscriptionModal({
                       name="nom"
                       value={formData.nom}
                       onChange={handleChange}
-                      required
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                       placeholder="Votre nom"
                     />
@@ -1439,33 +2147,8 @@ function PreInscriptionModal({
                       name="prenom"
                       value={formData.prenom}
                       onChange={handleChange}
-                      required
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                       placeholder="Votre prénom"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Date de naissance</label>
-                    <input
-                      type="date"
-                      name="dateNaissance"
-                      value={formData.dateNaissance}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Lieu de naissance</label>
-                    <input
-                      type="text"
-                      name="lieuNaissance"
-                      value={formData.lieuNaissance}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                      placeholder="Ville de naissance"
                     />
                   </div>
                 </div>
@@ -1478,7 +2161,6 @@ function PreInscriptionModal({
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      required
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                       placeholder="votre@email.com"
                     />
@@ -1490,264 +2172,127 @@ function PreInscriptionModal({
                       name="telephone"
                       value={formData.telephone}
                       onChange={handleChange}
-                      required
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                       placeholder="06 00 00 00 00"
                     />
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* ========================================= */}
-            {/* ÉTAPE 3: ADRESSE & SITUATION / ENTREPRISE */}
-            {/* ========================================= */}
-            {step === 3 && (
-              <div className="space-y-6">
-                {profileType === "entreprise" ? (
-                  <>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${primaryColor}15` }}
-                      >
-                        <Building2 className="w-5 h-5" style={{ color: primaryColor }} />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">Informations entreprise</h3>
-                        <p className="text-sm text-gray-500">Structure qui finance la formation</p>
-                      </div>
-                    </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date de naissance *</label>
+                    <DatePickerBirth
+                      value={formData.dateNaissance}
+                      onChange={(val) => setFormData(prev => ({ ...prev, dateNaissance: val }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Lieu de naissance *</label>
+                    <input
+                      type="text"
+                      name="lieuNaissance"
+                      value={formData.lieuNaissance}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="Ville de naissance"
+                    />
+                  </div>
+                </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Nom de l&apos;entreprise *</label>
-                        <input
-                          type="text"
-                          name="entreprise"
-                          value={formData.entreprise}
-                          onChange={handleChange}
-                          required
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          placeholder="Raison sociale"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">SIRET *</label>
-                        <input
-                          type="text"
-                          name="siret"
-                          value={formData.siret}
-                          onChange={handleChange}
-                          required
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          placeholder="123 456 789 00012"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Adresse de l&apos;entreprise</label>
-                      <input
-                        type="text"
-                        name="adresse"
-                        value={formData.adresse}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        placeholder="Numéro et nom de rue"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Code postal</label>
-                        <input
-                          type="text"
-                          name="codePostal"
-                          value={formData.codePostal}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          placeholder="75000"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Ville</label>
-                        <input
-                          type="text"
-                          name="ville"
-                          value={formData.ville}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          placeholder="Ville"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Votre poste dans l&apos;entreprise</label>
-                      <input
-                        type="text"
-                        name="poste"
-                        value={formData.poste}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        placeholder="Ex: Responsable RH, Directeur..."
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${primaryColor}15` }}
-                      >
-                        <MapPin className="w-5 h-5" style={{ color: primaryColor }} />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">Adresse & Situation</h3>
-                        <p className="text-sm text-gray-500">Vos coordonnées et situation professionnelle</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Adresse</label>
-                      <input
-                        type="text"
-                        name="adresse"
-                        value={formData.adresse}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        placeholder="Numéro et nom de rue"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Code postal</label>
-                        <input
-                          type="text"
-                          name="codePostal"
-                          value={formData.codePostal}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          placeholder="75000"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Ville</label>
-                        <input
-                          type="text"
-                          name="ville"
-                          value={formData.ville}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          placeholder="Ville"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Situation professionnelle</label>
-                      <select
-                        name="situationProfessionnelle"
-                        value={formData.situationProfessionnelle}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent bg-white"
-                      >
-                        <option value="">Sélectionnez</option>
-                        <option value="SALARIE">Salarié(e)</option>
-                        <option value="INDEPENDANT">Indépendant(e) / Freelance</option>
-                        <option value="DEMANDEUR_EMPLOI">Demandeur d&apos;emploi</option>
-                        <option value="ETUDIANT">Étudiant(e)</option>
-                        <option value="RETRAITE">Retraité(e)</option>
-                        <option value="AUTRE">Autre</option>
-                      </select>
-                    </div>
-
-                    {(formData.situationProfessionnelle === "SALARIE" || formData.situationProfessionnelle === "INDEPENDANT") && (
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            {formData.situationProfessionnelle === "SALARIE" ? "Entreprise" : "Nom commercial"}
-                          </label>
-                          <input
-                            type="text"
-                            name="entreprise"
-                            value={formData.entreprise}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            {formData.situationProfessionnelle === "SALARIE" ? "Poste" : "SIRET"}
-                          </label>
-                          <input
-                            type="text"
-                            name={formData.situationProfessionnelle === "SALARIE" ? "poste" : "siret"}
-                            value={formData.situationProfessionnelle === "SALARIE" ? formData.poste : formData.siret}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* ========================================= */}
-            {/* ÉTAPE 4: HANDICAP & FINANCEMENT */}
-            {/* ========================================= */}
-            {step === 4 && (
-              <div className="space-y-6">
-                {/* Section Handicap - Obligatoire Qualiopi */}
-                <div className="p-5 border-2 border-purple-200 rounded-xl bg-purple-50/50">
+                {/* Adresse */}
+                <div className="pt-4 border-t">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                      <Accessibility className="w-5 h-5 text-purple-600" />
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${primaryColor}15` }}
+                    >
+                      <MapPin className="w-5 h-5" style={{ color: primaryColor }} />
                     </div>
                     <div>
-                      <h3 className="font-medium text-gray-900">Accessibilité (Qualiopi)</h3>
-                      <p className="text-sm text-gray-500">Information obligatoire pour adapter votre parcours</p>
+                      <h3 className="font-medium text-gray-900">Votre adresse</h3>
+                      <p className="text-sm text-gray-500">Adresse de résidence</p>
                     </div>
                   </div>
 
-                  <label className="flex items-start gap-3 cursor-pointer p-3 bg-white rounded-lg border border-purple-200 hover:border-purple-300 transition-colors">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Adresse *</label>
                     <input
-                      type="checkbox"
-                      name="situationHandicap"
-                      checked={formData.situationHandicap}
+                      type="text"
+                      name="adresse"
+                      value={formData.adresse}
                       onChange={handleChange}
-                      className="mt-1 w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                      placeholder="Numéro et nom de rue"
                     />
-                    <div>
-                      <span className="font-medium text-gray-900">Êtes-vous en situation de handicap ?</span>
-                      <p className="text-sm text-gray-500 mt-0.5">
-                        Cette information nous permet de vous proposer des aménagements adaptés
-                      </p>
-                    </div>
-                  </label>
+                  </div>
 
-                  {formData.situationHandicap && (
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Avez-vous besoin d&apos;aménagements spécifiques ?
-                      </label>
-                      <textarea
-                        name="besoinsAmenagements"
-                        value={formData.besoinsAmenagements}
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Code postal *</label>
+                      <input
+                        type="text"
+                        name="codePostal"
+                        value={formData.codePostal}
                         onChange={handleChange}
-                        rows={3}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        placeholder="Décrivez vos besoins : accessibilité PMR, supports adaptés, pauses régulières..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="75000"
                       />
                     </div>
-                  )}
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Ville *</label>
+                      <input
+                        type="text"
+                        name="ville"
+                        value={formData.ville}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                        placeholder="Ville"
+                      />
+                    </div>
+                  </div>
                 </div>
 
+                {/* Situation actuelle */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${primaryColor}15` }}
+                    >
+                      <Briefcase className="w-5 h-5" style={{ color: primaryColor }} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Votre situation</h3>
+                      <p className="text-sm text-gray-500">Situation professionnelle actuelle</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Situation actuelle *</label>
+                    <select
+                      name="situationActuelle"
+                      value={formData.situationActuelle}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent bg-white"
+                    >
+                      <option value="">Sélectionnez votre situation</option>
+                      <option value="SALARIE">Salarié(e)</option>
+                      <option value="DEMANDEUR_EMPLOI">Demandeur d&apos;emploi</option>
+                      <option value="ETUDIANT">Étudiant(e)</option>
+                      <option value="RETRAITE">Retraité(e)</option>
+                      <option value="EN_RECONVERSION">En reconversion professionnelle</option>
+                      <option value="AUTRE">Autre</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================= */}
+            {/* ÉTAPE 3: FINANCEMENT */}
+            {/* ========================================= */}
+            {step === 3 && (
+              <div className="space-y-6">
                 {/* Section Financement */}
                 <div>
                   <div className="flex items-center gap-3 mb-4">
@@ -1823,7 +2368,7 @@ function PreInscriptionModal({
 
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Commentaire sur le financement (optionnel)
+                      Informations complémentaires sur le financement (optionnel)
                     </label>
                     <textarea
                       name="commentaireFinancement"
@@ -1831,7 +2376,7 @@ function PreInscriptionModal({
                       onChange={handleChange}
                       rows={2}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                      placeholder="Précisions sur votre situation de financement..."
+                      placeholder="Écrivez ici vos précisions…"
                     />
                   </div>
                 </div>

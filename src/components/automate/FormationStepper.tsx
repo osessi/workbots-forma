@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-export type StepId = "contexte" | "fiche" | "slides" | "evaluations" | "documents";
+export type StepId = "contexte" | "fiche" | "slides" | "evaluations";
 
 interface Step {
   id: StepId;
@@ -9,12 +9,12 @@ interface Step {
   label: string;
 }
 
+// 4 étapes : la partie Documents est maintenant gérée dans la section Sessions
 const steps: Step[] = [
   { id: "contexte", number: 1, label: "Contexte" },
   { id: "fiche", number: 2, label: "Fiche pédagogique" },
   { id: "slides", number: 3, label: "Slides & Support" },
   { id: "evaluations", number: 4, label: "Évaluations" },
-  { id: "documents", number: 5, label: "Documents" },
 ];
 
 interface FormationStepperProps {

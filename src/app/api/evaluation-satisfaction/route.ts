@@ -66,15 +66,79 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier que la session existe et appartient à l'organisation
-    const session = await prisma.documentSession.findUnique({
+    // Chercher d'abord dans Session (nouveau modèle), puis dans DocumentSession (ancien modèle)
+    let sessionData: { organizationId: string; formateurId: string | null; documentSessionId?: string } | null = null;
+    let actualSessionId = sessionId; // L'ID à utiliser pour créer l'évaluation
+
+    // D'abord essayer le nouveau modèle Session
+    const newSession = await prisma.session.findUnique({
       where: { id: sessionId },
       select: {
         organizationId: true,
-        formateurId: true,  // Récupérer le formateur pour créer son évaluation
+        formateurId: true,
       },
     });
 
-    if (!session || session.organizationId !== user.organizationId) {
+    if (newSession && newSession.organizationId === user.organizationId) {
+      // C'est une Session, on doit trouver ou créer un DocumentSession associé
+      let documentSession = await prisma.documentSession.findFirst({
+        where: {
+          trainingSessionId: sessionId,
+          organizationId: user.organizationId,
+        },
+        select: { id: true },
+      });
+
+      if (!documentSession) {
+        // Créer un DocumentSession lié à cette Session
+        const session = await prisma.session.findUnique({
+          where: { id: sessionId },
+          include: { formation: true },
+        });
+
+        if (session) {
+          documentSession = await prisma.documentSession.create({
+            data: {
+              organizationId: user.organizationId,
+              formationId: session.formationId,
+              trainingSessionId: sessionId,
+              formateurId: session.formateurId,
+              status: "BROUILLON",
+            },
+            select: { id: true },
+          });
+        }
+      }
+
+      if (documentSession) {
+        actualSessionId = documentSession.id;
+        sessionData = {
+          organizationId: newSession.organizationId,
+          formateurId: newSession.formateurId,
+          documentSessionId: documentSession.id,
+        };
+      }
+    }
+
+    // Si pas trouvé dans Session, essayer DocumentSession (rétrocompatibilité)
+    if (!sessionData) {
+      const oldSession = await prisma.documentSession.findUnique({
+        where: { id: sessionId },
+        select: {
+          organizationId: true,
+          formateurId: true,
+        },
+      });
+
+      if (oldSession && oldSession.organizationId === user.organizationId) {
+        sessionData = {
+          organizationId: oldSession.organizationId,
+          formateurId: oldSession.formateurId,
+        };
+      }
+    }
+
+    if (!sessionData) {
       return NextResponse.json({ error: "Session non trouvée" }, { status: 404 });
     }
 
@@ -92,7 +156,7 @@ export async function POST(request: NextRequest) {
     const existingEvaluation = await prisma.evaluationSatisfaction.findUnique({
       where: {
         sessionId_apprenantId_type: {
-          sessionId,
+          sessionId: actualSessionId,
           apprenantId,
           type: type as EvaluationSatisfactionType,
         },
@@ -133,7 +197,7 @@ export async function POST(request: NextRequest) {
     const evaluation = await prisma.evaluationSatisfaction.create({
       data: {
         organizationId: user.organizationId,
-        sessionId,
+        sessionId: actualSessionId,
         apprenantId,
         type: type as EvaluationSatisfactionType,
         expiresAt,
@@ -153,12 +217,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Créer automatiquement une évaluation intervenant si formateur assigné et pas encore créée
-    if (session.formateurId) {
+    if (sessionData.formateurId) {
       const existingIntervenantEval = await prisma.evaluationIntervenant.findUnique({
         where: {
           sessionId_intervenantId: {
-            sessionId,
-            intervenantId: session.formateurId,
+            sessionId: actualSessionId,
+            intervenantId: sessionData.formateurId,
           },
         },
       });
@@ -167,8 +231,8 @@ export async function POST(request: NextRequest) {
         await prisma.evaluationIntervenant.create({
           data: {
             organizationId: user.organizationId,
-            sessionId,
-            intervenantId: session.formateurId,
+            sessionId: actualSessionId,
+            intervenantId: sessionData.formateurId,
             expiresAt,
             sentAt: new Date(),
           },
@@ -179,8 +243,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(evaluation, { status: 201 });
   } catch (error) {
     console.error("Erreur création évaluation satisfaction:", error);
+    // Renvoyer plus de détails pour le debug
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return NextResponse.json(
-      { error: "Erreur lors de la création de l'évaluation" },
+      { error: `Erreur lors de la création de l'évaluation: ${errorMessage}` },
       { status: 500 }
     );
   }

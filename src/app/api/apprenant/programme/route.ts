@@ -66,9 +66,9 @@ export async function GET(request: NextRequest) {
             modules: {
               orderBy: { ordre: "asc" },
             },
-            // Récupérer les évaluations de positionnement pour savoir si Module 0 doit être affiché
+            // Récupérer TOUTES les évaluations (QCM, ateliers, positionnement, évaluation finale)
             evaluations: {
-              where: { type: "POSITIONNEMENT" },
+              orderBy: { ordre: "asc" },
               include: {
                 resultats: {
                   where: { apprenantId },
@@ -85,7 +85,8 @@ export async function GET(request: NextRequest) {
 
     // Vérifier si l'apprenant a besoin du Module 0 (score positionnement < 10%)
     const SEUIL_ADAPTATION = 10;
-    const positionnementResultat = inscription?.formation?.evaluations?.[0]?.resultats?.[0];
+    const positionnementEval = inscription?.formation?.evaluations?.find(e => e.type === "POSITIONNEMENT");
+    const positionnementResultat = positionnementEval?.resultats?.[0];
     const needsModuleZero = positionnementResultat && positionnementResultat.score !== null && positionnementResultat.score < SEUIL_ADAPTATION;
 
     if (!inscription) {
@@ -143,13 +144,92 @@ export async function GET(request: NextRequest) {
     // Calculer la durée totale (exclure Module 0)
     const dureeHeures = modulesStandard.reduce((sum, m) => sum + ((m.duree || 0) / 60), 0);
 
+    // Récupérer les données de la fiche pédagogique
+    const fichePedagogique = inscription.formation.fichePedagogique as {
+      objectifs?: string[];
+      contenu?: string;
+      methodsPedagogiques?: string[];
+      supportsPedagogiques?: Array<{ nom: string; url?: string; type: string }>;
+      methodesEvaluation?: string[];
+      accessibiliteHandicap?: string;
+    } | null;
+
+    // Récupérer les slides/supports par module
+    const slidesData = inscription.formation.slidesData as Array<{
+      moduleId?: string;
+      moduleTitre?: string;
+      exportUrl?: string;
+      editUrl?: string;
+      driveUrl?: string;
+      status?: string;
+    }> | null;
+
+    // Mapper les évaluations pour l'apprenant (sans exposer les bonnes réponses sauf si déjà complété)
+    const evaluationsApprenant = inscription.formation.evaluations.map((evaluation) => {
+      const resultat = evaluation.resultats?.[0];
+      const estComplete = resultat?.status === "termine" || resultat?.status === "valide";
+
+      // Parser le contenu de l'évaluation
+      const contenu = evaluation.contenu as {
+        questions?: Array<{
+          question: string;
+          options?: string[];
+          correctAnswer?: number;
+          explanation?: string;
+        }>;
+        consignes?: string;
+        objectifs?: string[];
+        livrables?: string[];
+        critereEvaluation?: string[];
+      } | null;
+
+      return {
+        id: evaluation.id,
+        type: evaluation.type,
+        titre: evaluation.titre,
+        description: evaluation.description,
+        dureeEstimee: evaluation.dureeEstimee,
+        nombreQuestions: evaluation.nombreQuestions,
+        tempsLimite: evaluation.tempsLimite,
+        scoreMinimum: evaluation.scoreMinimum,
+        moduleId: evaluation.moduleId,
+        ordre: evaluation.ordre,
+        // Contenu des questions (masquer les réponses si pas encore complété)
+        questions: contenu?.questions?.map((q) => ({
+          question: q.question,
+          options: q.options,
+          // Ne montrer la bonne réponse que si l'évaluation est terminée
+          correctAnswer: estComplete ? q.correctAnswer : undefined,
+          explanation: estComplete ? q.explanation : undefined,
+        })),
+        // Pour les ateliers
+        consignes: contenu?.consignes,
+        objectifs: contenu?.objectifs,
+        livrables: contenu?.livrables,
+        critereEvaluation: contenu?.critereEvaluation,
+        // Résultat de l'apprenant
+        resultat: resultat ? {
+          score: resultat.score,
+          status: resultat.status,
+          tentative: resultat.tentative,
+          completedAt: resultat.completedAt,
+          feedbackFormateur: resultat.feedbackFormateur,
+        } : null,
+      };
+    });
+
     return NextResponse.json({
       formation: {
         id: inscription.formation.id,
         titre: inscription.formation.titre,
         description: inscription.formation.description,
         dureeHeures,
-        objectifsPedagogiques: [],
+        objectifsPedagogiques: fichePedagogique?.objectifs || [],
+        contenuPedagogique: fichePedagogique?.contenu || null,
+        methodsPedagogiques: fichePedagogique?.methodsPedagogiques || [],
+        supportsPedagogiques: fichePedagogique?.supportsPedagogiques || [],
+        methodesEvaluation: fichePedagogique?.methodesEvaluation || [],
+        accessibiliteHandicap: fichePedagogique?.accessibiliteHandicap || null,
         modalite: null,
         publicCible: null,
         prerequis: null,
@@ -157,6 +237,10 @@ export async function GET(request: NextRequest) {
         reference: null,
       },
       modules: modulesAvecProgression,
+      // Slides/Supports par module
+      slides: slidesData || [],
+      // Évaluations disponibles pour l'apprenant
+      evaluations: evaluationsApprenant,
       progression: {
         global: inscription.progression || progressionGlobale,
         modulesTermines,

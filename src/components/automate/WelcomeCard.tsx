@@ -35,7 +35,7 @@ export const WelcomeCard: React.FC = () => {
           </div>
         </div>
         <Link
-          href="/automate/create"
+          href="/automate/import"
           className="inline-flex items-center gap-2 px-5 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:scale-[0.98] transition-all shadow-sm hover:shadow-md"
         >
           <PlusIcon />

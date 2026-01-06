@@ -100,18 +100,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             },
           },
         },
-        // Résultats d'évaluations
-        evaluationResultats: {
-          orderBy: { createdAt: "desc" },
-          take: 10,
-          include: {
-            evaluation: {
-              select: {
-                id: true,
-                titre: true,
-                type: true,
-              },
-            },
+        // Compter les documents liés à l'apprenant
+        _count: {
+          select: {
+            documents: true,
           },
         },
         // Organisation
@@ -155,7 +147,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         (p) => p.client.session.status === "TERMINEE"
       ).length,
       totalFormationsLMS: apprenant.lmsInscriptions.length,
-      totalEvaluations: apprenant.evaluationResultats.length,
+      totalDocuments: apprenant._count.documents,
     };
 
     return NextResponse.json({

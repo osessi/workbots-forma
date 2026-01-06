@@ -184,6 +184,19 @@ Génère un document de corrélation complet et professionnel conforme aux exige
       );
     }
 
+    // Forcer la date de génération correcte (format français)
+    const now = new Date();
+    const dateGeneration = now.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
+    // S'assurer que la date de génération est correcte dans la réponse
+    if (parsedResponse.formation) {
+      parsedResponse.formation.dateGeneration = dateGeneration;
+    }
+
     // Valider la réponse
     const validatedResponse = CorrelationResponseSchema.safeParse(parsedResponse);
     if (!validatedResponse.success) {
@@ -199,6 +212,9 @@ Génère un document de corrélation complet et professionnel conforme aux exige
         },
       });
     }
+
+    // Forcer également la date dans les données validées
+    validatedResponse.data.formation.dateGeneration = dateGeneration;
 
     // Extraire les tokens de l'usage
     const usage = response.usage as { promptTokens?: number; completionTokens?: number; totalTokens?: number } | undefined;

@@ -509,7 +509,6 @@ function PreInscriptionDetailModal({
   ) => void;
   updating: boolean;
 }) {
-  const [noteInterne, setNoteInterne] = useState(preInscription.noteInterne || "");
   const [motifRefus, setMotifRefus] = useState(preInscription.motifRefus || "");
   const [showRefusForm, setShowRefusForm] = useState(false);
 
@@ -517,7 +516,6 @@ function PreInscriptionDetailModal({
 
   const handleAccept = () => {
     onUpdateStatut(preInscription.id, "ACCEPTEE", {
-      noteInterne,
       convertirEnApprenant: true,
     });
   };
@@ -528,13 +526,12 @@ function PreInscriptionDetailModal({
       return;
     }
     onUpdateStatut(preInscription.id, "REFUSEE", {
-      noteInterne,
       motifRefus,
     });
   };
 
   const handleEnTraitement = () => {
-    onUpdateStatut(preInscription.id, "EN_TRAITEMENT", { noteInterne });
+    onUpdateStatut(preInscription.id, "EN_TRAITEMENT");
   };
 
   // Vérifier si une section a des données
@@ -869,21 +866,6 @@ function PreInscriptionDetailModal({
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* ========================================= */}
-          {/* NOTE INTERNE (pour l'équipe) */}
-          {/* ========================================= */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <Section title="Note interne" icon={FileText}>
-              <textarea
-                value={noteInterne}
-                onChange={(e) => setNoteInterne(e.target.value)}
-                placeholder="Ajoutez une note interne (visible uniquement par votre équipe)..."
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              />
-            </Section>
           </div>
 
           {/* Formulaire de refus */}

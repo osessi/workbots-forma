@@ -1,12 +1,11 @@
 "use client";
 import { useState, useCallback, useEffect, Suspense, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import FormationStepper, { StepId } from "@/components/automate/FormationStepper";
 import StepContexte from "@/components/automate/steps/StepContexte";
 import StepFichePedagogique from "@/components/automate/steps/StepFichePedagogique";
 import StepSlidesSupport from "@/components/automate/steps/StepSlidesSupport";
 import StepEvaluations, { EvaluationsDataSaved } from "@/components/automate/steps/StepEvaluations";
-import { DocumentsWizard, WizardData, FormationInfo } from "@/components/documents/wizard";
 import { useAutomate } from "@/context/AutomateContext";
 
 // Composant de chargement pour le Suspense
@@ -33,8 +32,10 @@ Attestation de fin de formation délivrée aux participants ayant suivi l'intég
 
 const FIXED_RESSOURCES_PEDAGOGIQUES = `Formation réalisée en présentiel (en salle équipée, en intra-entreprise) ou à distance via un outil de visioconférence (en classe virtuelle synchrone)
 Accompagnement par le formateur : suivi individualisé et réponses aux questions tout au long de la formation
-Ateliers pratiques : mises en situation et exercices appliqués pour ancrer les compétences
+Ateliers pratiques ou QCM pour valider les acquis des modules de formation
 Supports de cours remis aux participants (version numérique et/ou papier)`;
+
+const FIXED_EQUIPE_PEDAGOGIQUE = `Experts Forma réunit une équipe de formateurs expérimentés, sélectionnés pour leur expertise métier et leur pédagogie. Notre objectif : proposer des formations structurées et orientées résultats, avec un accompagnement de qualité tout au long du parcours.`;
 
 const FIXED_DELAI_ACCES = `Le délai d'accès à la formation est de 4 semaines à compter de la validation de la demande de formation.`;
 
@@ -54,6 +55,8 @@ const initialContexteData = {
   numeroFicheRS: "",
   referentielRSUrl: "",
   lienFranceCompetences: "",
+  // Éligibilité CPF
+  estEligibleCPF: false,
 };
 
 // Données initiales vides pour la fiche pédagogique (sera rempli par l'IA)
@@ -72,6 +75,7 @@ const initialFicheData = {
   prerequis: "",
   publicVise: "",
   suiviEvaluation: FIXED_SUIVI_EVALUATION,
+  equipePedagogique: FIXED_EQUIPE_PEDAGOGIQUE,
   ressourcesPedagogiques: FIXED_RESSOURCES_PEDAGOGIQUES,
   delaiAcces: FIXED_DELAI_ACCES,
   imageUrl: "",
@@ -110,6 +114,7 @@ interface FichePedagogiqueGeneree {
 
 function CreateFormationContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const editFormationId = searchParams.get("id");
   const { refreshFormations } = useAutomate();
 
@@ -257,6 +262,71 @@ function CreateFormationContent() {
     };
   }, []);
 
+  // Synchroniser les modules quand le contenu de la fiche pédagogique change (Corrections 166-167)
+  // Ceci assure que les modules affichés dans "Évaluations par module" correspondent
+  // toujours aux modules définis dans le "Contenu de la formation"
+  useEffect(() => {
+    if (!ficheData.contenu || ficheData.contenu.trim() === "") return;
+
+    // Parser le contenu pour extraire les modules
+    const parseModulesFromContenu = (contenu: string) => {
+      const parsedModules: Array<{ id: string; titre: string; contenu: string[]; isModuleZero?: boolean }> = [];
+      const lines = contenu.split("\n");
+      let currentModule: { id: string; titre: string; contenu: string[]; isModuleZero?: boolean } | null = null;
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+
+        // Détecter un titre de module (ex: "Module 1 - Introduction à..." ou "Module 0 - Mise à niveau")
+        const moduleMatch = trimmedLine.match(/^Module\s*(\d+)\s*[-–:]\s*(.+)/i);
+        if (moduleMatch) {
+          // Sauvegarder le module précédent
+          if (currentModule && currentModule.titre) {
+            parsedModules.push(currentModule);
+          }
+
+          const moduleNum = parseInt(moduleMatch[1]);
+          const moduleTitre = trimmedLine; // Garder le titre complet "Module X - Titre"
+          const isModuleZero = moduleNum === 0;
+
+          currentModule = {
+            id: String(moduleNum),
+            titre: moduleTitre,
+            contenu: [],
+            isModuleZero,
+          };
+        } else if (currentModule) {
+          // Ajouter le contenu au module courant (retirer le bullet point si présent)
+          const cleanedLine = trimmedLine.replace(/^[•\-\*]\s*/, "").trim();
+          if (cleanedLine) {
+            currentModule.contenu.push(cleanedLine);
+          }
+        }
+      }
+
+      // Ajouter le dernier module
+      if (currentModule && currentModule.titre) {
+        parsedModules.push(currentModule);
+      }
+
+      return parsedModules;
+    };
+
+    const parsedModules = parseModulesFromContenu(ficheData.contenu);
+
+    // Ne mettre à jour que si on a trouvé des modules ET que c'est différent
+    if (parsedModules.length > 0) {
+      // Comparer avec les modules actuels pour éviter les updates inutiles
+      const currentModulesStr = JSON.stringify(modules.map(m => ({ id: m.id, titre: m.titre })));
+      const parsedModulesStr = JSON.stringify(parsedModules.map(m => ({ id: m.id, titre: m.titre })));
+
+      if (currentModulesStr !== parsedModulesStr) {
+        setModules(parsedModules);
+      }
+    }
+  }, [ficheData.contenu, modules]);
+
   // Charger une formation existante si on est en mode édition
   useEffect(() => {
     if (editFormationId) {
@@ -295,6 +365,8 @@ function CreateFormationContent() {
             numeroFicheRS: String(savedContexte.numeroFicheRS || formation.numeroFicheRS || ""),
             referentielRSUrl: String(savedContexte.referentielRSUrl || formation.referentielRSUrl || ""),
             lienFranceCompetences: String(savedContexte.lienFranceCompetences || formation.lienFranceCompetences || ""),
+            // Éligibilité CPF
+            estEligibleCPF: Boolean(savedContexte.estEligibleCPF) || false,
           });
         } else {
           // Ancien format: extraire depuis fichePedagogique
@@ -313,6 +385,8 @@ function CreateFormationContent() {
             numeroFicheRS: String(fiche.numeroFicheRS || formation.numeroFicheRS || ""),
             referentielRSUrl: String(fiche.referentielRSUrl || formation.referentielRSUrl || ""),
             lienFranceCompetences: String(fiche.lienFranceCompetences || formation.lienFranceCompetences || ""),
+            // Éligibilité CPF
+            estEligibleCPF: Boolean(fiche.estEligibleCPF) || false,
           });
         }
 
@@ -354,6 +428,7 @@ function CreateFormationContent() {
           prerequis: fiche.prerequis as string || "",
           publicVise: fiche.publicVise as string || "",
           suiviEvaluation: fiche.suiviEvaluation as string || FIXED_SUIVI_EVALUATION,
+          equipePedagogique: fiche.equipePedagogique as string || FIXED_EQUIPE_PEDAGOGIQUE,
           ressourcesPedagogiques: fiche.ressourcesPedagogiques as string || FIXED_RESSOURCES_PEDAGOGIQUES,
           delaiAcces: fiche.delaiAcces as string || initialFicheData.delaiAcces,
           imageUrl: formation.image || "",
@@ -612,6 +687,7 @@ function CreateFormationContent() {
           tarifParticulier: tarifParticulierFormate,
           accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
           suiviEvaluation: FIXED_SUIVI_EVALUATION,
+          equipePedagogique: FIXED_EQUIPE_PEDAGOGIQUE,
           ressourcesPedagogiques: FIXED_RESSOURCES_PEDAGOGIQUES,
           contenu: contenuModules,
           delaiAcces: FIXED_DELAI_ACCES,
@@ -665,6 +741,7 @@ function CreateFormationContent() {
           tarifParticulier: tarifParticulierFormate,
           accessibilite: "Nous faisons notre possible pour rendre nos formations accessibles à tous. En cas de besoins particuliers, merci de nous en informer en amont afin que nous puissions envisager les aménagements nécessaires.",
           suiviEvaluation: FIXED_SUIVI_EVALUATION,
+          equipePedagogique: FIXED_EQUIPE_PEDAGOGIQUE,
           ressourcesPedagogiques: FIXED_RESSOURCES_PEDAGOGIQUES,
           contenu: contenuModules,
           delaiAcces: FIXED_DELAI_ACCES,
@@ -693,37 +770,35 @@ function CreateFormationContent() {
     }
   }, [goToNextStep]);
 
-  // Fonction pour obtenir les infos de la formation pour le wizard Documents
-  const getFormationInfo = useCallback((): FormationInfo => {
-    // Parser les tarifs depuis les chaînes (ex: "1500 € HT" -> 1500)
-    const parseTarif = (tarifStr: string): number => {
-      if (!tarifStr) return 0;
-      const match = tarifStr.match(/(\d+)/);
-      return match ? parseInt(match[1]) : 0;
-    };
-
-    return {
-      id: formationId || undefined,
-      titre: ficheData.titre || "Formation",
-      tarifEntreprise: parseTarif(ficheData.tarifEntreprise) || parseInt(contexteData.tarifEntreprise) || 0,
-      tarifIndependant: parseTarif(ficheData.tarifIndependant) || parseInt(contexteData.tarifIndependant) || 0,
-      tarifParticulier: parseTarif(ficheData.tarifParticulier) || parseInt(contexteData.tarifParticulier) || 0,
-      dureeHeures: parseInt(contexteData.dureeHeures) || 14,
-      dureeJours: parseInt(contexteData.dureeJours) || 2,
-    };
-  }, [formationId, ficheData, contexteData]);
-
-  // Callback quand la génération de documents est terminée
-  const handleDocumentsComplete = useCallback(async (data: WizardData, selectedDocs: string[]) => {
-    console.log("Documents wizard complete:", data);
-    console.log("Documents sélectionnés:", selectedDocs);
-
-    // TODO: Implémenter la génération réelle des documents
-    // Pour l'instant, marquer l'étape comme terminée
-    if (!completedSteps.includes("documents")) {
-      setCompletedSteps([...completedSteps, "documents"]);
+  // Handler pour créer une session à la fin du wizard
+  const handleCreateSession = useCallback(async () => {
+    // Marquer l'étape évaluations comme terminée
+    if (!completedSteps.includes("evaluations")) {
+      setCompletedSteps([...completedSteps, "evaluations"]);
     }
-  }, [completedSteps]);
+
+    // Sauvegarder la formation si nécessaire
+    if (formationId) {
+      await saveFormation(ficheData.titre, ficheData, modules);
+
+      // Publier automatiquement la formation au catalogue
+      try {
+        await fetch(`/api/formations/${formationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            estPublieCatalogue: true,
+            status: "complete" // Marquer la formation comme terminée
+          }),
+        });
+      } catch (error) {
+        console.error("Erreur lors de la publication au catalogue:", error);
+      }
+    }
+
+    // Rediriger vers la page de création de session avec l'ID de la formation
+    router.push(`/automate/sessions?create=true&formationId=${formationId}`);
+  }, [completedSteps, formationId, ficheData, modules, saveFormation, router]);
 
   // Handler pour la sauvegarde des slides générés
   const handleSlidesGenerated = useCallback((slidesData: { moduleId: string; moduleTitre: string; gammaUrl?: string; exportUrl?: string; status: string }[]) => {
@@ -765,6 +840,7 @@ function CreateFormationContent() {
           onNext={() => goToNextStep("contexte", "fiche")}
           onGenerateFiche={handleGenerateFiche}
           isGenerating={isGeneratingFiche}
+          hasAdvancedProgress={completedSteps.includes("slides") || completedSteps.includes("evaluations") || evaluationsData !== null}
         />
       )}
 
@@ -804,15 +880,8 @@ function CreateFormationContent() {
           formationObjectifs={ficheData.objectifs}
           initialData={evaluationsData || undefined}
           onDataChange={setEvaluationsData}
-          onNext={() => goToNextStep("evaluations", "documents")}
+          onNext={handleCreateSession}
           onPrevious={() => goToPreviousStep("slides")}
-        />
-      )}
-
-      {currentStep === "documents" && (
-        <DocumentsWizard
-          formation={getFormationInfo()}
-          onComplete={handleDocumentsComplete}
         />
       )}
     </div>

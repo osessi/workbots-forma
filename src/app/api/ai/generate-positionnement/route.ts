@@ -19,6 +19,7 @@ const RequestSchema = z.object({
   prerequis: z.array(z.string()).default([]),
   publicCible: z.string().default("Professionnels"),
   modules: z.array(ModuleSchema).optional(),
+  regenerate: z.string().optional(), // Token pour forcer la régénération avec des questions différentes
 });
 
 export async function POST(request: NextRequest) {
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
       objectifs,
       prerequis,
       publicCible: data.publicCible,
+      regenerateToken: data.regenerate, // Passer le token pour forcer la variation
     });
 
     if (!result.success) {

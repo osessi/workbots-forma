@@ -218,3 +218,132 @@ export async function POST(
     );
   }
 }
+
+// DELETE - Supprimer un fichier (photo ou CV)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: intervenantId } = await params;
+
+    // Client pour vérifier l'auth de l'utilisateur
+    const cookieStore = await cookies();
+    const authClient = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore errors in Server Components
+            }
+          },
+        },
+      }
+    );
+
+    // Client admin pour le storage (bypass RLS)
+    const adminClient = getAdminClient();
+
+    // Vérifier l'authentification
+    const {
+      data: { user: supabaseUser },
+      error: authError,
+    } = await authClient.auth.getUser();
+
+    if (authError || !supabaseUser) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
+    // Récupérer l'utilisateur et son organisation
+    const user = await prisma.user.findUnique({
+      where: { supabaseId: supabaseUser.id },
+      select: { organizationId: true },
+    });
+
+    if (!user?.organizationId) {
+      return NextResponse.json(
+        { error: "Organisation non trouvée" },
+        { status: 404 }
+      );
+    }
+
+    // Vérifier que l'intervenant appartient à l'organisation
+    const intervenant = await prisma.intervenant.findFirst({
+      where: {
+        id: intervenantId,
+        organizationId: user.organizationId,
+      },
+    });
+
+    if (!intervenant) {
+      return NextResponse.json(
+        { error: "Intervenant non trouvé" },
+        { status: 404 }
+      );
+    }
+
+    // Récupérer le type de fichier à supprimer (photo ou cv)
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get("type") as "photo" | "cv";
+
+    if (!type || !["photo", "cv"].includes(type)) {
+      return NextResponse.json(
+        { error: "Type de fichier non spécifié (photo ou cv)" },
+        { status: 400 }
+      );
+    }
+
+    // Récupérer le chemin du fichier actuel
+    const currentUrl = type === "photo" ? intervenant.photoUrl : intervenant.cv;
+
+    if (currentUrl) {
+      // Extraire le chemin du fichier depuis l'URL proxy
+      // Format: /api/fichiers/intervenants-photos/org_id/intervenant_id_timestamp.ext
+      const pathMatch = currentUrl.match(/\/api\/fichiers\/(.+)$/);
+      if (pathMatch) {
+        const storagePath = pathMatch[1];
+        console.log("Deleting file from storage:", storagePath);
+
+        // Supprimer le fichier du storage
+        const { error: deleteError } = await adminClient.storage
+          .from(STORAGE_BUCKET)
+          .remove([storagePath]);
+
+        if (deleteError) {
+          console.error("Storage delete error:", deleteError);
+          // On continue même si la suppression du fichier échoue
+        }
+      }
+    }
+
+    // Mettre à jour l'intervenant pour supprimer l'URL
+    const updateData = type === "photo" ? { photoUrl: null } : { cv: null };
+
+    await prisma.intervenant.update({
+      where: { id: intervenantId },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: type === "photo" ? "Photo supprimée" : "CV supprimé",
+    });
+  } catch (error) {
+    console.error("Intervenant file delete error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Erreur inconnue";
+    return NextResponse.json(
+      { error: `Erreur lors de la suppression: ${errorMessage}` },
+      { status: 500 }
+    );
+  }
+}

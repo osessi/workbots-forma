@@ -53,6 +53,7 @@ export async function GET() {
       organization: user.organization ? {
         id: user.organization.id,
         name: user.organization.name,
+        nomCommercial: user.organization.nomCommercial,
         slug: user.organization.slug,
         plan: user.organization.plan,
         siret: user.organization.siret,
@@ -66,6 +67,9 @@ export async function GET() {
         logo: user.organization.logo,
         signature: user.organization.signature,
         primaryColor: user.organization.primaryColor,
+        // Custom domain
+        customDomain: user.organization.customDomain,
+        customDomainVerified: user.organization.customDomainVerified,
       } : null,
     });
   } catch (error) {

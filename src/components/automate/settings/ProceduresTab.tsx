@@ -689,7 +689,7 @@ Cette procédure définit le maintien et le développement des compétences des 
             Procédures de l&apos;organisme
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Qualiopi IND 26 - Documentez vos procédures qualité
+            Renseignez les procédures de votre organisme de formation.
           </p>
         </div>
         {data && (
@@ -766,8 +766,17 @@ Cette procédure définit le maintien et le développement des compétences des 
                       <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
                         {proc.indicateur}
                       </span>
-                      {proc.version > 0 && <span>v{proc.version}</span>}
-                      {proc.versionsCount > 0 && (
+                      {proc.version > 0 && (
+                        <span>
+                          v{proc.version}
+                          {proc.updatedAt && (
+                            <span className="ml-1 text-gray-400">
+                              - Modifié le {new Date(proc.updatedAt).toLocaleDateString("fr-FR")}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {proc.versionsCount > 1 && (
                         <span className="flex items-center gap-1">
                           <History size={10} />
                           {proc.versionsCount} versions

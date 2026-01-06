@@ -61,12 +61,66 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier que la session existe et appartient à l'organisation
-    const session = await prisma.documentSession.findUnique({
+    // Chercher d'abord dans Session (nouveau modèle), puis dans DocumentSession (ancien modèle)
+    let sessionData: { organizationId: string } | null = null;
+    let actualSessionId = sessionId;
+
+    // D'abord essayer le nouveau modèle Session
+    const newSession = await prisma.session.findUnique({
       where: { id: sessionId },
       select: { organizationId: true },
     });
 
-    if (!session || session.organizationId !== user.organizationId) {
+    if (newSession && newSession.organizationId === user.organizationId) {
+      // C'est une Session, on doit trouver ou créer un DocumentSession associé
+      let documentSession = await prisma.documentSession.findFirst({
+        where: {
+          trainingSessionId: sessionId,
+          organizationId: user.organizationId,
+        },
+        select: { id: true },
+      });
+
+      if (!documentSession) {
+        // Créer un DocumentSession lié à cette Session
+        const session = await prisma.session.findUnique({
+          where: { id: sessionId },
+          include: { formation: true },
+        });
+
+        if (session) {
+          documentSession = await prisma.documentSession.create({
+            data: {
+              organizationId: user.organizationId,
+              formationId: session.formationId,
+              trainingSessionId: sessionId,
+              formateurId: session.formateurId,
+              status: "BROUILLON",
+            },
+            select: { id: true },
+          });
+        }
+      }
+
+      if (documentSession) {
+        actualSessionId = documentSession.id;
+        sessionData = { organizationId: newSession.organizationId };
+      }
+    }
+
+    // Si pas trouvé dans Session, essayer DocumentSession (rétrocompatibilité)
+    if (!sessionData) {
+      const oldSession = await prisma.documentSession.findUnique({
+        where: { id: sessionId },
+        select: { organizationId: true },
+      });
+
+      if (oldSession && oldSession.organizationId === user.organizationId) {
+        sessionData = { organizationId: oldSession.organizationId };
+      }
+    }
+
+    if (!sessionData) {
       return NextResponse.json({ error: "Session non trouvée" }, { status: 404 });
     }
 
@@ -84,7 +138,7 @@ export async function POST(request: NextRequest) {
     const existingEvaluation = await prisma.evaluationIntervenant.findUnique({
       where: {
         sessionId_intervenantId: {
-          sessionId,
+          sessionId: actualSessionId,
           intervenantId,
         },
       },
@@ -118,7 +172,7 @@ export async function POST(request: NextRequest) {
     const evaluation = await prisma.evaluationIntervenant.create({
       data: {
         organizationId: user.organizationId,
-        sessionId,
+        sessionId: actualSessionId,
         intervenantId,
         expiresAt,
         sentAt: new Date(),
@@ -139,8 +193,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(evaluation, { status: 201 });
   } catch (error) {
     console.error("Erreur création évaluation intervenant:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return NextResponse.json(
-      { error: "Erreur lors de la création de l'évaluation" },
+      { error: `Erreur lors de la création de l'évaluation: ${errorMessage}` },
       { status: 500 }
     );
   }

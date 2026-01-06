@@ -302,7 +302,7 @@ export default function ConfigureSessionPage({
               Configurez votre session en quelques étapes
             </p>
             <p className="text-sm text-brand-600 dark:text-brand-400 mt-1">
-              Ajoutez les clients et participants, définissez les tarifs et financements,
+              Ajoutez les clients et participants, définissez les tarifs,
               puis générez tous les documents administratifs de votre session.
             </p>
           </div>

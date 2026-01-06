@@ -375,10 +375,10 @@ export default function StepTarifs({
           </div>
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Tarifs & Financement
+              Tarifs
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Définissez le tarif par client et les éventuels financements externes
+              Définissez le tarif pour chaque client et, si besoin, ajoutez un financeur.
             </p>
           </div>
         </div>
@@ -485,10 +485,10 @@ export default function StepTarifs({
                     )}
                   </div>
 
-                  {/* 2. Financements */}
+                  {/* 2. Financeur */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      Financements
+                      Financeur
                     </label>
                     <button
                       onClick={() => openFinanceurModal(client.id)}
@@ -561,15 +561,16 @@ export default function StepTarifs({
                             min="0"
                             max={tarif.tarifHT}
                             step="0.01"
-                            value={financement.montant || ""}
-                            onChange={(e) =>
+                            value={financement.montant}
+                            onChange={(e) => {
+                              const value = e.target.value;
                               updateFinancementMontant(
                                 client.id,
                                 financement.id,
-                                Math.min(parseFloat(e.target.value) || 0, tarif.tarifHT)
-                              )
-                            }
-                            className="w-full pr-8 py-1.5 text-sm border border-green-300 rounded bg-white focus:ring-green-500 focus:border-green-500 dark:border-green-700 dark:bg-green-900/30 dark:text-white"
+                                value === "" ? 0 : Math.min(parseFloat(value) || 0, tarif.tarifHT)
+                              );
+                            }}
+                            className="w-full pl-3 pr-8 py-1.5 text-sm border border-green-300 rounded bg-white focus:ring-green-500 focus:border-green-500 dark:border-green-700 dark:bg-green-900/30 dark:text-white"
                             placeholder="Montant"
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600 text-xs">€</span>

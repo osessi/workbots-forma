@@ -49,12 +49,12 @@ const POSTE_STYLES: Record<OrganigrammePoste["type"], { bg: string; text: string
 
 const POSTE_LABELS: Record<OrganigrammePoste["type"], string> = {
   DIRIGEANT: "Dirigeant",
-  REFERENT_HANDICAP: "Referent Handicap",
-  REFERENT_PEDAGOGIQUE: "Referent Pedagogique",
-  REFERENT_QUALITE: "Referent Qualite",
+  REFERENT_HANDICAP: "Référent Handicap",
+  REFERENT_PEDAGOGIQUE: "Référent Pédagogique",
+  REFERENT_QUALITE: "Référent Qualité",
   FORMATEUR: "Formateur",
   ADMINISTRATIF: "Administratif",
-  AUTRE: "Equipe",
+  AUTRE: "Équipe",
 };
 
 // Composant carte de poste pyramidale
@@ -162,17 +162,17 @@ export default function AProposPage() {
 
   const levels = Object.keys(postesByLevel).map(Number).sort((a, b) => a - b);
 
-  const LEVEL_LABELS = ["Direction", "Referents", "Equipe", "Support"];
+  const LEVEL_LABELS = ["Direction", "Référents", "Équipe", "Support"];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          A propos
+          À propos
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Informations sur votre organisme de formation
+          Informations sur l&apos;organisme de formation
         </p>
       </div>
 
@@ -213,12 +213,12 @@ export default function AProposPage() {
 
         {/* Contenu */}
         <div className="p-6">
-          {/* Coordonnees */}
+          {/* Coordonnées */}
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <div className="space-y-4">
               <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-brand-500" />
-                Coordonnees
+                Coordonnées
               </h3>
 
               {organization?.adresse && (
@@ -274,7 +274,7 @@ export default function AProposPage() {
                   <Shield className="w-5 h-5 text-brand-600 dark:text-brand-400" />
                   <div>
                     <p className="text-xs text-brand-600 dark:text-brand-400 font-medium">
-                      Numero de declaration d&apos;activite
+                      Numéro de déclaration d&apos;activité
                     </p>
                     <p className="text-sm font-semibold text-brand-700 dark:text-brand-300">
                       {organization.numeroFormateur}
@@ -319,10 +319,10 @@ export default function AProposPage() {
           <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
             <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Users className="w-5 h-5 text-brand-500" />
-              Notre equipe
+              Notre équipe
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              L&apos;equipe a votre service pour votre reussite
+              L&apos;équipe à votre service pour votre réussite
             </p>
           </div>
 
@@ -366,18 +366,18 @@ export default function AProposPage() {
             </div>
           </div>
 
-          {/* Info referent handicap */}
+          {/* Info référent handicap */}
           {organigramme.some(p => p.type === "REFERENT_HANDICAP") && (
             <div className="mx-6 mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
               <div className="flex items-start gap-3">
                 <Accessibility className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Accessibilite et handicap
+                    Accessibilité et handicap
                   </p>
                   <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    Notre referent handicap est a votre disposition pour adapter votre parcours de formation
-                    a vos besoins specifiques. N&apos;hesitez pas a le contacter.
+                    Notre référent handicap est à votre disposition pour adapter votre parcours de formation
+                    à vos besoins spécifiques. N&apos;hésitez pas à le contacter.
                   </p>
                 </div>
               </div>
@@ -386,11 +386,11 @@ export default function AProposPage() {
         </motion.div>
       )}
 
-      {/* Documents legaux */}
+      {/* Documents légaux */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5 text-brand-500" />
-          Documents legaux
+          Documents légaux
         </h3>
         <div className="grid md:grid-cols-2 gap-3">
           <a
@@ -400,10 +400,10 @@ export default function AProposPage() {
             <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Reglement interieur
+                Règlement intérieur
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Consultez les regles de la formation
+                Consultez les règles de la formation
               </p>
             </div>
           </a>
@@ -414,7 +414,7 @@ export default function AProposPage() {
             <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Conditions generales
+                Conditions générales
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 CGV et conditions de formation
@@ -428,10 +428,10 @@ export default function AProposPage() {
             <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Politique de confidentialite
+                Politique de confidentialité
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Protection de vos donnees
+                Protection de vos données
               </p>
             </div>
           </a>
@@ -442,10 +442,10 @@ export default function AProposPage() {
             <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Mentions legales
+                Mentions légales
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Informations legales
+                Informations légales
               </p>
             </div>
           </a>

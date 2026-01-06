@@ -54,6 +54,7 @@ interface DashboardStats {
   documentsDisponibles: number;
   emargementsEnAttente: number;
   prochainsCréneaux: number;
+  messagesNonLus?: number;
 }
 
 // Qualiopi IND 3 - Certification obtenue par l'apprenant

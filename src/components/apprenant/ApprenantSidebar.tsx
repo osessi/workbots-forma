@@ -20,6 +20,7 @@ import {
   Send,
   Loader2,
   MessageCircle,
+  MessageSquare,
 } from "lucide-react";
 
 interface NavItem {
@@ -122,6 +123,13 @@ export default function ApprenantSidebar({
       href: "/apprenant/documents",
       icon: FileText,
       badge: dashboardStats?.documentsDisponibles || 0,
+      section: "main",
+    },
+    {
+      name: "Messagerie",
+      href: "/apprenant/messages",
+      icon: MessageSquare,
+      badge: dashboardStats?.messagesNonLus || 0,
       section: "main",
     },
     {

@@ -34,6 +34,7 @@ import {
   AlertCircle,
   ChevronRight,
   MessageSquarePlus,
+  MessageSquare,
   StickyNote,
   FolderOpen,
   Upload,
@@ -41,6 +42,8 @@ import {
   Trash2,
   Download,
   Eye,
+  Reply,
+  Inbox,
 } from "lucide-react";
 
 // Types
@@ -177,6 +180,37 @@ interface Stats {
   totalDocuments: number;
 }
 
+// Type pour les messages
+interface MessageReply {
+  id: string;
+  content: string;
+  senderName: string;
+  senderEmail: string;
+  createdAt: string;
+}
+
+interface ApprenantMessage {
+  id: string;
+  type: "incoming" | "outgoing";
+  subject: string;
+  content: string;
+  senderName: string;
+  senderEmail: string;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+  replies: MessageReply[];
+}
+
+// Labels pour les sujets de message
+const subjectLabels: Record<string, string> = {
+  question: "Question générale",
+  technique: "Problème technique",
+  formation: "Question sur la formation",
+  document: "Demande de document",
+  autre: "Autre",
+};
+
 // Configuration
 const statutLabels = {
   SALARIE: "Salarié",
@@ -240,7 +274,7 @@ export default function ApprenantDetailPage() {
   const [apprenant, setApprenant] = useState<Apprenant | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"info" | "preinscriptions" | "sessions" | "documents">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "preinscriptions" | "sessions" | "documents" | "messages">("info");
   const [selectedPreInscription, setSelectedPreInscription] = useState<PreInscription | null>(null);
 
   // Qualiopi IND 5 - États pour les notes avec historique
@@ -256,6 +290,18 @@ export default function ApprenantDetailPage() {
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // États pour les messages
+  const [messages, setMessages] = useState<ApprenantMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [selectedMessage, setSelectedMessage] = useState<ApprenantMessage | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+  const [showNewMessageForm, setShowNewMessageForm] = useState(false);
+  const [newMessageSubject, setNewMessageSubject] = useState("");
+  const [newMessageContent, setNewMessageContent] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const loadApprenant = useCallback(async () => {
     try {
@@ -375,6 +421,116 @@ export default function ApprenantDetailPage() {
       loadDocuments();
     }
   }, [activeTab, apprenantId, loadDocuments]);
+
+  // Charger les messages de l'apprenant
+  const loadMessages = useCallback(async () => {
+    if (!apprenantId) return;
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/messages`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages || []);
+        setUnreadMessages(data.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error("Erreur chargement messages:", error);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [apprenantId]);
+
+  // Charger les messages quand l'onglet Messages est actif
+  useEffect(() => {
+    if (activeTab === "messages" && apprenantId) {
+      loadMessages();
+    }
+  }, [activeTab, apprenantId, loadMessages]);
+
+  // Marquer un message comme lu
+  const handleMarkAsRead = async (messageId: string) => {
+    try {
+      await fetch(`/api/donnees/apprenants/${apprenantId}/messages/${messageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isRead: true }),
+      });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, isRead: true, readAt: new Date().toISOString() } : m
+        )
+      );
+      setUnreadMessages((prev) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Erreur marquage message:", error);
+    }
+  };
+
+  // Répondre à un message
+  const handleReplyMessage = async () => {
+    if (!selectedMessage || !replyContent.trim() || sendingReply) return;
+
+    setSendingReply(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: selectedMessage.id,
+          content: replyContent.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Mettre à jour le message avec la nouvelle réponse
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === selectedMessage.id
+              ? { ...m, replies: [...m.replies, data.reply] }
+              : m
+          )
+        );
+        setSelectedMessage((prev) =>
+          prev ? { ...prev, replies: [...prev.replies, data.reply] } : null
+        );
+        setReplyContent("");
+      }
+    } catch (error) {
+      console.error("Erreur envoi réponse:", error);
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  // Envoyer un nouveau message
+  const handleSendNewMessage = async () => {
+    if (!newMessageContent.trim() || sendingMessage) return;
+
+    setSendingMessage(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: newMessageSubject.trim() || "Message de l'organisme",
+          content: newMessageContent.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessages((prev) => [data.message, ...prev]);
+        setNewMessageSubject("");
+        setNewMessageContent("");
+        setShowNewMessageForm(false);
+      }
+    } catch (error) {
+      console.error("Erreur envoi message:", error);
+    } finally {
+      setSendingMessage(false);
+    }
+  };
 
   // Upload d'un document
   const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -593,6 +749,7 @@ export default function ApprenantDetailPage() {
             { id: "preinscriptions", label: "Pré-inscriptions", icon: <FileText size={16} />, count: stats?.totalPreInscriptions },
             { id: "sessions", label: "Sessions", icon: <Calendar size={16} />, count: stats?.totalSessions },
             { id: "documents", label: "Documents", icon: <FolderOpen size={16} />, count: stats?.totalDocuments },
+            { id: "messages", label: "Messages", icon: <MessageSquare size={16} />, count: messages.length, unread: unreadMessages },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -608,6 +765,12 @@ export default function ApprenantDetailPage() {
               {tab.count !== undefined && tab.count > 0 && (
                 <span className="ml-1 px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded-full">
                   {tab.count}
+                </span>
+              )}
+              {/* Badge messages non lus */}
+              {"unread" in tab && tab.unread !== undefined && tab.unread > 0 && (
+                <span className="ml-1 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full animate-pulse">
+                  {tab.unread}
                 </span>
               )}
               {activeTab === tab.id && (
@@ -1275,6 +1438,277 @@ export default function ApprenantDetailPage() {
                   <FolderOpen className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                   <p className="text-lg mb-2">Aucun document</p>
                   <p className="text-sm">Importez des documents liés à cet apprenant (pièces justificatives, attestations, etc.)</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Onglet Messages */}
+          {activeTab === "messages" && (
+            <motion.div
+              key="messages"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-6"
+            >
+              {/* Bouton nouveau message */}
+              <div className="mb-6 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  {messages.length} message(s) {unreadMessages > 0 && `(${unreadMessages} non lu(s))`}
+                </h3>
+                <button
+                  onClick={() => setShowNewMessageForm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-colors"
+                >
+                  <Send size={16} />
+                  Nouveau message
+                </button>
+              </div>
+
+              {/* Formulaire nouveau message */}
+              <AnimatePresence>
+                {showNewMessageForm && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-6 overflow-hidden"
+                  >
+                    <div className="bg-brand-50 dark:bg-brand-900/10 border border-brand-200 dark:border-brand-800/30 rounded-xl p-4">
+                      <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                        Envoyer un message à {apprenant.prenom} {apprenant.nom}
+                      </h4>
+                      <input
+                        type="text"
+                        value={newMessageSubject}
+                        onChange={(e) => setNewMessageSubject(e.target.value)}
+                        placeholder="Objet du message (optionnel)"
+                        className="w-full px-3 py-2 mb-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                      <textarea
+                        value={newMessageContent}
+                        onChange={(e) => setNewMessageContent(e.target.value)}
+                        placeholder="Votre message..."
+                        rows={4}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                      />
+                      <div className="flex justify-end gap-2 mt-3">
+                        <button
+                          onClick={() => {
+                            setShowNewMessageForm(false);
+                            setNewMessageSubject("");
+                            setNewMessageContent("");
+                          }}
+                          className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={handleSendNewMessage}
+                          disabled={!newMessageContent.trim() || sendingMessage}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg transition-colors"
+                        >
+                          {sendingMessage ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          Envoyer
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Liste des messages / Fil de discussion */}
+              {messagesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+                </div>
+              ) : messages.length > 0 ? (
+                <div className="grid lg:grid-cols-2 gap-6">
+                  {/* Liste des messages */}
+                  <div className="space-y-3">
+                    {messages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => {
+                          setSelectedMessage(message);
+                          if (!message.isRead && message.type === "incoming") {
+                            handleMarkAsRead(message.id);
+                          }
+                        }}
+                        className={`w-full text-left p-4 rounded-xl border transition-all ${
+                          selectedMessage?.id === message.id
+                            ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20"
+                            : !message.isRead && message.type === "incoming"
+                            ? "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            message.type === "incoming"
+                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                              : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                          }`}>
+                            {message.type === "incoming" ? (
+                              <Inbox size={18} />
+                            ) : (
+                              <Send size={18} />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                                {subjectLabels[message.subject] || message.subject}
+                              </p>
+                              {!message.isRead && message.type === "incoming" && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-500 text-white rounded">
+                                  Non lu
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                              {message.content}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                              <Clock size={12} />
+                              <span>
+                                {new Date(message.createdAt).toLocaleDateString("fr-FR", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                              {message.replies.length > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-brand-600 dark:text-brand-400">
+                                    {message.replies.length} réponse(s)
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Détail du message sélectionné */}
+                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-6 sticky top-6">
+                    {selectedMessage ? (
+                      <div className="space-y-4">
+                        {/* En-tête */}
+                        <div className="border-b dark:border-gray-700 pb-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              selectedMessage.type === "incoming"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            }`}>
+                              {selectedMessage.type === "incoming" ? "Reçu" : "Envoyé"}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {subjectLabels[selectedMessage.subject] || selectedMessage.subject}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            De: {selectedMessage.senderName} ({selectedMessage.senderEmail})
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(selectedMessage.createdAt).toLocaleDateString("fr-FR", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+
+                        {/* Fil de conversation */}
+                        <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                          {/* Message original */}
+                          <div className={`p-4 rounded-xl ${
+                            selectedMessage.type === "incoming"
+                              ? "bg-blue-50 dark:bg-blue-900/20 ml-0 mr-8"
+                              : "bg-green-50 dark:bg-green-900/20 ml-8 mr-0"
+                          }`}>
+                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-sm">
+                              {selectedMessage.content}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              {selectedMessage.senderName} - {new Date(selectedMessage.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+
+                          {/* Réponses */}
+                          {selectedMessage.replies.map((reply) => (
+                            <div
+                              key={reply.id}
+                              className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 ml-8 mr-0"
+                            >
+                              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-sm">
+                                {reply.content}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-2">
+                                {reply.senderName} - {new Date(reply.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Zone de réponse (uniquement pour les messages reçus) */}
+                        {selectedMessage.type === "incoming" && (
+                          <div className="pt-4 border-t dark:border-gray-700">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-1">
+                                <textarea
+                                  value={replyContent}
+                                  onChange={(e) => setReplyContent(e.target.value)}
+                                  placeholder="Votre réponse..."
+                                  rows={3}
+                                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none text-sm"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end mt-2">
+                              <button
+                                onClick={handleReplyMessage}
+                                disabled={!replyContent.trim() || sendingReply}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg transition-colors"
+                              >
+                                {sendingReply ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Reply className="w-4 h-4" />
+                                )}
+                                Répondre
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>Sélectionnez un message pour voir les détails</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <Inbox className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <p className="text-lg mb-2">Aucun message</p>
+                  <p className="text-sm">Les messages envoyés par cet apprenant via &quot;Nous contacter&quot; apparaîtront ici.</p>
                 </div>
               )}
             </motion.div>

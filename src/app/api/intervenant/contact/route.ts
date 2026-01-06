@@ -50,19 +50,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Intervenant non trouvé" }, { status: 404 });
     }
 
+    const subjectLabels: Record<string, string> = {
+      question: "Question générale",
+      technique: "Problème technique",
+      session: "Question sur une session",
+      apprenant: "Question sur un apprenant",
+      document: "Demande de document",
+      autre: "Autre demande",
+    };
+
+    const subjectLabel = subjectLabels[subject] || "Message";
+
+    // Créer une notification dans le dashboard admin
+    await prisma.notification.create({
+      data: {
+        organizationId,
+        type: "SYSTEME",
+        titre: `Message d'un intervenant - ${subjectLabel}`,
+        message: `${intervenant.prenom} ${intervenant.nom} vous a envoyé un message`,
+        resourceType: "intervenant",
+        resourceId: intervenantId,
+        actionUrl: `/automate/intervenants/${intervenantId}`,
+        isRead: false,
+        metadata: {
+          direction: "incoming",
+          subject: subjectLabel,
+          messageOriginal: message,
+          intervenantNom: `${intervenant.prenom} ${intervenant.nom}`,
+          intervenantEmail: intervenant.email,
+          sentAt: new Date().toISOString(),
+          replies: [],
+        },
+      },
+    });
+
     // Envoyer l'email à l'organisation
     if (intervenant.organization.email) {
-      const subjectLabels: Record<string, string> = {
-        question: "Question générale",
-        technique: "Problème technique",
-        session: "Question sur une session",
-        apprenant: "Question sur un apprenant",
-        document: "Demande de document",
-        autre: "Autre demande",
-      };
-
-      const subjectLabel = subjectLabels[subject] || "Message";
-
       await sendEmail({
         to: intervenant.organization.email,
         subject: `[Espace Intervenant] ${subjectLabel} - ${intervenant.prenom} ${intervenant.nom}`,

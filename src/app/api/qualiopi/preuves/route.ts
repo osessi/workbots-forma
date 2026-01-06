@@ -70,11 +70,38 @@ export async function POST(request: NextRequest) {
 
     // Construire l'URL de base et les cookies d'authentification
     const baseUrl = request.headers.get("origin") || "http://localhost:4000";
+
+    // Récupérer la session Supabase complète pour avoir le token d'accès
+    const { data: { session } } = await supabase.auth.getSession();
+
+    // Construire les cookies d'auth - inclure le token de session si disponible
     const authCookies = allCookies.map(c => ({
       name: c.name,
       value: c.value,
       domain: new URL(baseUrl).hostname,
     }));
+
+    // Si on a une session Supabase, ajouter aussi le token sous forme de cookie pour Puppeteer
+    if (session?.access_token) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+      const projectId = supabaseUrl.match(/https:\/\/([^.]+)\./)?.[1] || "default";
+
+      // Ajouter le cookie de session au format que Supabase attend
+      authCookies.push({
+        name: `sb-${projectId}-auth-token`,
+        value: JSON.stringify({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+          expires_at: session.expires_at,
+          expires_in: session.expires_in,
+          token_type: session.token_type,
+          user: session.user,
+        }),
+        domain: new URL(baseUrl).hostname,
+      });
+
+      console.log(`[Preuves API] Added Supabase session token for project: ${projectId}`);
+    }
 
     if (full) {
       // Générer le dossier d'audit complet (ZIP)

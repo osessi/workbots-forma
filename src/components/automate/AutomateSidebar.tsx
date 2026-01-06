@@ -137,7 +137,7 @@ const mainNavItems: NavItem[] = [
   },
   {
     icon: <Bot size={20} strokeWidth={1.5} />,
-    name: "Agent Qualiopi",
+    name: "Auditeur IA",
     path: "/automate/qualiopi",
   },
   {

@@ -68,12 +68,44 @@ function FormattedRapport({ rapport }: { rapport: string }) {
           key={index}
           className={`p-4 rounded-lg border-l-4 ${getSectionStyle(section.type)}`}
         >
-          <h4 className={`font-semibold mb-2 flex items-center gap-2 ${getSectionTitleColor(section.type)}`}>
+          <h4 className={`font-semibold mb-3 flex items-center gap-2 ${getSectionTitleColor(section.type)}`}>
             {getSectionIcon(section.type)}
             {section.title}
           </h4>
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown>{section.content}</ReactMarkdown>
+          <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+            <ReactMarkdown
+              components={{
+                // Amélioration du style des listes
+                ul: ({ children }) => (
+                  <ul className="list-none space-y-2 ml-0 pl-0 my-2">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-none space-y-2 ml-0 pl-0 my-2 counter-reset-item">{children}</ol>
+                ),
+                li: ({ children }) => (
+                  <li className="flex items-start gap-2 pl-0">
+                    <span className="w-1.5 h-1.5 bg-current rounded-full mt-2 flex-shrink-0 opacity-60"></span>
+                    <span className="flex-1">{children}</span>
+                  </li>
+                ),
+                // Style pour le texte en gras
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-gray-900 dark:text-white">{children}</strong>
+                ),
+                // Style pour les paragraphes
+                p: ({ children }) => (
+                  <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
+                ),
+                // Style pour les références d'indicateurs
+                code: ({ children }) => (
+                  <code className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs font-medium">
+                    {children}
+                  </code>
+                ),
+              }}
+            >
+              {section.content}
+            </ReactMarkdown>
           </div>
         </div>
       ))}
@@ -94,12 +126,18 @@ function parseRapport(rapport: string): RapportSection[] {
   let currentContent: string[] = [];
 
   const sectionPatterns: { regex: RegExp; type: RapportSection["type"]; title: string }[] = [
-    { regex: /^#{1,3}\s*(points?\s*forts?|forces?|atouts?)/i, type: "success", title: "Points Forts" },
-    { regex: /^#{1,3}\s*(points?\s*(à\s*)?améliorer|améliorations?|axes?\s*d'amélioration)/i, type: "warning", title: "Points à Améliorer" },
-    { regex: /^#{1,3}\s*(risques?|alertes?|dangers?|non[\s-]?conform)/i, type: "danger", title: "Risques Identifiés" },
-    { regex: /^#{1,3}\s*(recommandations?|conseils?|suggestions?)/i, type: "info", title: "Recommandations" },
-    { regex: /^#{1,3}\s*(synthèse|résumé|conclusion|bilan)/i, type: "neutral", title: "Synthèse" },
-    { regex: /^#{1,3}\s*(conformité|score|résultat)/i, type: "neutral", title: "Conformité" },
+    // Synthèse et résumé
+    { regex: /^#{1,3}\s*(\d+\.?\s*)?(synthèse|résumé|conclusion|bilan|résultat\s*global)/i, type: "neutral", title: "Synthèse Globale" },
+    // Points forts
+    { regex: /^#{1,3}\s*(\d+\.?\s*)?(points?\s*forts?|forces?|atouts?|éléments?\s*conformes?|points?\s*positifs?)/i, type: "success", title: "Points Forts Identifiés" },
+    // Points à améliorer
+    { regex: /^#{1,3}\s*(\d+\.?\s*)?(points?\s*(à\s*)?améliorer|améliorations?|axes?\s*d'amélioration|écarts?\s*critiques?)/i, type: "warning", title: "Points à Améliorer" },
+    // Risques
+    { regex: /^#{1,3}\s*(\d+\.?\s*)?(risques?|alertes?|dangers?|non[\s-]?certification)/i, type: "danger", title: "Risques de Non-Certification" },
+    // Recommandations
+    { regex: /^#{1,3}\s*(\d+\.?\s*)?(recommandations?|conseils?|suggestions?|actions?\s*prioritaires?)/i, type: "info", title: "Recommandations" },
+    // Conformité
+    { regex: /^#{1,3}\s*(\d+\.?\s*)?(conformité|score|évaluation)/i, type: "neutral", title: "Évaluation de Conformité" },
   ];
 
   for (const line of lines) {
@@ -126,7 +164,7 @@ function parseRapport(rapport: string): RapportSection[] {
         // Sauvegarder et créer nouvelle section neutre
         currentSection.content = currentContent.join("\n").trim();
         if (currentSection.content) sections.push(currentSection);
-        const title = line.replace(/^#{1,3}\s+/, "").trim();
+        const title = line.replace(/^#{1,3}\s*\d*\.?\s*/, "").trim();
         currentSection = { type: "neutral", title, content: "" };
         currentContent = [];
       } else {
@@ -283,10 +321,8 @@ function AuditCard({
 
       {/* Contenu détaillé */}
       {isExpanded && audit.notes && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown>{audit.notes}</ReactMarkdown>
-          </div>
+        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          <FormattedRapport rapport={audit.notes} />
         </div>
       )}
     </div>

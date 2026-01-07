@@ -54,23 +54,35 @@ export async function GET(request: NextRequest) {
         titre: true,
         type: true,
         fileUrl: true,
+        content: true,
         isGenerated: true,
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },
     });
 
-    // Transformer en format frontend
-    const documents = sessionDocuments.map(doc => ({
-      id: doc.id,
-      nom: doc.titre,
-      type: doc.type || "document",
-      taille: undefined,
-      dateCreation: doc.createdAt.toISOString(),
-      url: doc.fileUrl,
-      categorie: "session",
-      isGenerated: doc.isGenerated,
-    }));
+    // Transformer en format frontend avec URL PDF
+    const documents = sessionDocuments
+      .filter(doc => {
+        // Inclure si fileUrl existe OU si content HTML existe
+        const content = doc.content as { html?: string } | null;
+        return doc.fileUrl || content?.html;
+      })
+      .map(doc => {
+        // Utiliser l'URL du fichier si disponible, sinon générer l'URL vers l'API PDF
+        const documentUrl = doc.fileUrl || `/api/session-documents/${doc.id}/pdf?token=${token}`;
+
+        return {
+          id: doc.id,
+          nom: doc.titre,
+          type: doc.type || "document",
+          taille: undefined,
+          dateCreation: doc.createdAt.toISOString(),
+          url: documentUrl,
+          categorie: "session",
+          isGenerated: doc.isGenerated,
+        };
+      });
 
     return NextResponse.json({ documents });
   } catch (error) {

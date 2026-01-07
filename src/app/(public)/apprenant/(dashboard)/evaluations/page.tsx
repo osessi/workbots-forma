@@ -19,6 +19,7 @@ import {
   Snowflake,
   ExternalLink,
   XCircle,
+  Lock,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -57,7 +58,10 @@ interface EvaluationSatisfaction {
   id: string;
   token: string;
   type: "CHAUD" | "FROID";
-  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "EXPIRED";
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "EXPIRED" | "LOCKED";
+  isAvailable?: boolean;
+  availableAt?: string | null;
+  availableMessage?: string | null;
   formation: {
     id: string;
     titre: string;
@@ -65,6 +69,7 @@ interface EvaluationSatisfaction {
   session: {
     id: string;
     dateDebut: string | null;
+    dateFin?: string | null;
   };
   expiresAt: string | null;
   completedAt: string | null;
@@ -295,6 +300,13 @@ function EvaluationSatisfactionCard({ evaluation, index }: { evaluation: Evaluat
           icon: XCircle,
           iconClass: "text-red-500",
         };
+      case "LOCKED":
+        return {
+          badge: "Verrouillé",
+          badgeClass: "bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300",
+          icon: Lock,
+          iconClass: "text-gray-400",
+        };
       default:
         return {
           badge: "À compléter",
@@ -310,7 +322,8 @@ function EvaluationSatisfactionCard({ evaluation, index }: { evaluation: Evaluat
   const typeColor = evaluation.type === "CHAUD" ? "orange" : "blue";
 
   const isCompleted = evaluation.status === "COMPLETED";
-  const canFill = evaluation.status === "PENDING" || evaluation.status === "IN_PROGRESS";
+  const isLocked = evaluation.status === "LOCKED";
+  const canFill = (evaluation.status === "PENDING" || evaluation.status === "IN_PROGRESS") && evaluation.isAvailable !== false;
 
   // Calculer les jours restants avant expiration
   const daysRemaining = evaluation.expiresAt
@@ -325,6 +338,8 @@ function EvaluationSatisfactionCard({ evaluation, index }: { evaluation: Evaluat
       className={`bg-white dark:bg-gray-800 rounded-xl border overflow-hidden transition-all group ${
         evaluation.status === "EXPIRED"
           ? "border-red-200 dark:border-red-800 opacity-60"
+          : isLocked
+          ? "border-gray-200 dark:border-gray-700 opacity-70"
           : "border-gray-200 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500"
       }`}
     >
@@ -334,6 +349,8 @@ function EvaluationSatisfactionCard({ evaluation, index }: { evaluation: Evaluat
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
             isCompleted
               ? "bg-green-100 dark:bg-green-500/20"
+              : isLocked
+              ? "bg-gray-100 dark:bg-gray-700"
               : typeColor === "orange"
               ? "bg-orange-100 dark:bg-orange-500/20"
               : "bg-blue-100 dark:bg-blue-500/20"
@@ -341,6 +358,8 @@ function EvaluationSatisfactionCard({ evaluation, index }: { evaluation: Evaluat
             <TypeIcon className={`w-6 h-6 ${
               isCompleted
                 ? "text-green-600 dark:text-green-400"
+                : isLocked
+                ? "text-gray-400 dark:text-gray-500"
                 : typeColor === "orange"
                 ? "text-orange-600 dark:text-orange-400"
                 : "text-blue-600 dark:text-blue-400"
@@ -375,6 +394,19 @@ function EvaluationSatisfactionCard({ evaluation, index }: { evaluation: Evaluat
                   Formation du {new Date(evaluation.session.dateDebut).toLocaleDateString("fr-FR")}
                 </span>
               )}
+              {/* Message de disponibilité pour les évaluations verrouillées */}
+              {isLocked && evaluation.availableAt && (
+                <span className="flex items-center gap-1 text-gray-500">
+                  <Lock className="w-3.5 h-3.5" />
+                  Disponible le {new Date(evaluation.availableAt).toLocaleDateString("fr-FR")}
+                </span>
+              )}
+              {isLocked && evaluation.availableMessage && !evaluation.availableAt && (
+                <span className="flex items-center gap-1 text-gray-500">
+                  <Lock className="w-3.5 h-3.5" />
+                  {evaluation.availableMessage}
+                </span>
+              )}
               {daysRemaining !== null && daysRemaining > 0 && canFill && (
                 <span className={`flex items-center gap-1 ${
                   daysRemaining <= 7 ? "text-red-500" : ""
@@ -405,6 +437,11 @@ function EvaluationSatisfactionCard({ evaluation, index }: { evaluation: Evaluat
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400">
               <CheckCircle2 className="w-4 h-4" />
               Terminé
+            </div>
+          ) : isLocked ? (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+              <Lock className="w-4 h-4" />
+              Verrouillé
             </div>
           ) : (
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">

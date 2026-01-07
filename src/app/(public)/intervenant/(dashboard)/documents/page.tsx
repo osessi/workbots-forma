@@ -171,18 +171,21 @@ export default function IntervenantDocumentsPage() {
               const FileIcon = getFileIcon(doc.type);
 
               return (
-                <div
+                <a
                   key={doc.id}
-                  className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  href={doc.url || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer group"
                 >
                   {/* Icône */}
-                  <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FileIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                  <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/20 transition-colors">
+                    <FileIcon className="w-6 h-6 text-gray-500 dark:text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
                   </div>
 
                   {/* Infos */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white truncate">
+                    <p className="font-medium text-gray-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                       {doc.nom}
                     </p>
                     <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
@@ -195,29 +198,32 @@ export default function IntervenantDocumentsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    {doc.url && (
-                      <>
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-colors"
-                          title="Voir"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </a>
-                        <a
-                          href={doc.url}
-                          download
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-                          title="Télécharger"
-                        >
-                          <Download className="w-5 h-5" />
-                        </a>
-                      </>
-                    )}
+                    <span
+                      className="p-2 text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors"
+                      title="Voir le document"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (doc.url) {
+                          const link = document.createElement("a");
+                          link.href = doc.url;
+                          link.download = doc.nom || "document";
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                      title="Télécharger"
+                    >
+                      <Download className="w-5 h-5" />
+                    </button>
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>

@@ -40,47 +40,61 @@ interface DashboardData {
   }>;
 }
 
-// Icons
+// Icons - Modern & Clean Design
 const FormationIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 3L2 8l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 3L2 8.5L12 14L22 8.5L12 3Z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M4 10V16L12 20L20 16V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M12 14V20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
 const DocumentIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M14 2V8H20" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M8 13H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M8 17H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
 const CalendarIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="4" width="18" height="18" rx="2" />
-    <path d="M16 2v4M8 2v4M3 10h18" />
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="4" width="18" height="18" rx="2" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M3 9H21" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M8 2V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M16 2V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <rect x="7" y="13" width="3" height="3" rx="0.5" fill="currentColor"/>
+    <rect x="14" y="13" width="3" height="3" rx="0.5" fill="currentColor" fillOpacity="0.5"/>
   </svg>
 );
 
 const TrendingIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M23 6l-9.5 9.5-5-5L1 18" />
-    <path d="M17 6h6v6" />
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 17L9 11L13 15L21 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M15 7H21V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M3 17L9 11L13 15L21 7V17C21 18 20 19 19 19H5C4 19 3 18 3 17Z" fill="currentColor" fillOpacity="0.1"/>
   </svg>
 );
 
 const BuildingIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="4" y="2" width="16" height="20" rx="2" />
-    <path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01" />
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 21H21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="9" y="7" width="2" height="2" rx="0.5" fill="currentColor"/>
+    <rect x="13" y="7" width="2" height="2" rx="0.5" fill="currentColor"/>
+    <rect x="9" y="12" width="2" height="2" rx="0.5" fill="currentColor"/>
+    <rect x="13" y="12" width="2" height="2" rx="0.5" fill="currentColor"/>
+    <path d="M10 21V17H14V21" stroke="currentColor" strokeWidth="1.5"/>
   </svg>
 );
 
 const UsersIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="9" cy="7" r="4" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M3 21V19C3 17.9391 3.42143 16.9217 4.17157 16.1716C4.92172 15.4214 5.93913 15 7 15H11C12.0609 15 13.0783 15.4214 13.8284 16.1716C14.5786 16.9217 15 17.9391 15 19V21" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <circle cx="17" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M21 21V19.5C21 18.5 20.5 17.6 19.8 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
@@ -107,13 +121,17 @@ const StatCard = ({
   color: string;
   trend?: { value: number; isPositive: boolean };
 }) => (
-  <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] hover:shadow-md transition-shadow">
+  <div className="group rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-300 hover:-translate-y-0.5">
     <div className="flex items-start justify-between">
-      <div className={`p-2.5 rounded-xl ${color}`}>{icon}</div>
+      <div className={`p-3 rounded-2xl ${color} shadow-sm group-hover:shadow-md transition-shadow duration-300`}>
+        {icon}
+      </div>
       {trend && (
         <span
-          className={`flex items-center gap-1 text-xs font-medium ${
-            trend.isPositive ? "text-green-600" : "text-red-600"
+          className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
+            trend.isPositive
+              ? "text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400"
+              : "text-red-700 bg-red-100 dark:bg-red-900/40 dark:text-red-400"
           }`}
         >
           {trend.isPositive ? "↑" : "↓"} {Math.abs(trend.value)}%
@@ -121,9 +139,9 @@ const StatCard = ({
       )}
     </div>
     <div className="mt-4">
-      <h4 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h4>
-      {subValue && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subValue}</p>}
-      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{label}</p>
+      <h4 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{value}</h4>
+      {subValue && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-medium">{subValue}</p>}
+      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-medium">{label}</p>
     </div>
   </div>
 );

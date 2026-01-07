@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import {
   BookOpen,
@@ -17,16 +18,39 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  ClipboardCheck,
+  Laptop,
+  Timer,
+  Accessibility,
+  Info,
 } from "lucide-react";
 
 export default function IntervenantProgrammePage() {
   useRequireIntervenantAuth();
-  const { selectedSession, isLoading } = useIntervenantPortal();
+  const { selectedSession, isLoading, selectSession, sessions } = useIntervenantPortal();
+  const searchParams = useSearchParams();
+
+  // Sélectionner la session depuis l'URL si présente
+  useEffect(() => {
+    const sessionIdFromUrl = searchParams.get("session");
+    if (sessionIdFromUrl && sessions.length > 0) {
+      // Vérifier que la session existe
+      const sessionExists = sessions.some(s => s.id === sessionIdFromUrl);
+      if (sessionExists) {
+        selectSession(sessionIdFromUrl);
+      }
+    }
+  }, [searchParams, sessions, selectSession]);
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
+    description: true,
     objectifs: true,
     programme: true,
     public: false,
     prerequis: false,
+    moyens: false,
+    suivi: false,
+    delai: false,
+    accessibilite: false,
   });
 
   const toggleSection = (section: string) => {
@@ -193,6 +217,47 @@ export default function IntervenantProgrammePage() {
             {selectedSession.lieu.lieuFormation && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {selectedSession.lieu.lieuFormation}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Description de la formation */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={() => toggleSection("description")}
+          className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+              <Info className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Description
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Présentation générale de la formation
+              </p>
+            </div>
+          </div>
+          {expandedSections.description ? (
+            <ChevronUp className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
+
+        {expandedSections.description && (
+          <div className="px-6 pb-6">
+            {formation.description ? (
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {formation.description}
+              </p>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400 italic">
+                Description non renseignée
               </p>
             )}
           </div>
@@ -400,6 +465,170 @@ export default function IntervenantProgrammePage() {
           )}
         </div>
       )}
+
+      {/* Ressources techniques et pédagogiques */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={() => toggleSection("moyens")}
+          className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/20 rounded-lg flex items-center justify-center">
+              <Laptop className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Ressources techniques et pédagogiques
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Moyens mis à disposition pour la formation
+              </p>
+            </div>
+          </div>
+          {expandedSections.moyens ? (
+            <ChevronUp className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
+
+        {expandedSections.moyens && (
+          <div className="px-6 pb-6">
+            {formation.moyensPedagogiques ? (
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {formation.moyensPedagogiques}
+              </p>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400 italic">
+                Ressources techniques et pédagogiques non renseignées
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Suivi de l'exécution et évaluation des résultats */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={() => toggleSection("suivi")}
+          className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-100 dark:bg-teal-500/20 rounded-lg flex items-center justify-center">
+              <ClipboardCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Suivi de l&apos;exécution et évaluation
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Modalités de suivi et d&apos;évaluation des résultats
+              </p>
+            </div>
+          </div>
+          {expandedSections.suivi ? (
+            <ChevronUp className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
+
+        {expandedSections.suivi && (
+          <div className="px-6 pb-6">
+            {formation.suiviEvaluation ? (
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {formation.suiviEvaluation}
+              </p>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400 italic">
+                Modalités de suivi et d&apos;évaluation non renseignées
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Délai d'accès */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={() => toggleSection("delai")}
+          className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-100 dark:bg-orange-500/20 rounded-lg flex items-center justify-center">
+              <Timer className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Délai d&apos;accès
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Délai pour accéder à la formation
+              </p>
+            </div>
+          </div>
+          {expandedSections.delai ? (
+            <ChevronUp className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
+
+        {expandedSections.delai && (
+          <div className="px-6 pb-6">
+            {formation.delaiAcces ? (
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {formation.delaiAcces}
+              </p>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400 italic">
+                Délai d&apos;accès non renseigné
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Accessibilité */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={() => toggleSection("accessibilite")}
+          className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-pink-100 dark:bg-pink-500/20 rounded-lg flex items-center justify-center">
+              <Accessibility className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Accessibilité
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Accessibilité aux personnes en situation de handicap
+              </p>
+            </div>
+          </div>
+          {expandedSections.accessibilite ? (
+            <ChevronUp className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
+
+        {expandedSections.accessibilite && (
+          <div className="px-6 pb-6">
+            {formation.accessibilite ? (
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {formation.accessibilite}
+              </p>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400 italic">
+                Informations sur l&apos;accessibilité non renseignées
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

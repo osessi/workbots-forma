@@ -196,11 +196,92 @@ export async function GET(request: NextRequest) {
       const now = new Date();
       const prochaineJournee = session.journees?.find(j => new Date(j.date) >= now);
 
-      // Extraire dureeHeures, modalite et objectifsPedagogiques de fichePedagogique si disponible
+      // Extraire les données pédagogiques de fichePedagogique si disponible
       const fichePedagogique = session.formation.fichePedagogique as Record<string, unknown> | null;
-      const dureeHeures = fichePedagogique?.dureeHeures as number | null || null;
-      const modalite = fichePedagogique?.modalite as string | null || null;
-      const objectifsPedagogiques = (fichePedagogique?.objectifsPedagogiques as string[] | null) || [];
+      const dureeHeures = (fichePedagogique?.dureeHeures as number | null) || null;
+      const modalite = (fichePedagogique?.modalite as string | null) || (fichePedagogique?.modalites as string | null) || null;
+
+      // Objectifs pédagogiques - peut être dans "objectifs" ou "objectifsPedagogiques"
+      const objectifsPedagogiques = (fichePedagogique?.objectifs as string[] | null)
+        || (fichePedagogique?.objectifsPedagogiques as string[] | null)
+        || [];
+
+      // Public cible - peut être dans "publicVise" ou "publicCible"
+      const publicCible = (fichePedagogique?.publicVise as string | null)
+        || (fichePedagogique?.publicCible as string | null)
+        || null;
+
+      // Prérequis
+      const prerequis = (fichePedagogique?.prerequis as string | null) || null;
+
+      // Moyens/ressources pédagogiques
+      const moyensPedagogiques = (fichePedagogique?.ressourcesPedagogiques as string | null)
+        || (fichePedagogique?.moyensPedagogiques as string | null)
+        || null;
+
+      // Suivi de l'exécution et évaluation des résultats
+      const suiviEvaluation = (fichePedagogique?.suiviEvaluation as string | null)
+        || (fichePedagogique?.suiviExecution as string | null)
+        || (fichePedagogique?.modalitesEvaluation as string | null)
+        || null;
+
+      // Délai d'accès
+      const delaiAcces = (fichePedagogique?.delaiAcces as string | null)
+        || (fichePedagogique?.delaisAcces as string | null)
+        || null;
+
+      // Accessibilité
+      const accessibilite = (fichePedagogique?.accessibilite as string | null)
+        || (fichePedagogique?.accessibilitePMR as string | null)
+        || (fichePedagogique?.accessibiliteHandicap as string | null)
+        || null;
+
+      // Contenu/modules - texte libre ou tableau
+      const contenu = fichePedagogique?.contenu;
+      let modules: Array<{ id: string; titre: string; description?: string; ordre: number; duree?: number }> = [];
+
+      // Si contenu est un texte, essayer de le parser en modules
+      if (typeof contenu === "string" && contenu.trim()) {
+        // Parser le contenu texte en modules (format "Module X – Titre\n• point1\n• point2")
+        const moduleRegex = /Module\s*(\d+)\s*[–-]\s*([^\n]+)/gi;
+        let match;
+        let ordre = 1;
+        const moduleMatches: Array<{ ordre: number; titre: string; start: number }> = [];
+
+        while ((match = moduleRegex.exec(contenu)) !== null) {
+          moduleMatches.push({
+            ordre: parseInt(match[1]) || ordre,
+            titre: match[2].trim(),
+            start: match.index,
+          });
+          ordre++;
+        }
+
+        // Extraire les descriptions de chaque module
+        moduleMatches.forEach((mod, idx) => {
+          const nextStart = moduleMatches[idx + 1]?.start || contenu.length;
+          const description = contenu
+            .substring(mod.start + (contenu.substring(mod.start).indexOf("\n") + 1), nextStart)
+            .trim()
+            .replace(/^[•\-]\s*/gm, "• ");
+
+          modules.push({
+            id: `module-${mod.ordre}`,
+            titre: mod.titre,
+            description: description || undefined,
+            ordre: mod.ordre,
+          });
+        });
+      } else if (Array.isArray(contenu)) {
+        // Si c'est déjà un tableau
+        modules = contenu.map((m, idx) => ({
+          id: m.id || `module-${idx + 1}`,
+          titre: m.titre || m.title || `Module ${idx + 1}`,
+          description: m.description || m.contenu || undefined,
+          ordre: m.ordre || idx + 1,
+          duree: m.duree || m.dureeMinutes || undefined,
+        }));
+      }
 
       return {
         id: session.id,
@@ -217,6 +298,13 @@ export async function GET(request: NextRequest) {
           dureeHeures,
           modalite,
           objectifsPedagogiques,
+          publicCible,
+          prerequis,
+          moyensPedagogiques,
+          suiviEvaluation,
+          delaiAcces,
+          accessibilite,
+          modules,
         },
         lieu: session.lieu,
         nombreApprenants,
@@ -225,12 +313,16 @@ export async function GET(request: NextRequest) {
           id: prochaineJournee.id,
           date: prochaineJournee.date,
           heureDebutMatin: prochaineJournee.heureDebutMatin,
+          heureFinMatin: prochaineJournee.heureFinMatin,
+          heureDebutAprem: prochaineJournee.heureDebutAprem,
           heureFinAprem: prochaineJournee.heureFinAprem,
         } : null,
         journees: session.journees?.map(j => ({
           id: j.id,
           date: j.date,
           heureDebutMatin: j.heureDebutMatin,
+          heureFinMatin: j.heureFinMatin,
+          heureDebutAprem: j.heureDebutAprem,
           heureFinAprem: j.heureFinAprem,
         })) || [],
       };

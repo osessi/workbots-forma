@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
       const signatures = feuille?.signatures || [];
 
       const signaturesMatin = signatures.filter(s => s.periode === "matin").length;
-      const signaturesAprem = signatures.filter(s => s.periode === "aprem").length;
+      const signaturesAprem = signatures.filter(s => s.periode === "aprem" || s.periode === "apres_midi").length;
 
       return {
         id: journee.id,
@@ -114,6 +114,7 @@ export async function GET(request: NextRequest) {
         heureDebutAprem: journee.heureDebutAprem,
         heureFinAprem: journee.heureFinAprem,
         feuilleId: feuille?.id,
+        feuilleToken: feuille?.token,
         signaturesMatin,
         signaturesAprem,
         totalParticipants,

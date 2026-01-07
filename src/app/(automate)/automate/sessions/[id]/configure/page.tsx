@@ -245,11 +245,18 @@ export default function ConfigureSessionPage({
             <span className="text-sm font-medium">Dates</span>
           </div>
           {session.journees.length > 0 ? (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {session.journees.slice(0, 3).map((j) => (
-                <p key={j.id} className="text-sm text-gray-900 dark:text-white">
-                  {format(new Date(j.date), "EEEE d MMMM", { locale: fr })}
-                </p>
+                <div key={j.id}>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {format(new Date(j.date), "EEEE d MMMM yyyy", { locale: fr })}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {j.heureDebutMatin || "09:00"} - {j.heureFinMatin || "12:30"}
+                    {" / "}
+                    {j.heureDebutAprem || "14:00"} - {j.heureFinAprem || "17:30"}
+                  </p>
+                </div>
               ))}
               {session.journees.length > 3 && (
                 <p className="text-sm text-gray-500">

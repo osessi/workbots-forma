@@ -22,7 +22,61 @@ import {
 
 export default function IntervenantAccueilPage() {
   useRequireIntervenantAuth();
-  const { intervenant, dashboardStats, sessions, selectedSession, isLoading } = useIntervenantPortal();
+  const { intervenant, dashboardStats, sessions, selectedSession, isLoading, selectSession } = useIntervenantPortal();
+
+  // Trouver la vraie prochaine journée parmi toutes les sessions (dans le futur uniquement)
+  const prochaineJourneeGlobale = React.useMemo(() => {
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let prochaine: { session: typeof sessions[0]; journee: NonNullable<typeof sessions[0]["prochaineJournee"]> } | null = null;
+
+    for (const session of sessions) {
+      if (session.prochaineJournee) {
+        const journeeDate = new Date(session.prochaineJournee.date);
+        journeeDate.setHours(0, 0, 0, 0);
+        // La prochaine session doit être strictement dans le futur (pas aujourd'hui)
+        if (journeeDate > today) {
+          if (!prochaine || journeeDate < new Date(prochaine.journee.date)) {
+            prochaine = { session, journee: session.prochaineJournee };
+          }
+        }
+      }
+    }
+
+    return prochaine;
+  }, [sessions]);
+
+  // Trouver la session active (en cours aujourd'hui)
+  const sessionActiveAujourdhui = React.useMemo(() => {
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const session of sessions) {
+      // Vérifier si la session a une journée aujourd'hui
+      if (session.journees) {
+        for (const journee of session.journees) {
+          const journeeDate = new Date(journee.date);
+          journeeDate.setHours(0, 0, 0, 0);
+          if (journeeDate.getTime() === today.getTime()) {
+            return { session, journee };
+          }
+        }
+      }
+      // Sinon vérifier si la prochaineJournee est aujourd'hui
+      if (session.prochaineJournee) {
+        const journeeDate = new Date(session.prochaineJournee.date);
+        journeeDate.setHours(0, 0, 0, 0);
+        if (journeeDate.getTime() === today.getTime()) {
+          return { session, journee: session.prochaineJournee };
+        }
+      }
+    }
+
+    return null;
+  }, [sessions]);
 
   if (isLoading) {
     return (
@@ -188,6 +242,7 @@ export default function IntervenantAccueilPage() {
                 <Link
                   key={session.id}
                   href={`/intervenant/programme?session=${session.id}`}
+                  onClick={() => selectSession(session.id)}
                   className="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
                 >
                   <div className="flex gap-4">
@@ -328,7 +383,7 @@ export default function IntervenantAccueilPage() {
           </div>
 
           {/* Prochaine session */}
-          {selectedSession?.prochaineJournee && (
+          {prochaineJourneeGlobale && (
             <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-500/10 dark:to-emerald-600/10 rounded-xl p-4 border border-emerald-200 dark:border-emerald-500/20">
               <div className="flex items-center gap-2 mb-3">
                 <Clock className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -337,41 +392,64 @@ export default function IntervenantAccueilPage() {
                 </h3>
               </div>
               <p className="text-sm text-emerald-800 dark:text-emerald-200 font-medium">
-                {formatDate(selectedSession.prochaineJournee.date)}
+                {formatDate(prochaineJourneeGlobale.journee.date)}
               </p>
-              <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
-                {selectedSession.prochaineJournee.heureDebutMatin} - {selectedSession.prochaineJournee.heureFinAprem}
-              </p>
+              <div className="text-sm text-emerald-700 dark:text-emerald-300 mt-1 space-y-0.5">
+                <p>
+                  Matin : {prochaineJourneeGlobale.journee.heureDebutMatin || "09:00"} – {prochaineJourneeGlobale.journee.heureFinMatin || "12:30"}
+                </p>
+                <p>
+                  Après-midi : {prochaineJourneeGlobale.journee.heureDebutAprem || "14:00"} – {prochaineJourneeGlobale.journee.heureFinAprem || "17:30"}
+                </p>
+              </div>
               <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-                {selectedSession.formation.titre}
+                {prochaineJourneeGlobale.session.formation.titre}
               </p>
             </div>
           )}
 
-          {/* Info session sélectionnée */}
-          {selectedSession && (
+          {/* Session active aujourd'hui */}
+          {sessionActiveAujourdhui ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-emerald-200 dark:border-emerald-500/30 p-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-emerald-500" />
+                Session active
+              </h3>
+              <div className="space-y-2 text-sm">
+                <p className="text-gray-600 dark:text-gray-300">
+                  <span className="font-medium">{sessionActiveAujourdhui.session.formation.titre}</span>
+                </p>
+                <p className="text-gray-500 dark:text-gray-400">
+                  Réf: {sessionActiveAujourdhui.session.reference}
+                </p>
+                <p className="text-gray-500 dark:text-gray-400">
+                  {sessionActiveAujourdhui.session.nombreApprenants} participant{sessionActiveAujourdhui.session.nombreApprenants > 1 ? "s" : ""}
+                </p>
+                <div className="text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-700 mt-2">
+                  <p>
+                    Matin : {sessionActiveAujourdhui.journee.heureDebutMatin || "09:00"} – {sessionActiveAujourdhui.journee.heureFinMatin || "12:30"}
+                  </p>
+                  <p>
+                    Après-midi : {sessionActiveAujourdhui.journee.heureDebutAprem || "14:00"} – {sessionActiveAujourdhui.journee.heureFinAprem || "17:30"}
+                  </p>
+                </div>
+                {sessionActiveAujourdhui.session.lieu && (
+                  <p className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    {sessionActiveAujourdhui.session.lieu.nom}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
               <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-gray-400" />
                 Session active
               </h3>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-600 dark:text-gray-300">
-                  <span className="font-medium">{selectedSession.formation.titre}</span>
-                </p>
-                <p className="text-gray-500 dark:text-gray-400">
-                  Réf: {selectedSession.reference}
-                </p>
-                <p className="text-gray-500 dark:text-gray-400">
-                  {selectedSession.nombreApprenants} participant{selectedSession.nombreApprenants > 1 ? "s" : ""}
-                </p>
-                {selectedSession.lieu && (
-                  <p className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    {selectedSession.lieu.nom}
-                  </p>
-                )}
-              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                Aucune session en cours aujourd&apos;hui
+              </p>
             </div>
           )}
         </div>

@@ -78,21 +78,17 @@ export default function IntervenantHeader({
           {/* Logo organisation */}
           <Link href="/intervenant/accueil" className="flex items-center gap-3">
             {organization?.logoUrl ? (
-              <Image
-                src={organization.logoUrl}
-                alt={organization.nomCommercial || organization.name}
-                width={120}
-                height={40}
-                className="h-8 w-auto object-contain"
-              />
+              <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-800 flex-shrink-0">
+                <Image
+                  src={organization.logoUrl}
+                  alt={organization.nomCommercial || organization.name}
+                  fill
+                  className="object-contain p-1"
+                />
+              </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                  <Briefcase className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-semibold text-gray-900 dark:text-white hidden sm:block">
-                  {organization?.nomCommercial || organization?.name || "Espace Intervenant"}
-                </span>
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                <Briefcase className="w-5 h-5 text-white" />
               </div>
             )}
           </Link>

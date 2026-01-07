@@ -365,8 +365,8 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
                     </span>
                     <h3 className="font-semibold text-gray-900 dark:text-white">
                       {client.type === "ENTREPRISE"
-                        ? client.entreprise?.raisonSociale
-                        : `${client.apprenant?.prenom} ${client.apprenant?.nom}`}
+                        ? (client.entreprise?.raisonSociale || "Entreprise")
+                        : (client.apprenant ? `${client.apprenant.prenom} ${client.apprenant.nom}` : "—")}
                     </h3>
                   </div>
                 </div>
@@ -523,8 +523,8 @@ export default function StepClients({ clients, onChange, onNext }: StepClientsPr
               >
                 <span className="text-gray-600 dark:text-gray-400">
                   {client.type === "ENTREPRISE"
-                    ? client.entreprise?.raisonSociale
-                    : `${client.apprenant?.prenom} ${client.apprenant?.nom}`}
+                    ? (client.entreprise?.raisonSociale || "Entreprise")
+                    : (client.apprenant ? `${client.apprenant.prenom} ${client.apprenant.nom}` : "—")}
                 </span>
                 <span className="font-medium text-gray-900 dark:text-white">
                   {client.apprenants.length} apprenant{client.apprenants.length > 1 ? "s" : ""}

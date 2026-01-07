@@ -8,24 +8,72 @@ import {
   Clock,
   Users,
   CheckCircle,
-  XCircle,
   AlertCircle,
   ChevronRight,
   Download,
   Eye,
+  X,
+  QrCode,
+  ExternalLink,
+  Loader2,
+  Check,
+  Printer,
 } from "lucide-react";
 
 interface Journee {
   id: string;
   date: string;
-  heureDebutMatin: string;
-  heureFinMatin: string;
-  heureDebutAprem: string;
-  heureFinAprem: string;
+  heureDebutMatin: string | null;
+  heureFinMatin: string | null;
+  heureDebutAprem: string | null;
+  heureFinAprem: string | null;
   feuilleId?: string;
+  feuilleToken?: string;
   signaturesMatin: number;
   signaturesAprem: number;
   totalParticipants: number;
+}
+
+interface Participant {
+  id: string;
+  apprenant: {
+    id: string;
+    nom: string;
+    prenom: string;
+    email: string;
+  };
+}
+
+interface Signature {
+  id: string;
+  signataire: string;
+  participantId: string | null;
+  intervenantId: string | null;
+  periode: string;
+  signedAt: string | null;
+  signatureData: string | null;
+}
+
+interface FeuilleDetail {
+  journee: {
+    id: string;
+    date: string;
+    heureDebutMatin: string | null;
+    heureFinMatin: string | null;
+    heureDebutAprem: string | null;
+    heureFinAprem: string | null;
+  };
+  formation: {
+    titre: string;
+  };
+  participants: Participant[];
+  feuille: {
+    id: string;
+    token: string;
+    status: string;
+    signatures: Signature[];
+  };
+  intervenantId: string;
 }
 
 export default function IntervenantEmargementsPage() {
@@ -33,6 +81,9 @@ export default function IntervenantEmargementsPage() {
   const { selectedSession, token, isLoading } = useIntervenantPortal();
   const [journees, setJournees] = useState<Journee[]>([]);
   const [loadingJournees, setLoadingJournees] = useState(false);
+  const [selectedJournee, setSelectedJournee] = useState<Journee | null>(null);
+  const [feuilleDetail, setFeuilleDetail] = useState<FeuilleDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     if (selectedSession && token) {
@@ -55,6 +106,50 @@ export default function IntervenantEmargementsPage() {
     } finally {
       setLoadingJournees(false);
     }
+  };
+
+  const openFeuilleDetail = async (journee: Journee) => {
+    setSelectedJournee(journee);
+    setLoadingDetail(true);
+    setFeuilleDetail(null);
+
+    try {
+      const res = await fetch(`/api/intervenant/emargements/${journee.id}?token=${token}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFeuilleDetail(data);
+      }
+    } catch (error) {
+      console.error("Erreur fetch détail:", error);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const closeFeuilleDetail = () => {
+    setSelectedJournee(null);
+    setFeuilleDetail(null);
+    // Rafraîchir les journées après fermeture
+    fetchJournees();
+  };
+
+  const openEmargementPage = (feuilleToken: string) => {
+    // Ouvrir la page d'émargement en ligne dans un nouvel onglet
+    window.open(`/emargement/${feuilleToken}`, "_blank");
+  };
+
+  const getSignature = (participantId: string, periode: string) => {
+    return feuilleDetail?.feuille.signatures.find(
+      (s) => s.participantId === participantId && s.periode === periode
+    );
+  };
+
+  const formatDateTime = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   if (isLoading) {
@@ -177,18 +272,33 @@ export default function IntervenantEmargementsPage() {
         <div className="space-y-3">
           {journees.map((journee) => {
             const statusInfo = getEmargementStatus(journee);
+            const isClickable = statusInfo.status !== "future";
 
             return (
-              <div
+              <button
                 key={journee.id}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4"
+                onClick={() => isClickable && openFeuilleDetail(journee)}
+                disabled={!isClickable}
+                className={`w-full text-left bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 transition-all ${
+                  isClickable
+                    ? "hover:border-emerald-300 dark:hover:border-emerald-600 hover:shadow-md cursor-pointer"
+                    : "opacity-75 cursor-not-allowed"
+                }`}
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   {/* Date et horaires */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        isClickable
+                          ? "bg-emerald-100 dark:bg-emerald-500/20"
+                          : "bg-gray-100 dark:bg-gray-700"
+                      }`}>
+                        <Calendar className={`w-6 h-6 ${
+                          isClickable
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-gray-400 dark:text-gray-500"
+                        }`} />
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-white capitalize">
@@ -197,7 +307,9 @@ export default function IntervenantEmargementsPage() {
                         <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                           <Clock className="w-4 h-4" />
                           <span>
-                            {journee.heureDebutMatin || "09:00"} - {journee.heureFinAprem || "17:00"}
+                            {journee.heureDebutMatin || "09:00"} - {journee.heureFinMatin || "12:30"}
+                            {" / "}
+                            {journee.heureDebutAprem || "14:00"} - {journee.heureFinAprem || "17:30"}
                           </span>
                         </div>
                       </div>
@@ -226,29 +338,231 @@ export default function IntervenantEmargementsPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {journee.feuilleId && (
-                        <>
-                          <button
-                            className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-lg transition-colors"
-                            title="Voir la feuille"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
-                          <button
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-                            title="Télécharger"
-                          >
-                            <Download className="w-5 h-5" />
-                          </button>
-                        </>
+                      {isClickable && (
+                        <span className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5">
+                          <Eye className="w-4 h-4" />
+                          Ouvrir
+                        </span>
                       )}
-                      <ChevronRight className="w-5 h-5 text-gray-300" />
+                      <ChevronRight className={`w-5 h-5 ${isClickable ? "text-emerald-400" : "text-gray-300"}`} />
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal détail feuille d'émargement */}
+      {selectedJournee && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Feuille d&apos;émargement
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {formatDate(selectedJournee.date)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {feuilleDetail?.feuille.token && (
+                  <button
+                    onClick={() => openEmargementPage(feuilleDetail.feuille.token)}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Émargement en ligne
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+                <button
+                  onClick={closeFeuilleDetail}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingDetail ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                </div>
+              ) : feuilleDetail ? (
+                <div className="space-y-6">
+                  {/* Infos formation */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                      {feuilleDetail.formation.titre}
+                    </h3>
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {formatDate(feuilleDetail.journee.date)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        Matin : {feuilleDetail.journee.heureDebutMatin || "09:00"} – {feuilleDetail.journee.heureFinMatin || "12:30"}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        Après-midi : {feuilleDetail.journee.heureDebutAprem || "14:00"} – {feuilleDetail.journee.heureFinAprem || "17:30"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Stats signatures */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {feuilleDetail.participants.length}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Participants</p>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {feuilleDetail.feuille.signatures.filter(s => s.periode === "matin").length}/{feuilleDetail.participants.length}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Matin</p>
+                    </div>
+                    <div className="bg-indigo-50 dark:bg-indigo-500/10 rounded-xl p-4 text-center">
+                      <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                        {feuilleDetail.feuille.signatures.filter(s => s.periode === "apres_midi").length}/{feuilleDetail.participants.length}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Après-midi</p>
+                    </div>
+                  </div>
+
+                  {/* Tableau des participants */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-100 dark:bg-gray-700">
+                          <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-left text-sm font-medium text-gray-900 dark:text-white">
+                            Participant
+                          </th>
+                          <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-900 dark:text-white">
+                            Matin
+                          </th>
+                          <th className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center text-sm font-medium text-gray-900 dark:text-white">
+                            Après-midi
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {feuilleDetail.participants.map((participant) => {
+                          const sigMatin = getSignature(participant.id, "matin");
+                          const sigAprem = getSignature(participant.id, "apres_midi");
+
+                          return (
+                            <tr key={participant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <td className="border border-gray-200 dark:border-gray-600 px-4 py-3">
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {participant.apprenant.prenom} {participant.apprenant.nom}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {participant.apprenant.email}
+                                </p>
+                              </td>
+                              <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center">
+                                {sigMatin ? (
+                                  <div className="flex flex-col items-center">
+                                    {sigMatin.signatureData ? (
+                                      <img
+                                        src={sigMatin.signatureData}
+                                        alt="Signature"
+                                        className="max-h-10 max-w-24"
+                                      />
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-xs rounded-full">
+                                        <Check className="w-3 h-3" /> Signé
+                                      </span>
+                                    )}
+                                    {sigMatin.signedAt && (
+                                      <span className="text-xs text-gray-400 mt-1">
+                                        {formatDateTime(sigMatin.signedAt)}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-300 dark:text-gray-600 text-xl">—</span>
+                                )}
+                              </td>
+                              <td className="border border-gray-200 dark:border-gray-600 px-4 py-3 text-center">
+                                {sigAprem ? (
+                                  <div className="flex flex-col items-center">
+                                    {sigAprem.signatureData ? (
+                                      <img
+                                        src={sigAprem.signatureData}
+                                        alt="Signature"
+                                        className="max-h-10 max-w-24"
+                                      />
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-xs rounded-full">
+                                        <Check className="w-3 h-3" /> Signé
+                                      </span>
+                                    )}
+                                    {sigAprem.signedAt && (
+                                      <span className="text-xs text-gray-400 mt-1">
+                                        {formatDateTime(sigAprem.signedAt)}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-300 dark:text-gray-600 text-xl">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {feuilleDetail.participants.length === 0 && (
+                    <div className="text-center py-8 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                      <Users className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 dark:text-gray-400">
+                        Aucun participant inscrit à cette session
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Erreur lors du chargement des données
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={closeFeuilleDetail}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Fermer
+              </button>
+              {feuilleDetail?.feuille.token && (
+                <button
+                  onClick={() => openEmargementPage(feuilleDetail.feuille.token)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <PenLine className="w-4 h-4" />
+                  Faire signer les participants
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

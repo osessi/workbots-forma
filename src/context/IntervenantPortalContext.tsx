@@ -42,6 +42,9 @@ interface Formation {
   publicCible?: string | null;
   prerequis?: string | null;
   moyensPedagogiques?: string | null;
+  suiviEvaluation?: string | null;
+  delaiAcces?: string | null;
+  accessibilite?: string | null;
   modules?: Module[];
 }
 
@@ -58,6 +61,8 @@ interface Journee {
   id: string;
   date: string;
   heureDebutMatin: string | null;
+  heureFinMatin: string | null;
+  heureDebutAprem: string | null;
   heureFinAprem: string | null;
 }
 
@@ -146,6 +151,36 @@ export function IntervenantPortalProvider({ children }: { children: ReactNode })
   // Computed
   const isAuthenticated = !!token && !!intervenant;
   const selectedSession = sessions.find(s => s.id === selectedSessionId) || sessions[0] || null;
+
+  // Calculer les stats automatiquement à partir des sessions
+  const computedStats: DashboardStats = React.useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const sessionsEnCours = sessions.filter(s => s.status === "EN_COURS").length;
+    const sessionsAVenir = sessions.filter(s => {
+      if (s.status === "PLANIFIEE") return true;
+      // Aussi compter les sessions dont la date de début est dans le futur
+      if (s.dateDebut && new Date(s.dateDebut) > now) return true;
+      return false;
+    }).length;
+    const totalApprenants = sessions.reduce((sum, s) => sum + (s.nombreApprenants || 0), 0);
+
+    // Calculer émargements en attente et évaluations à corriger
+    // Pour l'instant, on utilise les valeurs du dashboardStats si elles existent
+    const emargementsEnAttente = dashboardStats?.emargementsEnAttente || 0;
+    const evaluationsACorreger = dashboardStats?.evaluationsACorreger || 0;
+    const prochainsCréneaux = dashboardStats?.prochainsCréneaux || 0;
+
+    return {
+      sessionsEnCours,
+      sessionsAVenir,
+      totalApprenants,
+      emargementsEnAttente,
+      evaluationsACorreger,
+      prochainsCréneaux,
+    };
+  }, [sessions, dashboardStats]);
 
   // =====================================
   // FETCH DATA
@@ -281,7 +316,7 @@ export function IntervenantPortalProvider({ children }: { children: ReactNode })
     organization,
     sessions,
     selectedSession,
-    dashboardStats,
+    dashboardStats: computedStats, // Utiliser les stats calculées automatiquement
 
     // Actions
     login,

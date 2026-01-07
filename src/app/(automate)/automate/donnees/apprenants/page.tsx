@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -82,7 +82,7 @@ const statutColors = {
   PARTICULIER: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400",
 };
 
-export default function ApprenantsPage() {
+function ApprenantsPageContent() {
   const searchParams = useSearchParams();
   const entrepriseIdFromUrl = searchParams.get("entreprise");
 
@@ -911,5 +911,14 @@ export default function ApprenantsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Wrapper avec Suspense pour useSearchParams
+export default function ApprenantsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div></div>}>
+      <ApprenantsPageContent />
+    </Suspense>
   );
 }

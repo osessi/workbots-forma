@@ -3,7 +3,7 @@
 // PAGE EDITEUR DE TEMPLATE - STYLE WORD
 // ===========================================
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -70,7 +70,7 @@ const MARGIN_LEFT_MM = 25;
 const MARGIN_RIGHT_MM = 25;
 const HEADER_HEIGHT_MM = 30;
 
-export default function TemplateEditorPage() {
+function TemplateEditorPageContent() {
   const searchParams = useSearchParams();
   const templateId = searchParams.get("id");
 
@@ -1022,5 +1022,13 @@ export default function TemplateEditorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TemplateEditorPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div></div>}>
+      <TemplateEditorPageContent />
+    </Suspense>
   );
 }

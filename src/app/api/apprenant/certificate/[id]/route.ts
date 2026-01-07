@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
+import { generatePDFFromHtmlRaw } from "@/lib/services/pdf-generator";
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -108,12 +109,25 @@ export async function GET(
       sessionReference: session.reference,
     });
 
-    // Retourner le HTML (pour l'instant, le PDF nécessiterait une lib comme puppeteer)
-    // On retourne un HTML stylé qui peut être imprimé en PDF
-    return new NextResponse(certificateHtml, {
+    // Générer le PDF à partir du HTML
+    const pdfBuffer = await generatePDFFromHtmlRaw(certificateHtml, {
+      format: "A4",
+      landscape: true,
+      margin: {
+        top: "10mm",
+        right: "10mm",
+        bottom: "10mm",
+        left: "10mm",
+      },
+    });
+
+    // Retourner le PDF
+    const fileName = `Certificat_${apprenant.prenom}_${apprenant.nom}_${participantData.numeroCertificat || id}.pdf`;
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Disposition": `inline; filename="certificat-${participantData.numeroCertificat || id}.html"`,
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${fileName}"`,
+        "Content-Length": pdfBuffer.length.toString(),
       },
     });
 

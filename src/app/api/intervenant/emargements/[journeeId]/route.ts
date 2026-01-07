@@ -90,9 +90,9 @@ export async function GET(
             signatures: {
               select: {
                 id: true,
-                signataire: true,
+                typeSignataire: true,
                 participantId: true,
-                intervenantId: true,
+                formateurId: true,
                 periode: true,
                 signedAt: true,
                 signatureData: true,
@@ -146,20 +146,20 @@ export async function GET(
     if (!feuille) {
       // Créer une feuille d'émargement si elle n'existe pas
       const newToken = crypto.randomUUID();
-      feuille = await prisma.feuilleEmargement.create({
+      feuille = await prisma.feuilleEmargementNew.create({
         data: {
           journeeId: journee.id,
           token: newToken,
-          status: "active",
+          isActive: true,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
         },
         include: {
           signatures: {
             select: {
               id: true,
-              signataire: true,
+              typeSignataire: true,
               participantId: true,
-              intervenantId: true,
+              formateurId: true,
               periode: true,
               signedAt: true,
               signatureData: true,
@@ -188,12 +188,12 @@ export async function GET(
       feuille: {
         id: feuille.id,
         token: feuille.token,
-        status: feuille.status,
-        signatures: feuille.signatures.map((s) => ({
+        status: feuille.isActive ? "active" : "inactive",
+        signatures: feuille.signatures.map((s: { id: string; typeSignataire: string; participantId: string | null; formateurId: string | null; periode: string; signedAt: Date | null; signatureData: string | null }) => ({
           id: s.id,
-          signataire: s.signataire,
+          signataire: s.typeSignataire,
           participantId: s.participantId,
-          intervenantId: s.intervenantId,
+          intervenantId: s.formateurId,
           periode: s.periode,
           signedAt: s.signedAt?.toISOString(),
           signatureData: s.signatureData,

@@ -8,6 +8,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 
 const STORAGE_BUCKET = "worksbots-forma-stockage";
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -184,7 +185,7 @@ export async function POST(
     await prisma.reclamation.update({
       where: { id: reclamationId },
       data: {
-        piecesJointes: [...existingPieces, newPiece],
+        piecesJointes: [...existingPieces, newPiece] as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -308,7 +309,7 @@ export async function DELETE(
     await prisma.reclamation.update({
       where: { id: reclamationId },
       data: {
-        piecesJointes: updatedPieces.length > 0 ? updatedPieces : null,
+        piecesJointes: updatedPieces.length > 0 ? (updatedPieces as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
 

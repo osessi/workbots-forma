@@ -1010,7 +1010,7 @@ function NewAmeliorationModal({
               </label>
               <select
                 value={formData.origine}
-                onChange={(e) => setFormData({ ...formData, origine: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, origine: e.target.value as ActionAmelioration["origine"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {Object.entries(ORIGINE_CONFIG).map(([key, config]) => (
@@ -1025,7 +1025,7 @@ function NewAmeliorationModal({
               </label>
               <select
                 value={formData.priorite}
-                onChange={(e) => setFormData({ ...formData, priorite: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, priorite: e.target.value as ActionAmelioration["priorite"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {Object.entries(PRIORITE_CONFIG).map(([key, config]) => (
@@ -1231,7 +1231,7 @@ function EditAmeliorationModal({
               </label>
               <select
                 value={formData.origine}
-                onChange={(e) => setFormData({ ...formData, origine: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, origine: e.target.value as ActionAmelioration["origine"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {Object.entries(ORIGINE_CONFIG).map(([key, config]) => (
@@ -1246,7 +1246,7 @@ function EditAmeliorationModal({
               </label>
               <select
                 value={formData.priorite}
-                onChange={(e) => setFormData({ ...formData, priorite: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, priorite: e.target.value as ActionAmelioration["priorite"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {Object.entries(PRIORITE_CONFIG).map(([key, config]) => (

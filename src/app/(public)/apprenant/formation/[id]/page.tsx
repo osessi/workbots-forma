@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   GraduationCap,
@@ -106,12 +106,11 @@ const formatDuration = (minutes: number) => {
 // MAIN COMPONENT
 // =====================================
 
-export default function FormationDetailPage({
-  params,
+function FormationDetailPageContent({
+  resolvedParams,
 }: {
-  params: Promise<{ id: string }>;
+  resolvedParams: { id: string };
 }) {
-  const resolvedParams = use(params);
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
@@ -609,5 +608,19 @@ export default function FormationDetailPage({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function FormationDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
+
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div></div>}>
+      <FormationDetailPageContent resolvedParams={resolvedParams} />
+    </Suspense>
   );
 }

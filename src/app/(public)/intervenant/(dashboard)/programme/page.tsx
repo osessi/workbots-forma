@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
@@ -25,7 +25,7 @@ import {
   Info,
 } from "lucide-react";
 
-export default function IntervenantProgrammePage() {
+function IntervenantProgrammePageContent() {
   useRequireIntervenantAuth();
   const { selectedSession, isLoading, selectSession, sessions } = useIntervenantPortal();
   const searchParams = useSearchParams();
@@ -630,5 +630,13 @@ export default function IntervenantProgrammePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function IntervenantProgrammePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div></div>}>
+      <IntervenantProgrammePageContent />
+    </Suspense>
   );
 }

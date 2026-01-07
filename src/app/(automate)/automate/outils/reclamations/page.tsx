@@ -984,7 +984,7 @@ function NewReclamationModal({
               </label>
               <select
                 value={formData.origine}
-                onChange={(e) => setFormData({ ...formData, origine: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, origine: e.target.value as Reclamation["origine"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {Object.entries(ORIGINE_CONFIG).map(([value, config]) => (
@@ -999,7 +999,7 @@ function NewReclamationModal({
               </label>
               <select
                 value={formData.categorie}
-                onChange={(e) => setFormData({ ...formData, categorie: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, categorie: e.target.value as Reclamation["categorie"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {CATEGORIE_OPTIONS.map(opt => (
@@ -1211,7 +1211,7 @@ function EditReclamationModal({
               </label>
               <select
                 value={formData.origine}
-                onChange={(e) => setFormData({ ...formData, origine: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, origine: e.target.value as Reclamation["origine"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {Object.entries(ORIGINE_CONFIG).map(([value, config]) => (
@@ -1226,7 +1226,7 @@ function EditReclamationModal({
               </label>
               <select
                 value={formData.categorie}
-                onChange={(e) => setFormData({ ...formData, categorie: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, categorie: e.target.value as Reclamation["categorie"] })}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
                 {CATEGORIE_OPTIONS.map(opt => (

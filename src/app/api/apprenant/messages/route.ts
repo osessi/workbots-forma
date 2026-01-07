@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 
 // Décoder et valider le token apprenant (encodé en base64url JSON)
 function decodeApprenantToken(token: string): { apprenantId: string; organizationId: string } | null {
@@ -245,7 +246,7 @@ export async function POST(request: NextRequest) {
             ...currentMetadata,
             replies,
             repliesReadByApprenant: true, // L'apprenant a vu ses propres réponses
-          },
+          } as Prisma.InputJsonValue,
           // Marquer comme non lu pour l'organisme
           isRead: false,
           readAt: null,

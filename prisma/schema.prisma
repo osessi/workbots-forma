@@ -324,6 +324,7 @@ model Organization {
   evaluationsSatisfaction EvaluationSatisfaction[]
   evaluationsIntervenant  EvaluationIntervenant[]
   evaluationsFinanceur    EvaluationFinanceur[]
+  evaluationsEntreprise   EvaluationEntreprise[]
 
   // Organigramme (Qualiopi IND 9)
   organigrammePostes OrganigrammePoste[]
@@ -1303,6 +1304,9 @@ model Entreprise {
   // Nouveau système de sessions
   sessionsClientNew SessionClientNew[] @relation("SessionClientEntreprise")
 
+  // Évaluations entreprise
+  evaluationsEntreprise EvaluationEntreprise[] @relation("EvaluationEntrepriseEntreprise")
+
   @@index([organizationId])
   @@index([raisonSociale])
   @@index([siret])
@@ -1761,6 +1765,7 @@ model DocumentSession {
   evaluationsSatisfaction EvaluationSatisfaction[]
   evaluationsIntervenant  EvaluationIntervenant[]
   evaluationsFinanceur    EvaluationFinanceur[]
+  evaluationsEntreprise   EvaluationEntreprise[]
 
   // Réunions vidéo liées
   videoMeetings  VideoMeeting[]
@@ -4014,6 +4019,167 @@ model EvaluationFinanceurReponse {
   // SCORES CALCULÉS
   // ===========================================
   scoreMoyen Float?
+
+  // ===========================================
+  // METADATA TECHNIQUE
+  // ===========================================
+  ipAddress String?
+  userAgent String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([evaluationId])
+}
+
+// ===========================================
+// ÉVALUATION ENTREPRISE - Qualiopi
+// ===========================================
+// Évaluation de satisfaction des entreprises clientes
+// Permet de mesurer la satisfaction du donneur d'ordre (DRH, responsable formation, etc.)
+
+enum EvaluationEntrepriseStatus {
+  PENDING // En attente
+  IN_PROGRESS // Commencé mais pas terminé
+  COMPLETED // Complété
+  EXPIRED // Expiré (lien plus valide)
+}
+
+model EvaluationEntreprise {
+  id String @id @default(cuid())
+
+  // Organisation (multi-tenant)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Session de formation liée
+  sessionId String
+  session   DocumentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Entreprise concernée
+  entrepriseId String
+  entreprise   Entreprise @relation("EvaluationEntrepriseEntreprise", fields: [entrepriseId], references: [id], onDelete: Cascade)
+
+  // Token unique pour accès public (QR code / lien)
+  token String @unique @default(cuid())
+
+  // Statut
+  status EvaluationEntrepriseStatus @default(PENDING)
+
+  // Dates
+  expiresAt   DateTime? // Date d'expiration du lien
+  sentAt      DateTime? // Date d'envoi à l'entreprise
+  startedAt   DateTime? // Date de début de complétion
+  completedAt DateTime? // Date de complétion
+
+  // Réponse (stockée dans un modèle séparé)
+  reponse EvaluationEntrepriseReponse?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, entrepriseId])
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([entrepriseId])
+  @@index([token])
+  @@index([status])
+}
+
+// Réponses détaillées à l'évaluation entreprise
+model EvaluationEntrepriseReponse {
+  id String @id @default(cuid())
+
+  // Évaluation parent
+  evaluationId String               @unique
+  evaluation   EvaluationEntreprise @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  // ===========================================
+  // INFORMATIONS DU RÉPONDANT
+  // ===========================================
+  nomContact      String?
+  prenomContact   String?
+  fonctionContact String?
+
+  // ===========================================
+  // SECTION 1: PRÉPARATION DE LA FORMATION
+  // ===========================================
+  // L'analyse des besoins de formation a-t-elle été réalisée correctement ?
+  analyseBesoins Int? // Note 0-10
+
+  // Le programme proposé correspondait-il à vos attentes ?
+  programmeAttentes Int? // Note 0-10
+
+  // Les modalités logistiques (dates, lieu, etc.) étaient-elles adaptées ?
+  modalitesLogistiques Int? // Note 0-10
+
+  // ===========================================
+  // SECTION 2: QUALITÉ DE LA FORMATION
+  // ===========================================
+  // Les objectifs de formation ont-ils été atteints ?
+  objectifsAtteints Int? // Note 0-10
+
+  // La qualité pédagogique du formateur était-elle satisfaisante ?
+  qualitePedagogique Int? // Note 0-10
+
+  // Les supports pédagogiques étaient-ils adaptés et de qualité ?
+  qualiteSupports Int? // Note 0-10
+
+  // La formation a-t-elle répondu aux besoins opérationnels identifiés ?
+  reponseBesoinsOperationnels Int? // Note 0-10
+
+  // ===========================================
+  // SECTION 3: SUIVI ET COMMUNICATION
+  // ===========================================
+  // La communication avec l'organisme de formation était-elle efficace ?
+  qualiteCommunication Int? // Note 0-10
+
+  // Les documents administratifs ont-ils été transmis dans les délais ?
+  documentsDelais Int? // Note 0-10
+
+  // Un suivi post-formation a-t-il été proposé ?
+  suiviPostFormation Int? // Note 0-10
+
+  // ===========================================
+  // SECTION 4: SATISFACTION GLOBALE
+  // ===========================================
+  // Quel est votre niveau de satisfaction globale ?
+  satisfactionGlobale Int? // Note 0-10
+
+  // Recommanderiez-vous cet organisme de formation ?
+  recommandation Int? // Note 0-10
+
+  // Feriez-vous à nouveau appel à cet organisme ?
+  nouvelleCollaboration Int? // Note 0-10
+
+  // ===========================================
+  // SECTION 5: IMPACT
+  // ===========================================
+  // Avez-vous constaté une amélioration des compétences des collaborateurs formés ?
+  ameliorationCompetences Int? // Note 0-10
+
+  // Cette formation a-t-elle eu un impact positif sur votre activité ?
+  impactActivite Int? // Note 0-10
+
+  // ===========================================
+  // COMMENTAIRES
+  // ===========================================
+  pointsForts       String? @db.Text
+  pointsAmeliorer   String? @db.Text
+  suggestionsAutres String? @db.Text
+
+  // ===========================================
+  // SCORES CALCULÉS
+  // ===========================================
+  scoreMoyen          Float?
+  scorePreparation    Float? // Moyenne section 1
+  scoreQualite        Float? // Moyenne section 2
+  scoreSuivi          Float? // Moyenne section 3
+  scoreSatisfaction   Float? // Moyenne section 4
+  scoreImpact         Float? // Moyenne section 5
+  tauxSatisfaction    Float? // Score global sur 100
 
   // ===========================================
   // METADATA TECHNIQUE

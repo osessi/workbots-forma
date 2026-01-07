@@ -2,7 +2,6 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useAutomate } from "@/context/AutomateContext";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import OrganigrammeTab from "@/components/automate/settings/OrganigrammeTab";
 import ProceduresTab from "@/components/automate/settings/ProceduresTab";
@@ -687,12 +686,11 @@ export default function SettingsPage() {
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
                           ) : organisme.logo ? (
                             <div className="relative">
-                              <Image
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
                                 src={organisme.logo}
                                 alt="Logo"
-                                width={120}
-                                height={60}
-                                className="object-contain max-h-16"
+                                className="object-contain max-h-16 max-w-[120px]"
                               />
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOrganismeChange("logo", ""); }}
@@ -732,12 +730,11 @@ export default function SettingsPage() {
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
                           ) : organisme.signature ? (
                             <div className="relative">
-                              <Image
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
                                 src={organisme.signature}
                                 alt="Signature"
-                                width={120}
-                                height={60}
-                                className="object-contain max-h-16"
+                                className="object-contain max-h-16 max-w-[120px]"
                               />
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOrganismeChange("signature", ""); }}
@@ -779,12 +776,11 @@ export default function SettingsPage() {
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
                           ) : organisme.cachet ? (
                             <div className="relative">
-                              <Image
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
                                 src={organisme.cachet}
                                 alt="Cachet"
-                                width={80}
-                                height={80}
-                                className="object-contain max-h-16"
+                                className="object-contain max-h-16 max-w-[80px]"
                               />
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOrganismeChange("cachet", ""); }}
@@ -901,11 +897,10 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700">
                               {member.avatar ? (
-                                <Image
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
                                   src={member.avatar}
                                   alt={member.name}
-                                  width={40}
-                                  height={40}
                                   className="object-cover w-full h-full"
                                 />
                               ) : (
@@ -1054,12 +1049,11 @@ export default function SettingsPage() {
                 </h3>
                 <div className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800">
                   {organisme.logo ? (
-                    <Image
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
                       src={organisme.logo}
                       alt="Logo"
-                      width={48}
-                      height={48}
-                      className="object-contain"
+                      className="w-12 h-12 object-contain"
                     />
                   ) : (
                     <div

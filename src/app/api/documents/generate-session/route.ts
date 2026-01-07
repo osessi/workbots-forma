@@ -157,6 +157,11 @@ function mapDocumentType(wizardType: string): DocumentType | null {
     evaluation_entreprise: "EVALUATION_ENTREPRISE",
     evaluation_financeur: "EVALUATION_FINANCEUR",
     evaluation_intervenant: "EVALUATION_INTERVENANT",
+    // Nouveaux types
+    programme: "PROGRAMME_FORMATION",
+    reglement_interieur: "REGLEMENT_INTERIEUR",
+    cgv: "CONDITIONS_GENERALES_VENTE",
+    contrat_sous_traitance: "CONTRAT_SOUS_TRAITANCE",
   };
   return mapping[wizardType] || null;
 }
@@ -176,6 +181,11 @@ function mapToFileCategory(docType: string): FileCategory {
     evaluation_entreprise: "EVALUATION",
     evaluation_financeur: "EVALUATION",
     evaluation_intervenant: "EVALUATION",
+    // Nouveaux types
+    programme: "DOCUMENT",
+    reglement_interieur: "DOCUMENT",
+    cgv: "DOCUMENT",
+    contrat_sous_traitance: "DOCUMENT",
   };
   return mapping[docType] || "DOCUMENT";
 }
@@ -561,14 +571,70 @@ export async function POST(request: NextRequest) {
 
     const generatedDocuments: GeneratedDocument[] = [];
 
+    // Récupérer les données complètes de la formation depuis la base de données
+    let formationComplete = null;
+    let fichePeda: Record<string, unknown> | null = null;
+    if (formation.id) {
+      formationComplete = await prisma.formation.findUnique({
+        where: { id: formation.id },
+      });
+      // Les données détaillées sont dans fichePedagogique (JSON)
+      if (formationComplete?.fichePedagogique) {
+        fichePeda = formationComplete.fichePedagogique as Record<string, unknown>;
+      }
+    }
+
+    // Helper pour extraire les valeurs de la fiche pédagogique (support des différentes conventions de nommage)
+    const getFicheValue = (keys: string[], defaultValue: string = ""): string => {
+      if (!fichePeda) return defaultValue;
+      for (const key of keys) {
+        const value = fichePeda[key];
+        if (value !== undefined && value !== null && value !== "") {
+          // Si c'est un tableau, le joindre
+          if (Array.isArray(value)) {
+            return value.join("\n- ");
+          }
+          return String(value);
+        }
+      }
+      return defaultValue;
+    };
+
+    // Générer le planning des journées au format texte
+    const planningJournees = lieu.journees.map((j, index) => {
+      const dateFormatted = formatDateFr(j.date);
+      return `Jour ${index + 1} (${dateFormatted}) : Matin ${j.horaireMatin || "09:00 - 12:30"}, Après-midi ${j.horaireApresMidi || "14:00 - 17:30"}`;
+    }).join("\n");
+
     // Construire le contexte de base commun à tous les documents
     const baseContext = {
+      // ===========================================
+      // FORMATION (formation_)
+      // ===========================================
       formation: {
         id: formation.id || "",
-        titre: formation.titre,
+        titre: formationComplete?.titre || formation.titre,
+        modalite: lieu.modalite === "PRESENTIEL" ? "Présentiel" :
+                  lieu.modalite === "DISTANCIEL" ? "Distanciel" : "Mixte",
+        categorie_action: getFicheValue(["categorieAction", "categorie_action"], "Action de formation"),
+        duree_heures: getFicheValue(["dureeHeures", "duree_heures", "nombreHeures"], String(formation.dureeHeures)),
+        duree_jours: getFicheValue(["dureeJours", "duree_jours", "nombreJours"], String(formation.dureeJours)),
+        duree_heures_jours: `${getFicheValue(["dureeHeures", "duree_heures"], String(formation.dureeHeures))} heures (${getFicheValue(["dureeJours", "duree_jours"], String(formation.dureeJours))} jours)`,
+        nb_participants_max: getFicheValue(["nbParticipantsMax", "nb_participants_max", "nbParticipants"], "12"),
+        description: formationComplete?.description || getFicheValue(["description"]),
+        objectifs_pedagogiques: getFicheValue(["objectifsPedagogiques", "objectifs_pedagogiques", "objectifs"]),
+        prerequis: formationComplete?.prerequis || getFicheValue(["prerequis", "preRequis"], "Aucun prérequis"),
+        public_vise: getFicheValue(["publicVise", "public_vise", "publicCible", "public"]),
+        contenu_detaille: getFicheValue(["contenuDetaille", "contenu_detaille", "contenu", "programmeDetaille"]),
+        suivi_execution_evaluation: getFicheValue(["suiviExecutionEvaluation", "suivi_execution_evaluation", "suiviEvaluation"], "Feuilles de présence signées, QCM d'évaluation des acquis"),
+        ressources_pedagogiques: getFicheValue(["ressourcesPedagogiques", "ressources_pedagogiques", "ressources", "moyensPedagogiques"], "Supports de cours, exercices pratiques"),
+        accessibilite: getFicheValue(["accessibilite", "accessibiliteHandicap"], "Formation accessible aux personnes en situation de handicap"),
+        delai_acces: getFicheValue(["delaiAcces", "delai_acces"], "14 jours ouvrables avant le début de la formation"),
+        tarif_entreprise_ht_fiche_peda: `${formation.tarifEntreprise.toLocaleString("fr-FR")} € HT`,
+        tarif_independant_ht_fiche_peda: `${formation.tarifIndependant.toLocaleString("fr-FR")} € HT`,
+        tarif_particulier_ttc_fiche_peda: `${formation.tarifParticulier.toLocaleString("fr-FR")} € TTC`,
+        // Legacy/compatibilité
         duree: `${formation.dureeHeures} heures (${formation.dureeJours} jours)`,
-        duree_heures: formation.dureeHeures,
-        nombre_jours: formation.dureeJours,
         prix: formation.tarifEntreprise,
         prix_format: `${formation.tarifEntreprise.toLocaleString("fr-FR")} € HT`,
         modalites: lieu.modalite === "PRESENTIEL" ? "Présentiel" :
@@ -582,14 +648,93 @@ export async function POST(request: NextRequest) {
         date_fin: lieu.journees[lieu.journees.length - 1]?.date
                    ? formatDateFr(lieu.journees[lieu.journees.length - 1].date) : "",
       },
+
+      // ===========================================
+      // SESSION (session_)
+      // ===========================================
+      session: {
+        modalite: lieu.modalite === "PRESENTIEL" ? "Présentiel" :
+                  lieu.modalite === "DISTANCIEL" ? "Distanciel" : "Mixte",
+        date_debut: lieu.journees[0]?.date ? formatDateFr(lieu.journees[0].date) : "",
+        date_fin: lieu.journees[lieu.journees.length - 1]?.date
+                   ? formatDateFr(lieu.journees[lieu.journees.length - 1].date) : "",
+        planning_journees_formation: planningJournees,
+        journees: lieu.journees.map((j, index) => ({
+          numero: index + 1,
+          date: formatDateFr(j.date),
+          horaire_matin: j.horaireMatin || "09:00 - 12:30",
+          horaire_apres_midi: j.horaireApresMidi || "14:00 - 17:30",
+        })),
+      },
+
+      // ===========================================
+      // LIEU (lieu_)
+      // ===========================================
+      lieu: {
+        type: lieu.modalite === "PRESENTIEL" ? "PRESENTIEL" : "VISIOCONFERENCE",
+        nom: lieu.lieu?.nom || "Lieu de formation",
+        formation: lieu.lieu?.lieuFormation || lieu.adresseLibre || lieu.lienConnexion || "",
+        code_postal: lieu.lieu?.codePostal || "",
+        ville: lieu.lieu?.ville || "",
+        informations_pratiques: lieu.lieu ? `${lieu.lieu.lieuFormation}${lieu.lieu.ville ? `, ${lieu.lieu.ville}` : ""}` : lieu.lienConnexion || "",
+        capacite: 12,
+      },
+
+      // ===========================================
+      // INTERVENANT (intervenant_)
+      // ===========================================
+      intervenant: {
+        nom: formateurs.formateurPrincipal?.nom || "",
+        prenom: formateurs.formateurPrincipal?.prenom || "",
+        adresse: "",
+        code_postal: "",
+        ville: "",
+        pays: "France",
+        email: formateurs.formateurPrincipal?.email || "",
+        telephone: formateurs.formateurPrincipal?.telephone || "",
+        specialites: formateurs.formateurPrincipal?.specialites?.join(", ") || "",
+        raison_sociale: "",
+        siret: "",
+        nda: "",
+      },
+
+      // Liste des intervenants pour les boucles
+      intervenants: [
+        ...(formateurs.formateurPrincipal ? [{
+          id: formateurs.formateurPrincipal.id,
+          nom: formateurs.formateurPrincipal.nom,
+          prenom: formateurs.formateurPrincipal.prenom,
+          email: formateurs.formateurPrincipal.email || "",
+          specialites: formateurs.formateurPrincipal.specialites || [],
+        }] : []),
+        ...formateurs.coformateurs.map(cf => ({
+          id: cf.id,
+          nom: cf.nom,
+          prenom: cf.prenom,
+          email: cf.email || "",
+          specialites: [],
+        })),
+      ],
+      intervenant_equipe_pedagogique: formateurs.formateurPrincipal
+        ? `${formateurs.formateurPrincipal.prenom} ${formateurs.formateurPrincipal.nom}${formateurs.formateurPrincipal.specialites?.length ? ` (${formateurs.formateurPrincipal.specialites.join(", ")})` : ""}`
+        : "",
+
+      // ===========================================
+      // JOURNEES pour les boucles
+      // ===========================================
       journees: lieu.journees.map((j, index) => ({
         numero: index + 1,
         date: formatDateFr(j.date),
         date_courte: formatDateCourteFr(j.date),
-        horaires_matin: j.horaireMatin,
-        horaires_apres_midi: j.horaireApresMidi,
+        horaires_matin: j.horaireMatin || "09:00 - 12:30",
+        horaires_apres_midi: j.horaireApresMidi || "14:00 - 17:30",
+        horaire_matin: j.horaireMatin || "09:00 - 12:30",
+        horaire_apres_midi: j.horaireApresMidi || "14:00 - 17:30",
       })),
-      // Nouveau format OF (of_)
+
+      // ===========================================
+      // ORGANISME DE FORMATION (of_)
+      // ===========================================
       of: {
         raison_sociale: user.organization?.name || "",
         nom_commercial: user.organization?.nomCommercial || "",
@@ -611,7 +756,24 @@ export async function POST(request: NextRequest) {
         cachet: user.organization?.cachet || "",
         logo_organisme: user.organization?.logo || "",
       },
-      // Ancien format pour compatibilité (legacy)
+
+      // ===========================================
+      // DATES DU JOUR (date_)
+      // ===========================================
+      dates: {
+        jour: String(new Date().getDate()).padStart(2, "0"),
+        mois: getMonthName(new Date().getMonth()),
+        annee: String(new Date().getFullYear()),
+        complete_longue: formatDateCompleteFr(new Date()),
+        complete_courte: formatDateCourteFr(new Date().toISOString().split("T")[0]),
+        // Legacy
+        date_complete: formatDateCompleteFr(new Date()),
+        date_courte: formatDateCourteFr(new Date().toISOString().split("T")[0]),
+      },
+
+      // ===========================================
+      // LEGACY - Ancien format pour compatibilité
+      // ===========================================
       organisation: {
         nom: user.organization?.name || "",
         siret: user.organization?.siret || "",
@@ -645,13 +807,6 @@ export async function POST(request: NextRequest) {
         email: cf.email || "",
         telephone: cf.telephone || "",
       })),
-      dates: {
-        jour: String(new Date().getDate()).padStart(2, "0"),
-        mois: getMonthName(new Date().getMonth()),
-        annee: String(new Date().getFullYear()),
-        date_complete: formatDateCompleteFr(new Date()),
-        date_courte: formatDateCourteFr(new Date().toISOString().split("T")[0]),
-      },
       signature: {
         responsable_organisme: user.organization?.signature || "",
       },
@@ -791,6 +946,21 @@ export async function POST(request: NextRequest) {
                 // Liste des apprenants pour les boucles {{#each apprenants}}
                 apprenants: apprenantsComplets,
                 apprenants_liste: apprenantsComplets.map(a => `${a.prenom} ${a.nom}`).join(", "),
+                // Apprenant singulier (premier de la liste) pour les templates qui utilisent apprenant_*
+                // Note: Pour les conventions entreprise, ce n'est normalement pas utilisé mais certains templates le référencent
+                apprenant: apprenantsComplets.length > 0 ? {
+                  nom: apprenantsComplets[0].nom,
+                  prenom: apprenantsComplets[0].prenom,
+                  statut: "SALARIE",
+                  raison_sociale: "",
+                  siret: "",
+                  adresse: "",
+                  code_postal: "",
+                  ville: "",
+                  pays: "France",
+                  email: apprenantsComplets[0].email || "",
+                  telephone: apprenantsComplets[0].telephone || "",
+                } : undefined,
                 // Ancien format tarif pour compatibilité
                 tarif: {
                   ht: tarif?.tarifHT || 0,
@@ -1576,6 +1746,180 @@ export async function POST(request: NextRequest) {
             }
 
             generatedDocuments.push(factureEntry);
+          }
+          break;
+
+        case "programme":
+          // Programme de formation = un document global par session
+          {
+            const programmeDoc = await generateDocument(
+              template,
+              {
+                ...baseContext,
+              },
+              false
+            );
+
+            const programmeEntry: GeneratedDocument = {
+              id: `programme_${Date.now()}`,
+              type: "programme",
+              titre: `Programme - ${formation.titre}`,
+              renderedContent: programmeDoc,
+            };
+
+            if (autoSaveToDrive && formation.id) {
+              const saveResult = await saveDocumentToDrive({
+                organizationId: user.organizationId!,
+                userId: user.id,
+                formationId: formation.id,
+                formationTitre: formation.titre,
+                documentType: "programme",
+                titre: programmeEntry.titre,
+                content: programmeDoc,
+              });
+              programmeEntry.savedToDrive = saveResult.success;
+              programmeEntry.fileId = saveResult.fileId;
+            }
+
+            generatedDocuments.push(programmeEntry);
+          }
+          break;
+
+        case "reglement_interieur":
+          // Règlement intérieur = un document global par session
+          {
+            const reglementDoc = await generateDocument(
+              template,
+              {
+                ...baseContext,
+              },
+              false
+            );
+
+            const reglementEntry: GeneratedDocument = {
+              id: `reglement_${Date.now()}`,
+              type: "reglement_interieur",
+              titre: `Règlement Intérieur - ${formation.titre}`,
+              renderedContent: reglementDoc,
+            };
+
+            if (autoSaveToDrive && formation.id) {
+              const saveResult = await saveDocumentToDrive({
+                organizationId: user.organizationId!,
+                userId: user.id,
+                formationId: formation.id,
+                formationTitre: formation.titre,
+                documentType: "reglement_interieur",
+                titre: reglementEntry.titre,
+                content: reglementDoc,
+              });
+              reglementEntry.savedToDrive = saveResult.success;
+              reglementEntry.fileId = saveResult.fileId;
+            }
+
+            generatedDocuments.push(reglementEntry);
+          }
+          break;
+
+        case "cgv":
+          // CGV = un document global par session
+          {
+            const cgvDoc = await generateDocument(
+              template,
+              {
+                ...baseContext,
+              },
+              false
+            );
+
+            const cgvEntry: GeneratedDocument = {
+              id: `cgv_${Date.now()}`,
+              type: "cgv",
+              titre: `Conditions Générales de Vente`,
+              renderedContent: cgvDoc,
+            };
+
+            if (autoSaveToDrive && formation.id) {
+              const saveResult = await saveDocumentToDrive({
+                organizationId: user.organizationId!,
+                userId: user.id,
+                formationId: formation.id,
+                formationTitre: formation.titre,
+                documentType: "cgv",
+                titre: cgvEntry.titre,
+                content: cgvDoc,
+              });
+              cgvEntry.savedToDrive = saveResult.success;
+              cgvEntry.fileId = saveResult.fileId;
+            }
+
+            generatedDocuments.push(cgvEntry);
+          }
+          break;
+
+        case "contrat_sous_traitance":
+          // Contrat de sous-traitance = un par intervenant externe
+          {
+            // Récupérer les co-formateurs s'il y en a
+            const allIntervenants = [
+              ...(formateurs.formateurPrincipal ? [formateurs.formateurPrincipal] : []),
+              ...(formateurs.coformateurs || []),
+            ];
+
+            for (const intervenant of allIntervenants) {
+              // Récupérer les données complètes de l'intervenant
+              const intervenantDb = await prisma.intervenant.findUnique({
+                where: { id: intervenant.id },
+              });
+
+              if (!intervenantDb) continue;
+
+              const contratDoc = await generateDocument(
+                template,
+                {
+                  ...baseContext,
+                  intervenant: {
+                    nom: intervenantDb.nom,
+                    prenom: intervenantDb.prenom,
+                    adresse: "",
+                    code_postal: "",
+                    ville: "",
+                    pays: "France",
+                    email: intervenantDb.email || "",
+                    telephone: intervenantDb.telephone || "",
+                    fonction: intervenantDb.fonction || "",
+                    specialites: intervenantDb.specialites || [],
+                    raison_sociale: intervenantDb.structure || "",
+                    siret: intervenantDb.structureSiret || "",
+                    nda: intervenantDb.numeroDeclarationActivite || "",
+                  },
+                },
+                false
+              );
+
+              const contratEntry: GeneratedDocument = {
+                id: `contrat_sous_traitance_${intervenant.id}_${Date.now()}`,
+                type: "contrat_sous_traitance",
+                titre: `Contrat de sous-traitance - ${intervenantDb.prenom} ${intervenantDb.nom}`,
+                renderedContent: contratDoc,
+              };
+
+              if (autoSaveToDrive && formation.id) {
+                const saveResult = await saveDocumentToDrive({
+                  organizationId: user.organizationId!,
+                  userId: user.id,
+                  formationId: formation.id,
+                  formationTitre: formation.titre,
+                  documentType: "contrat_sous_traitance",
+                  titre: contratEntry.titre,
+                  content: contratDoc,
+                });
+                contratEntry.savedToDrive = saveResult.success;
+                contratEntry.fileId = saveResult.fileId;
+              }
+
+              generatedDocuments.push(contratEntry);
+            }
           }
           break;
 

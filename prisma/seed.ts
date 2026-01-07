@@ -4,6 +4,7 @@
 // Génère des données de test pour le développement
 
 import { PrismaClient, Plan, DocumentType, TemplateCategory } from "@prisma/client";
+import { DEFAULT_DOCUMENT_TEMPLATES } from "./seed-document-templates";
 
 const prisma = new PrismaClient();
 
@@ -72,84 +73,31 @@ async function main() {
   console.log(`   ✓ Organisation créée: ${demoOrg.name}`);
 
   // ===========================================
-  // 3. Templates système
+  // 3. Templates système (importés depuis seed-document-templates.ts)
   // ===========================================
   console.log("📄 Création des templates système...");
 
-  const templates = [
-    {
-      name: "Fiche Pédagogique Standard",
-      description: "Template de fiche pédagogique conforme Qualiopi",
-      category: TemplateCategory.DOCUMENT,
-      documentType: DocumentType.FICHE_PEDAGOGIQUE,
-      isSystem: true,
-      variables: ["formation.titre", "formation.description", "formation.duree", "formateur.nom", "organisation.nom"],
-      content: {
-        type: "doc",
-        content: [
-          { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "{{formation.titre}}" }] },
-          { type: "paragraph", content: [{ type: "text", text: "Durée: {{formation.duree}} heures" }] },
-        ],
-      },
-    },
-    {
-      name: "Convention de Formation",
-      description: "Template de convention de formation",
-      category: TemplateCategory.DOCUMENT,
-      documentType: DocumentType.CONVENTION,
-      isSystem: true,
-      variables: ["formation.titre", "participant.nom", "participant.prenom", "organisation.nom", "dates.debut", "dates.fin"],
-      content: {
-        type: "doc",
-        content: [
-          { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Convention de Formation Professionnelle" }] },
-        ],
-      },
-    },
-    {
-      name: "Attestation de Fin de Formation",
-      description: "Template d'attestation de fin de formation",
-      category: TemplateCategory.DOCUMENT,
-      documentType: DocumentType.ATTESTATION_FIN,
-      isSystem: true,
-      variables: ["participant.nom", "participant.prenom", "formation.titre", "dates.debut", "dates.fin", "organisation.nom"],
-      content: {
-        type: "doc",
-        content: [
-          { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Attestation de Fin de Formation" }] },
-        ],
-      },
-    },
-    {
-      name: "Email de Convocation",
-      description: "Template d'email de convocation aux participants",
-      category: TemplateCategory.EMAIL,
-      isSystem: true,
-      variables: ["participant.prenom", "formation.titre", "dates.debut", "lieu", "formateur.nom"],
-      content: {
-        type: "doc",
-        content: [
-          { type: "paragraph", content: [{ type: "text", text: "Bonjour {{participant.prenom}}," }] },
-          { type: "paragraph", content: [{ type: "text", text: "Nous avons le plaisir de vous confirmer votre inscription à la formation {{formation.titre}}." }] },
-        ],
-      },
-    },
-  ];
+  // Filtrer le template "test" qui n'est pas un vrai template système
+  const systemTemplates = DEFAULT_DOCUMENT_TEMPLATES.filter(t => t.name !== "test");
 
-  for (const template of templates) {
+  for (const template of systemTemplates) {
     await prisma.template.upsert({
       where: {
         id: `system-${template.name.toLowerCase().replace(/\s+/g, "-")}`,
       },
-      update: template,
+      update: {
+        ...template,
+        isSystem: true,
+      },
       create: {
         id: `system-${template.name.toLowerCase().replace(/\s+/g, "-")}`,
         ...template,
+        isSystem: true,
       },
     });
   }
 
-  console.log(`   ✓ ${templates.length} templates système créés`);
+  console.log(`   ✓ ${systemTemplates.length} templates système créés`);
 
   // ===========================================
   // 4. Dossiers de démonstration
@@ -690,7 +638,7 @@ async function main() {
   console.log("\n✅ Seeding terminé avec succès!\n");
   console.log("📊 Résumé:");
   console.log(`   - 1 organisation démo (${demoOrg.name})`);
-  console.log(`   - ${templates.length} templates système`);
+  console.log(`   - ${systemTemplates.length} templates système`);
   console.log(`   - ${folders.length} dossiers de démonstration`);
   console.log(`   - 2 configurations globales`);
   console.log(`   - 5 workflows d'automatisation`);

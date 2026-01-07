@@ -132,13 +132,19 @@ function isImageVariable(variableName: string): boolean {
 
 /**
  * Verifier si une URL est une URL d'image valide
+ * Accepte: URLs absolues (http/https), data URIs, et chemins relatifs (/api/...)
  */
 function isValidImageUrl(url: string): boolean {
   if (!url || typeof url !== "string") return false;
-  if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("data:image/")) {
-    return false;
+  // Accepter les URLs absolues
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:image/")) {
+    return true;
   }
-  return true;
+  // Accepter les chemins relatifs qui commencent par /
+  if (url.startsWith("/")) {
+    return true;
+  }
+  return false;
 }
 
 // ===========================================
@@ -192,15 +198,18 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
 
     switch (field) {
       case "raison_sociale": return entreprise.raison_sociale;
+      case "nom": return entreprise.nom || entreprise.raison_sociale; // Alias pour raison_sociale
       case "siret": return entreprise.siret;
       case "adresse": return entreprise.adresse;
       case "code_postal": return entreprise.code_postal;
       case "ville": return entreprise.ville;
       case "pays": return entreprise.pays;
+      case "adresse_complete": return entreprise.adresse_complete;
       case "representant_civilite": return entreprise.representant_civilite;
       case "representant_nom": return entreprise.representant_nom;
       case "representant_prenom": return entreprise.representant_prenom;
       case "representant_fonction": return entreprise.representant_fonction;
+      case "representant": return entreprise.representant; // Nom complet du représentant
       case "email": return entreprise.email;
       case "telephone": return entreprise.telephone;
       case "tva_intracom": return entreprise.tva_intracom;
@@ -296,6 +305,7 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
       case "type": return lieu.type;
       case "nom": return lieu.nom;
       case "adresse": return lieu.formation;
+      case "formation": return lieu.formation; // Alias pour lieu_formation
       case "code_postal": return lieu.code_postal;
       case "ville": return lieu.ville;
       case "informations_pratiques": return lieu.informations_pratiques;
@@ -315,7 +325,9 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
     switch (field) {
       case "titre": return formation.titre;
       case "modalite": return formation.modalite;
+      case "modalites": return formation.modalite; // Alias
       case "categorie_action": return formation.categorie_action;
+      case "duree": return formation.duree_heures_jours || formation.duree; // Alias
       case "duree_heures": return formation.duree_heures;
       case "duree_jours": return formation.duree_jours;
       case "duree_heures_jours": return formation.duree_heures_jours;
@@ -332,6 +344,17 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
       case "tarif_entreprise_ht_fiche_peda": return formation.tarif_entreprise_ht_fiche_peda;
       case "tarif_independant_ht_fiche_peda": return formation.tarif_independant_ht_fiche_peda;
       case "tarif_particulier_ttc_fiche_peda": return formation.tarif_particulier_ttc_fiche_peda;
+      // Alias pour les dates de session (souvent utilisés dans les templates)
+      case "date_debut": return context.session?.date_debut || formation.date_debut;
+      case "date_fin": return context.session?.date_fin || formation.date_fin;
+      // Alias pour le lieu
+      case "lieu": return context.lieu?.formation || formation.lieu;
+      case "adresse": return formation.adresse || context.lieu?.formation;
+      case "code_postal": return formation.code_postal || context.lieu?.code_postal;
+      case "ville": return formation.ville || context.lieu?.ville;
+      case "lien_connexion": return formation.lien_connexion;
+      case "prix": return formation.prix;
+      case "prix_format": return formation.prix_format;
       default: return undefined;
     }
   }
@@ -374,10 +397,10 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
   }
 
   // ===========================================
-  // DATES (date_)
+  // DATES (date_ ou dates_)
   // ===========================================
-  if (variableName.startsWith("date_")) {
-    const field = variableName.replace("date_", "");
+  if (variableName.startsWith("date_") || variableName.startsWith("dates_")) {
+    const field = variableName.replace(/^dates?_/, "");
     const dates = context.dates;
     if (!dates) {
       // Générer les dates du jour si pas fournies
@@ -392,6 +415,7 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
         case "annee": return String(now.getFullYear());
         case "complete_longue": return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
         case "complete_courte": return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+        case "date_complete": return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
         default: return undefined;
       }
     }
@@ -402,6 +426,7 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
       case "annee": return dates.annee;
       case "complete_longue": return dates.complete_longue;
       case "complete_courte": return dates.complete_courte;
+      case "date_complete": return dates.complete_longue || dates.date_complete;
       default: return undefined;
     }
   }
@@ -423,6 +448,7 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
       case "entreprise_montant_financeur_ttc": return tarifs.entreprise_montant_financeur_ttc;
       case "entreprise_reste_a_charge_ht": return tarifs.entreprise_reste_a_charge_ht;
       case "entreprise_reste_a_charge_ttc": return tarifs.entreprise_reste_a_charge_ttc;
+      case "entreprise_a_financeur": return tarifs.entreprise_a_financeur;
       // Indépendant
       case "tarif_independant_ht_documents": return tarifs.tarif_independant_ht_documents;
       case "independant_montant_tva": return tarifs.independant_montant_tva;
@@ -431,10 +457,21 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
       case "independant_montant_financeur_ttc": return tarifs.independant_montant_financeur_ttc;
       case "independant_reste_a_charge_ht": return tarifs.independant_reste_a_charge_ht;
       case "independant_reste_a_charge_ttc": return tarifs.independant_reste_a_charge_ttc;
+      case "independant_a_financeur": return tarifs.independant_a_financeur;
       // Particulier
       case "particulier_prix_ttc": return tarifs.particulier_prix_ttc;
       default: return undefined;
     }
+  }
+
+  // ===========================================
+  // CONDITIONS FINANCEUR (entreprise_a_financeur, independant_a_financeur)
+  // ===========================================
+  if (variableName === "entreprise_a_financeur") {
+    return context.tarifs?.entreprise_a_financeur;
+  }
+  if (variableName === "independant_a_financeur") {
+    return context.tarifs?.independant_a_financeur;
   }
 
   // ===========================================
@@ -460,6 +497,67 @@ function getValueFromVariableName(context: TemplateContext, variableName: string
 
   if (variableName === "intervenant_equipe_pedagogique") {
     return context.intervenant_equipe_pedagogique;
+  }
+
+  if (variableName === "planning_journees_formation") {
+    return context.session?.planning_journees_formation;
+  }
+
+  // ===========================================
+  // TARIFS DIRECTS (sans préfixe tarifs_)
+  // Support des anciennes conventions: tarif_entreprise_ht_documents, entreprise_montant_tva, etc.
+  // ===========================================
+  const tarifsDirectFields = [
+    "tarif_entreprise_ht_documents", "entreprise_montant_tva", "entreprise_prix_ttc",
+    "entreprise_montant_financeur_ht", "entreprise_montant_financeur_ttc",
+    "entreprise_reste_a_charge_ht", "entreprise_reste_a_charge_ttc",
+    "tarif_independant_ht_documents", "independant_montant_tva", "independant_prix_ttc",
+    "independant_montant_financeur_ht", "independant_montant_financeur_ttc",
+    "independant_reste_a_charge_ht", "independant_reste_a_charge_ttc",
+    "particulier_prix_ttc",
+    // Tarifs fiche pédagogique (sans préfixe formation_)
+    "tarif_entreprise_ht_fiche_peda", "tarif_independant_ht_fiche_peda", "tarif_particulier_ttc_fiche_peda",
+    // Aliases génériques
+    "tarif_ht_format", "tarif_ttc_format", "tarif_tva_format", "tarif_nombre_participants"
+  ];
+
+  if (tarifsDirectFields.includes(variableName)) {
+    const tarifs = context.tarifs;
+    if (tarifs) {
+      const value = tarifs[variableName as keyof typeof tarifs];
+      if (value !== undefined) return value;
+    }
+    // Essayer aussi dans context.formation (pour les tarifs fiche pédagogique)
+    const formation = context.formation;
+    if (formation) {
+      const formationValue = formation[variableName as keyof typeof formation];
+      if (formationValue !== undefined) return formationValue;
+    }
+    // Essayer aussi dans context.tarif (ancien format)
+    const tarif = context.tarif as Record<string, unknown> | undefined;
+    if (tarif) {
+      // Mappings pour les aliases génériques
+      if (variableName === "tarif_ht_format") return tarif.ht_format;
+      if (variableName === "tarif_ttc_format") return tarif.ttc_format || tarif.ht_format;
+      if (variableName === "tarif_tva_format") return tarif.tva_format;
+      if (variableName === "tarif_nombre_participants") return tarif.nombre_participants;
+    }
+    return undefined;
+  }
+
+  // ===========================================
+  // FACTURE (facture_)
+  // ===========================================
+  if (variableName.startsWith("facture_")) {
+    const field = variableName.replace("facture_", "");
+    const facture = context.facture as Record<string, unknown> | undefined;
+    if (!facture) return undefined;
+
+    switch (field) {
+      case "numero": return facture.numero;
+      case "date": return facture.date;
+      default: return undefined;
+    }
   }
 
   // ===========================================

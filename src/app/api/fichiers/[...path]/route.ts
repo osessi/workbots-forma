@@ -5,12 +5,27 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 // Bucket Supabase Storage
 const STORAGE_BUCKET = "worksbots-forma-stockage";
 
-// Helper pour créer le client Supabase
+// Client admin avec service role (bypass RLS) pour le téléchargement
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+// Helper pour créer le client Supabase (authentification)
 async function getSupabaseClient() {
   const cookieStore = await cookies();
   return createServerClient(
@@ -52,16 +67,25 @@ export async function GET(
     // Reconstruire le chemin du fichier (décoder chaque segment)
     const filePath = path.map(segment => decodeURIComponent(segment)).join("/");
 
-    // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Vérifier si c'est un chemin d'image publique (logos, signatures, cachets, avatars)
+    const isPublicImage = filePath.startsWith("logos/") ||
+                          filePath.startsWith("signatures/") ||
+                          filePath.startsWith("cachets/") ||
+                          filePath.startsWith("avatars/");
 
-    if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Pour les fichiers non-publics, vérifier l'authentification
+    if (!isPublicImage) {
+      const supabase = await getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      }
     }
 
-    // Télécharger le fichier depuis Supabase Storage
-    const { data, error } = await supabase.storage
+    // Télécharger le fichier depuis Supabase Storage avec le client admin (bypass RLS)
+    const adminClient = getAdminClient();
+    const { data, error } = await adminClient.storage
       .from(STORAGE_BUCKET)
       .download(filePath);
 

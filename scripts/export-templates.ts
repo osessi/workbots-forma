@@ -1,53 +1,57 @@
-import { PrismaClient } from '@prisma/client';
-import * as fs from 'fs';
-import * as path from 'path';
+// Script pour exporter les templates de la base de données
+import { PrismaClient } from "@prisma/client";
+import * as fs from "fs";
 
 const prisma = new PrismaClient();
 
-async function exportTemplates() {
-  try {
-    const templates = await prisma.template.findMany({
-      orderBy: { createdAt: 'asc' }
-    });
+async function main() {
+  // Exporter les Template (modèle existant)
+  const templates = await prisma.template.findMany({
+    where: {
+      // Uniquement les templates documents
+      category: "DOCUMENT"
+    },
+    orderBy: { documentType: "asc" },
+  });
 
-    // Créer un backup avec timestamp
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupsDir = path.join(process.cwd(), 'backups');
-    const backupPath = path.join(backupsDir, `templates-backup-${timestamp}.json`);
+  console.log(`Found ${templates.length} document templates\n`);
 
-    // Créer le dossier backups s'il n'existe pas
-    if (!fs.existsSync(backupsDir)) {
-      fs.mkdirSync(backupsDir, { recursive: true });
-    }
+  // Afficher les templates trouvés
+  console.log("=== DOCUMENT TEMPLATES ===");
+  templates.forEach((t, i) => {
+    console.log(`${i + 1}. ${t.documentType}: ${t.name}`);
+  });
 
-    fs.writeFileSync(backupPath, JSON.stringify(templates, null, 2));
+  // Générer le code TypeScript pour le seed
+  const seedCode = templates.map((t) => {
+    return `    {
+      name: ${JSON.stringify(t.name)},
+      description: ${t.description ? JSON.stringify(t.description) : "null"},
+      category: TemplateCategory.${t.category},
+      documentType: ${t.documentType ? `DocumentType.${t.documentType}` : "undefined"},
+      isSystem: ${t.isSystem},
+      variables: ${JSON.stringify(t.variables)},
+      content: ${JSON.stringify(t.content)},
+    }`;
+  });
 
-    console.log('=== BACKUP CRÉÉ ===');
-    console.log('Fichier:', backupPath);
-    console.log('Nombre de templates:', templates.length);
-    console.log('');
-    console.log('=== LISTE DES TEMPLATES ===');
-    templates.forEach((t, i) => {
-      console.log(`${i+1}. ${t.name} | Type: ${t.documentType} | System: ${t.isSystem}`);
-    });
+  const output = `// ===========================================
+// TEMPLATES DE DOCUMENTS PAR DÉFAUT
+// ===========================================
+// Générés automatiquement depuis la base de données
+// Date: ${new Date().toISOString()}
 
-    // Afficher aussi les templates avec type AUTRE pour les identifier
-    console.log('');
-    console.log('=== TEMPLATES AVEC TYPE "AUTRE" ===');
-    const autreTemplates = templates.filter(t => t.documentType === 'AUTRE');
-    if (autreTemplates.length === 0) {
-      console.log('Aucun template avec le type AUTRE');
-    } else {
-      autreTemplates.forEach((t, i) => {
-        console.log(`${i+1}. ${t.name} (ID: ${t.id})`);
-      });
-    }
+import { TemplateCategory, DocumentType } from "@prisma/client";
 
-  } catch (error) {
-    console.error('Erreur:', error);
-  } finally {
-    await prisma.$disconnect();
-  }
+export const DEFAULT_DOCUMENT_TEMPLATES = [
+${seedCode.join(",\n")}
+];
+`;
+
+  fs.writeFileSync("prisma/seed-document-templates.ts", output);
+  console.log("\n✅ Templates exported to prisma/seed-document-templates.ts");
 }
 
-exportTemplates();
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

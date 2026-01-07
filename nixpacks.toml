@@ -19,6 +19,5 @@ cmd = "npm run start"
 [variables]
 NEXT_TELEMETRY_DISABLED = "1"
 NODE_OPTIONS = "--max-old-space-size=4096"
-# Override NODE_ENV during build to ensure devDependencies are available
+# CI=true ensures npm ci --include=dev installs devDependencies
 CI = "true"
-NODE_ENV = "development"

@@ -206,6 +206,11 @@ const mainNavItems: NavItem[] = [
 
 const bottomNavItems: NavItem[] = [
   {
+    icon: <BookOpen size={20} strokeWidth={1.5} />,
+    name: "Documentation",
+    path: "/automate/documentation",
+  },
+  {
     icon: <Settings size={20} strokeWidth={1.5} />,
     name: "Paramètres",
     path: "/automate/settings",

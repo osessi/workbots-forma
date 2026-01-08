@@ -208,7 +208,7 @@ const bottomNavItems: NavItem[] = [
   {
     icon: <BookOpen size={20} strokeWidth={1.5} />,
     name: "Documentation",
-    path: "/automate/documentation",
+    path: "/docs",
   },
   {
     icon: <Settings size={20} strokeWidth={1.5} />,

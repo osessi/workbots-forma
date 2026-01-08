@@ -76,7 +76,7 @@ export default function DashboardAdminPage() {
     <div className="space-y-6">
       {/* Navigation */}
       <Link
-        href="/automate/documentation"
+        href="/docs"
         className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400 transition-colors"
       >
         <ArrowLeftIcon />
@@ -512,7 +512,7 @@ export default function DashboardAdminPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
-            href="/automate/documentation/dashboard-intervenant"
+            href="/docs/dashboard-intervenant"
             className="p-4 rounded-xl border border-gray-200 hover:border-brand-300 hover:bg-brand-50/50 transition-all dark:border-gray-700 dark:hover:border-brand-600"
           >
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">👨‍🏫 Dashboard Intervenant</h3>
@@ -521,7 +521,7 @@ export default function DashboardAdminPage() {
             </p>
           </Link>
           <Link
-            href="/automate/documentation/qualiopi"
+            href="/docs/qualiopi"
             className="p-4 rounded-xl border border-gray-200 hover:border-brand-300 hover:bg-brand-50/50 transition-all dark:border-gray-700 dark:hover:border-brand-600"
           >
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">✅ Conformité Qualiopi</h3>

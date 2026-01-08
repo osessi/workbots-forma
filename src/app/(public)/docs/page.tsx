@@ -57,7 +57,7 @@ const sections: DocSection[] = [
     title: "🚀 Démarrage rapide",
     description: "Créez votre compte et lancez votre première formation en 10 minutes",
     icon: <RocketIcon />,
-    href: "/automate/documentation/demarrage",
+    href: "/docs/demarrage",
     badge: "Commencer ici"
   },
   {
@@ -65,28 +65,28 @@ const sections: DocSection[] = [
     title: "👨‍💼 Dashboard Admin",
     description: "Guide complet de l'interface administrateur : formations, sessions, apprenants, CRM, Qualiopi",
     icon: <BookOpenIcon />,
-    href: "/automate/documentation/dashboard-admin"
+    href: "/docs/dashboard-admin"
   },
   {
     id: "dashboard-intervenant",
     title: "👨‍🏫 Dashboard Intervenant",
     description: "Interface formateur : programme, émargements, documents, évaluations",
     icon: <UserIcon />,
-    href: "/automate/documentation/dashboard-intervenant"
+    href: "/docs/dashboard-intervenant"
   },
   {
     id: "qualiopi",
     title: "✅ Conformité Qualiopi",
     description: "Préparez votre certification avec les 32 indicateurs, preuves et assistant IA",
     icon: <ChecklistIcon />,
-    href: "/automate/documentation/qualiopi"
+    href: "/docs/qualiopi"
   },
   {
     id: "automatisations",
     title: "🤖 Automatisations",
     description: "Créez des workflows intelligents pour automatiser vos tâches répétitives",
     icon: <AutomateIcon />,
-    href: "/automate/documentation/automatisations"
+    href: "/docs/automatisations"
   },
 ];
 
@@ -182,7 +182,7 @@ export default function DocumentationPage() {
         </div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <a
-            href="/automate/documentation/faq"
+            href="/docs/faq"
             className="p-4 rounded-xl border border-gray-200 hover:border-brand-300 hover:bg-brand-50/50 transition-all dark:border-gray-700 dark:hover:border-brand-600 dark:hover:bg-brand-500/5"
           >
             <div className="text-2xl mb-2">❓</div>

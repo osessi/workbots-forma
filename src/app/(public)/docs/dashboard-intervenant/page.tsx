@@ -67,7 +67,7 @@ export default function DashboardIntervenantPage() {
     <div className="space-y-6">
       {/* Navigation */}
       <Link
-        href="/automate/documentation"
+        href="/docs"
         className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400 transition-colors"
       >
         <ArrowLeftIcon />
@@ -374,7 +374,7 @@ export default function DashboardIntervenantPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
-            href="/automate/documentation/dashboard-admin"
+            href="/docs/dashboard-admin"
             className="p-4 rounded-xl border border-gray-200 hover:border-brand-300 hover:bg-brand-50/50 transition-all dark:border-gray-700 dark:hover:border-brand-600"
           >
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">👨‍💼 Dashboard Admin</h3>
@@ -383,7 +383,7 @@ export default function DashboardIntervenantPage() {
             </p>
           </Link>
           <Link
-            href="/automate/documentation/faq"
+            href="/docs/faq"
             className="p-4 rounded-xl border border-gray-200 hover:border-brand-300 hover:bg-brand-50/50 transition-all dark:border-gray-700 dark:hover:border-brand-600"
           >
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">❓ FAQ</h3>

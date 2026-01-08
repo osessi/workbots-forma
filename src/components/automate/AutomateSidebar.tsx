@@ -50,6 +50,7 @@ type NavItem = {
   icon: React.ReactNode;
   path?: string;
   subItems?: SubNavItem[];
+  external?: boolean;
 };
 
 const mainNavItems: NavItem[] = [
@@ -209,6 +210,7 @@ const bottomNavItems: NavItem[] = [
     icon: <BookOpen size={20} strokeWidth={1.5} />,
     name: "Documentation",
     path: "/docs",
+    external: true,
   },
   {
     icon: <Settings size={20} strokeWidth={1.5} />,
@@ -359,24 +361,46 @@ const AutomateSidebar: React.FC = () => {
     }
 
     // Item simple sans sous-menu
+    const linkClasses = `flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 ${
+      isActive(nav.path!)
+        ? "bg-brand-500 text-white border-brand-500 shadow-md"
+        : isDisabled
+        ? "text-gray-400 cursor-not-allowed border-transparent"
+        : "text-gray-600 border-gray-200 bg-gray-50/50 hover:bg-gray-100 hover:border-gray-300 dark:text-gray-300 dark:border-gray-700 dark:bg-gray-800/30 dark:hover:bg-gray-800 dark:hover:border-gray-600"
+    } ${!isExpanded && !isHovered && !isMobileOpen ? "lg:justify-center lg:px-3" : ""}`;
+
+    const linkContent = (
+      <>
+        <span className={isActive(nav.path!) ? "text-white" : "text-gray-500 dark:text-gray-400"}>
+          {nav.icon}
+        </span>
+        {(isExpanded || isHovered || isMobileOpen) && (
+          <span className="text-sm font-medium">{nav.name}</span>
+        )}
+      </>
+    );
+
+    // Lien externe (nouvel onglet)
+    if (nav.external) {
+      return (
+        <li key={nav.name}>
+          <a
+            href={nav.path!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkClasses}
+          >
+            {linkContent}
+          </a>
+        </li>
+      );
+    }
+
+    // Lien interne
     return (
       <li key={nav.name}>
-        <Link
-          href={nav.path!}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200 ${
-            isActive(nav.path!)
-              ? "bg-brand-500 text-white border-brand-500 shadow-md"
-              : isDisabled
-              ? "text-gray-400 cursor-not-allowed border-transparent"
-              : "text-gray-600 border-gray-200 bg-gray-50/50 hover:bg-gray-100 hover:border-gray-300 dark:text-gray-300 dark:border-gray-700 dark:bg-gray-800/30 dark:hover:bg-gray-800 dark:hover:border-gray-600"
-          } ${!isExpanded && !isHovered && !isMobileOpen ? "lg:justify-center lg:px-3" : ""}`}
-        >
-          <span className={isActive(nav.path!) ? "text-white" : "text-gray-500 dark:text-gray-400"}>
-            {nav.icon}
-          </span>
-          {(isExpanded || isHovered || isMobileOpen) && (
-            <span className="text-sm font-medium">{nav.name}</span>
-          )}
+        <Link href={nav.path!} className={linkClasses}>
+          {linkContent}
         </Link>
       </li>
     );

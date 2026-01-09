@@ -10,6 +10,7 @@ import {
   getIndicateur,
 } from "./indicateurs-data";
 import { analyserConformiteOrganisation } from "./conformite.service";
+import { deductCredits, hasEnoughCredits, CREDIT_COSTS } from "@/lib/services/credits.service";
 
 // Initialiser le client Anthropic
 const anthropic = new Anthropic({
@@ -97,6 +98,16 @@ export async function envoyerMessage(
   context: MessageContext
 ): Promise<AgentResponse> {
   const { organizationId, userId, conversationId } = context;
+
+  // Vérifier les crédits disponibles
+  const creditCost = CREDIT_COSTS.AGENT_QUALIOPI_MESSAGE;
+  const hasCredits = await hasEnoughCredits(organizationId, creditCost);
+  if (!hasCredits) {
+    return {
+      message: "Désolé, vous n'avez plus assez de crédits pour utiliser l'assistant Qualiopi. Veuillez recharger votre compte ou passer à un plan supérieur.",
+      indicateursMentionnes: [],
+    };
+  }
 
   // Récupérer le contexte de l'organisation
   const [organization, conformite, historique] = await Promise.all([
@@ -215,6 +226,14 @@ ${conformite.alertes.slice(0, 5).map(a =>
     },
   });
 
+  // Déduire les crédits après la génération réussie
+  await deductCredits({
+    organizationId,
+    userId,
+    amount: creditCost,
+    description: "Agent Qualiopi - Message",
+  });
+
   // Générer des suggestions d'actions
   const suggestions = genererSuggestions(indicateursMentionnes, conformite.analyses);
 
@@ -271,12 +290,20 @@ export const QUESTIONS_SUGGEREES = [
 
 export async function analyserIndicateurSpecifique(
   organizationId: string,
-  numeroIndicateur: number
+  numeroIndicateur: number,
+  userId?: string
 ): Promise<{
   indicateur: any;
   analyse: string;
   actions: string[];
 }> {
+  // Vérifier les crédits
+  const creditCost = CREDIT_COSTS.ANALYSE_INDICATEUR;
+  const hasCredits = await hasEnoughCredits(organizationId, creditCost);
+  if (!hasCredits) {
+    throw new Error("Crédits insuffisants pour cette analyse");
+  }
+
   const indicateur = getIndicateur(numeroIndicateur);
   if (!indicateur) {
     throw new Error(`Indicateur ${numeroIndicateur} non trouvé`);
@@ -364,6 +391,16 @@ Fournis une analyse complète avec:
         .map((l) => l.replace(/^[-•]\s*/, ""))
     : [];
 
+  // Déduire les crédits
+  if (userId) {
+    await deductCredits({
+      organizationId,
+      userId,
+      amount: creditCost,
+      description: `Analyse indicateur ${numeroIndicateur}`,
+    });
+  }
+
   return {
     indicateur,
     analyse: analyseText,
@@ -376,7 +413,8 @@ Fournis une analyse complète avec:
 // ===========================================
 
 export async function simulerAudit(
-  organizationId: string
+  organizationId: string,
+  userId?: string
 ): Promise<{
   rapport: string;
   pointsForts: string[];
@@ -384,6 +422,13 @@ export async function simulerAudit(
   risques: string[];
   score: number;
 }> {
+  // Vérifier les crédits
+  const creditCost = CREDIT_COSTS.SIMULATION_AUDIT;
+  const hasCredits = await hasEnoughCredits(organizationId, creditCost);
+  if (!hasCredits) {
+    throw new Error("Crédits insuffisants pour la simulation d'audit");
+  }
+
   const conformite = await analyserConformiteOrganisation(organizationId);
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
@@ -472,6 +517,16 @@ IMPORTANT:
   const pointsForts = extraireSectionAmeliore(rapportText, ["points forts", "éléments conformes", "points positifs"]);
   const pointsAmeliorer = extraireSectionAmeliore(rapportText, ["points à améliorer", "améliorer prioritaires", "écarts", "non-conformités"]);
   const risques = extraireSectionAmeliore(rapportText, ["risques", "non-certification", "risques majeurs"]);
+
+  // Déduire les crédits
+  if (userId) {
+    await deductCredits({
+      organizationId,
+      userId,
+      amount: creditCost,
+      description: "Simulation d'audit Qualiopi",
+    });
+  }
 
   return {
     rapport: rapportText,

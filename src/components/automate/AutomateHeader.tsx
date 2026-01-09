@@ -7,7 +7,7 @@ import UserAvatar from "@/components/ui/avatar/UserAvatar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, Mail, Send, HelpCircle } from "lucide-react";
+import { Bell, Mail, Send, HelpCircle, Sparkles } from "lucide-react";
 
 const AutomateHeader: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -19,6 +19,7 @@ const AutomateHeader: React.FC = () => {
   const [sentEmailsCount, setSentEmailsCount] = useState(0);
   const [devEmailsCount, setDevEmailsCount] = useState(0);
   const [isDev, setIsDev] = useState(false);
+  const [credits, setCredits] = useState<{ formatted: string; statusColor: "green" | "yellow" | "red" } | null>(null);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { user, formations, searchQuery, setSearchQuery } = useAutomate();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -67,20 +68,38 @@ const AutomateHeader: React.FC = () => {
     }
   }, []);
 
+  // Fetch credits balance
+  const fetchCredits = useCallback(async () => {
+    try {
+      const res = await fetch("/api/credits");
+      if (res.ok) {
+        const data = await res.json();
+        setCredits({
+          formatted: data.creditsFormatted,
+          statusColor: data.statusColor,
+        });
+      }
+    } catch (error) {
+      // Silently ignore - credits display is optional
+    }
+  }, []);
+
   // Load counts on mount and periodically
   useEffect(() => {
     fetchNotificationCount();
     fetchSentEmailsCount();
     fetchDevEmailsCount();
+    fetchCredits();
 
     const interval = setInterval(() => {
       fetchNotificationCount();
       fetchSentEmailsCount();
       fetchDevEmailsCount();
+      fetchCredits();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [fetchNotificationCount, fetchSentEmailsCount, fetchDevEmailsCount]);
+  }, [fetchNotificationCount, fetchSentEmailsCount, fetchDevEmailsCount, fetchCredits]);
 
   // Filter formations based on local search query
   const searchResults = localSearchQuery.length > 0
@@ -238,8 +257,28 @@ const AutomateHeader: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Theme toggle + User dropdown */}
+        {/* Right: Credits + Theme toggle + User dropdown */}
         <div className="flex items-center gap-3">
+          {/* Credits indicator - discret */}
+          {credits && (
+            <Link
+              href="/automate/settings/credits"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+              title="Voir les détails des crédits"
+            >
+              <Sparkles className={`w-4 h-4 ${
+                credits.statusColor === "green"
+                  ? "text-emerald-500"
+                  : credits.statusColor === "yellow"
+                    ? "text-amber-500"
+                    : "text-red-500"
+              }`} />
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                {credits.formatted}
+              </span>
+            </Link>
+          )}
+
           <ThemeToggleButton />
 
           {/* User Dropdown */}

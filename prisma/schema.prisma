@@ -263,6 +263,13 @@ model Organization {
   stripeCustomerId     String? @unique
   stripeSubscriptionId String?
 
+  // Système de crédits IA
+  credits            Int      @default(5000)  // Solde actuel de crédits
+  creditsMonthly     Int      @default(5000)  // Crédits inclus dans le plan (reset mensuel)
+  creditsUsedThisMonth Int    @default(0)     // Crédits utilisés ce mois
+  creditsResetAt     DateTime @default(now()) // Date du prochain reset mensuel
+  creditTransactions CreditTransaction[]
+
   // APIs externes (clés optionnelles par organisation)
   gammaApiKey String? // Clé API Gamma pour génération slides
 
@@ -405,13 +412,14 @@ model User {
 
   // Relations
   formations       Formation[]
-  files            File[]
-  sessions         FormationSession[]
-  auditLogs        AuditLog[]
-  aiGenerationLogs AIGenerationLog[]
-  templateVersions TemplateVersion[]  @relation("TemplateVersionCreator")
-  opportunites     CRMOpportunite[]
-  notifications    Notification[]
+  files              File[]
+  sessions           FormationSession[]
+  auditLogs          AuditLog[]
+  aiGenerationLogs   AIGenerationLog[]
+  creditTransactions CreditTransaction[]
+  templateVersions   TemplateVersion[]  @relation("TemplateVersionCreator")
+  opportunites       CRMOpportunite[]
+  notifications      Notification[]
 
   // Qualiopi IND 5 - Notes créées
   apprenantNotes ApprenantNote[] @relation("ApprenantNoteCreatedBy")
@@ -1252,6 +1260,52 @@ model AIGenerationLog {
   @@index([organizationId])
   @@index([promptType])
   @@index([status])
+  @@index([createdAt])
+}
+
+// ===========================================
+// CREDIT TRANSACTIONS (Historique des crédits)
+// ===========================================
+
+enum CreditTransactionType {
+  USAGE           // Utilisation de crédits (génération IA)
+  MONTHLY_RESET   // Reset mensuel des crédits
+  PURCHASE        // Achat de crédits supplémentaires
+  BONUS           // Bonus (promo, parrainage, etc.)
+  ADJUSTMENT      // Ajustement manuel (support)
+  REFUND          // Remboursement
+}
+
+model CreditTransaction {
+  id String @id @default(cuid())
+
+  // Organisation concernée
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Utilisateur qui a déclenché (optionnel pour les resets automatiques)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Type et montant
+  type          CreditTransactionType
+  amount        Int                    // Positif = ajout, Négatif = utilisation
+  balanceBefore Int                    // Solde avant transaction
+  balanceAfter  Int                    // Solde après transaction
+
+  // Description et contexte
+  description String                   // Ex: "Génération fiche pédagogique", "Reset mensuel"
+  metadata    Json?                    // Données supplémentaires (promptType, tokens, etc.)
+
+  // Lien avec la génération IA (si applicable)
+  aiGenerationLogId String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([type])
   @@index([createdAt])
 }
 

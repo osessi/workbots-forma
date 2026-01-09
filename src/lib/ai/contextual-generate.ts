@@ -13,6 +13,7 @@ import {
   validateRequiredVariables,
   DEFAULT_PROMPTS,
 } from "./dynamic-prompts";
+import { deductCredits, getCreditCost, hasEnoughCredits } from "@/lib/services/credits.service";
 
 // ===========================================
 // TYPES
@@ -160,6 +161,18 @@ export async function generateWithContext(
     };
   }
 
+  // Vérifier les crédits disponibles si organisation fournie
+  const creditCost = getCreditCost(input.promptType);
+  if (input.organizationId) {
+    const hasCredits = await hasEnoughCredits(input.organizationId, creditCost);
+    if (!hasCredits) {
+      return {
+        success: false,
+        error: "Crédits insuffisants. Veuillez recharger votre compte ou passer à un plan supérieur.",
+      };
+    }
+  }
+
   try {
     // Recuperer le prompt
     const prompt = await getPromptForGeneration(input.promptType, input.organizationId);
@@ -209,7 +222,7 @@ export async function generateWithContext(
     const usage = result.usage as { promptTokens?: number; completionTokens?: number; totalTokens?: number } | undefined;
 
     // Logger la generation
-    await prisma.aIGenerationLog.create({
+    const aiLog = await prisma.aIGenerationLog.create({
       data: {
         promptId: prompt.id,
         promptType: input.promptType,
@@ -227,6 +240,18 @@ export async function generateWithContext(
         model: prompt.model,
       },
     });
+
+    // Déduire les crédits après génération réussie
+    if (input.organizationId) {
+      await deductCredits({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        amount: creditCost,
+        description: `Génération ${prompt.name}`,
+        promptType: input.promptType,
+        aiGenerationLogId: aiLog.id,
+      });
+    }
 
     // Parser le contenu si c'est du JSON
     let contentJson: unknown = undefined;

@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
           message: `Nouveau message de ${apprenant.prenom} ${apprenant.nom}`,
           resourceType: "apprenant",
           resourceId: apprenant.id,
-          actionUrl: `/automate/apprenants/${apprenant.id}`,
+          actionUrl: `/apprenants/${apprenant.id}`,
           isRead: false,
           metadata: {
             direction: "incoming",

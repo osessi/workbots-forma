@@ -146,7 +146,7 @@ export default function KanbanBoard({ formations }: KanbanBoardProps) {
 
                       {/* Bouton éditer */}
                       <Link
-                        href={`/automate/create?id=${formation.id}`}
+                        href={`/create?id=${formation.id}`}
                         className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
                       >
                         Continuer

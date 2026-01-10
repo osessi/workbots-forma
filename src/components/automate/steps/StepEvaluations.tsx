@@ -29,6 +29,7 @@ interface AtelierData {
   description: string;
   objectifs: string[];
   instructions: string[];
+  exemplesRendu?: string[];
   dureeEstimee: string;
   critereEvaluation: string[];
 }
@@ -279,6 +280,9 @@ interface EvaluationPreviewProps {
   onViewAll: () => void;
   onDownload: () => void;
   onDownloadAnswers?: () => void;
+  // Correction 326 & 327: Personnalisation des info-bulles
+  downloadLabel?: string;
+  downloadAnswersLabel?: string;
 }
 
 const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
@@ -290,6 +294,8 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
   onViewAll,
   onDownload,
   onDownloadAnswers,
+  downloadLabel = "Télécharger le test",
+  downloadAnswersLabel = "Télécharger le test corrigé",
 }) => {
   if (isGenerating) {
     return (
@@ -350,7 +356,7 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(); }}
             className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-green-600 dark:text-green-400"
-            title="Télécharger le test"
+            title={downloadLabel}
           >
             <DownloadIcon />
           </button>
@@ -358,7 +364,7 @@ const EvaluationPreview: React.FC<EvaluationPreviewProps> = ({
             <button
               onClick={(e) => { e.stopPropagation(); onDownloadAnswers(); }}
               className="p-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 text-purple-600 dark:text-purple-400"
-              title="Télécharger les réponses"
+              title={downloadAnswersLabel}
             >
               <AnswersIcon />
             </button>
@@ -455,29 +461,17 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ data, onClose, onDown
                   </p>
                 </div>
 
-                {q.type === "qcm" && q.options && (
+                {q.options && q.options.length > 0 && (
                   <div className="ml-11 space-y-2">
                     {q.options.map((option, optIdx) => (
                       <div
                         key={optIdx}
-                        className={`flex items-start gap-2 p-2 rounded-lg ${
-                          q.correctAnswer === optIdx
-                            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                            : 'bg-white dark:bg-gray-900'
-                        }`}
+                        className="flex items-start gap-2 p-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
                       >
-                        <span className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs font-medium ${
-                          q.correctAnswer === optIdx
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                        }`}>
+                        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                           {String.fromCharCode(65 + optIdx)}
                         </span>
-                        <span className={`text-sm ${
-                          q.correctAnswer === optIdx
-                            ? 'text-green-700 dark:text-green-400 font-medium'
-                            : 'text-gray-600 dark:text-gray-400'
-                        }`}>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
                           {option}
                         </span>
                       </div>
@@ -485,25 +479,20 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ data, onClose, onDown
                   </div>
                 )}
 
-                {q.type === "vrai_faux" && (
+                {q.type === "vrai_faux" && !q.options && (
                   <div className="ml-11 flex gap-2">
-                    <span className={`px-3 py-1 rounded-lg text-sm ${
-                      q.correctAnswer === "vrai" ? 'bg-green-100 text-green-700 font-medium dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    }`}>
+                    <span className="px-3 py-1 rounded-lg text-sm bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                       Vrai
                     </span>
-                    <span className={`px-3 py-1 rounded-lg text-sm ${
-                      q.correctAnswer === "faux" ? 'bg-green-100 text-green-700 font-medium dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    }`}>
+                    <span className="px-3 py-1 rounded-lg text-sm bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                       Faux
                     </span>
                   </div>
                 )}
 
-                {q.type === "ouvert" && (
-                  <div className="ml-11 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Réponse attendue :</p>
-                    <p className="text-sm text-blue-700 dark:text-blue-300">{q.correctAnswer || "Question ouverte"}</p>
+                {q.type === "ouvert" && !q.options && (
+                  <div className="ml-11 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Zone de réponse libre</p>
                   </div>
                 )}
               </div>
@@ -655,7 +644,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           <div class="question-block">
             <span class="question-number">${i + 1}</span>
             <span class="question-text">${q.question}</span>
-            ${q.type === 'qcm' && q.options ? `
+            ${q.options && q.options.length > 0 ? `
               <div class="options">
                 ${q.options.map((opt, idx) => `
                   <div class="option">
@@ -721,10 +710,8 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .answer-label { font-weight: 600; color: #166534; font-size: 12px; margin-bottom: 5px; }
           .answer-text { color: #15803d; font-size: 14px; }
           .options { margin-top: 15px; padding-left: 40px; }
-          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; }
+          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; }
           .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
-          .correct { background: #dcfce7; border: 1px solid #86efac; }
-          .correct .option-letter { background: #22c55e; color: white; }
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -742,7 +729,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             ${q.options ? `
               <div class="options">
                 ${q.options.map((opt, idx) => `
-                  <div class="option ${q.correctAnswer === idx ? 'correct' : ''}">
+                  <div class="option">
                     <span class="option-letter">${String.fromCharCode(65 + idx)}</span>
                     ${opt}
                   </div>
@@ -1044,6 +1031,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             description: data.data.description || "",
             objectifs: data.data.objectifs || [],
             instructions: data.data.instructions || [],
+            exemplesRendu: data.data.exemplesRendu || [],
             dureeEstimee: data.data.dureeEstimee || "30 minutes",
             critereEvaluation: data.data.critereEvaluation || [],
           },
@@ -1423,10 +1411,8 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .question-number { display: inline-block; width: 28px; height: 28px; background: #22c55e; color: white; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; font-size: 14px; }
           .question-text { font-weight: 600; color: #1e293b; display: inline; }
           .options { margin-top: 15px; padding-left: 40px; }
-          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; }
+          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; }
           .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
-          .correct { background: #dcfce7; border: 1px solid #86efac; }
-          .correct .option-letter { background: #22c55e; color: white; }
           .answer-section { margin-top: 15px; padding: 12px; background: #dcfce7; border-radius: 8px; border: 1px solid #86efac; }
           .answer-label { font-weight: 600; color: #166534; font-size: 12px; margin-bottom: 5px; }
           .answer-text { color: #15803d; font-size: 14px; }
@@ -1454,7 +1440,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             <span class="question-text">${q.question}</span>
             <div class="options">
               ${q.options.map((opt, idx) => `
-                <div class="option ${q.correctAnswer === idx ? 'correct' : ''}">
+                <div class="option">
                   <span class="option-letter">${String.fromCharCode(65 + idx)}</span>
                   ${opt}
                 </div>
@@ -1767,7 +1753,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                 <div class="exemple-step-title">Étape ${idx + 1}</div>
                 <div class="exemple-step-content">
                   <strong>Instruction :</strong> ${inst}<br><br>
-                  <strong>Rendu attendu :</strong> L'apprenant doit avoir complété cette étape en appliquant les connaissances acquises dans le module "${module.titre}". Le résultat doit démontrer une compréhension des concepts clés et une mise en pratique correcte.
+                  <strong>Rendu attendu :</strong> ${atelier.exemplesRendu && atelier.exemplesRendu[idx] ? atelier.exemplesRendu[idx] : `L'apprenant doit avoir complété cette étape en appliquant les connaissances acquises dans le module "${module.titre}".`}
                 </div>
               </div>
             `).join('')}
@@ -1822,6 +1808,8 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             onViewAll={() => setViewingPositionnement(true)}
             onDownload={() => positionnement && handleDownloadEvaluation(positionnement)}
             onDownloadAnswers={() => positionnement && handleDownloadAnswers(positionnement)}
+            downloadLabel="Télécharger le test"
+            downloadAnswersLabel="Télécharger le test corrigé"
           />
         </div>
 
@@ -1842,6 +1830,8 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             onViewAll={() => setViewingEvaluation(true)}
             onDownload={() => evaluationFinale && handleDownloadEvaluation(evaluationFinale)}
             onDownloadAnswers={() => evaluationFinale && handleDownloadAnswers(evaluationFinale)}
+            downloadLabel="Télécharger l'évaluation"
+            downloadAnswersLabel="Télécharger l'évaluation corrigée"
           />
         </div>
       </div>
@@ -2057,7 +2047,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                         <button
                           onClick={() => evalType === "qcm" && qcm ? handleDownloadQCM(module, qcm) : atelier && handleDownloadAtelier(module, atelier)}
                           className="p-2 text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                          title={evalType === "qcm" ? "Télécharger le test" : "Télécharger l'atelier"}
+                          title={evalType === "qcm" ? "Télécharger le QCM" : "Télécharger l'atelier"}
                         >
                           <DownloadIcon />
                         </button>
@@ -2066,7 +2056,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                           <button
                             onClick={() => handleDownloadQCMAnswers(module, qcm)}
                             className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                            title="Télécharger le corrigé"
+                            title="Télécharger le QCM corrigé"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2078,7 +2068,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
                           <button
                             onClick={() => handleDownloadAtelierCorrection(module, atelier)}
                             className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                            title="Télécharger l'exemple de rendu"
+                            title="Télécharger l'atelier corrigé"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2235,9 +2225,9 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors shadow-sm"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 4.16667V15.8333M4.16667 10H15.8333" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M16.6667 5L7.5 14.1667L3.33334 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Créer une session
+          Terminer
         </button>
       </div>
 

@@ -159,7 +159,7 @@ const AutomateHeader: React.FC = () => {
   const handleFormationClick = (id: string) => {
     setLocalSearchQuery("");
     setIsSearchOpen(false);
-    router.push(`/automate/create?id=${id}`);
+    router.push(`/create?id=${id}`);
   };
 
   const handleSignOut = async () => {
@@ -262,7 +262,7 @@ const AutomateHeader: React.FC = () => {
           {/* Credits indicator - discret */}
           {credits && (
             <Link
-              href="/automate/settings/credits"
+              href="/settings/credits"
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
               title="Voir les détails des crédits"
             >
@@ -317,14 +317,14 @@ const AutomateHeader: React.FC = () => {
 
             {isDropdownOpen && (
               <div className="absolute right-0 mt-2 w-56 rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg dark:border-gray-700 dark:bg-gray-800 animate-in fade-in slide-in-from-top-2 duration-200">
-                <a href="/automate/account" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                <a href="/account" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
                   Mon compte
                 </a>
-                <a href="/automate/billing" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                <a href="/billing" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
                   Facturation
                 </a>
                 <hr className="my-1.5 border-gray-100 dark:border-gray-700" />
-                <a href="/automate/notifications" className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                <a href="/notifications" className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
                   <span className="flex items-center gap-2">
                     <Bell className="w-4 h-4" />
                     Notifications
@@ -335,7 +335,7 @@ const AutomateHeader: React.FC = () => {
                     </span>
                   )}
                 </a>
-                <a href="/automate/emails" className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                <a href="/emails" className="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
                   <span className="flex items-center gap-2">
                     <Send className="w-4 h-4" />
                     Emails envoyés
@@ -347,7 +347,7 @@ const AutomateHeader: React.FC = () => {
                   )}
                 </a>
                 {isDev && (
-                  <a href="/automate/dev/emails" className="flex items-center justify-between px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 transition-colors">
+                  <a href="/dev/emails" className="flex items-center justify-between px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 transition-colors">
                     <span className="flex items-center gap-2">
                       <Mail className="w-4 h-4" />
                       Dev Emails (mémoire)
@@ -360,9 +360,9 @@ const AutomateHeader: React.FC = () => {
                   </a>
                 )}
                 <hr className="my-1.5 border-gray-100 dark:border-gray-700" />
-                <a href="/automate/faq" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
+                <a href="/docs" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-brand-50/50 hover:text-brand-600 dark:text-gray-200 dark:hover:bg-brand-500/10 dark:hover:text-brand-400 transition-colors">
                   <HelpCircle className="w-4 h-4" />
-                  FAQ
+                  Documentation
                 </a>
                 <hr className="my-1.5 border-gray-100 dark:border-gray-700" />
                 <button

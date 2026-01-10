@@ -2384,7 +2384,7 @@ export default function StepDocuments({
 
             <div className="space-y-3">
               <a
-                href="/automate/formations"
+                href="/formations"
                 className="block w-full py-3 px-4 text-sm font-medium text-white bg-gradient-to-r from-brand-500 to-purple-500 rounded-xl hover:from-brand-600 hover:to-purple-600 transition-all"
               >
                 Voir mes formations

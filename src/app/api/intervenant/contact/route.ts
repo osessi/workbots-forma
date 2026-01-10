@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         message: `${intervenant.prenom} ${intervenant.nom} vous a envoyé un message`,
         resourceType: "intervenant",
         resourceId: intervenantId,
-        actionUrl: `/automate/intervenants/${intervenantId}`,
+        actionUrl: `/intervenants/${intervenantId}`,
         isRead: false,
         metadata: {
           direction: "incoming",

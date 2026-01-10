@@ -308,7 +308,7 @@ export default function NotificationBell({ isExpanded = true }: NotificationBell
             <div className="border-t border-gray-200 dark:border-gray-700 p-2">
               <button
                 onClick={() => {
-                  router.push("/automate/notifications");
+                  router.push("/notifications");
                   setIsOpen(false);
                 }}
                 className="w-full px-4 py-2 text-sm text-brand-600 hover:bg-gray-50 dark:text-brand-400 dark:hover:bg-gray-800 rounded-lg transition-colors"

@@ -109,12 +109,27 @@ interface CertificationData {
   lienFranceCompetences?: string;
 }
 
+// Interface pour les données de l'organisation (Correction 315)
+interface OrganisationData {
+  nom: string;
+  siret: string;
+  nda: string; // Numéro de Déclaration d'Activité
+  adresse: string;
+  codePostal: string;
+  ville: string;
+  prefectureRegion: string; // Région d'enregistrement du NDA
+  representantNom?: string;
+  representantPrenom?: string;
+  logoUrl?: string | null;
+}
+
 interface StepFichePedagogiqueProps {
   data: FichePedagogiqueData;
   onChange: (data: FichePedagogiqueData) => void;
   onNext: () => void;
   onPrevious: () => void;
   certificationData?: CertificationData;
+  organisationData?: OrganisationData;
 }
 
 // Composant pour les blocs éditables avec stylo
@@ -334,6 +349,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   onNext,
   onPrevious,
   certificationData,
+  organisationData,
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(data.titre);
@@ -519,9 +535,52 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
     }
   };
 
+  // Générer le pied de page avec les informations de l'organisation (Correction 315)
+  const generateFooterHtml = () => {
+    if (!organisationData || !organisationData.nom) {
+      return '';
+    }
+
+    const adresseComplete = [
+      organisationData.adresse,
+      [organisationData.codePostal, organisationData.ville].filter(Boolean).join(' ')
+    ].filter(Boolean).join(', ');
+
+    const ndaInfo = organisationData.nda
+      ? `Numéro de déclaration d'activité : ${organisationData.nda}${organisationData.prefectureRegion ? ` (auprès de la région ${organisationData.prefectureRegion})` : ''}`
+      : '';
+
+    return `
+      <div class="footer">
+        <div class="footer-line">${organisationData.nom}${adresseComplete ? ` | ${adresseComplete}` : ''}</div>
+        ${organisationData.siret ? `<div class="footer-line">Numéro SIRET : ${organisationData.siret}</div>` : ''}
+        ${ndaInfo ? `<div class="footer-line">${ndaInfo}</div>` : ''}
+      </div>
+    `;
+  };
+
+  // Générer l'en-tête avec le logo de l'organisation (Correction 315)
+  const generateHeaderHtml = () => {
+    if (!organisationData?.logoUrl) {
+      return '';
+    }
+    return `
+      <div class="header">
+        <img src="${organisationData.logoUrl}" alt="Logo ${organisationData.nom || 'Organisme'}" class="header-logo" />
+      </div>
+    `;
+  };
+
   // Fonction de telechargement PDF via API print
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
+
+    // Date de génération du document
+    const dateGeneration = new Date().toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
 
     // Creer une fenetre d'impression stylisee
     const printContent = `
@@ -530,13 +589,27 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       <head>
         <title>${data.titre} - Fiche Pédagogique</title>
         <style>
+          @page {
+            margin: 20mm 15mm 25mm 15mm;
+          }
           body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
             color: #333;
             max-width: 800px;
             margin: 0 auto;
-            padding: 40px;
+            padding: 20px;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          .header-logo {
+            max-height: 60px;
+            max-width: 200px;
+            object-fit: contain;
           }
           h1 { color: #1a1a2e; font-size: 28px; margin-bottom: 20px; border-bottom: 3px solid #6366f1; padding-bottom: 10px; }
           h2 { color: #4338ca; font-size: 18px; margin-top: 30px; margin-bottom: 10px; }
@@ -548,13 +621,35 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           li { margin-bottom: 8px; }
           .section { margin-bottom: 25px; padding: 20px; background: #fafafa; border-radius: 8px; }
           .section-title { font-weight: 600; color: #4338ca; margin-bottom: 10px; }
+          .footer {
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 10px;
+            color: #6b7280;
+            text-align: center;
+          }
+          .footer-line {
+            margin: 3px 0;
+          }
+          .date-generation {
+            font-size: 10px;
+            color: #9ca3af;
+            text-align: right;
+            margin-bottom: 10px;
+          }
           @media print {
-            body { padding: 20px; }
+            body { padding: 0; }
             .section { break-inside: avoid; }
+            .header { position: running(header); }
           }
         </style>
       </head>
       <body>
+        ${generateHeaderHtml()}
+
+        <div class="date-generation">Document généré le ${dateGeneration}</div>
+
         <h1>${data.titre}</h1>
 
         <div class="info-grid">
@@ -621,16 +716,21 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
         ${data.suiviEvaluation ? `
         <div class="section">
-          <div class="section-title">Suivi et évaluation</div>
+          <div class="section-title">Suivi de l'exécution et évaluation des résultats</div>
           <ul>
             ${data.suiviEvaluation.split('\n').filter(s => s.trim()).map(s => `<li>${s}</li>`).join('')}
           </ul>
         </div>
         ` : ''}
 
+        <div class="section">
+          <div class="section-title">Équipe pédagogique</div>
+          <p>${data.equipePedagogique || "L'équipe pédagogique est composée de formateurs experts dans leur domaine, sélectionnés pour leurs compétences professionnelles et leur expérience en formation d'adultes. Chaque formateur dispose d'une expertise métier reconnue et d'une pédagogie adaptée aux différents profils d'apprenants."}</p>
+        </div>
+
         ${data.ressourcesPedagogiques ? `
         <div class="section">
-          <div class="section-title">Ressources pédagogiques</div>
+          <div class="section-title">Ressources techniques et pédagogiques</div>
           <ul>
             ${data.ressourcesPedagogiques.split('\n').filter(r => r.trim()).map(r => `<li>${r}</li>`).join('')}
           </ul>
@@ -650,6 +750,8 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
           <p>${data.delaiAcces}</p>
         </div>
         ` : ''}
+
+        ${generateFooterHtml()}
       </body>
       </html>
     `;
@@ -780,14 +882,36 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         });
       }
 
-      // Générer des objectifs plus spécifiques basés sur le contenu du module
+      // Correction 317 & 346: Générer des objectifs plus spécifiques basés sur le contenu du module
+      // Synthétiser le contenu en 1-2 phrases explicatives et descriptives
       modules.forEach((module) => {
         if (module.contenu) {
-          const firstContent = module.contenu.split('\n')[0] || '';
-          const cleanContent = firstContent.replace(/^[-•*]\s*/, '').trim();
-          if (cleanContent.length > 10) {
-            module.objectif = `Comprendre et appliquer : ${cleanContent.substring(0, 80)}${cleanContent.length > 80 ? '...' : ''}`;
+          const contentLines = module.contenu.split('\n').filter(line => line.trim());
+          // Extraire les thèmes principaux (nettoyer les puces)
+          const themes = contentLines
+            .slice(0, 4)
+            .map(line => line.replace(/^[-•*]\s*/, '').trim())
+            .filter(t => t.length > 5);
+
+          if (themes.length >= 2) {
+            // Construire un objectif qui synthétise le contenu avec plusieurs thèmes
+            const theme1 = themes[0].charAt(0).toLowerCase() + themes[0].slice(1);
+            const theme2 = themes[1].charAt(0).toLowerCase() + themes[1].slice(1);
+
+            // Générer un objectif descriptif en 1-2 phrases structurées
+            module.objectif = `À l'issue de ce module, le participant sera capable de comprendre et appliquer les notions liées à ${theme1}. Il maîtrisera également ${theme2} pour une mise en pratique efficace en situation professionnelle.`;
+          } else if (themes.length === 1) {
+            const theme = themes[0].charAt(0).toLowerCase() + themes[0].slice(1);
+            module.objectif = `Ce module permet d'acquérir les compétences essentielles pour ${theme}. Le participant pourra appliquer ces connaissances dans son contexte professionnel.`;
+          } else {
+            // Fallback basé sur le nom du module
+            const moduleName = module.nom.toLowerCase();
+            module.objectif = `À l'issue de ce module, le participant maîtrisera les fondamentaux de ${moduleName} et sera capable de les appliquer concrètement dans ses activités professionnelles.`;
           }
+        } else {
+          // Pas de contenu, générer un objectif basé sur le nom
+          const moduleName = module.nom.toLowerCase();
+          module.objectif = `Ce module permet d'acquérir les compétences essentielles liées à ${moduleName}. Le participant développera une maîtrise opérationnelle des concepts abordés.`;
         }
       });
 
@@ -796,34 +920,73 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
     const modules = parseModules(data.contenu || '');
 
-    // Générer les lignes du tableau pour chaque module
+    // Correction 347: Fonction pour formater le contenu sans saut de ligne parasite
+    const formatModuleContent = (contenu: string) => {
+      if (!contenu) return 'Voir programme détaillé';
+      // Nettoyer et formater le contenu en liste à puces HTML
+      const lines = contenu.split('\n').filter(line => line.trim());
+      return lines.map(line => {
+        const cleanLine = line.replace(/^[-•*]\s*/, '').trim();
+        return `• ${cleanLine}`;
+      }).join('<br/>');
+    };
+
+    // Correction 347: Générer les lignes du tableau avec alignement vertical cohérent
     const generateModuleRows = () => {
       return modules.map((module, index) => `
         <tr>
-          <td style="padding: 12px; border: 1px solid #e2e8f0; font-weight: 500; background: #f8fafc; vertical-align: top;">
+          <td style="padding: 10px 12px; border: 1px solid #e2e8f0; font-weight: 500; background: #f8fafc; vertical-align: top; line-height: 1.4;">
             ${module.nom}
           </td>
-          <td style="padding: 12px; border: 1px solid #e2e8f0; vertical-align: top; white-space: pre-line;">
-            ${module.contenu || 'Voir programme détaillé'}
+          <td style="padding: 10px 12px; border: 1px solid #e2e8f0; vertical-align: top; line-height: 1.4;">
+            ${formatModuleContent(module.contenu)}
           </td>
-          <td style="padding: 12px; border: 1px solid #e2e8f0; vertical-align: top;">
+          <td style="padding: 10px 12px; border: 1px solid #e2e8f0; vertical-align: top; line-height: 1.4;">
             ${module.objectif}
           </td>
-          <td style="padding: 12px; border: 1px solid #e2e8f0; text-align: center; vertical-align: top;">
+          <td style="padding: 10px 12px; border: 1px solid #e2e8f0; text-align: center; vertical-align: top; line-height: 1.4;">
             ${module.duree || 'À définir'}
           </td>
-          <td style="padding: 12px; border: 1px solid #e2e8f0; vertical-align: top;">
+          <td style="padding: 10px 12px; border: 1px solid #e2e8f0; vertical-align: top; line-height: 1.4;">
             ${data.ressourcesPedagogiques ? data.ressourcesPedagogiques.split('\n').slice(0, 2).join(', ') : 'Exposé, exercices pratiques, études de cas'}
           </td>
-          <td style="padding: 12px; border: 1px solid #e2e8f0; vertical-align: top;">
+          <td style="padding: 10px 12px; border: 1px solid #e2e8f0; vertical-align: top; line-height: 1.4;">
             ${data.ressourcesPedagogiques || 'Support de cours, exercices pratiques, études de cas'}
           </td>
-          <td style="padding: 12px; border: 1px solid #e2e8f0; vertical-align: top;">
-            Atelier pratique ou QCM pour valider les acquis du module
+          <td style="padding: 10px 12px; border: 1px solid #e2e8f0; vertical-align: top; line-height: 1.4;">
+            QCM ou atelier pour valider les acquis du module.
           </td>
         </tr>
       `).join('');
     };
+
+    // Date de génération du document
+    const dateGenerationScenario = new Date().toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    // Construire le pied de page avec les informations de l'organisation
+    const scenarioFooterInfo = (() => {
+      if (!organisationData || !organisationData.nom) {
+        return `Document généré le ${dateGenerationScenario}`;
+      }
+
+      const adresseComplete = [
+        organisationData.adresse,
+        [organisationData.codePostal, organisationData.ville].filter(Boolean).join(' ')
+      ].filter(Boolean).join(', ');
+
+      const lines = [
+        `${organisationData.nom}${adresseComplete ? ` | ${adresseComplete}` : ''}`,
+        organisationData.siret ? `Numéro SIRET : ${organisationData.siret}` : '',
+        organisationData.nda ? `Numéro de déclaration d'activité : ${organisationData.nda}${organisationData.prefectureRegion ? ` (auprès de la région ${organisationData.prefectureRegion})` : ''}` : '',
+        `Document généré le ${dateGenerationScenario}`
+      ].filter(Boolean);
+
+      return lines.join('<br/>');
+    })();
 
     const scenarioContent = `
       <!DOCTYPE html>
@@ -844,8 +1007,10 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             padding-bottom: 20px;
             border-bottom: 3px solid #6366f1;
           }
-          .logo {
-            max-height: 60px;
+          .header-logo {
+            max-height: 50px;
+            max-width: 180px;
+            object-fit: contain;
             margin-bottom: 15px;
           }
           h1 {
@@ -912,9 +1077,10 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             margin-top: 30px;
             padding-top: 15px;
             border-top: 1px solid #e2e8f0;
-            font-size: 11px;
+            font-size: 10px;
             color: #6b7280;
             text-align: center;
+            line-height: 1.6;
           }
           .qualiopi-note {
             background: #fef3c7;
@@ -938,6 +1104,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       </head>
       <body>
         <div class="header">
+          ${organisationData?.logoUrl ? `<img src="${organisationData.logoUrl}" alt="Logo" class="header-logo" />` : ''}
           <div class="subtitle">SCÉNARIO PÉDAGOGIQUE</div>
           <h1>${data.titre}</h1>
         </div>
@@ -983,7 +1150,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         </div>
 
         <div class="footer">
-          Document généré automatiquement - ${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+          ${scenarioFooterInfo}
         </div>
       </body>
       </html>
@@ -1152,61 +1319,87 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       return Math.min(100, baseScore + bonus);
     };
 
-    // CORRECTION 98 & 100: Associer chaque compétence RS à un objectif pédagogique et un module
+    // CORRECTION 319: Trouver tous les modules correspondants pour une compétence (minimum 2)
+    const findAllMatchingModules = (competence: RSCompetence, modules: Array<{ nom: string; contenu: string; objectif: string; index: number }>) => {
+      const matchingModules: Array<{ module: typeof modules[0]; score: number }> = [];
+
+      modules.forEach((mod) => {
+        const score = calculateCorrespondanceScore(competence.intitule, '', mod);
+        matchingModules.push({ module: mod, score });
+      });
+
+      // Trier par score décroissant et prendre les 2 meilleurs minimum
+      matchingModules.sort((a, b) => b.score - a.score);
+
+      // Retourner au moins 2 modules (ou tous si moins de 2)
+      return matchingModules.slice(0, Math.max(2, Math.min(3, matchingModules.length)));
+    };
+
+    // CORRECTION 318: Associer chaque compétence RS à un objectif pédagogique (mapping 1:1 idéal)
     const findBestMatch = (competence: RSCompetence, objectifs: string[], modules: Array<{ nom: string; contenu: string; objectif: string; index: number }>) => {
       let bestObjectifIndex = competence.numero - 1;
-      let bestModuleIndex = 0;
       let bestScore = 0;
 
-      // Si l'index correspond directement, l'utiliser
+      // Mapping 1:1 : Si l'index correspond directement, l'utiliser
       if (bestObjectifIndex >= 0 && bestObjectifIndex < objectifs.length) {
         const objectif = objectifs[bestObjectifIndex];
         const module = modules[bestObjectifIndex] || modules[0];
         if (module) {
           bestScore = calculateCorrespondanceScore(competence.intitule, objectif, module);
-          bestModuleIndex = bestObjectifIndex;
         }
       }
 
       // Sinon, chercher la meilleure correspondance
-      if (bestScore < 80 && modules.length > 0) {
+      if (bestScore < 80 && objectifs.length > 0) {
         objectifs.forEach((obj, i) => {
-          modules.forEach((mod, j) => {
+          modules.forEach((mod) => {
             const score = calculateCorrespondanceScore(competence.intitule, obj, mod);
             if (score > bestScore) {
               bestScore = score;
               bestObjectifIndex = i;
-              bestModuleIndex = j;
             }
           });
         });
       }
 
+      // CORRECTION 319: Trouver plusieurs modules correspondants
+      const matchingModules = findAllMatchingModules(competence, modules);
+
       return {
         objectif: objectifs[bestObjectifIndex] || competence.intitule,
-        module: modules[bestModuleIndex] || { nom: 'Programme complet', contenu: data.contenu, objectif: '', index: 1 },
+        modules: matchingModules, // Plusieurs modules au lieu d'un seul
         score: bestScore || 85, // Score minimum de 85%
       };
     };
 
-    // CORRECTION 98: Générer les lignes du tableau avec l'intitulé exact des compétences RS
+    // CORRECTION 317 & 316: Générer les lignes avec intitulé COMPLET des compétences RS (sans troncature)
     const generateTableRows = () => {
       return competencesRS.map((competence) => {
         const match = findBestMatch(competence, objectifsPedagogiques, modules);
         const scoreColor = match.score >= 80 ? '#22c55e' : match.score >= 60 ? '#f59e0b' : '#ef4444';
 
+        // CORRECTION 319: Afficher plusieurs modules correspondants
+        const modulesHtml = match.modules.map((m, idx) => {
+          const moduleContent = (m.module.objectif || m.module.contenu || '').substring(0, 80);
+          return `<div style="${idx > 0 ? 'margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e5e7eb;' : ''}">
+            <strong>${m.module.nom}</strong>
+            <span style="font-size: 10px; color: #9ca3af; margin-left: 5px;">(${m.score}%)</span><br/>
+            <span style="font-size: 11px; color: #6b7280;">• ${moduleContent}${moduleContent.length >= 80 ? '...' : ''}</span>
+          </div>`;
+        }).join('');
+
         return `
           <tr>
             <td style="padding: 12px; border: 1px solid #e5e7eb; vertical-align: top;">
-              <strong>Compétence ${competence.numero} – ${competence.intitule.substring(0, 60)}${competence.intitule.length > 60 ? '...' : ''}</strong><br/>
-              <span style="color: #6b7280; font-size: 11px;">(${certificationData.numeroFicheRS})</span>
+              <strong>Compétence ${competence.numero}</strong><br/>
+              <span style="font-size: 12px;">${competence.intitule}</span><br/>
+              <span style="color: #6b7280; font-size: 10px;">(RS${certificationData.numeroFicheRS})</span>
             </td>
             <td style="padding: 12px; border: 1px solid #e5e7eb; vertical-align: top;">
               ${match.objectif}
             </td>
             <td style="padding: 12px; border: 1px solid #e5e7eb; vertical-align: top;">
-              <strong>${match.module.nom}</strong><br/>
-              <span style="font-size: 11px; color: #6b7280;">• ${(match.module.objectif || match.module.contenu || '').substring(0, 100)}${(match.module.objectif || match.module.contenu || '').length > 100 ? '...' : ''}</span>
+              ${modulesHtml}
             </td>
             <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: center; vertical-align: middle;">
               <div style="display: inline-flex; align-items: center; gap: 8px;">
@@ -1230,6 +1423,34 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
 
     // Nombre de modules effectifs (après exclusion des modules "Mise à niveau")
     const modulesEffectifs = modules.length;
+
+    // Date de génération du document
+    const dateGenerationTableau = new Date().toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    // Construire le pied de page avec les informations de l'organisation
+    const tableauFooterInfo = (() => {
+      if (!organisationData || !organisationData.nom) {
+        return `Document généré le ${dateGenerationTableau}`;
+      }
+
+      const adresseComplete = [
+        organisationData.adresse,
+        [organisationData.codePostal, organisationData.ville].filter(Boolean).join(' ')
+      ].filter(Boolean).join(', ');
+
+      const lines = [
+        `${organisationData.nom}${adresseComplete ? ` | ${adresseComplete}` : ''}`,
+        organisationData.siret ? `Numéro SIRET : ${organisationData.siret}` : '',
+        organisationData.nda ? `Numéro de déclaration d'activité : ${organisationData.nda}${organisationData.prefectureRegion ? ` (auprès de la région ${organisationData.prefectureRegion})` : ''}` : '',
+        `Document généré le ${dateGenerationTableau}`
+      ].filter(Boolean);
+
+      return lines.join('<br/>');
+    })();
 
     const tableauCroiseContent = `
       <!DOCTYPE html>
@@ -1256,6 +1477,12 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             margin-bottom: 30px;
             padding-bottom: 20px;
             border-bottom: 3px solid #7c3aed;
+          }
+          .header-logo {
+            max-height: 50px;
+            max-width: 180px;
+            object-fit: contain;
+            margin-bottom: 15px;
           }
           .header h1 {
             font-size: 20px;
@@ -1338,6 +1565,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
             border-top: 1px solid #e5e7eb;
             color: #9ca3af;
             font-size: 10px;
+            line-height: 1.6;
           }
           .legend {
             display: flex;
@@ -1360,6 +1588,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
       </head>
       <body>
         <div class="header">
+          ${organisationData?.logoUrl ? `<img src="${organisationData.logoUrl}" alt="Logo" class="header-logo" />` : ''}
           <h1>TABLEAU CROISÉ RS / FICHE PÉDAGOGIQUE</h1>
           <p><strong>${data.titre}</strong></p>
           <div>
@@ -1371,10 +1600,11 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         <div class="info-box">
           <h3>Informations de la formation certifiante</h3>
           <p><strong>Formation :</strong> ${data.titre}</p>
-          <p><strong>Numéro fiche RS :</strong> ${certificationData.numeroFicheRS}</p>
+          <p><strong>Numéro fiche RS :</strong> RS${certificationData.numeroFicheRS}</p>
           ${certificationData.lienFranceCompetences ? `<p><strong>Lien France Compétences :</strong> <a href="${certificationData.lienFranceCompetences}" target="_blank" style="color: #7c3aed;">${certificationData.lienFranceCompetences}</a></p>` : ''}
+          <p><strong>Nombre de compétences RS :</strong> ${competencesRS.length}</p>
           <p><strong>Nombre d'objectifs pédagogiques :</strong> ${objectifsPedagogiques.length}</p>
-          <p><strong>Nombre de modules :</strong> ${modulesEffectifs}</p>
+          <p><strong>Nombre de modules correspondants :</strong> ${modulesEffectifs}</p>
         </div>
 
         <div class="legend">
@@ -1426,7 +1656,7 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
         </div>
 
         <div class="footer">
-          Document généré automatiquement - ${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+          ${tableauFooterInfo}
         </div>
       </body>
       </html>

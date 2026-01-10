@@ -38,7 +38,7 @@ const publicRoutes = [
 ];
 
 // Routes qui nécessitent une authentification
-const protectedRoutes = ["/automate", "/admin"];
+const protectedRoutes = ["/", "/admin"];
 
 // Slides API URL for proxying
 const SLIDES_API_URL = process.env.SLIDES_API_URL || "http://localhost:8000";
@@ -230,7 +230,7 @@ async function handleAuth(
   // Si l'utilisateur est connecté et essaie d'accéder aux pages auth classiques, rediriger vers automate
   // Note: /admin-login est exclu car il a sa propre logique de redirection
   if (user && (pathname === "/signin" || pathname === "/signup")) {
-    return NextResponse.redirect(new URL("/automate", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return supabaseResponse;

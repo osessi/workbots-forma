@@ -42,7 +42,7 @@ export default function SignInForm() {
       if (data.user) {
         // Synchroniser l'utilisateur avec Prisma
         await fetch("/api/user/sync", { method: "POST" });
-        router.push("/automate");
+        router.push("/");
         router.refresh();
       }
     } catch (err) {
@@ -57,6 +57,13 @@ export default function SignInForm() {
     setIsLoading(true);
     setError(null);
 
+    // Noms affichables des providers
+    const providerNames: Record<string, string> = {
+      google: "Google",
+      azure: "Microsoft",
+      linkedin_oidc: "LinkedIn",
+    };
+
     try {
       const supabase = getSupabaseBrowserClient();
       const { error } = await supabase.auth.signInWithOAuth({
@@ -67,12 +74,17 @@ export default function SignInForm() {
       });
 
       if (error) {
-        setError(error.message);
+        // Message d'erreur plus explicite
+        if (error.message.includes("provider") || error.message.includes("not enabled")) {
+          setError(`La connexion via ${providerNames[provider]} n'est pas encore disponible. Veuillez utiliser l'email et le mot de passe.`);
+        } else {
+          setError(error.message);
+        }
         setIsLoading(false);
       }
       // Pas de setIsLoading(false) car on redirige
     } catch (err) {
-      setError("Une erreur est survenue. Veuillez réessayer.");
+      setError(`Erreur lors de la connexion via ${providerNames[provider]}. Veuillez réessayer ou utiliser l'email.`);
       setIsLoading(false);
     }
   };
@@ -112,7 +124,7 @@ export default function SignInForm() {
               Connexion
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Acc&#233;dez &#224; votre espace Automate Forma
+              Accédez à votre espace Workbots Formations
             </p>
           </div>
           <div>
@@ -185,7 +197,7 @@ export default function SignInForm() {
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
                   <Input
-                    placeholder="votre@email.com"
+                    placeholder="contact@votre-domaine.com"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}

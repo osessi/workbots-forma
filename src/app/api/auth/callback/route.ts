@@ -14,7 +14,7 @@ import prisma from "@/lib/db/prisma";
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") ?? "/automate";
+  const next = requestUrl.searchParams.get("next") ?? "/";
 
   if (code) {
     const cookieStore = await cookies();
@@ -70,14 +70,26 @@ export async function GET(request: NextRequest) {
           if (!existingOrg) {
             const newOrg = await prisma.organization.create({
               data: {
+                // Identité de l'organisme
                 name: metadata.workspace_name,
                 slug: metadata.workspace_slug,
+                nomCommercial: metadata.nom_commercial || null,
+                // Informations légales
                 siret: metadata.siret || null,
+                villeRcs: metadata.ville_rcs || null,
                 numeroFormateur: metadata.numero_formateur || null,
+                prefectureRegion: metadata.prefecture_region || null,
+                // Représentant légal
+                representantNom: metadata.representant_nom || null,
+                representantPrenom: metadata.representant_prenom || null,
+                representantFonction: metadata.representant_fonction || null,
+                // Coordonnées
                 adresse: metadata.adresse || null,
                 codePostal: metadata.code_postal || null,
                 ville: metadata.ville || null,
-                telephone: metadata.phone || null,
+                email: metadata.email_organisme || null,
+                telephone: metadata.telephone_organisme || metadata.phone || null,
+                siteWeb: metadata.site_web || null,
               },
             });
             organizationId = newOrg.id;
@@ -115,7 +127,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Rediriger vers la page demandée ou /automate par défaut
+      // Rediriger vers la page demandée ou / par défaut
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
   }

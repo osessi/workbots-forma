@@ -46,7 +46,7 @@ export default async function SuperAdminLayout({
   });
 
   if (!user?.isSuperAdmin) {
-    redirect("/automate");
+    redirect("/");
   }
 
   return (

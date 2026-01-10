@@ -69,7 +69,7 @@ export default function SignUpForm() {
           // Connexion automatique si pas de confirmation requise
           // Synchroniser l'utilisateur avec Prisma
           await fetch("/api/user/sync", { method: "POST" });
-          router.push("/automate");
+          router.push("/");
           router.refresh();
         }
       }

@@ -144,7 +144,7 @@ export default function UsersPage() {
 
       if (response.ok) {
         // Rediriger vers l'application principale
-        window.location.href = "/automate";
+        window.location.href = "/";
       } else {
         alert(data.error || "Erreur lors de l'impersonation");
         setImpersonatingId(null);

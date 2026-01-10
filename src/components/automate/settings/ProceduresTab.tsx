@@ -1,16 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useAutomate } from "@/context/AutomateContext";
 import {
   FileText,
   Check,
-  Clock,
   Edit,
   Eye,
   Download,
   ChevronRight,
   AlertCircle,
-  CheckCircle,
   Plus,
   Save,
   X,
@@ -25,7 +24,6 @@ import {
   BookOpen,
   GraduationCap,
   FileQuestion,
-  Shield,
 } from "lucide-react";
 
 // Type de procédure
@@ -98,12 +96,14 @@ const PROCEDURE_COLORS: Record<ProcedureType, string> = {
 };
 
 export default function ProceduresTab() {
+  const { user } = useAutomate();
   const [data, setData] = useState<ProceduresData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProcedure, setSelectedProcedure] = useState<ProcedureInfo | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   const fetchProcedures = useCallback(async () => {
     try {
@@ -201,438 +201,308 @@ export default function ProceduresTab() {
     }
   };
 
-  const handlePublish = async () => {
-    if (!selectedProcedure?.procedure) return;
-
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/settings/procedures/${selectedProcedure.procedure.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          isPublished: !selectedProcedure.isPublished,
-        }),
-      });
-
-      if (res.ok) {
-        await fetchProcedures();
-        // Mettre à jour la procédure sélectionnée
-        const updatedData = await res.json();
-        setSelectedProcedure((prev) =>
-          prev
-            ? {
-                ...prev,
-                isPublished: updatedData.isPublished,
-                procedure: updatedData,
-              }
-            : null
-        );
-      }
-    } catch (error) {
-      console.error("Erreur publication:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleInitFromTemplate = async (proc: ProcedureInfo) => {
     setSaving(true);
     try {
-      // Créer un contenu par défaut basé sur le type
+      // Créer un contenu par défaut basé sur le type - Contenu rédigé et cohérent
       const defaultContents: Record<ProcedureType, string> = {
         ACCUEIL: `PROCÉDURE D'ACCUEIL DES STAGIAIRES
 
 1. OBJET
-Cette procédure définit les modalités d'accueil des apprenants au sein de notre organisme de formation.
 
-2. CHAMP D'APPLICATION
-Cette procédure s'applique à l'ensemble des formations dispensées par l'organisme.
+Cette procédure a pour objet de décrire les différentes étapes mises en place par l'organisme de formation, de la première mise en contact avec le client jusqu'au démarrage effectif de la formation. Elle détaille la démarche adoptée pour gérer chaque candidature, les différents cas de figure et les adaptations envisagées pour garantir un accueil de qualité.
 
-3. RESPONSABILITÉS
-- Le responsable pédagogique supervise l'accueil
-- Les formateurs assurent l'accueil opérationnel
-- L'assistante administrative gère les aspects logistiques
+2. MISE EN CONTACT
 
-4. ÉTAPES DE L'ACCUEIL
+Lorsqu'un client souhaite être mis en relation avec l'organisme de formation dans le but d'entrer en formation, celui-ci formalise sa demande via l'un des canaux suivants : une demande sur le formulaire de contact disponible sur le site web, une demande par mail directement, ou un appel téléphonique.
 
-4.1 Avant la formation
-- Envoi de la convocation avec les informations pratiques
-- Confirmation de l'inscription et des prérequis
-- Envoi du règlement intérieur et des conditions générales
+Dès réception de la demande, un mail de bienvenue est adressé au client pour lui souhaiter la bienvenue. Ce mail reprend le nom et prénom du client, le nom de la formation, la fiche produit précisant toutes les modalités de celle-ci, ainsi qu'une fiche de renseignement permettant de connaître le client (données administratives), de détecter les situations de handicap, et d'évaluer l'adéquation entre la formation et les objectifs du client. Le devis de la formation est également joint.
 
-4.2 Le jour de la formation
-- Accueil physique ou en visioconférence
-- Vérification de l'identité des participants
-- Présentation du programme et des objectifs
-- Tour de table et recueil des attentes
-- Présentation des locaux et des règles de sécurité
+3. INSCRIPTION ET SUIVI
 
-4.3 Pendant la formation
-- Suivi régulier de la satisfaction
-- Adaptation si nécessaire du rythme et du contenu
+Du début de la mise en contact à la fin de la formation, le client est suivi via une ligne dédiée dans le tableau de suivi d'activité. Ce tableau est complété régulièrement (mails envoyés/reçus/relances, commentaires éventuels, pièces précontractuelles reçues, envoi de la convocation, etc.) pour permettre le suivi de la formation et son bon déroulement.
+
+Pour chaque étape du dossier client, les demandes par mail sont inscrites sous la forme "Relance le XX/XX/XXXX" et un commentaire est précisé dans la colonne correspondante. Au bout de 2 relances sans retour, le dossier est considéré comme abandonné.
+
+4. CONVOCATION À LA FORMATION
+
+Lorsque toutes les pièces contractuelles et les analyses concernant le stagiaire ont été effectuées, la convocation de formation est envoyée au client. Cette convocation reprend le nom et prénom du client, le nom de la formation, la date de la formation, le lieu de formation, les informations relatives à l'accès au site de formation, ainsi que le livret d'accueil de la formation.
 
 5. DOCUMENTS ASSOCIÉS
-- Convocation
-- Règlement intérieur
-- Feuille d'émargement
-- Questionnaire de satisfaction
+
+Cette procédure s'appuie sur les documents suivants : la fiche de renseignement client, le devis, la fiche produit de la formation, les conditions générales de vente, le règlement intérieur, la convention de formation, la convocation, et le livret d'accueil.
 
 6. RÉVISION
-Cette procédure est révisée annuellement ou en cas de modification significative des pratiques.`,
+
+Cette procédure est révisée annuellement ou en cas de modification significative des pratiques d'accueil.`,
 
         RECLAMATIONS: `PROCÉDURE DE GESTION DES RÉCLAMATIONS
 
 1. OBJET
-Cette procédure définit le processus de traitement des réclamations et des insatisfactions exprimées par les parties prenantes.
 
-2. CHAMP D'APPLICATION
-Cette procédure concerne les réclamations émanant :
-- Des apprenants
-- Des entreprises clientes
-- Des financeurs
-- Des intervenants
+Cette procédure définit les modalités de prise en compte et de traitement par l'organisme de formation des réclamations exprimées par les différentes parties prenantes. Elle vise également à intégrer ces réclamations dans une démarche d'amélioration continue permettant d'optimiser le fonctionnement et l'organisation de l'organisme.
 
-3. DÉFINITIONS
-- Réclamation : expression formelle d'insatisfaction
-- Insatisfaction : expression informelle de mécontentement
+2. REMONTÉE D'INFORMATIONS
 
-4. PROCESSUS DE TRAITEMENT
+Différentes enquêtes de satisfaction sont menées auprès des parties prenantes et permettent de remonter les réclamations. Le stagiaire remplit un questionnaire papier après la formation, le formateur complète un questionnaire en fin de formation, l'entreprise reçoit un questionnaire par mail 3 mois après la formation, et le financeur est sollicité annuellement.
 
-4.1 Réception de la réclamation
-- Par email, courrier, téléphone ou formulaire en ligne
-- Enregistrement dans le registre des réclamations
-- Accusé de réception sous 48h
+Les résultats sont analysés via le tableau de suivi d'activité et diffusés selon les cas sur internet (pour les stagiaires et entreprises) ou conservés en interne (pour les formateurs et financeurs).
 
-4.2 Analyse
-- Identification de la cause
-- Évaluation de la gravité
-- Consultation des parties concernées
+3. ENREGISTREMENT ET TRAITEMENT
 
-4.3 Traitement
-- Délai de réponse : 15 jours maximum
-- Proposition de solution
-- Mise en œuvre des actions correctives
+Chaque réclamation exprimée est notifiée dans le tableau de suivi d'activité. Les réclamations peuvent être exprimées via différents canaux : mail, téléphone, commentaires sur les réseaux sociaux, courrier, ou échange physique.
 
-4.4 Suivi
-- Vérification de la satisfaction du réclamant
-- Analyse des tendances
-- Actions préventives si récurrence
+La réclamation est prise en compte sous 5 jours maximum et fait l'objet d'une analyse et de la mise en place des actions correctives nécessaires. Une réponse est apportée à l'émetteur de la réclamation dans les 30 jours.
 
-5. INDICATEURS
-- Nombre de réclamations par période
-- Délai moyen de traitement
-- Taux de satisfaction post-traitement
+Lorsque l'analyse de la réclamation met en lumière un problème ou un dysfonctionnement récurrent ou susceptible de se reproduire, une ou des actions préventives sont inscrites au plan d'amélioration continue.
 
-6. DOCUMENTS ASSOCIÉS
-- Registre des réclamations
-- Formulaire de réclamation
-- Modèle de réponse`,
+4. PLAN D'AMÉLIORATION CONTINUE
+
+Le plan d'amélioration continue recense tout événement survenu ou tout écart constaté ayant perturbé ou susceptible de perturber l'organisation et le bon déroulement des formations, ainsi que toute opportunité d'amélioration issue de suggestion, retour d'expérience ou différentes veilles.
+
+Les actions prévues peuvent faire suite à une réclamation, un dysfonctionnement constaté, un abandon de stagiaire, l'analyse des veilles, la revue des indicateurs, une non-conformité suite à un audit, ou un retour d'expérience du formateur.
+
+Chaque élément inscrit au plan fait l'objet d'une analyse et de la programmation d'actions correctives et/ou préventives, ainsi que d'une planification dans le temps. Ce tableau fait l'objet d'un examen et d'une mise à jour trimestrielle.
+
+5. DOCUMENTS ASSOCIÉS
+
+Tableau de suivi d'activité (onglet Réclamations), questionnaires de satisfaction, plan d'amélioration continue.`,
 
         EVALUATION: `PROCÉDURE D'ÉVALUATION
 
 1. OBJET
-Cette procédure définit les modalités d'évaluation des acquis des apprenants et de la qualité des formations.
 
-2. TYPES D'ÉVALUATIONS
+Cette procédure définit les modalités d'évaluation des acquis des apprenants avant, pendant et après la formation. Elle permet de mesurer la progression du stagiaire et d'adapter le contenu pédagogique à son niveau.
 
-2.1 Évaluation des acquis
-- Positionnement initial
-- Évaluations formatives (pendant la formation)
-- Évaluation sommative (fin de formation)
+2. TEST INITIAL DE FORMATION
 
-2.2 Évaluation de la satisfaction
-- Évaluation à chaud (fin de formation)
-- Évaluation à froid (3 à 6 mois après)
+À la suite de la réception des documents précontractuels, le stagiaire complète un test initial de formation. Les réponses sont répertoriées et une note sous forme de pourcentage est attribuée automatiquement selon le barème suivant :
 
-3. MODALITÉS
+Si le résultat est inférieur à 30%, le stagiaire est classé niveau débutant. Si le résultat est compris entre 30% et 60%, le stagiaire est classé niveau intermédiaire. Si le résultat est supérieur ou égal à 60%, le stagiaire est classé niveau avancé.
 
-3.1 Évaluation des acquis
-- QCM / Quiz
-- Études de cas
-- Mises en situation pratiques
-- Productions individuelles ou collectives
+Cette note permet d'établir le niveau de progression du stagiaire en fin de formation (en comparaison avec le test final) et d'établir les adaptations nécessaires du contenu de la formation.
 
-3.2 Critères de réussite
-- Seuil de réussite défini par formation
-- Critères d'évaluation communiqués en amont
+3. ADAPTATIONS EN FONCTION DU NIVEAU
 
-4. TRAÇABILITÉ
-- Résultats individuels archivés
-- Attestation de fin de formation avec mention des acquis
-- Registre des certifications le cas échéant
+En fonction du niveau du stagiaire, les aménagements suivants sont prévus :
 
-5. AMÉLIORATION CONTINUE
-- Analyse des résultats par formation
-- Identification des points d'amélioration
-- Révision des contenus si nécessaire
+Contenu adapté : proposer un contenu de formation qui correspond au niveau du stagiaire, en ajustant la complexité des concepts abordés. Pour un stagiaire débutant, il peut être nécessaire de commencer par les bases et d'augmenter progressivement la difficulté.
 
-6. DOCUMENTS ASSOCIÉS
-- Grilles d'évaluation
-- Questionnaires de satisfaction
-- Attestations de formation`,
+Rythme d'apprentissage : proposer un rythme d'apprentissage adapté. Certains stagiaires peuvent nécessiter plus de temps pour assimiler les informations, tandis que d'autres peuvent progresser plus rapidement.
 
-        SOUS_TRAITANCE: `PROCÉDURE DE SOUS-TRAITANCE
+Soutien supplémentaire : fournir un soutien supplémentaire au stagiaire qui en a besoin, incluant des séances de tutorat individuelles, des ressources supplémentaires, des exercices pratiques ou des sessions de révision.
+
+Adaptation des supports pédagogiques : adapter les supports pour répondre aux besoins spécifiques du stagiaire en simplifiant les informations complexes, en fournissant des exemples supplémentaires ou des explications détaillées.
+
+4. TEST FINAL ET PROGRESSION
+
+À l'issue de la formation, le stagiaire complète le test final de formation. Ceci permet de calculer sa progression et de clôturer la formation par l'émission d'une attestation de fin de formation, une fois la facture acquittée en intégralité.
+
+5. DOCUMENTS ASSOCIÉS
+
+Test initial de formation, test final de formation, grilles d'évaluation, attestation de fin de formation.`,
+
+        SOUS_TRAITANCE: `PROCÉDURE DE GESTION DES FORMATEURS ET SOUS-TRAITANCE
 
 1. OBJET
-Cette procédure encadre le recours aux sous-traitants et co-traitants dans le cadre des prestations de formation.
 
-2. CHAMP D'APPLICATION
-Concerne tous les intervenants externes :
-- Formateurs indépendants
-- Organismes de formation partenaires
-- Prestataires techniques
+Cette procédure encadre la sélection, l'évaluation et le suivi des formateurs internes et externes intervenant pour le compte de l'organisme de formation. Elle garantit le maintien d'un niveau de qualité conforme aux exigences du référentiel Qualiopi.
 
-3. SÉLECTION DES SOUS-TRAITANTS
+2. SÉLECTION DES FORMATEURS
 
-3.1 Critères de sélection
-- Compétences et qualifications
-- Expérience dans le domaine
-- Références vérifiables
-- Conformité aux exigences Qualiopi
+Lors du recrutement d'un formateur, les éléments suivants sont vérifiés : CV et diplômes, attestation d'assurance RC Pro, numéro de déclaration d'activité (si organisme de formation), références vérifiables, et conformité aux exigences Qualiopi.
 
-3.2 Documents requis
-- CV et diplômes
-- Attestation d'assurance RC Pro
-- Numéro de déclaration d'activité (si OF)
-- Engagement de confidentialité
+Un contrat de sous-traitance ou de prestation est établi, précisant le cahier des charges, les engagements qualité et les obligations de confidentialité.
 
-4. CONTRACTUALISATION
-- Contrat de sous-traitance obligatoire
-- Cahier des charges précis
-- Engagements qualité
+3. ÉVALUATION EN SITUATION RÉELLE
 
-5. SUIVI ET ÉVALUATION
-- Supervision des interventions
-- Évaluation par les apprenants
-- Bilan de prestation
+La première étape consiste en un test en situation réelle comprenant la vérification des aptitudes du formateur en séance selon une grille d'évaluation, ainsi que la vérification de la satisfaction client vis-à-vis du formateur.
 
-6. RESPECT DU RÉFÉRENTIEL QUALIOPI
-Le sous-traitant s'engage à respecter :
-- Les procédures de l'organisme
-- Les critères du référentiel national qualité
-- Les obligations de traçabilité
+Cette évaluation permet de s'assurer que le formateur maîtrise non seulement son domaine d'expertise, mais également les techniques pédagogiques adaptées au public formé.
 
-7. DOCUMENTS ASSOCIÉS
-- Contrat de sous-traitance
-- Fiche intervenant
-- Grille d'évaluation intervenant`,
+4. BILAN ANNUEL
+
+Chaque année, un bilan est réalisé pour chaque formateur comprenant l'analyse du nombre de formations réalisées annuellement, la vérification du maintien en compétences au travers des actions de formation, autoformation et veille listées sur le bilan, et la vérification de la satisfaction client vis-à-vis du formateur sur l'année.
+
+Ce bilan permet d'identifier les besoins en formation continue et de s'assurer que les formateurs restent à jour dans leur domaine d'expertise.
+
+5. RESPECT DU RÉFÉRENTIEL QUALIOPI
+
+Le sous-traitant s'engage à respecter les procédures de l'organisme, les critères du référentiel national qualité et les obligations de traçabilité.
+
+6. DOCUMENTS ASSOCIÉS
+
+Contrat de sous-traitance, fiche intervenant, grille d'évaluation formateur, bilan annuel des compétences.`,
 
         VEILLE: `PROCÉDURE DE VEILLE
 
 1. OBJET
-Cette procédure organise la veille légale, réglementaire, métier et pédagogique.
 
-2. DOMAINES DE VEILLE
+Cette procédure organise la veille légale, réglementaire, métier et pédagogique de l'organisme de formation. Elle permet de maintenir à jour les connaissances et les formations proposées, et d'anticiper les évolutions du secteur.
 
-2.1 Veille légale et réglementaire
-- Évolutions législatives (formation professionnelle)
-- Textes de France Compétences
-- Publications du Ministère du Travail
+2. AXES DE VEILLE
 
-2.2 Veille métiers et compétences
-- Évolutions des métiers
-- Nouvelles certifications
-- Besoins en compétences des secteurs
+Une veille est effectuée selon les 3 axes suivants :
 
-2.3 Veille innovation pédagogique
-- Nouvelles méthodes
-- Outils et technologies
-- Tendances EdTech
+Veille réglementaire : suivi des évolutions législatives concernant la formation professionnelle, des textes de France Compétences, des publications du Ministère du Travail, et des obligations liées au référentiel Qualiopi.
 
-2.4 Veille handicap et accessibilité
-- Réglementation accessibilité
-- Bonnes pratiques d'inclusion
-- Aides et dispositifs
+Veille métier : observation des évolutions des métiers couverts par les formations, des nouvelles certifications, des besoins en compétences des secteurs d'activité, et des tendances du marché de l'emploi.
 
-3. SOURCES
-- Sites institutionnels
-- Flux RSS et newsletters
-- Réseaux professionnels
-- Publications spécialisées
+Veille innovation pédagogique : exploration des nouvelles méthodes d'apprentissage, des outils et technologies numériques, des tendances EdTech, et des bonnes pratiques pédagogiques.
 
-4. FRÉQUENCE
-- Consultation quotidienne des sources principales
-- Synthèse hebdomadaire
-- Bilan mensuel
+3. SOURCES DE VEILLE
 
-5. EXPLOITATION
-- Information de l'équipe pédagogique
-- Mise à jour des formations si nécessaire
-- Adaptation des procédures
+La veille s'appuie sur différentes sources : sites institutionnels (Ministère du Travail, France Compétences, DREETS), flux RSS et newsletters spécialisées, réseaux professionnels et associations, publications et revues spécialisées, webinaires et conférences.
 
-6. TRAÇABILITÉ
-- Historique des articles consultés
-- Notes et analyses
-- Actions mises en œuvre`,
+4. EXPLOITATION DE LA VEILLE
 
-        ACCESSIBILITE: `PROCÉDURE D'ACCESSIBILITÉ HANDICAP
+L'exploitation de la veille se matérialise par deux éléments complémentaires :
+
+Un premier volet recense les sources utilisées pour la veille (site web, newsletter, réseaux sociaux, etc.).
+
+Un second volet présente pour chaque information collectée l'exploitation qui en est faite : mise à jour des formations, adaptation des procédures, information de l'équipe pédagogique, ou intégration au plan d'amélioration continue.
+
+Un code couleur est utilisé pour distinguer les différents types de veille et faciliter leur recensement.
+
+5. FRÉQUENCE
+
+La consultation des sources principales est effectuée de manière régulière. Une synthèse hebdomadaire est réalisée, et un bilan mensuel permet d'identifier les actions à mener.
+
+6. DOCUMENTS ASSOCIÉS
+
+Tableau de veille, tableau d'exploitation de la veille, plan de formation continue.`,
+
+        ACCESSIBILITE: `PROCÉDURE D'ACCESSIBILITÉ ET GESTION DU HANDICAP
 
 1. OBJET
-Cette procédure définit l'accueil et l'accompagnement des personnes en situation de handicap.
 
-2. RÉFÉRENT HANDICAP
-- Nom : [À compléter]
-- Contact : [À compléter]
-- Rôle : Point d'entrée unique pour les questions liées au handicap
+Cette procédure définit l'accueil et l'accompagnement des personnes en situation de handicap (PSH) dans le cadre des formations dispensées par l'organisme. Elle vise à garantir l'égalité d'accès à la formation pour tous les publics.
 
-3. IDENTIFICATION DES BESOINS
+2. DÉTECTION DES SITUATIONS DE HANDICAP
 
-3.1 Entretien préalable
-- Questionnaire de préinscription
-- Échange confidentiel avec le référent handicap
-- Identification des aménagements nécessaires
+Lors de la demande d'inscription, le client complète une fiche de renseignements permettant notamment de détecter les situations de handicap. Si le client répond positivement à la question sur les personnes en situation de handicap, il est invité à remplir en détails tous les items qui permettront d'adapter la formation à sa situation.
 
-3.2 Types de handicap pris en compte
-- Handicap moteur
-- Handicap sensoriel
-- Handicap cognitif
-- Handicap psychique
-- Maladies chroniques invalidantes
+3. ANALYSE DE LA FAISABILITÉ
 
-4. AMÉNAGEMENTS POSSIBLES
+L'analyse se réalise en 3 étapes :
 
-4.1 Aménagements pédagogiques
-- Adaptation du rythme
-- Supports adaptés
-- Temps majoré pour les évaluations
+Première étape : analyse de la fiche de renseignements permettant d'avoir un premier niveau de compatibilité avec la formation souhaitée.
 
-4.2 Aménagements techniques
-- Accessibilité des locaux
-- Matériel adapté
-- Logiciels spécifiques
+Deuxième étape : analyse de la typologie du handicap en fonction des 6 grandes catégories (visuel, auditif, moteur, consécutif à une maladie invalidante, psychique, intellectuel). L'organisme prend contact avec le PSH, son employeur, ses proches, ou un acteur spécialisé dans le handicap pour obtenir un éclairage sur les répercussions du handicap au quotidien.
 
-4.3 Aménagements organisationnels
-- Horaires adaptés
-- Pauses supplémentaires
-- Accompagnement renforcé
+Troisième étape : analyse finale de la compatibilité avec la formation.
+
+4. DÉCISIONS POSSIBLES
+
+À la suite des analyses, deux cas de figure peuvent se présenter :
+
+Réorientation : en cas d'incompatibilité avérée entre le handicap du candidat et la formation, l'organisme oriente le candidat vers des organismes capables de l'aider à redéfinir ou ajuster son projet de formation ou de reconversion professionnelle.
+
+Mise en œuvre des compensations : en cas de compatibilité, il convient d'identifier avec précision les besoins d'adaptation et les solutions de compensation (présence d'un interprète langue des signes, matériel spécifique adapté, fractionnement de la formation, adaptation des horaires, etc.).
 
 5. PARTENAIRES
-- AGEFIPH / FIPHFP
-- Cap Emploi
-- MDPH
-- Associations spécialisées
 
-6. SUIVI
-- Point régulier avec l'apprenant
-- Évaluation des aménagements
-- Ajustements si nécessaire`,
+Pour mener à bien cette mission, l'organisme s'appuie sur le réseau Ressources Handicap Formation mis en place par l'AGEFIPH, les services d'entités spécialisées (Cap Emploi, MDPH, associations), et le référent Handicap de l'organisme.
+
+6. DOCUMENTS ASSOCIÉS
+
+Fiche de renseignements, grille d'analyse du handicap, listing réseau handicap.`,
 
         SUIVI_STAGIAIRES: `PROCÉDURE DE SUIVI DES STAGIAIRES
 
 1. OBJET
-Cette procédure organise le suivi et l'accompagnement des apprenants pendant leur parcours de formation.
 
-2. TYPES DE SUIVI
+Cette procédure organise le suivi et l'accompagnement des apprenants pendant leur parcours de formation, ainsi que la gestion des retards, absences et abandons. Elle garantit la qualité de l'accompagnement et le respect des obligations contractuelles.
 
-2.1 Suivi pédagogique
-- Progression dans le programme
-- Acquisition des compétences
-- Difficultés rencontrées
+2. PRÉVENTION DES ABANDONS
 
-2.2 Suivi administratif
-- Présence et émargement
-- Documents contractuels
-- Attestations
+L'organisme accorde une attention particulière à l'adaptation de la formation aux objectifs du bénéficiaire dans le but de prévenir les abandons. Pour cela, une analyse des besoins est effectuée via la fiche de renseignements pour identifier la problématique du client.
 
-2.3 Suivi personnalisé
-- Accompagnement individuel si besoin
-- Orientation vers des ressources complémentaires
+L'organisme veille également à ce que le profil des participants soit bien en phase avec les prérequis et à ce que le programme, les modalités de déroulement et les objectifs soient diffusés en amont.
 
-3. MODALITÉS DE SUIVI
+Chaque formation débute systématiquement par un questionnement des stagiaires sur leurs connaissances, leurs attentes et leurs besoins par rapport à la thématique, de façon à permettre au formateur d'orienter son propos.
 
-3.1 Pendant la formation
-- Points réguliers en fin de journée/module
-- Disponibilité du formateur
-- Accompagnement entre les sessions
+3. GESTION DES ABANDONS EN COURS DE FORMATION
 
-3.2 Outils de suivi
-- Feuilles d'émargement
-- Fiches de suivi individuel
-- Plateforme LMS (si e-learning)
+Dans le cas où le stagiaire ne peut plus ou ne veut plus suivre l'action de formation, il se doit d'en notifier son employeur. L'organisme fournira la feuille d'émargement signée par le stagiaire à l'entreprise concernée précisant l'heure de départ.
 
-4. INDICATEURS
-- Taux de présence
-- Progression des acquis
-- Satisfaction continue
+La délivrance de l'attestation de formation étant conditionnée à la réalisation et la participation active à tous les exercices et travaux pratiques, le stagiaire ayant abandonné ne pourra prétendre à l'obtention de ces justificatifs.
 
-5. ACTIONS CORRECTIVES
-- Identification des difficultés
-- Plan d'action personnalisé
-- Soutien renforcé si nécessaire
+4. GESTION DES RETARDS ET ABSENCES
+
+En cas de retard, le stagiaire a l'obligation de prévenir le formateur. Celui-ci pourra selon le cas accepter le stagiaire en session ou non.
+
+En cas d'absence, le stagiaire doit prévenir le formateur et son entreprise. L'organisme avisera dans tous les cas l'entreprise concernée par mail en fournissant la feuille d'émargement.
+
+Dans tous les cas, la non-participation même partielle entraîne l'application des conditions de report et d'annulation prévues aux CGV et la comptabilisation de l'absence dans le tableau de suivi.
+
+5. OBLIGATIONS DU STAGIAIRE
+
+Lors des sessions de formation, le stagiaire doit se comporter de manière exemplaire : émargement de la feuille de présence, participation active à tous les modules, respect du formateur et des autres stagiaires, et complétion du test final de formation.
 
 6. DOCUMENTS ASSOCIÉS
-- Fiche de suivi individuel
-- Questionnaires intermédiaires
-- Compte-rendus des entretiens`,
 
-        GESTION_COMPETENCES: `PROCÉDURE DE GESTION DES COMPÉTENCES
+Feuille d'émargement, fiche de suivi individuel, CGV, règlement intérieur.`,
+
+        GESTION_COMPETENCES: `PROCÉDURE DE GESTION DES COMPÉTENCES ET FORMATION CONTINUE
 
 1. OBJET
-Cette procédure définit le maintien et le développement des compétences des formateurs et de l'équipe pédagogique.
 
-2. ÉVALUATION DES COMPÉTENCES
+Cette procédure définit le maintien et le développement des compétences des formateurs et de l'équipe pédagogique. Elle s'inscrit dans une démarche d'amélioration continue visant à garantir la qualité des formations dispensées.
 
-2.1 Compétences requises
-- Expertise métier
-- Compétences pédagogiques
-- Maîtrise des outils
-- Soft skills
+2. PLAN DE FORMATION CONTINUE
 
-2.2 Modalités d'évaluation
-- Auto-évaluation annuelle
-- Évaluation par les apprenants
-- Observation par les pairs
-- Entretien professionnel
+L'organisme a défini une politique de formation continue dans le but de prévoir les formations nécessaires pour respecter la réglementation en vigueur et améliorer sa qualité.
 
-3. DÉVELOPPEMENT DES COMPÉTENCES
+Ce plan de formation se matérialise pour chaque élément par : l'intitulé de la formation, le descriptif de la formation, les objectifs de la formation, l'organisme de formation (ou nom du formateur si formation interne), la date prévue de la formation, et la date de réalisation effective.
 
-3.1 Plan de formation interne
-- Formations techniques
-- Formations pédagogiques
-- Veille et actualisation
+3. MISE À JOUR DES COMPÉTENCES
 
-3.2 Autres dispositifs
-- Participation à des colloques
-- Échanges de pratiques
-- Communautés professionnelles
+Une mise à jour des compétences est prévue dès la détection d'un nouveau besoin par l'organisme de formation. Cette mise à jour peut résulter de l'analyse des veilles réglementaire, technologique et métiers, des retours d'expérience des formations, des évolutions des certifications ou des besoins identifiés lors des bilans annuels.
 
-4. DOCUMENTATION
-- Fiches intervenants à jour
-- CV et diplômes
-- Attestations de formation
-- Évaluations reçues
+4. ÉVALUATION DES FORMATEURS
 
-5. SUIVI
-- Revue annuelle des compétences
-- Identification des besoins
-- Plan d'action individuel
+L'évaluation des formateurs se fait en deux temps :
 
-6. INDICATEURS
-- Nombre d'heures de formation/intervenant
-- Évolution des évaluations
-- Diversification des compétences`,
+Test en situation réelle : vérification des aptitudes du formateur en séance selon une grille d'évaluation et vérification de la satisfaction client.
+
+Bilan annuel : analyse du nombre de formations réalisées, vérification du maintien en compétences au travers des actions de formation et de veille, vérification de la satisfaction client sur l'année.
+
+5. DOCUMENTATION
+
+La documentation des compétences comprend les fiches intervenants à jour, les CV et diplômes, les attestations de formation suivies, les évaluations reçues par les stagiaires, et les bilans annuels.
+
+6. DOCUMENTS ASSOCIÉS
+
+Plan de formation continue, fiche intervenant, grille d'évaluation, bilan annuel des compétences.`,
 
         PERSONNALISEE: `PROCÉDURE PERSONNALISÉE
 
-[À compléter selon les besoins spécifiques de votre organisme]
+Cette procédure peut être adaptée selon les besoins spécifiques de votre organisme de formation.
 
 1. OBJET
-[Décrire l'objectif de cette procédure]
+
+Décrivez ici l'objectif de cette procédure et le contexte dans lequel elle s'applique.
 
 2. CHAMP D'APPLICATION
-[Définir le périmètre concerné]
+
+Définissez le périmètre concerné par cette procédure : quelles formations, quels publics, quelles situations.
 
 3. RESPONSABILITÉS
-[Identifier les acteurs et leurs rôles]
+
+Identifiez les acteurs impliqués et leurs rôles respectifs dans la mise en œuvre de cette procédure.
 
 4. PROCESSUS
-[Détailler les étapes]
+
+Détaillez les différentes étapes du processus, de manière chronologique et claire. Chaque étape doit être suffisamment détaillée pour être reproductible.
 
 5. DOCUMENTS ASSOCIÉS
-[Lister les documents liés]
+
+Listez les documents liés à cette procédure : formulaires, tableaux de suivi, modèles, etc.
 
 6. RÉVISION
-[Définir les modalités de mise à jour]`,
+
+Définissez les modalités de mise à jour de cette procédure : fréquence de révision, conditions déclenchant une mise à jour, responsable de la mise à jour.`,
       };
 
       const content = {
@@ -672,6 +542,116 @@ Cette procédure définit le maintien et le développement des compétences des 
     }
   };
 
+  // Créer une procédure vide (rédiger de zéro)
+  const handleCreateFromScratch = async (proc: ProcedureInfo) => {
+    setSaving(true);
+    try {
+      // Créer une procédure avec un contenu vide/minimal
+      const content = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: `PROCÉDURE : ${proc.nom.toUpperCase()}` }],
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "" }],
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "1. OBJET" }],
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "[À compléter]" }],
+          },
+        ],
+      };
+
+      const res = await fetch("/api/settings/procedures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: proc.type,
+          nom: proc.nom,
+          description: proc.description,
+          content,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchProcedures();
+        const newProc = await res.json();
+        const updatedProc = {
+          ...proc,
+          procedure: newProc,
+          hasContent: true,
+        };
+        // Sélectionner et passer directement en mode édition
+        setSelectedProcedure(updatedProc);
+        setEditContent(`PROCÉDURE : ${proc.nom.toUpperCase()}\n\n1. OBJET\n[À compléter]`);
+        setIsEditing(true);
+      }
+    } catch (error) {
+      console.error("Erreur création procédure:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Télécharger la procédure en PDF avec en-tête et pied de page
+  const handleDownloadPDF = async (proc: ProcedureInfo) => {
+    if (!proc.procedure || !editContent) return;
+
+    setDownloadingPDF(true);
+    try {
+      // Appel API pour générer le PDF
+      const res = await fetch("/api/pdf/procedure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          procedureType: proc.type,
+          procedureName: proc.nom,
+          content: editContent,
+          version: proc.version,
+          indicateur: proc.indicateur,
+          // Infos organisme pour en-tête/pied de page (depuis UserProfile)
+          organisme: {
+            nomCommercial: user?.entreprise || "",
+            adresse: user?.adresse || "",
+            codePostal: user?.codePostal || "",
+            ville: user?.ville || "",
+            siret: user?.siret || "",
+            numeroFormateur: user?.numeroFormateur || "",
+            prefectureRegion: user?.prefectureRegion || "",
+            logo: user?.logoUrl || "",
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `procedure-${proc.type.toLowerCase()}-v${proc.version || 1}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        console.error("Erreur téléchargement PDF");
+        alert("Erreur lors de la génération du PDF");
+      }
+    } catch (error) {
+      console.error("Erreur PDF:", error);
+      alert("Erreur lors de la génération du PDF");
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -693,21 +673,11 @@ Cette procédure définit le maintien et le développement des compétences des 
           </p>
         </div>
         {data && (
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-              <FileText size={16} className="text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                {data.stats.completed}/{data.stats.total} procédures
-              </span>
-            </div>
-            {data.stats.published > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <CheckCircle size={16} className="text-green-600 dark:text-green-400" />
-                <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                  {data.stats.published} publiées
-                </span>
-              </div>
-            )}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+            <FileText size={16} className="text-amber-600 dark:text-amber-400" />
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+              {data.stats.completed}/{data.stats.total} procédures rédigées
+            </span>
           </div>
         )}
       </div>
@@ -738,24 +708,9 @@ Cette procédure définit le maintien et le développement des compétences des 
                         {proc.nom}
                       </h3>
                       {proc.hasContent && (
-                        <span
-                          className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-full ${
-                            proc.isPublished
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                          }`}
-                        >
-                          {proc.isPublished ? (
-                            <>
-                              <Check size={10} />
-                              Publiée
-                            </>
-                          ) : (
-                            <>
-                              <Clock size={10} />
-                              Brouillon
-                            </>
-                          )}
+                        <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <Check size={10} />
+                          Rédigée
                         </span>
                       )}
                     </div>
@@ -813,26 +768,15 @@ Cette procédure définit le maintien et le développement des compétences des 
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedProcedure.hasContent && (
-                      <>
-                        <button
-                          onClick={handlePublish}
-                          disabled={saving}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                            selectedProcedure.isPublished
-                              ? "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
-                              : "bg-green-500 text-white hover:bg-green-600"
-                          }`}
-                        >
-                          <Shield size={14} />
-                          {selectedProcedure.isPublished ? "Dépublier" : "Publier"}
-                        </button>
-                        <button
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                          title="Télécharger PDF"
-                        >
-                          <Download size={18} />
-                        </button>
-                      </>
+                      <button
+                        onClick={() => handleDownloadPDF(selectedProcedure)}
+                        disabled={saving}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        title="Télécharger PDF"
+                      >
+                        <Download size={16} />
+                        Télécharger PDF
+                      </button>
                     )}
                   </div>
                 </div>
@@ -920,13 +864,15 @@ Cette procédure définit le maintien et le développement des compétences des 
                         Initialiser avec modèle
                       </button>
                       <button
-                        onClick={() => {
-                          setEditContent("");
-                          setIsEditing(true);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        onClick={() => handleCreateFromScratch(selectedProcedure)}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
                       >
-                        <Plus size={16} />
+                        {saving ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Plus size={16} />
+                        )}
                         Rédiger de zéro
                       </button>
                     </div>

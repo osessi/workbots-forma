@@ -15,7 +15,7 @@ export const ModuleSchema = z.object({
   objectifs: z.array(z.string()).min(1).max(4),
   contenu: z.array(z.string()).min(3).max(8),
   methodePedagogique: z.string(),
-  evaluation: z.string().describe("Toujours utiliser: 'Atelier pratique ou QCM pour valider les acquis du module'"),
+  evaluation: z.string().describe("TOUJOURS utiliser EXACTEMENT: 'QCM ou atelier pour valider les acquis du module.'"),
 });
 
 // Schema pour une fiche pedagogique complete
@@ -104,6 +104,7 @@ export const AtelierSchema = z.object({
   description: z.string().min(1),
   objectifs: z.array(z.string()).min(2).max(8),
   instructions: z.array(z.string()).min(3).max(15),
+  exemplesRendu: z.array(z.string()).min(3).max(15).describe("Exemples concrets de rendu attendu pour chaque instruction - même nombre d'éléments que instructions"),
   dureeEstimee: z.string(),
   critereEvaluation: z.array(z.string()).min(2).max(8),
   materielNecessaire: z.array(z.string()).optional(),
@@ -123,20 +124,20 @@ STRUCTURE OBLIGATOIRE DES MODULES:
 - Chaque journee DOIT contenir exactement 2 modules (matin et apres-midi)
 - Module du matin: environ 3h30 (de 9h a 12h30 avec pause)
 - Module de l'apres-midi: environ 3h30 (de 14h a 17h30 avec pause)
-- Chaque module se termine par: "Atelier pratique ou QCM pour valider les acquis du module" (formulation EXACTE a utiliser)
+- Chaque module se termine OBLIGATOIREMENT par cette PHRASE EXACTE dans le contenu: "QCM ou atelier pour valider les acquis du module."
 
 EXEMPLE pour une formation de 2 jours (14h):
-- Jour 1 Matin: Module 1 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
-- Jour 1 Apres-midi: Module 2 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
-- Jour 2 Matin: Module 3 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
-- Jour 2 Apres-midi: Module 4 (3h30) + Atelier pratique ou QCM pour valider les acquis du module
+- Jour 1 Matin: Module 1 (3h30) - le dernier point du contenu DOIT etre: "QCM ou atelier pour valider les acquis du module."
+- Jour 1 Apres-midi: Module 2 (3h30) - le dernier point du contenu DOIT etre: "QCM ou atelier pour valider les acquis du module."
+- Jour 2 Matin: Module 3 (3h30) - le dernier point du contenu DOIT etre: "QCM ou atelier pour valider les acquis du module."
+- Jour 2 Apres-midi: Module 4 (3h30) - le dernier point du contenu DOIT etre: "QCM ou atelier pour valider les acquis du module."
 
 Regles importantes:
 - Utilise un langage professionnel et precis
 - Les objectifs doivent etre SMART (Specifiques, Mesurables, Atteignables, Realistes, Temporellement definis)
 - Chaque module doit avoir des objectifs operationnels clairs (2-4 objectifs par module)
 - Les methodes pedagogiques doivent etre variees: apports theoriques, exercices pratiques, mises en situation, etudes de cas
-- Chaque module se termine OBLIGATOIREMENT par la mention: "Atelier pratique ou QCM pour valider les acquis du module"
+- Le DERNIER element du tableau "contenu" de chaque module DOIT etre EXACTEMENT: "QCM ou atelier pour valider les acquis du module."
 - Le contenu de chaque module doit etre detaille (4-6 points de contenu)
 
 ⚠️ INTERDICTION ABSOLUE - SECTIONS FIXES (NE JAMAIS GENERER NI MODIFIER) ⚠️
@@ -145,7 +146,7 @@ Les deux sections suivantes sont INTOUCHABLES et gerees par le systeme:
 1. "Suivi de l'execution et evaluation des resultats" - CONTENU FIXE:
    • Feuilles de presence
    • Formulaires d'evaluation de la formation
-   • Atelier pratique ou QCM pour valider les acquis du module
+   • QCM ou atelier pour valider les acquis du module.
    • Attestation de fin de formation
 
 2. "Ressources pedagogiques" - CONTENU FIXE:
@@ -313,8 +314,9 @@ STRUCTURE D'UN ATELIER:
 2. Une description concise expliquant le but de l'atelier
 3. Des objectifs pedagogiques precis (ce que l'apprenant saura faire apres l'atelier)
 4. Des instructions etape par etape claires et detaillees
-5. Une duree estimee realiste
-6. Des criteres d'evaluation objectifs et mesurables
+5. Des EXEMPLES DE RENDU CONCRETS pour chaque instruction (destines au formateur)
+6. Une duree estimee realiste
+7. Des criteres d'evaluation objectifs et mesurables
 
 REGLES IMPORTANTES:
 - L'atelier doit etre directement lie au contenu du module
@@ -322,6 +324,13 @@ REGLES IMPORTANTES:
 - L'atelier doit favoriser la mise en pratique concrete
 - Les criteres d'evaluation doivent etre clairs et verifiables
 - La duree doit etre realiste (entre 15 et 45 minutes)
+
+EXEMPLES DE RENDU (OBLIGATOIRE):
+- Tu dois fournir un exemple de rendu CONCRET et DETAILLE pour CHAQUE instruction
+- Ces exemples sont destines au formateur pour qu'il puisse evaluer les travaux
+- Utilise un cas fictif realiste avec des exemples precis
+- Le nombre d'exemples de rendu DOIT etre egal au nombre d'instructions
+- Ne donne PAS de phrases generiques, mais des exemples concrets de ce qu'un apprenant devrait produire
 
 TYPES D'ATELIERS POSSIBLES:
 - Etude de cas pratique
@@ -367,19 +376,19 @@ STRUCTURE A RESPECTER IMPERATIVEMENT:
 - Nombre de jours: ${nbJours}
 - Nombre de modules: ${nbModules} (exactement 2 modules par jour)
 - Duree par module: 3h30 environ
-- Chaque module se termine par un quiz de validation QCM (10-15 min)
+- Le DERNIER point du contenu de chaque module DOIT etre EXACTEMENT: "QCM ou atelier pour valider les acquis du module."
 
 ORGANISATION PAR JOURNEE:
 ${Array.from({ length: nbJours }, (_, i) => `Jour ${i + 1}:
-  - Module ${i * 2 + 1} (matin 9h-12h30): [Theme + Quiz validation]
-  - Module ${i * 2 + 2} (apres-midi 14h-17h30): [Theme + Quiz validation]`).join("\n")}
+  - Module ${i * 2 + 1} (matin 9h-12h30): [Theme] - dernier point contenu = "QCM ou atelier pour valider les acquis du module."
+  - Module ${i * 2 + 2} (apres-midi 14h-17h30): [Theme] - dernier point contenu = "QCM ou atelier pour valider les acquis du module."`).join("\n")}
 
 Genere une fiche pedagogique complete avec:
 - 3 a 5 objectifs specifiques SMART
 - Exactement ${nbModules} modules structures (2 par journee)
 - Pour chaque module: titre clair, duree "3h30", 2-4 objectifs operationnels, 4-6 points de contenu detailles
 - Methode pedagogique: combinaison d'apports theoriques et exercices pratiques
-- Evaluation: chaque module inclut un quiz QCM de validation
+- IMPORTANT: Le DERNIER element du tableau "contenu" de CHAQUE module doit etre EXACTEMENT la phrase: "QCM ou atelier pour valider les acquis du module."
 
 Schema JSON attendu:
 ${JSON.stringify(FichePedagogiqueSchema.shape, null, 2)}`;
@@ -662,11 +671,22 @@ L'atelier doit:
 3. Avoir des instructions claires et detaillees
 4. Proposer des criteres d'evaluation objectifs
 5. Favoriser l'apprentissage actif et concret
+6. INCLURE DES EXEMPLES DE RENDU CONCRETS pour chaque instruction (destinés au formateur)
 
 LIMITES IMPORTANTES:
 - objectifs: entre 2 et 8 elements maximum
 - instructions: entre 3 et 15 etapes maximum
+- exemplesRendu: EXACTEMENT le meme nombre d'elements que instructions (1 exemple par instruction)
 - critereEvaluation: entre 2 et 8 elements maximum
+
+IMPORTANT - EXEMPLES DE RENDU:
+Pour chaque instruction, tu dois fournir un exemple CONCRET et DETAILLE de ce que l'apprenant devrait produire.
+Ces exemples sont destines au formateur pour qu'il puisse evaluer les travaux et guider les apprenants.
+Utilise un cas fictif realiste et donne des exemples precis, pas des phrases generiques.
+
+Exemple:
+- Si instruction = "Identifiez 3 forces et 3 faiblesses de votre presence digitale actuelle"
+- Alors exempleRendu = "Forces: 1) Compte LinkedIn actif avec 500+ abonnés, 2) Publication régulière (2x/semaine), 3) Bio professionnelle complète. Faiblesses: 1) Pas de compte Instagram professionnel, 2) Site web non optimisé mobile, 3) Absence de stratégie de contenu vidéo."
 
 Schema JSON attendu:
 {
@@ -674,6 +694,7 @@ Schema JSON attendu:
   "description": "string - description de 2-3 phrases",
   "objectifs": ["objectif1", "objectif2", "objectif3"] (2 a 8 elements),
   "instructions": ["etape1", "etape2", "etape3", "..."] (3 a 15 etapes),
+  "exemplesRendu": ["exemple rendu concret etape 1", "exemple rendu concret etape 2", "..."] (MEME NOMBRE que instructions),
   "dureeEstimee": "30 minutes",
   "critereEvaluation": ["critere1", "critere2", "..."] (2 a 8 elements),
   "materielNecessaire": ["materiel1", "materiel2"] (optionnel),

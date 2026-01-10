@@ -315,6 +315,71 @@ async function generateWithAI<T>(
 }
 
 // ===========================================
+// POST-TRAITEMENT DES MODULES
+// ===========================================
+
+/**
+ * Phrase standardisée pour la fin de chaque module (Correction 314)
+ * Cette phrase doit être identique pour tous les modules et cohérente avec les évaluations (QCM ou Atelier)
+ */
+const PHRASE_EVALUATION_MODULE = "QCM ou atelier pour valider les acquis du module.";
+
+/**
+ * Normalise le contenu des modules pour garantir que chaque module se termine
+ * par la phrase standardisée d'évaluation
+ */
+function normalizeModulesContent(fiche: FichePedagogique): FichePedagogique {
+  if (!fiche.modules || fiche.modules.length === 0) {
+    return fiche;
+  }
+
+  const normalizedModules = fiche.modules.map((module) => {
+    if (!module.contenu || module.contenu.length === 0) {
+      return {
+        ...module,
+        contenu: [PHRASE_EVALUATION_MODULE],
+      };
+    }
+
+    // Vérifier si le dernier élément contient déjà une mention de QCM/atelier/quiz/exercice
+    const lastItem = module.contenu[module.contenu.length - 1].toLowerCase();
+    const isEvaluationMention =
+      lastItem.includes("qcm") ||
+      lastItem.includes("atelier") ||
+      lastItem.includes("quiz") ||
+      lastItem.includes("exercice") ||
+      lastItem.includes("évaluation") ||
+      lastItem.includes("validation") ||
+      lastItem.includes("acquis");
+
+    if (isEvaluationMention) {
+      // Remplacer le dernier élément par la phrase standardisée
+      return {
+        ...module,
+        contenu: [
+          ...module.contenu.slice(0, -1),
+          PHRASE_EVALUATION_MODULE,
+        ],
+      };
+    } else {
+      // Ajouter la phrase standardisée à la fin
+      return {
+        ...module,
+        contenu: [
+          ...module.contenu,
+          PHRASE_EVALUATION_MODULE,
+        ],
+      };
+    }
+  });
+
+  return {
+    ...fiche,
+    modules: normalizedModules,
+  };
+}
+
+// ===========================================
 // FONCTIONS DE GENERATION SPECIFIQUES
 // ===========================================
 
@@ -323,13 +388,23 @@ export async function generateFichePedagogique(
   options?: GenerationOptions
 ): Promise<GenerationResult<FichePedagogique>> {
   const prompt = generateFichePedagogiquePrompt(input);
-  return generateWithAI(
+  const result = await generateWithAI(
     SYSTEM_PROMPTS.fichePedagogique,
     prompt,
     FichePedagogiqueSchema,
     AI_CONFIGS.fichePedagogique,
     options
   );
+
+  // Post-traitement: normaliser le contenu des modules
+  if (result.success && result.data) {
+    return {
+      ...result,
+      data: normalizeModulesContent(result.data),
+    };
+  }
+
+  return result;
 }
 
 export async function generateQCM(

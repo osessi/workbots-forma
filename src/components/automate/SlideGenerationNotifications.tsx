@@ -178,7 +178,7 @@ export default function SlideGenerationNotifications({
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <Link
-                  href={`/automate/create?id=${gen.formationId}&step=slides`}
+                  href={`/create?id=${gen.formationId}&step=slides`}
                   className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-brand-600 bg-brand-50 dark:bg-brand-500/10 dark:text-brand-400 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors"
                 >
                   <ExternalLink size={12} />

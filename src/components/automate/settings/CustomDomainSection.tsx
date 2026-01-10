@@ -255,7 +255,7 @@ export default function CustomDomainSection({
         <div className="mt-4">
           <input
             type="text"
-            placeholder="formation.votre-domaine.com"
+            placeholder="app.votre-domaine.com"
             disabled
             className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-100 dark:bg-gray-900 dark:border-gray-700 text-gray-400 cursor-not-allowed"
             readOnly
@@ -310,7 +310,7 @@ export default function CustomDomainSection({
                 setDomain(e.target.value.toLowerCase());
                 setError(null);
               }}
-              placeholder="formation.votre-domaine.com"
+              placeholder="app.votre-domaine.com"
               className="flex-1 px-4 py-3 text-sm border border-gray-200 rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-white focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
             />
             <button
@@ -322,7 +322,7 @@ export default function CustomDomainSection({
             </button>
           </div>
           <p className="text-xs text-gray-500">
-            Exemple : formation.votre-entreprise.com, app.votre-domaine.fr
+            Exemple : app.votre-entreprise.com, espace.votre-domaine.fr
           </p>
         </div>
       ) : (

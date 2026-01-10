@@ -47,7 +47,7 @@ export const RecentFormationsTable: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <Link
-                    href={`/automate/create?id=${formation.id}`}
+                    href={`/create?id=${formation.id}`}
                     className="inline-flex items-center px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 active:scale-[0.98] transition-all dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
                   >
                     Éditer

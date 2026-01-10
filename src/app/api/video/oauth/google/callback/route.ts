@@ -19,20 +19,20 @@ export async function GET(request: NextRequest) {
 
     if (!user || !user.organizationId) {
       return NextResponse.redirect(
-        new URL("/automate/settings?tab=integrations&error=not_authenticated", request.url)
+        new URL("/settings?tab=integrations&error=not_authenticated", request.url)
       );
     }
 
     if (error) {
       console.error("Google OAuth error:", error);
       return NextResponse.redirect(
-        new URL("/automate/settings?tab=integrations&error=oauth_denied", request.url)
+        new URL("/settings?tab=integrations&error=oauth_denied", request.url)
       );
     }
 
     if (!code) {
       return NextResponse.redirect(
-        new URL("/automate/settings?tab=integrations&error=no_code", request.url)
+        new URL("/settings?tab=integrations&error=no_code", request.url)
       );
     }
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
-        new URL("/automate/settings?tab=integrations&error=missing_config", request.url)
+        new URL("/settings?tab=integrations&error=missing_config", request.url)
       );
     }
 
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       const errorData = await tokenResponse.text();
       console.error("Google token exchange error:", errorData);
       return NextResponse.redirect(
-        new URL("/automate/settings?tab=integrations&error=token_exchange_failed", request.url)
+        new URL("/settings?tab=integrations&error=token_exchange_failed", request.url)
       );
     }
 
@@ -122,12 +122,12 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL("/automate/settings?tab=integrations&success=google_connected", request.url)
+      new URL("/settings?tab=integrations&success=google_connected", request.url)
     );
   } catch (error) {
     console.error("Erreur Google OAuth callback:", error);
     return NextResponse.redirect(
-      new URL("/automate/settings?tab=integrations&error=server_error", request.url)
+      new URL("/settings?tab=integrations&error=server_error", request.url)
     );
   }
 }

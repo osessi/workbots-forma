@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // Disable Turbopack for dev to avoid manifest issues
   devIndicators: false,
 
+  // Packages that should be loaded externally on the server (not bundled)
+  // pdf-parse uses native modules that don't work well with bundlers
+  serverExternalPackages: ['pdf-parse'],
+
   // Increase HTTP server timeout for long-running API calls (like OpenAI GPT-5)
   httpAgentOptions: {
     keepAlive: true,

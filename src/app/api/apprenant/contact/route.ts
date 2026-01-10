@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
         message: notificationMessage,
         resourceType: "apprenant",
         resourceId: apprenantId,
-        actionUrl: `/automate/apprenants/${apprenantId}`,
+        actionUrl: `/apprenants/${apprenantId}`,
         metadata: {
           subject,
           apprenantEmail: apprenant.email,

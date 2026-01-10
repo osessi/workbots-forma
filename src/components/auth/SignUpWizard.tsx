@@ -11,11 +11,6 @@ import { useRouter } from "next/navigation";
 import React, { useState, useRef } from "react";
 
 // Types
-interface TeamMember {
-  email: string;
-  role: "admin" | "formateur" | "membre";
-}
-
 interface WizardData {
   // Step 1: Account
   firstName: string;
@@ -27,9 +22,13 @@ interface WizardData {
   avatarPreview: string | null;
   // Step 2: Organisme de formation
   workspaceName: string;
+  nomCommercial: string;
   workspaceSlug: string;
-  representantLegal: string;
+  representantNom: string;
+  representantPrenom: string;
+  representantFonction: string;
   siret: string;
+  villeRcs: string;
   numeroFormateur: string;
   prefectureRegion: string;
   adresse: string;
@@ -37,19 +36,21 @@ interface WizardData {
   ville: string;
   emailOrganisme: string;
   telephoneOrganisme: string;
+  siteWeb: string;
   logoFile: File | null;
   logoPreview: string | null;
+  cachetFile: File | null;
+  cachetPreview: string | null;
+  signatureFile: File | null;
+  signaturePreview: string | null;
   // Copier infos entreprise
   copyFromAccount: boolean;
-  // Step 3: Invitations
-  teamMembers: TeamMember[];
 }
 
 // Steps indicator
 const steps = [
   { id: 1, name: "Compte", description: "Vos informations" },
   { id: 2, name: "Organisme", description: "Votre organisme de formation" },
-  { id: 3, name: "Equipe", description: "Inviter des membres" },
 ];
 
 export default function SignUpWizard() {
@@ -62,6 +63,8 @@ export default function SignUpWizard() {
   const [success, setSuccess] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const cachetInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
 
   // Form data
   const [data, setData] = useState<WizardData>({
@@ -73,9 +76,13 @@ export default function SignUpWizard() {
     avatarFile: null,
     avatarPreview: null,
     workspaceName: "",
+    nomCommercial: "",
     workspaceSlug: "",
-    representantLegal: "",
+    representantNom: "",
+    representantPrenom: "",
+    representantFonction: "",
     siret: "",
+    villeRcs: "",
     numeroFormateur: "",
     prefectureRegion: "",
     adresse: "",
@@ -83,10 +90,14 @@ export default function SignUpWizard() {
     ville: "",
     emailOrganisme: "",
     telephoneOrganisme: "",
+    siteWeb: "",
     logoFile: null,
     logoPreview: null,
+    cachetFile: null,
+    cachetPreview: null,
+    signatureFile: null,
+    signaturePreview: null,
     copyFromAccount: false,
-    teamMembers: [{ email: "", role: "formateur" }],
   });
 
   // Update data helper
@@ -146,6 +157,56 @@ export default function SignUpWizard() {
     reader.readAsDataURL(file);
   };
 
+  // Handle cachet selection
+  const handleCachetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Veuillez sélectionner une image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("L'image ne doit pas dépasser 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updateData({
+        cachetFile: file,
+        cachetPreview: reader.result as string,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle signature selection
+  const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Veuillez sélectionner une image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("L'image ne doit pas dépasser 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updateData({
+        signatureFile: file,
+        signaturePreview: reader.result as string,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Generate slug from workspace name
   const generateSlug = (name: string) => {
     return name
@@ -163,33 +224,6 @@ export default function SignUpWizard() {
       workspaceName: name,
       workspaceSlug: generateSlug(name),
     });
-  };
-
-  // Add team member field
-  const addTeamMember = () => {
-    if (data.teamMembers.length < 10) {
-      updateData({ teamMembers: [...data.teamMembers, { email: "", role: "formateur" }] });
-    }
-  };
-
-  // Remove team member field
-  const removeTeamMember = (index: number) => {
-    const newMembers = data.teamMembers.filter((_, i) => i !== index);
-    updateData({ teamMembers: newMembers.length > 0 ? newMembers : [{ email: "", role: "formateur" }] });
-  };
-
-  // Update team member email
-  const updateTeamMemberEmail = (index: number, email: string) => {
-    const newMembers = [...data.teamMembers];
-    newMembers[index] = { ...newMembers[index], email };
-    updateData({ teamMembers: newMembers });
-  };
-
-  // Update team member role
-  const updateTeamMemberRole = (index: number, role: "admin" | "formateur" | "membre") => {
-    const newMembers = [...data.teamMembers];
-    newMembers[index] = { ...newMembers[index], role };
-    updateData({ teamMembers: newMembers });
   };
 
   // Validate current step
@@ -236,7 +270,7 @@ export default function SignUpWizard() {
   // Go to next step
   const nextStep = () => {
     if (validateStep()) {
-      setCurrentStep((prev) => Math.min(prev + 1, 3));
+      setCurrentStep((prev) => Math.min(prev + 1, 2));
     }
   };
 
@@ -270,9 +304,13 @@ export default function SignUpWizard() {
             phone: data.telephone,
             // Infos organisme de formation
             workspace_name: data.workspaceName,
+            nom_commercial: data.nomCommercial,
             workspace_slug: data.workspaceSlug,
-            representant_legal: data.representantLegal,
+            representant_nom: data.representantNom,
+            representant_prenom: data.representantPrenom,
+            representant_fonction: data.representantFonction,
             siret: data.siret,
+            ville_rcs: data.villeRcs,
             numero_formateur: data.numeroFormateur,
             prefecture_region: data.prefectureRegion,
             adresse: data.adresse,
@@ -280,6 +318,7 @@ export default function SignUpWizard() {
             ville: data.ville,
             email_organisme: data.emailOrganisme,
             telephone_organisme: data.telephoneOrganisme,
+            site_web: data.siteWeb,
           },
         },
       });
@@ -326,7 +365,29 @@ export default function SignUpWizard() {
             });
           }
 
-          router.push("/automate");
+          // Upload cachet si sélectionné
+          if (data.cachetFile) {
+            const formData = new FormData();
+            formData.append("file", data.cachetFile);
+            formData.append("type", "cachet");
+            await fetch("/api/user/avatar", {
+              method: "POST",
+              body: formData,
+            });
+          }
+
+          // Upload signature si sélectionné
+          if (data.signatureFile) {
+            const formData = new FormData();
+            formData.append("file", data.signatureFile);
+            formData.append("type", "signature");
+            await fetch("/api/user/avatar", {
+              method: "POST",
+              body: formData,
+            });
+          }
+
+          router.push("/");
           router.refresh();
         }
       }
@@ -654,7 +715,7 @@ export default function SignUpWizard() {
                 Votre organisme de formation
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ces informations sont indispensables pour generer vos documents officiels
+                Ces informations sont indispensables pour générer correctement l&apos;ensemble de vos documents officiels.
               </p>
             </div>
 
@@ -670,11 +731,23 @@ export default function SignUpWizard() {
               />
             </div>
 
+            {/* Nom commercial */}
+            <div>
+              <Label>Nom commercial de l&apos;organisme<span className="text-error-500">*</span></Label>
+              <Input
+                type="text"
+                placeholder="Forma Center"
+                value={data.nomCommercial}
+                onChange={(e) => updateData({ nomCommercial: e.target.value })}
+                required
+              />
+            </div>
+
             <div>
               <Label>Identifiant du workspace<span className="text-error-500">*</span></Label>
               <div className="flex items-center">
                 <span className="px-3 py-2.5 text-sm text-gray-500 bg-gray-100 border border-r-0 border-gray-200 rounded-l-lg dark:bg-gray-800 dark:border-gray-700">
-                  automateforma.fr/
+                  workbots.io/
                 </span>
                 <Input
                   type="text"
@@ -687,21 +760,43 @@ export default function SignUpWizard() {
               </div>
             </div>
 
-            {/* Representant legal */}
+            {/* Représentant légal - Nom et Prénom séparés */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Nom du représentant légal</Label>
+                <Input
+                  type="text"
+                  placeholder="Dupont"
+                  value={data.representantNom}
+                  onChange={(e) => updateData({ representantNom: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Prénom du représentant légal</Label>
+                <Input
+                  type="text"
+                  placeholder="Jean"
+                  value={data.representantPrenom}
+                  onChange={(e) => updateData({ representantPrenom: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Fonction du représentant légal */}
             <div>
-              <Label>Nom et prenom du representant legal</Label>
+              <Label>Fonction du représentant légal</Label>
               <Input
                 type="text"
-                placeholder="Jean Dupont"
-                value={data.representantLegal}
-                onChange={(e) => updateData({ representantLegal: e.target.value })}
+                placeholder="Gérant, Président, Directeur..."
+                value={data.representantFonction}
+                onChange={(e) => updateData({ representantFonction: e.target.value })}
               />
             </div>
 
-            {/* SIRET et Numéro formateur */}
+            {/* SIRET et Ville RCS */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Numero SIRET</Label>
+                <Label>Numéro SIRET</Label>
                 <Input
                   type="text"
                   placeholder="123 456 789 00012"
@@ -710,31 +805,42 @@ export default function SignUpWizard() {
                 />
               </div>
               <div>
-                <Label>N° declaration d&apos;activite (NDA)</Label>
+                <Label>Ville d&apos;immatriculation RCS</Label>
+                <Input
+                  type="text"
+                  placeholder="Paris"
+                  value={data.villeRcs}
+                  onChange={(e) => updateData({ villeRcs: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* NDA et Région */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>N° de déclaration d&apos;activité (NDA)</Label>
                 <Input
                   type="text"
                   placeholder="11 75 12345 67"
                   value={data.numeroFormateur}
                   onChange={(e) => updateData({ numeroFormateur: e.target.value })}
                 />
-                <p className="mt-1 text-xs text-gray-400">Delivre par la DREETS</p>
+                <p className="mt-1 text-xs text-gray-400">Délivré par la DREETS</p>
               </div>
-            </div>
-
-            {/* Region */}
-            <div>
-              <Label>Region d&apos;enregistrement</Label>
-              <Input
-                type="text"
-                placeholder="Ile-de-France"
-                value={data.prefectureRegion}
-                onChange={(e) => updateData({ prefectureRegion: e.target.value })}
-              />
+              <div>
+                <Label>Région d&apos;enregistrement</Label>
+                <Input
+                  type="text"
+                  placeholder="Île-de-France"
+                  value={data.prefectureRegion}
+                  onChange={(e) => updateData({ prefectureRegion: e.target.value })}
+                />
+              </div>
             </div>
 
             {/* Adresse */}
             <div>
-              <Label>Adresse du siege</Label>
+              <Label>Adresse du siège</Label>
               <Input
                 type="text"
                 placeholder="15 rue de la Formation"
@@ -765,7 +871,7 @@ export default function SignUpWizard() {
               </div>
             </div>
 
-            {/* Email et telephone organisme */}
+            {/* Email et téléphone organisme */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Email de contact</Label>
@@ -777,7 +883,7 @@ export default function SignUpWizard() {
                 />
               </div>
               <div>
-                <Label>Telephone</Label>
+                <Label>Téléphone</Label>
                 <Input
                   type="tel"
                   placeholder="01 23 45 67 89"
@@ -785,6 +891,17 @@ export default function SignUpWizard() {
                   onChange={(e) => updateData({ telephoneOrganisme: e.target.value })}
                 />
               </div>
+            </div>
+
+            {/* Site web */}
+            <div>
+              <Label>Site web</Label>
+              <Input
+                type="url"
+                placeholder="https://www.mon-organisme.fr"
+                value={data.siteWeb}
+                onChange={(e) => updateData({ siteWeb: e.target.value })}
+              />
             </div>
 
             {/* Logo entreprise */}
@@ -826,9 +943,101 @@ export default function SignUpWizard() {
                 </button>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Ce logo apparaitra sur vos documents de formation
+                    Ce logo apparaîtra sur vos documents de formation
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">PNG, JPG jusqu&apos;a 5MB</p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG jusqu&apos;à 5MB</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Cachet de l'organisme */}
+            <div>
+              <Label>Cachet de l&apos;organisme</Label>
+              <div className="flex items-center gap-4 mt-2">
+                <input
+                  ref={cachetInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCachetChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => cachetInputRef.current?.click()}
+                  className="relative group"
+                >
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 transition-all group-hover:border-brand-300 group-hover:bg-brand-50/50 dark:group-hover:bg-brand-500/10">
+                    {data.cachetPreview ? (
+                      <Image
+                        src={data.cachetPreview}
+                        alt="Cachet preview"
+                        width={80}
+                        height={80}
+                        className="object-contain w-full h-full p-1"
+                      />
+                    ) : (
+                      <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 p-1 bg-brand-500 text-white rounded-full">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                </button>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Le cachet officiel de votre organisme
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG jusqu&apos;à 5MB</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Signature du responsable */}
+            <div>
+              <Label>Signature du responsable de l&apos;organisme</Label>
+              <div className="flex items-center gap-4 mt-2">
+                <input
+                  ref={signatureInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSignatureChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => signatureInputRef.current?.click()}
+                  className="relative group"
+                >
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-50 dark:bg-gray-800 transition-all group-hover:border-brand-300 group-hover:bg-brand-50/50 dark:group-hover:bg-brand-500/10">
+                    {data.signaturePreview ? (
+                      <Image
+                        src={data.signaturePreview}
+                        alt="Signature preview"
+                        width={80}
+                        height={80}
+                        className="object-contain w-full h-full p-1"
+                      />
+                    ) : (
+                      <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 p-1 bg-brand-500 text-white rounded-full">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                </button>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    La signature du responsable pour les documents officiels
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG jusqu&apos;à 5MB</p>
                 </div>
               </div>
             </div>
@@ -836,85 +1045,7 @@ export default function SignUpWizard() {
             {/* Info box */}
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                <span className="font-medium">Bon a savoir :</span> Vous pourrez modifier ces informations a tout moment dans Parametres &gt; Organisme de formation.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Invitations */}
-        {currentStep === 3 && (
-          <div className="space-y-5">
-            <div className="mb-4">
-              <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-                Inviter votre équipe
-              </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Invitez des collaborateurs à rejoindre votre workspace
-              </p>
-            </div>
-
-            {/* Rôles description */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
-              <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Rôles disponibles :</p>
-              <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                <li><span className="font-medium">Admin</span> - Accès complet, gestion des membres</li>
-                <li><span className="font-medium">Formateur</span> - Créer et gérer ses formations</li>
-                <li><span className="font-medium">Membre</span> - Consulter les formations</li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
-              {data.teamMembers.map((member, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <Input
-                      type="email"
-                      placeholder="collegue@email.com"
-                      value={member.email}
-                      onChange={(e) => updateTeamMemberEmail(index, e.target.value)}
-                    />
-                  </div>
-                  <select
-                    value={member.role}
-                    onChange={(e) => updateTeamMemberRole(index, e.target.value as "admin" | "formateur" | "membre")}
-                    className="h-11 px-3 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  >
-                    <option value="formateur">Formateur</option>
-                    <option value="admin">Admin</option>
-                    <option value="membre">Membre</option>
-                  </select>
-                  {data.teamMembers.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeTeamMember(index)}
-                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {data.teamMembers.length < 10 && (
-              <button
-                type="button"
-                onClick={addTeamMember}
-                className="flex items-center gap-2 text-sm text-brand-500 hover:text-brand-600 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Ajouter un membre
-              </button>
-            )}
-
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Les personnes invitées recevront un email avec un lien pour créer leur compte et rejoindre votre workspace.
+                <span className="font-medium">À savoir :</span> vous pourrez modifier ces informations à tout moment dans Paramètres &gt; Organisme de formation.
               </p>
             </div>
           </div>
@@ -934,7 +1065,7 @@ export default function SignUpWizard() {
             <div />
           )}
 
-          {currentStep < 3 ? (
+          {currentStep < 2 ? (
             <button
               type="button"
               onClick={nextStep}
@@ -943,24 +1074,14 @@ export default function SignUpWizard() {
               Continuer
             </button>
           ) : (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isLoading}
-                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-              >
-                Passer
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isLoading}
-                className="px-6 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
-              >
-                {isLoading ? "Création..." : "Créer mon compte"}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isLoading}
+              className="px-6 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
+            >
+              {isLoading ? "Création..." : "Créer mon compte"}
+            </button>
           )}
         </div>
 

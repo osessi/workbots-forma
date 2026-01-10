@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
           situationHandicap: data.situationHandicap,
           modeFinancement: data.modeFinancement,
           objectifsProfessionnels: data.objectifsProfessionnels,
-          adminUrl: `${baseUrl}/automate/pre-inscriptions?id=${preInscription.id}`,
+          adminUrl: `${baseUrl}/pre-inscriptions?id=${preInscription.id}`,
         });
 
         await sendEmail({

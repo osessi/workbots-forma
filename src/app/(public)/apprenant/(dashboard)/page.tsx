@@ -490,6 +490,7 @@ function FormateurWidget({
             width={64}
             height={64}
             className="w-16 h-16 rounded-full object-cover"
+            unoptimized
           />
         ) : (
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white text-xl font-semibold">

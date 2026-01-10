@@ -86,7 +86,7 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
         return;
       }
 
-      router.push("/automate");
+      router.push("/");
       router.refresh();
     } catch (err) {
       setError("Une erreur est survenue. Veuillez réessayer.");
@@ -122,7 +122,7 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
             last_name: lastName,
             invitation_token: token,
           },
-          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/automate`,
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/`,
         },
       });
 
@@ -148,7 +148,7 @@ export default function AcceptInviteForm({ token }: AcceptInviteFormProps) {
         // Synchroniser avec Prisma
         await fetch("/api/user/sync", { method: "POST" });
 
-        router.push("/automate");
+        router.push("/");
         router.refresh();
       }
     } catch (err) {

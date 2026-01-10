@@ -1,0 +1,419 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PROCEDURE DE GESTION DE L'ORGANISME DE FORMATION (MAJ le 10/10/2023)
+
+SOMMAIRE
+1. Objet
+2. Mise en contact
+3. Analyse des besoins du client / Gestion du handicap
+4. Transmission des documents précontractuels
+5. Adaptation de la formation au niveau du stagiaire
+6. Convocation du stagiaire à la formation
+7. Gestion des retards, absences et abandons
+8. Engagements et obligations du stagiaire en formation
+9. Suivi et accompagnement post-formation
+10. Amélioration continue et gestion des réclamations
+11. Procédure de gestion des formateurs 
+12. Formation continue et veille réglementaire
+13. Mise à jour des compétences et veille stratégique
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. OBJET
+Cette procédure a pour objet de décrire les différentes étapes mises en place par l'organisme de formation [indiquer le nom de l'organisme de formation] de la première mise en contact avec le client montrant son intérêt par la formation jusqu'à la fin de la formation.
+Nous allons voir avec précision toute la démarche choisie et adoptée par l'organisme de formation pour gérer cette candidature, les cas de figures et les différentes adaptations envisagées. 
+Les aspects financiers de la formation n'ont pas objet d'être précisés ici et sont repris dans le document nommé " Convention de formation professionnelle ".
+
+2. MISE EN CONTACT
+Lorsque le client souhaite être mis en relation avec l'organisme de formation dans le but d'entrer en formation, celui-ci formalise sa demande via un des canaux suivants :
+
+* Une demande sur le formulaire de contact disponible sur le site web
+* Une demande par mail directement 
+* Un appel téléphonique
+
+Gestion du premier contact
+
+Lorsque la demande parvient à [indiquer le nom de l'organisme de formation], il convient de définir les différentes étapes pour donner suite au souhait du client d'entrer en formation.
+
+ETAPE N°1 = Un mail de bienvenue est adressé au client pour lui souhaiter la bienvenue.
+
+
+
+
+
+
+      
+
+ Ce mail doit reprendre : 
+* Le nom/prénom du client 
+* Le nom de la formation 
+* La fiche produit de la formation précisant toutes les modalités de celle-ci
+* La fiche de renseignement client permettant de : 
+
+o Connaitre le client (données administratives)
+o Détecter les situations de PSH
+o Évaluer les adéquations entre la formation et les objectifs du client
+
+* Le devis de la formation
+
+Objectifs du mail de contact :
+
+* Permettre d'informer avec précision le client sur le contenu de la formation (Fiche Produit)
+* Réaliser un premier diagnostic sur la faisabilité de la formation (Fiche de renseignement)
+* Obtenir l'accord du client sur sa volonté de rentrer en formation (Signature du devis)
+
+
+ETAPE N°2 = Inscription de la demande du client au tableau " Tableau de suivi d'activité "
+
+Du début de la mise en contact à la fin de la formation, le client sera suivi via une ligne dédiée dans l'onglet " SUIVI FORMATION "
+Cet onglet sera complété régulièrement (Mails envoyés/reçus/relances, commentaires éventuels, pièces précontractuelles reçues, envoi de la convocation, etc.) pour permettre le suivi de la formation et son bon déroulement.
+Conjointement à cette première demande, une ligne est donc inscrite donc ce premier onglet dans la partie " INFORMATIONS CLIENTS " (Voir ci-dessous)
+
+
+
+Pour chaque étape du dossier client, il est convenu que les demandes par mail sont inscrites sous la forme " Relance le XX/XX/XXXX " et un commentaire est précisé dans la colonne " Commentaire " correspondante 
+Au bout de 2 relances sans retour, le dossier est considéré est comme " Abandonné ".
+
+3. ANALYSE DE LA DEMANDE DU CLIENT
+Lorsque le client revient vers [indiquer le nom de l'organisme de formation] pour préciser sa demande via la complétude des pièces transmises lors du premier mail, une seconde analyse est réalisée pour établir la possibilité que la formation ait bien lieu. (Analyse de la " Fiche de renseignements ")
+Nous considérons ici que le devis client a été retourné convenablement rempli et signé.
+
+Cette analyse passe par 3 niveaux d'analyse :
+
+ANALYSE N°1/3 = Étude de la situation administrative du client
+
+Objectif : Connaître le client (Situation administrative, emploi actuel, niveau d'étude, attentes vis-à-vis de la formation, modalités logistiques nécessaires)
+
+ANALYSE N°2/3 = Étude de la faisabilité de la formation si PSH
+
+Objectif : Diagnostiquer une situation de PSH (Si le client répond positivement à la question sur les personnes en situation de handicap, il est invité à remplir en détails tous les items qui permettront d'adapter la formation à sa situation)
+Cette analyse se réalise en 3 étapes.
+
+1) Analyse de la " Fiche de renseignements "
+
+L 'analyse des données recueillies sur la fiche de renseignements permet d'avoir un premier niveau de compatibilité.
+Ils seront mis en corrélation avec le tableau ci-dessous qui synthétise les 6 grandes typologies de handicap et dresse de manière générale la compatibilité de ces formations pour chaque typologie.
+
+
+2) Analyse de la typologie du handicap et de l'entourage du PSH
+
+Le tableau ci-dessous donne un second niveau de compatibilité et permet ensuite une évaluation des besoins au cas par cas.
+Typologie de handicapFaisabilitéVisuelLe domaine de formation est compatible moyennant la mise en place d'adaptations et compensations en fonction des situations et besoins.AuditifMoteur Consécutif à une maladie invalidantePsychique La compatibilité dépend de la pathologie et des capacités cognitives du candidat.Intellectuel
+[indiquer le nom de l'organisme de formation] a convenu de prendre contact avec le PSH, son employeur, ses proches, son entourage, un acteur spécialisé dans le handicap pour nous apporter un éclairage sur les répercussions du handicap détecté au quotidien et notamment dans son parcours professionnel.
+
+3) Analyse finale de la compatibilité avec la formation
+
+À la suite des 2 analyses précédentes, 2 cas de figures peuvent se présenter :
+
+* Réorientation vers des organismes spécialisés
+
+En cas d'incompatibilité avérée entre le handicap du candidat et la formation, [indiquer le nom de l'organisme de formation] oriente le candidat vers les organismes capables de l'aider à redéfinir ou ajuster son projet de formation ou de reconversion professionnelle. 
+
+* Mise en œuvre des compensations nécessaires en cas de compatibilité
+
+En cas de compatibilité entre le handicap et la prestation, il convient d'identifier avec précision les besoins d'adaptation de la formation et les solutions de compensation (présence d'un interprète langue des signes, matériel spécifique adapté, fractionnement de la formation, adaptation des horaires...).
+
+Pour mener à bien cette mission, [indiquer le nom de l'organisme de formation] s'appuiera sur :
+
+- Le réseau Ressources Handicap Formation mis en place par l'AGEFIPH 
+- Les services d'entités spécialisées dont la liste est précisée sur le document " Listing Réseau Handicap "
+- La sous traitance du référent Handicap [indiquer le nom/prénom du référent handicap]
+
+ANALYSE N°3/3 = Étude de l'adéquation entre le client et la formation souhaitée.
+
+Objectif : Évaluer si le client est positionné dans la formation qui pourra répondre à ses attentes/objectifs 
+
+Il arrive que certains clients ne se positionnent pas dans la formation adéquate à leur niveau ou qu'ils ne comprennent pas les réels objectifs de la formation vendue. Le fait de leur permettre de s'exprimer librement sur leurs motivations et leurs intérêts permet de déceler ces situations.
+
+[indiquer le nom de l'organisme de formation] attache donc une importante toute particulière à l'expression de la demande du client avec ses propres mots pour déceler une incohérence entre formation et attendus client.
+
+
+Lorsque ces 3 niveaux d'analyse ont été effectuées, nous nous retrouvons dans un des 4 cas suivants :
+
+Cas N°1 = Analyse de la fiche de renseignements positive
+==> La faisabilité de la formation est confirmée. [indiquer le nom de l'organisme de formation] envoie un second mail au client en lui fournissant les pièces précontractuelles (CGV, Règlement intérieur, Convention de formation) à compléter ainsi que le " Test initial de formation "
+
+Cas N°2 = Analyse de la fiche de renseignements incomplète
+==> L'étude de la fiche de renseignements ne nous permet pas de statuer sur la demande. Une demande de pièces complémentaires est envoyée au client.
+
+Cas N°3 = Analyse de la fiche de renseignement négative
+==> Un mail est adressé au stagiaire lui indiquant que nous ne pouvons donner une suite favorable à son souhait de rentrer en formation en lui précisant le motif et l'invitons à revoir sa demande.
+
+Cas N°4 = Absence de retour de la fiche de renseignements
+==> Une relance par mail est effectuée, puis une seconde si nécessaire. Faute de retour le dossier est considéré comme abandonné et [indiquer le nom de l'organisme de formation] ajoute un commentaire pour permettre une analyse future des demandes abandonnées.
+
+Dans tous les cas, l'organisme de formation remplit la partie " Analyse des besoins et validations des prérequis " qui permettra le suivi de l'analyse de l'adéquation formation/client.
+
+
+
+4. TRANSMISSION DES DOCUMENTS PRECONTRACTUELS
+
+L'organisme de formation réalise ensuite l'envoi par mail des pièces contractuelles suivantes :
+
+* Conditions Générales de vente 
+* Règlement intérieur
+* Convention de formation
+
+Cette demande est accompagnée du " Test initial de formation " qui permettra d'analyser le niveau du client avant son entrée en formation et l'adaptation du propos du formateur.
+
+Le suivi de cette demande est formalisé dans la partie " PLANIFICATION ET SUIVI " en précisant la date d'envoi du mail des pièces contractuelles de la formation et en cochant les pièces reçues et complétées convenablement.
+
+Nous pouvons être confrontés à plusieurs cas de figures :
+
+Cas N°1 = " Demande complète "
+La demande est considérée complète lorsque tous les items de la partie " Documents contractuels complétés " sont cochés.
+Lorsque cette validation est effective, la demande passe à la partie 6 " Adaptation de la formation au niveau du stagiaire "
+
+Cas N°2 = " Demande incomplète "
+Lorsque le client ne transmet pas à l'organisme de formation tous les documents contractuels complétés, une relance est effectuée par mail.
+
+Cas N°3 = " Absence de retour "
+==> Une relance par mail est effectuée, puis une seconde si nécessaire. Faute de retour le dossier est considéré comme abandonné et l'organisme de formation ajoute un commentaire pour permettre une analyse future des demandes abandonnées.
+
+Dans tous les cas, [indiquer le nom de l'organisme de formation] remplit la partie " Documents contractuels complétés " qui permettra le suivi de la formation
+
+
+
+5. ADAPTATION DE LA FORMATION AU NIVEAU DU STAGIAIRE
+
+À la suite de la réception des documents précontractuels et de la complétude du " Test initial de formation ", il convient de répertorier les réponses du futur stagiaire dans la partie " Analyse du niveau du stagiaire préformation ". Une fois complété une note sous forme de pourcentage est attribuée automatiquement au client selon le barème ci-dessous et catégorise le stagiaire en débutant/intermédiaire/avancé
+
+Classification du niveau du stagiaire en fonction du résultat au test initial de formation
+
+(X étant le pourcentage de réussite au test initial de formation)
+
+Résultat au test initial de formationX < 30%30% = X < 60%60% = XNIVEAU DÉBUTANTNIVEAU INTERMÉDIAIRENIVEAU AVANCÉ
+
+Cette note aura deux utilités : 
+
+* Permettre d'établir le niveau de progression du stagiaire en fin de formation (en comparaison avec le test final de formation)
+* Établir les adaptations nécessaires du contenu de la formation en fonction du niveau du stagiaire selon les dispositions suivantes :
+
+
+En fonction du niveau du stagiaire les aménagements suivants sont prévus :
+
+Contenu adapté : Proposer un contenu de formation qui correspond au niveau du stagiaire, en ajustant la complexité des concepts abordés. Par exemple, pour un stagiaire débutant, il peut être nécessaire de commencer par les bases et d'augmenter progressivement la difficulté.
+
+Rythme d'apprentissage :  Proposer un rythme d'apprentissage adapté au stagiaire. Certains stagiaires peuvent nécessiter plus de temps pour assimiler les informations, tandis que d'autres peuvent progresser plus rapidement. Offrir la flexibilité nécessaire pour s'adapter aux différents rythmes de chacun.
+
+Soutien supplémentaire : Fournir un soutien supplémentaire au stagiaire qui en a besoin. Cela peut inclure des séances de tutorat individuelles, des ressources supplémentaires, des exercices pratiques supplémentaires ou des sessions de révision supplémentaires.
+
+Groupes de niveau : Organiser les stagiaires en groupes de niveau, lorsque cela est possible, afin de favoriser des interactions et des apprentissages plus adaptés. Les stagiaires peuvent alors travailler en petits groupes avec des personnes ayant un niveau similaire, ce qui facilite l'échange d'idées et l'apprentissage collaboratif.
+
+Adaptation des supports pédagogiques : Adapter les supports pédagogiques pour répondre aux besoins spécifiques du stagiaire. Simplifier les informations complexes, fournir des exemples supplémentaires ou des explications détaillées peuvent aider à mieux accompagner les stagiaires selon leur niveau.
+
+Encouragement et feedback constructif : Fournir un feedback constructif et encourageant pour aider les stagiaires à progresser. Identifier leurs points forts et leurs points faibles, et leur fournir des conseils spécifiques pour améliorer leurs compétences.
+Il est important de noter que ces exemples sont généraux et qu'il est essentiel de prendre en compte les besoins et les attentes spécifiques de chaque stagiaire pour fournir des aménagements adaptés à leur niveau.
+
+6. CONVOCATION DU STAGIAIRE A LA FORMATION
+Lorsque toutes les pièces contractuelles et les analyses concernant le stagiaire ont été effectuées en amont de la formation, la convention de formation est envoyée au client.
+
+
+ 
+
+
+
+Ce mail doit reprendre : 
+
+* Le nom/prénom du client 
+* Le nom de la formation 
+* La date de la formation
+* Le lieu de formation 
+* Les informations relatives à l'accès au site de formation
+* Le livret d'accueil de la formation
+
+* 
+7. PREVENTION ET GESTION DES RETARDS/ABSENCES/ABANDONS
+Il n'est pas question dans cette procédure des reports ou annulations de formation avant la date de démarrage de celle-ci.  Les délais et conditions de report et d'annulation d'une formation étant définis dans les CGV et le contrat ou la convention de formation professionnelle. 
+
+
+1. Prévention des abandons en cours de formation
+
+[indiquer le nom de l'organisme de formation] accorde une attention toute particulière à l'adaptation de la formation proposée aux objectifs du bénéficiaire de la formation et ce dans le but de prévenir les abandons. 
+
+* Pour cela, par la complétude de la " Fiche de renseignements " une analyse des besoins permettant d'identifier la problématique du client est effectuée
+
+* L'organisme de formation veille également à ce que le profil des participants aux formations soit bien en phase avec les prérequis et à ce que le programme, les modalités de déroulement et les objectifs soient bien diffusés en amont de la formation.  
+
+* Chaque formation débute systématiquement par un questionnement des stagiaires sur leurs connaissances, leurs attentes et leurs besoins par rapport à la thématique de formation, de façon à permettre au formateur l'orientation éventuelle de son propos.
+
+* Chaque formation prévoit l'alternance de démonstration didactique et de techniques pédagogiques participatives et collaboratives permettant de rythmer la formation et de solliciter la participation de chacun des stagiaires.
+
+
+2. Gestion des abandons en cours de formation
+
+Obligations du stagiaire :
+      
+Dans le cas où le stagiaire ne peut plus ou ne veut plus suivre l'action de formation pour laquelle il est engagé, il se doit d'en notifier son employeur.
+L'organisme de formation fournira la feuille d'émargement signé par le stagiaire à l'entreprise concerné qui précisera l'heure de départ de la formation.
+Cette notification pourra donner lieu, le cas échéant, à un entretien avec le responsable de l'organisme de formation. 
+
+Dispositions applicables :
+
+La délivrance de l'attestation de formation étant conditionnée à la réalisation et la participation active à tous les exercices, travaux pratiques et mises en situations proposés pendant la formation.  Par conséquent, le(la) stagiaire ayant abandonné(e) toute ou une partie de la formation ne pourra prétendre à l'obtention de ces justificatifs d'acquisition des connaissances et compétences.
+3. Gestion des retards/absence à une session de formation
+
+Retard du stagiaire à une session de formation
+      
+Dans le cas où le stagiaire est en retard lors d'une séance de formation, celui-ci a l'obligation de prévenir le formateur du désagrément occasionné.
+Le formateur pourra selon le cas accepter le stagiaire en session de formation ou non.
+Dans le cas d'un refus, il avisera l'entreprise et [indiquer le nom de l'organisme de formation] de l'absence du stagiaire à la session de formation.
+
+
+Absence du stagiaire à une session de formation
+
+Si le stagiaire est absent d'une session de formation, il a le devoir de prévenir le formateur/ [indiquer le nom de l'organisme de formation] et son entreprise.
+[indiquer le nom de l'organisme de formation] en avisera dans tous les cas l'entreprise concernée par mail en fournissant la feuille d'émargement de la session de formation.
+Le formateur pourra selon le cas accepter le stagiaire lors d'une autre session de formation ou non.
+
+Dispositions applicables :
+La délivrance de l'attestation de formation étant conditionnée à la réalisation et la participation active à tous les exercices, travaux pratiques et mises en situations proposés pendant la formation.  Par conséquent, le(la) stagiaire ayant abandonné(e) toute ou une partie de la formation ne pourra prétendre à l'obtention de ces justificatifs d'acquisition des connaissances et compétences.
+
+Dans tous les cas la non-participation même partielle du stagiaire à une session de formation, entraine :
+
+* L'application des conditions de report et d'annulation prévues aux CGV
+
+* La comptabilisation de l'absence dans l'onglet " Tableau de suivi d'activité " qui permettra la remontée des indicateurs de résultats de l'organisme de formation.
+
+8. OBLIGATIONS DU STAGIAIRE LORS DE LA FORMATION
+Il est convenu que lors de la ou les sessions de formation, le stagiaire se comportera de manière exemplaire et satisfera les conditions obligatoires de la formation à savoir :
+* L'émargement de la feuille de présence 
+* La participation active à tous les modules composant la formation
+* Le respect du formateur et de ses camarades en session de formation
+* La complétude du " Test final de formation "
+
+9. TRAITEMENT POST-FORMATION
+A l'issue de la formation, le formateur remplit de nouveau le " Tableau de suivi d'activité " en précisant les réponses du stagiaire au " Test final de formation ".
+Ceci permettra de calculer la progression du stagiaire et de clôturer la formation du stagiaire par l'émission d'une " attestation de fin de formation ", une fois la facture de la formation acquittée en intégralité.
+Celle-ci sera transmise par mail au stagiaire par mail et à l'entreprise concernée.
+
+10. AMELIORATION CONTINUE ET RECLAMATIONS
+Cette procédure a pour but de définir les modalités de prise en compte et de traitement par " xxxx " des différents éléments suivants parvenant à l'organisme de formation :
+
+> Les réclamations des stagiaires
+> Les abandons des stagiaires
+> Les remontées d'informations provenant des veilles réalisées 
+> Les non-conformités constatées en audit
+> Les améliorations des formations (à la suite d'un dysfonctionnement, une difficulté ou une situation inadaptée constatée lors d'une formation)
+> La mise en place d'actions correctives et préventives.
+Cette procédure permet également à [indiquer le nom de l'organisme de formation] de disposer d'une vision globale de l'ensemble des évènements survenus ou qui auraient pu survenir et des solutions apportées. Ces solutions constituent la base d'un plan d'amélioration continue visant à améliorer le fonctionnement et l'organisation de l'organisme de formation.
+
+1. La remontée d'informations
+
+Différentes enquêtes de satisfaction sont menées vers les parties prenantes et permettent de remonter les réclamations des stagiaires.
+
+Les modalités de recueil, d'analyse, de relance et de diffusion sont synthétisées dans le tableau ci-après :
+
+
+DESTINATAIRE
+MODALITES
+FREQUENCE
+MODALITES D'ANALYSE DES RESULTATS
+DIFFUSION DES RESULTATSSTAGIAIREQUESTIONNAIRE PAPIERAPRES LA FORMATIONTABLEAU DE SUIVI D'ACTIVITEINTERNETFORMATEURQUESTIONNAIRE PAPIERFIN DE FORMATIONTABLEAU DE SUIVI D'ACTIVITENON (INTERNE)ENTREPRISEQUESTIONNAIRE MAIL3 MOIS APRESTABLEAU DE SUIVI D'ACTIVITEINTERNETFINANCEURQUESTIONNAIRE MAILANNUELLETABLEAU DE SUIVI D'ACTIVITENON (INTERNE)
+
+
+2. Enregistrement et traitement des réclamations
+
+Chaque réclamation exprimée est notifiée dans le tableau " Tableau de suivi d'activité " (Onglet " Réclamations ")
+Les réclamations peuvent être exprimées via différentes canaux : 
+
+> Mail
+> Téléphone
+> Commentaires sur les réseaux sociaux
+> Courrier
+> Échange physique
+
+La réclamation est prise en compte sous 5 jours maximums et fait l'objet d'une analyse et de la mise en place des actions correctives nécessaires. 
+Une réponse est apportée à l'émetteur de la réclamation dans les 30 jours. 
+Lorsque l'analyse de la réclamation met en lumière un problème ou un dysfonctionnement récurrent ou susceptible de se reproduire, une ou des actions préventives sont inscrites au plan d'amélioration continue.
+
+3. Plan d'amélioration continue
+
+Le plan d'amélioration continue formalisé par l'onglet " Plan d'amélioration continue " dans le " Tableau de suivi d'activité ", recense :
+
+> Tout événement survenu ou tout écart constaté ayant perturbé ou susceptible de perturber l'organisation et le bon déroulement des formations d'une part, 
+> Toute opportunité d'amélioration issue de suggestion, retour d'expérience ou différentes veilles, d'autre part
+Ainsi les actions prévues au plan d'amélioration, peuvent faire suite à :
+> Une réclamation 
+> Un dysfonctionnement constaté
+> Un abandon d'un ou une stagiaire en cours de formation
+> L'analyse des veilles réglementaire, technologique, compétences et métiers
+> La revue des indicateurs
+> Une non-conformité suite à un audit
+> Un retour d'expérience du formateur 
+> Une initiative du formateur
+Chaque élément inscrit au plan d'amélioration continue, fait l'objet d'une analyse et de la programmation d'actions correctives et/ou préventives, ainsi que d'une planification dans le temps de la mise en œuvre des actions.
+Le plan d'amélioration continue permet de suivre l'état d'avancement des actions engagées. 		
+Ce tableau fait l'objet d'un examen et d'une mise à jour trimestrielle.
+
+11. PROCÉDURE DE GESTION DES FORMATEURS
+Étape N°1 :   Test en situation réelle 
+* Vérification des aptitudes du formateur en séance (selon grille évaluation)
+* Vérification de la satisfaction client vis-à-vis du formateur 
+
+Étape N°2 :  Bilan annuel 
+* Analyse du nombre de formations réalisées annuellement
+* Vérification du maintien en compétences au travers des actions de formation, autoformation et veille listées sur le bilan 
+* Vérification de la satisfaction client vis-à-vis du formateur sur l'année
+
+12. FORMATION CONTINUE ET VEILLE
+1. Formation continue
+[indiquer le nom de l'organisme de formation] a défini une politique de " formation continue " dans le but de prévoir les formations nécessaires à mettre en place dans un soucis de respect de la réglementation en vigueur ou d'amélioration de sa qualité.
+Ce plan de formation se matérialise via l'onglet " Formation continue " du Tableau de suivi d'activité ou l'on retrouve pour chaque items les éléments suivants :
+
+* Intitulé de la formation	
+* Descriptif de la formation	
+* Objectifs de la formation	
+* Organisme de formation (ou nom du formateur si formation interne)	
+* Date prévue de la formation	
+* Formation réalisée (date)
+
+13. MISE À JOUR DES COMPÉTENCES ET VEILLE STRATÉGIQUE
+
+Une mise à jour dès la détection d'un nouveau besoin est prévue par l'organisme de formation.
+
+
+
+2. Veille
+
+Une veille est effectuée selon les 3 axes suivants est réalisée par [indiquer le nom de l'organisme de formation] :
+- Veille réglementaire
+- Veille métier
+- Veille innovation pédagogique
+
+Cette veille se matérialise par les 2 onglets du " Tableau de suivi d'activité " nommés :
+
+1er Onglet = " VEILLE " où sont recensées les sources utilisées pour la veille (Site Web/Newsletter/Réseaux sociaux, etc.)
+
+2ème Onglet = " EXPLOITATION VEILLE "   ou l'on retrouve pour chaque items l'exploitation qui en est faite.
+
+Un code couleur est utilisé pour permettre de distinguer les différents types de veille et mieux les recenser.
+
+
+
+
+

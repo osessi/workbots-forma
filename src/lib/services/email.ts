@@ -277,7 +277,7 @@ export async function sendEmail(
     console.log("Subject:", options.subject);
     console.log("From:", options.from || "noreply@workbots.fr");
     console.log("-------------------------------------------");
-    console.log("Voir les emails: /automate/emails");
+    console.log("Voir les emails: /emails");
     console.log("===========================================");
 
     // Stocker en BDD même en dev

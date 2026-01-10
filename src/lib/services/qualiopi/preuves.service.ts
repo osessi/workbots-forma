@@ -1196,23 +1196,23 @@ function getPagesPourIndicateur(
         // Page publique - ce que voit le visiteur/auditeur
         { url: cataloguePublicUrl, nom: "catalogue_public", description: "Catalogue public des formations (vue visiteur)", isPublic: true, fullPage: true },
         // Pages internes de gestion
-        { url: `${baseUrl}/automate/mes-formations`, nom: "gestion_formations", description: "Gestion des formations avec détails", fullPage: true },
-        { url: `${baseUrl}/automate/settings`, nom: "parametres_organisme", description: "Paramètres de l'organisme (contacts, infos)" }
+        { url: `${baseUrl}/mes-formations`, nom: "gestion_formations", description: "Gestion des formations avec détails", fullPage: true },
+        { url: `${baseUrl}/settings`, nom: "parametres_organisme", description: "Paramètres de l'organisme (contacts, infos)" }
       );
       break;
 
     case 2: // Indicateurs de résultats
       pages.push(
-        { url: `${baseUrl}/automate`, nom: "dashboard_general", description: "Tableau de bord général avec KPIs" },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "dashboard_qualiopi", description: "Dashboard Qualiopi avec scores" },
-        { url: `${baseUrl}/automate/evaluations`, nom: "evaluations_resultats", description: "Résultats des évaluations de satisfaction", fullPage: true }
+        { url: `${baseUrl}`, nom: "dashboard_general", description: "Tableau de bord général avec KPIs" },
+        { url: `${baseUrl}/qualiopi`, nom: "dashboard_qualiopi", description: "Dashboard Qualiopi avec scores" },
+        { url: `${baseUrl}/evaluations`, nom: "evaluations_resultats", description: "Résultats des évaluations de satisfaction", fullPage: true }
       );
       break;
 
     case 3: // Obtention des certifications (indicateur CFA/certifiant)
       pages.push(
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_certifiantes", description: "Formations certifiantes (RNCP/RS)" },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_certifications", description: "Suivi des certifications" }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_certifiantes", description: "Formations certifiantes (RNCP/RS)" },
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_certifications", description: "Suivi des certifications" }
       );
       break;
 
@@ -1221,35 +1221,35 @@ function getPagesPourIndicateur(
     // =============================================
     case 4: // Analyse du besoin
       pages.push(
-        { url: `${baseUrl}/automate/donnees/apprenants`, nom: "apprenants_positionnement", description: "Liste des apprenants avec positionnement", fullPage: true },
-        { url: `${baseUrl}/automate/sessions`, nom: "sessions_inscriptions", description: "Sessions avec inscriptions" }
+        { url: `${baseUrl}/donnees/apprenants`, nom: "apprenants_positionnement", description: "Liste des apprenants avec positionnement", fullPage: true },
+        { url: `${baseUrl}/sessions`, nom: "sessions_inscriptions", description: "Sessions avec inscriptions" }
       );
       break;
 
     case 5: // Objectifs opérationnels
       pages.push(
         { url: cataloguePublicUrl, nom: "catalogue_objectifs", description: "Catalogue avec objectifs des formations (vue publique)", isPublic: true, fullPage: true },
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_objectifs", description: "Formations avec objectifs détaillés", fullPage: true }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_objectifs", description: "Formations avec objectifs détaillés", fullPage: true }
       );
       break;
 
     case 6: // Contenus et modalités
       pages.push(
         { url: cataloguePublicUrl, nom: "catalogue_programmes", description: "Programmes de formation (vue publique)", isPublic: true, fullPage: true },
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_contenus", description: "Contenus et modalités des formations", fullPage: true }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_contenus", description: "Contenus et modalités des formations", fullPage: true }
       );
       break;
 
     case 7: // Adéquation contenus/certification (CFA)
       pages.push(
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_referentiels", description: "Formations avec référentiels de certification", fullPage: true }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_referentiels", description: "Formations avec référentiels de certification", fullPage: true }
       );
       break;
 
     case 8: // Procédures de positionnement
       pages.push(
-        { url: `${baseUrl}/automate/donnees/apprenants`, nom: "apprenants_evaluations", description: "Apprenants avec évaluations initiales", fullPage: true },
-        { url: `${baseUrl}/automate/evaluations`, nom: "evaluations_positionnement", description: "Évaluations de positionnement" }
+        { url: `${baseUrl}/donnees/apprenants`, nom: "apprenants_evaluations", description: "Apprenants avec évaluations initiales", fullPage: true },
+        { url: `${baseUrl}/evaluations`, nom: "evaluations_positionnement", description: "Évaluations de positionnement" }
       );
       break;
 
@@ -1259,57 +1259,57 @@ function getPagesPourIndicateur(
     case 9: // Information des publics
       pages.push(
         { url: cataloguePublicUrl, nom: "catalogue_conditions", description: "Conditions de déroulement (vue publique)", isPublic: true, fullPage: true },
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_modalites", description: "Modalités de formation" },
-        { url: `${baseUrl}/automate/settings`, nom: "reglement_interieur", description: "Paramètres avec règlement intérieur" }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_modalites", description: "Modalités de formation" },
+        { url: `${baseUrl}/settings`, nom: "reglement_interieur", description: "Paramètres avec règlement intérieur" }
       );
       break;
 
     case 10: // Adaptation de la prestation
       pages.push(
-        { url: `${baseUrl}/automate/sessions`, nom: "sessions_suivi", description: "Sessions avec suivi des participants", fullPage: true },
-        { url: `${baseUrl}/automate/donnees/apprenants`, nom: "apprenants_suivi", description: "Suivi individuel des apprenants", fullPage: true }
+        { url: `${baseUrl}/sessions`, nom: "sessions_suivi", description: "Sessions avec suivi des participants", fullPage: true },
+        { url: `${baseUrl}/donnees/apprenants`, nom: "apprenants_suivi", description: "Suivi individuel des apprenants", fullPage: true }
       );
       break;
 
     case 11: // Évaluation de l'atteinte des objectifs
       pages.push(
-        { url: `${baseUrl}/automate/evaluations`, nom: "evaluations_acquis", description: "Évaluations des acquis", fullPage: true },
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_evaluations", description: "Formations avec évaluations" }
+        { url: `${baseUrl}/evaluations`, nom: "evaluations_acquis", description: "Évaluations des acquis", fullPage: true },
+        { url: `${baseUrl}/mes-formations`, nom: "formations_evaluations", description: "Formations avec évaluations" }
       );
       break;
 
     case 12: // Engagement des bénéficiaires
       pages.push(
-        { url: `${baseUrl}/automate/sessions`, nom: "sessions_assiduite", description: "Taux de présence par session", fullPage: true },
-        { url: `${baseUrl}/automate/donnees/apprenants`, nom: "apprenants_presence", description: "Suivi de l'assiduité des apprenants", fullPage: true }
+        { url: `${baseUrl}/sessions`, nom: "sessions_assiduite", description: "Taux de présence par session", fullPage: true },
+        { url: `${baseUrl}/donnees/apprenants`, nom: "apprenants_presence", description: "Suivi de l'assiduité des apprenants", fullPage: true }
       );
       break;
 
     case 13: // Coordination des acteurs (alternance - CFA)
       pages.push(
-        { url: `${baseUrl}/automate/sessions`, nom: "sessions_alternance", description: "Sessions en alternance" },
-        { url: `${baseUrl}/automate/donnees/apprenants`, nom: "apprenants_alternance", description: "Apprenants en alternance", fullPage: true }
+        { url: `${baseUrl}/sessions`, nom: "sessions_alternance", description: "Sessions en alternance" },
+        { url: `${baseUrl}/donnees/apprenants`, nom: "apprenants_alternance", description: "Apprenants en alternance", fullPage: true }
       );
       break;
 
     case 14: // Exercice de la citoyenneté (CFA)
       pages.push(
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_accompagnement", description: "Accompagnement socio-professionnel" },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_accompagnement", description: "Suivi accompagnement" }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_accompagnement", description: "Accompagnement socio-professionnel" },
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_accompagnement", description: "Suivi accompagnement" }
       );
       break;
 
     case 15: // Information sur les aides (CFA - apprentis)
       pages.push(
-        { url: `${baseUrl}/automate/settings`, nom: "informations_apprentis", description: "Informations droits/devoirs apprentis" },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_apprentis", description: "Suivi des apprentis" }
+        { url: `${baseUrl}/settings`, nom: "informations_apprentis", description: "Informations droits/devoirs apprentis" },
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_apprentis", description: "Suivi des apprentis" }
       );
       break;
 
     case 16: // Conformité du contrat (certifications)
       pages.push(
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_certifications", description: "Formations avec certifications" },
-        { url: `${baseUrl}/automate/evaluations`, nom: "evaluations_certifications", description: "Résultats des certifications" }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_certifications", description: "Formations avec certifications" },
+        { url: `${baseUrl}/evaluations`, nom: "evaluations_certifications", description: "Résultats des certifications" }
       );
       break;
 
@@ -1318,37 +1318,37 @@ function getPagesPourIndicateur(
     // =============================================
     case 17: // Moyens humains et techniques
       pages.push(
-        { url: `${baseUrl}/automate/donnees/intervenants`, nom: "intervenants_liste", description: "Liste des intervenants", fullPage: true },
-        { url: `${baseUrl}/automate/sessions`, nom: "sessions_moyens", description: "Sessions avec moyens affectés", fullPage: true },
-        { url: `${baseUrl}/automate/settings`, nom: "locaux_equipements", description: "Informations locaux et équipements" }
+        { url: `${baseUrl}/donnees/intervenants`, nom: "intervenants_liste", description: "Liste des intervenants", fullPage: true },
+        { url: `${baseUrl}/sessions`, nom: "sessions_moyens", description: "Sessions avec moyens affectés", fullPage: true },
+        { url: `${baseUrl}/settings`, nom: "locaux_equipements", description: "Informations locaux et équipements" }
       );
       break;
 
     case 18: // Coordination des intervenants
       pages.push(
-        { url: `${baseUrl}/automate/donnees/intervenants`, nom: "intervenants_coordination", description: "Coordination des intervenants", fullPage: true },
-        { url: `${baseUrl}/automate/sessions`, nom: "sessions_planning", description: "Planning des sessions avec intervenants", fullPage: true }
+        { url: `${baseUrl}/donnees/intervenants`, nom: "intervenants_coordination", description: "Coordination des intervenants", fullPage: true },
+        { url: `${baseUrl}/sessions`, nom: "sessions_planning", description: "Planning des sessions avec intervenants", fullPage: true }
       );
       break;
 
     case 19: // Ressources pédagogiques
       pages.push(
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_ressources", description: "Ressources pédagogiques par formation", fullPage: true },
-        { url: `${baseUrl}/automate/documents`, nom: "documents_pedagogiques", description: "Documents et supports pédagogiques", fullPage: true }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_ressources", description: "Ressources pédagogiques par formation", fullPage: true },
+        { url: `${baseUrl}/documents`, nom: "documents_pedagogiques", description: "Documents et supports pédagogiques", fullPage: true }
       );
       break;
 
     case 20: // Intervenants internes ou externes (CFA - référents)
       pages.push(
-        { url: `${baseUrl}/automate/donnees/intervenants`, nom: "referents_designes", description: "Référents handicap et mobilité" },
-        { url: `${baseUrl}/automate/settings`, nom: "organigramme_referents", description: "Organigramme avec référents" }
+        { url: `${baseUrl}/donnees/intervenants`, nom: "referents_designes", description: "Référents handicap et mobilité" },
+        { url: `${baseUrl}/settings`, nom: "organigramme_referents", description: "Organigramme avec référents" }
       );
       break;
 
     case 21: // Modalités de diffusion des supports
       pages.push(
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_supports", description: "Supports de formation avec dates de mise à jour", fullPage: true },
-        { url: `${baseUrl}/automate/documents`, nom: "documents_actualisation", description: "Suivi d'actualisation des documents", fullPage: true }
+        { url: `${baseUrl}/mes-formations`, nom: "formations_supports", description: "Supports de formation avec dates de mise à jour", fullPage: true },
+        { url: `${baseUrl}/documents`, nom: "documents_actualisation", description: "Suivi d'actualisation des documents", fullPage: true }
       );
       break;
 
@@ -1357,28 +1357,28 @@ function getPagesPourIndicateur(
     // =============================================
     case 22: // Compétences des intervenants
       pages.push(
-        { url: `${baseUrl}/automate/donnees/intervenants`, nom: "intervenants_competences", description: "Fiches intervenants avec compétences/CV", fullPage: true }
+        { url: `${baseUrl}/donnees/intervenants`, nom: "intervenants_competences", description: "Fiches intervenants avec compétences/CV", fullPage: true }
       );
       break;
 
     case 23: // Développement des compétences
       pages.push(
-        { url: `${baseUrl}/automate/donnees/intervenants`, nom: "intervenants_formations", description: "Formations suivies par les intervenants", fullPage: true },
-        { url: `${baseUrl}/automate/qualiopi/veille`, nom: "veille_pedagogique", description: "Veille pédagogique" }
+        { url: `${baseUrl}/donnees/intervenants`, nom: "intervenants_formations", description: "Formations suivies par les intervenants", fullPage: true },
+        { url: `${baseUrl}/qualiopi/veille`, nom: "veille_pedagogique", description: "Veille pédagogique" }
       );
       break;
 
     case 24: // Veille légale et réglementaire
       pages.push(
-        { url: `${baseUrl}/automate/qualiopi/veille`, nom: "veille_reglementaire", description: "Sources de veille réglementaire", fullPage: true },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_veille", description: "Dashboard veille Qualiopi" }
+        { url: `${baseUrl}/qualiopi/veille`, nom: "veille_reglementaire", description: "Sources de veille réglementaire", fullPage: true },
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_veille", description: "Dashboard veille Qualiopi" }
       );
       break;
 
     case 25: // Veille sur les compétences métiers
       pages.push(
-        { url: `${baseUrl}/automate/qualiopi/veille`, nom: "veille_metiers", description: "Veille sur les évolutions métiers", fullPage: true },
-        { url: `${baseUrl}/automate/mes-formations`, nom: "formations_actualisation", description: "Mise à jour des formations" }
+        { url: `${baseUrl}/qualiopi/veille`, nom: "veille_metiers", description: "Veille sur les évolutions métiers", fullPage: true },
+        { url: `${baseUrl}/mes-formations`, nom: "formations_actualisation", description: "Mise à jour des formations" }
       );
       break;
 
@@ -1387,29 +1387,29 @@ function getPagesPourIndicateur(
     // =============================================
     case 26: // Veille sur les innovations
       pages.push(
-        { url: `${baseUrl}/automate/qualiopi/veille`, nom: "veille_innovations", description: "Veille sur les innovations pédagogiques", fullPage: true }
+        { url: `${baseUrl}/qualiopi/veille`, nom: "veille_innovations", description: "Veille sur les innovations pédagogiques", fullPage: true }
       );
       break;
 
     case 27: // Réseau professionnel (handicap)
       pages.push(
-        { url: `${baseUrl}/automate/settings`, nom: "referent_handicap", description: "Informations référent handicap" },
-        { url: `${baseUrl}/automate/donnees/apprenants`, nom: "apprenants_handicap", description: "Accompagnement des personnes en situation de handicap", fullPage: true },
+        { url: `${baseUrl}/settings`, nom: "referent_handicap", description: "Informations référent handicap" },
+        { url: `${baseUrl}/donnees/apprenants`, nom: "apprenants_handicap", description: "Accompagnement des personnes en situation de handicap", fullPage: true },
         { url: cataloguePublicUrl, nom: "catalogue_accessibilite", description: "Informations accessibilité (vue publique)", isPublic: true }
       );
       break;
 
     case 28: // Sous-traitance
       pages.push(
-        { url: `${baseUrl}/automate/donnees/intervenants`, nom: "intervenants_externes", description: "Intervenants externes/sous-traitants", fullPage: true },
-        { url: `${baseUrl}/automate/documents`, nom: "contrats_soustraitance", description: "Contrats de sous-traitance" }
+        { url: `${baseUrl}/donnees/intervenants`, nom: "intervenants_externes", description: "Intervenants externes/sous-traitants", fullPage: true },
+        { url: `${baseUrl}/documents`, nom: "contrats_soustraitance", description: "Contrats de sous-traitance" }
       );
       break;
 
     case 29: // Insertion professionnelle (CFA)
       pages.push(
-        { url: `${baseUrl}/automate/qualiopi`, nom: "partenariats_entreprises", description: "Partenariats entreprises" },
-        { url: `${baseUrl}/automate/donnees/entreprises`, nom: "entreprises_partenaires", description: "Liste des entreprises partenaires", fullPage: true }
+        { url: `${baseUrl}/qualiopi`, nom: "partenariats_entreprises", description: "Partenariats entreprises" },
+        { url: `${baseUrl}/donnees/entreprises`, nom: "entreprises_partenaires", description: "Liste des entreprises partenaires", fullPage: true }
       );
       break;
 
@@ -1418,29 +1418,29 @@ function getPagesPourIndicateur(
     // =============================================
     case 30: // Recueil des appréciations
       pages.push(
-        { url: `${baseUrl}/automate/evaluations`, nom: "evaluations_satisfaction", description: "Évaluations de satisfaction", fullPage: true },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_satisfaction", description: "Synthèse satisfaction" }
+        { url: `${baseUrl}/evaluations`, nom: "evaluations_satisfaction", description: "Évaluations de satisfaction", fullPage: true },
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_satisfaction", description: "Synthèse satisfaction" }
       );
       break;
 
     case 31: // Traitement des réclamations
       pages.push(
-        { url: `${baseUrl}/automate/reclamations`, nom: "reclamations_liste", description: "Registre des réclamations", fullPage: true },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_reclamations", description: "Suivi des réclamations" }
+        { url: `${baseUrl}/reclamations`, nom: "reclamations_liste", description: "Registre des réclamations", fullPage: true },
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_reclamations", description: "Suivi des réclamations" }
       );
       break;
 
     case 32: // Mesures d'amélioration
       pages.push(
-        { url: `${baseUrl}/automate/ameliorations`, nom: "ameliorations_liste", description: "Actions d'amélioration continue", fullPage: true },
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_ameliorations", description: "Suivi des améliorations" }
+        { url: `${baseUrl}/ameliorations`, nom: "ameliorations_liste", description: "Actions d'amélioration continue", fullPage: true },
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_ameliorations", description: "Suivi des améliorations" }
       );
       break;
 
     default:
       // Fallback si indicateur non géré
       pages.push(
-        { url: `${baseUrl}/automate/qualiopi`, nom: "qualiopi_general", description: "Dashboard Qualiopi" }
+        { url: `${baseUrl}/qualiopi`, nom: "qualiopi_general", description: "Dashboard Qualiopi" }
       );
   }
 

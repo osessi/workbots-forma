@@ -299,7 +299,7 @@ export async function POST(
           message: content.trim(),
           resourceType: "apprenant",
           resourceId: apprenantId,
-          actionUrl: `/automate/apprenants/${apprenantId}`,
+          actionUrl: `/apprenants/${apprenantId}`,
           isRead: true, // Déjà "lu" car c'est nous qui l'envoyons
           readAt: new Date(),
           metadata: {

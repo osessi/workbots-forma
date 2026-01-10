@@ -328,6 +328,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Formation non trouvée" }, { status: 404 });
     }
 
+    // Vérifier si des sessions sont rattachées à cette formation
+    const sessionsCount = await prisma.session.count({
+      where: { formationId: id },
+    });
+
+    if (sessionsCount > 0) {
+      return NextResponse.json(
+        {
+          error: "Impossible de supprimer cette formation : des sessions existent déjà. Vous pouvez archiver la formation à la place.",
+          sessionsCount,
+          suggestion: "archive"
+        },
+        { status: 400 }
+      );
+    }
+
     // Supprimer la formation (cascade supprimera modules, documents, etc.)
     await prisma.formation.delete({
       where: { id },

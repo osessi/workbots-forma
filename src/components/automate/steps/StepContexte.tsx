@@ -601,10 +601,10 @@ export const StepContexte: React.FC<StepContexteProps> = ({
                 onChange={(e) => handleChange("description", e.target.value)}
                 maxLength={3000}
                 rows={18}
-                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 resize-none"
+                className="w-full px-4 py-3 pb-8 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 resize-none"
               />
-              <div className="absolute bottom-3 right-3 text-xs text-gray-400">
-                {data.description.length}/3000
+              <div className="absolute bottom-2 right-3 text-xs text-gray-400 bg-gray-50 dark:bg-gray-800 px-1 rounded">
+                {data.description.length} / 3000
               </div>
             </div>
           </div>

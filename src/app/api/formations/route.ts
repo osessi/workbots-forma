@@ -9,20 +9,6 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 
-// Générer une référence de session unique
-function generateSessionReference(formationTitre: string, year: number, count: number): string {
-  // Prendre les 4 premières lettres du titre en majuscules (sans accents)
-  const prefix = formationTitre
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z]/g, "")
-    .substring(0, 4)
-    .toUpperCase();
-
-  // Format: XXXX-2025-001
-  return `${prefix || "FORM"}-${year}-${String(count).padStart(3, "0")}`;
-}
-
 // POST - Créer une nouvelle formation
 export async function POST(request: NextRequest) {
   try {
@@ -126,20 +112,9 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 3. Créer automatiquement une session initiale (Session 1)
-      const currentYear = new Date().getFullYear();
-      const reference = generateSessionReference(titre, currentYear, 1);
-
-      await tx.session.create({
-        data: {
-          reference,
-          nom: "Session 1",
-          formationId: newFormation.id,
-          organizationId: user.organizationId!,
-          status: "BROUILLON",
-          modalite: "PRESENTIEL",
-        },
-      });
+      // Correction 356: Ne plus créer de session automatiquement
+      // La création de session doit se faire uniquement via un bouton explicite
+      // (depuis "Mes sessions" ou depuis la page de la formation)
 
       return newFormation;
     });
@@ -147,8 +122,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(formation, { status: 201 });
   } catch (error) {
     console.error("Erreur création formation:", error);
+
+    // Détailler l'erreur pour aider au debug
+    let errorMessage = "Erreur lors de la création de la formation";
+
+    if (error instanceof Error) {
+      // Erreurs Prisma connues
+      if (error.message.includes("Unique constraint")) {
+        errorMessage = "Une formation avec ce titre existe déjà";
+      } else if (error.message.includes("Foreign key constraint")) {
+        errorMessage = "Référence invalide (utilisateur ou organisation)";
+      } else if (error.message.includes("Invalid")) {
+        errorMessage = `Données invalides: ${error.message}`;
+      } else {
+        // En développement, afficher le message complet
+        errorMessage = process.env.NODE_ENV === "development"
+          ? `Erreur: ${error.message}`
+          : errorMessage;
+      }
+    }
+
     return NextResponse.json(
-      { error: "Erreur lors de la création de la formation" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

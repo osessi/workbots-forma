@@ -852,7 +852,7 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
 
               {/* Lien vers les paramètres */}
               <Link
-                href="/automate/settings?tab=organisme"
+                href="/settings?tab=organisme"
                 className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -870,7 +870,7 @@ export const StepDocuments: React.FC<StepDocumentsProps> = ({
                 Aucune information d'organisme configurée
               </p>
               <Link
-                href="/automate/settings?tab=organisme"
+                href="/settings?tab=organisme"
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

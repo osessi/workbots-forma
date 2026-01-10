@@ -112,10 +112,12 @@ export async function POST(request: NextRequest) {
       if (file.type === "application/pdf") {
         // Extraction PDF avec pdf-parse v2.x
         console.log(`[Import] Extraction PDF: ${file.name} (${file.size} bytes)`);
-        const pdfParser = new PDFParse(buffer);
+        const pdfParser = new PDFParse({ data: buffer });
         const pdfResult = await pdfParser.getText();
-        // getText() retourne un objet avec pages, on concat le texte de toutes les pages
-        textContent = pdfResult.pages.map(page => page.text).join("\n") || "";
+        // getText() retourne un TextResult avec .text (tout le texte) et .pages (par page)
+        textContent = pdfResult.text || "";
+        // Nettoyer le parser après utilisation
+        await pdfParser.destroy();
         console.log(`[Import] PDF extrait: ${textContent.length} caractères`);
       } else {
         // Extraction DOCX/DOC avec mammoth
@@ -125,9 +127,10 @@ export async function POST(request: NextRequest) {
         console.log(`[Import] Word extrait: ${textContent.length} caractères`);
       }
     } catch (extractionError) {
-      console.error("[Import] Erreur d'extraction du contenu:", extractionError);
+      const errorMessage = extractionError instanceof Error ? extractionError.message : String(extractionError);
+      console.error("[Import] Erreur d'extraction du contenu:", errorMessage, extractionError);
       return NextResponse.json(
-        { error: `Impossible de lire le contenu du fichier. Vérifiez que le fichier n'est pas corrompu ou protégé par mot de passe.` },
+        { error: `Impossible de lire le contenu du fichier: ${errorMessage}` },
         { status: 400 }
       );
     }

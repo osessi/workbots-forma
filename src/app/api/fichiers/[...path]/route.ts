@@ -67,11 +67,12 @@ export async function GET(
     // Reconstruire le chemin du fichier (décoder chaque segment)
     const filePath = path.map(segment => decodeURIComponent(segment)).join("/");
 
-    // Vérifier si c'est un chemin d'image publique (logos, signatures, cachets, avatars)
+    // Vérifier si c'est un chemin d'image publique (logos, signatures, cachets, avatars, photos intervenants)
     const isPublicImage = filePath.startsWith("logos/") ||
                           filePath.startsWith("signatures/") ||
                           filePath.startsWith("cachets/") ||
-                          filePath.startsWith("avatars/");
+                          filePath.startsWith("avatars/") ||
+                          filePath.startsWith("intervenants-photos/");
 
     // Pour les fichiers non-publics, vérifier l'authentification
     if (!isPublicImage) {

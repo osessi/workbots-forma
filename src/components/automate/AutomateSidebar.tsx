@@ -57,22 +57,22 @@ const mainNavItems: NavItem[] = [
   {
     icon: <LayoutDashboard size={20} strokeWidth={1.5} />,
     name: "Tableau de bord",
-    path: "/automate",
+    path: "/",
   },
   {
     icon: <PlusCircle size={20} strokeWidth={1.5} />,
     name: "Créer une formation",
-    path: "/automate/import",
+    path: "/import",
   },
   {
     icon: <FolderOpen size={20} strokeWidth={1.5} />,
     name: "Mes formations",
-    path: "/automate/formations",
+    path: "/formations",
   },
   {
     icon: <FileBox size={20} strokeWidth={1.5} />,
     name: "Mes fichiers",
-    path: "/automate/files",
+    path: "/files",
   },
   {
     icon: <Calendar size={20} strokeWidth={1.5} />,
@@ -81,29 +81,29 @@ const mainNavItems: NavItem[] = [
       {
         icon: <Users size={18} strokeWidth={1.5} />,
         name: "Mes sessions",
-        path: "/automate/sessions",
+        path: "/sessions",
       },
       {
         icon: <Calendar size={18} strokeWidth={1.5} />,
         name: "Calendrier",
-        path: "/automate/calendrier",
+        path: "/calendrier",
       },
       {
         icon: <ClipboardCheck size={18} strokeWidth={1.5} />,
         name: "Émargement",
-        path: "/automate/calendrier?tab=emargement",
+        path: "/calendrier?tab=emargement",
       },
       {
         icon: <FileSignature size={18} strokeWidth={1.5} />,
         name: "Signatures",
-        path: "/automate/signatures",
+        path: "/signatures",
       },
     ],
   },
   {
     icon: <TrendingUp size={20} strokeWidth={1.5} />,
     name: "CRM",
-    path: "/automate/crm",
+    path: "/crm",
   },
   {
     icon: <Globe size={20} strokeWidth={1.5} />,
@@ -112,44 +112,44 @@ const mainNavItems: NavItem[] = [
       {
         icon: <BookOpen size={18} strokeWidth={1.5} />,
         name: "Mon catalogue",
-        path: "/automate/catalogue",
+        path: "/catalogue-admin",
       },
       {
         icon: <UserPlus size={18} strokeWidth={1.5} />,
         name: "Pré-inscriptions",
-        path: "/automate/pre-inscriptions",
+        path: "/pre-inscriptions",
       },
       {
         icon: <ClipboardList size={18} strokeWidth={1.5} />,
         name: "Évaluations",
-        path: "/automate/catalogue/evaluations",
+        path: "/catalogue-admin/evaluations",
       },
     ],
   },
   {
     icon: <GraduationCap size={20} strokeWidth={1.5} />,
     name: "LMS",
-    path: "/automate/lms",
+    path: "/lms",
   },
   {
     icon: <Video size={20} strokeWidth={1.5} />,
     name: "Classe virtuelle",
-    path: "/automate/classe-virtuelle",
+    path: "/classe-virtuelle",
   },
   {
     icon: <Bot size={20} strokeWidth={1.5} />,
     name: "Auditeur IA",
-    path: "/automate/qualiopi",
+    path: "/qualiopi",
   },
   {
     icon: <Workflow size={20} strokeWidth={1.5} />,
     name: "Automatisations",
-    path: "/automate/automatisations",
+    path: "/automatisations",
   },
   {
     icon: <Mail size={20} strokeWidth={1.5} />,
     name: "Emails",
-    path: "/automate/emails",
+    path: "/emails",
   },
   {
     icon: <Newspaper size={20} strokeWidth={1.5} />,
@@ -158,17 +158,17 @@ const mainNavItems: NavItem[] = [
       {
         icon: <Eye size={18} strokeWidth={1.5} />,
         name: "Veille",
-        path: "/automate/outils/veille",
+        path: "/outils/veille",
       },
       {
         icon: <MessageSquareWarning size={18} strokeWidth={1.5} />,
         name: "Réclamations",
-        path: "/automate/outils/reclamations",
+        path: "/outils/reclamations",
       },
       {
         icon: <TrendingUpIcon size={18} strokeWidth={1.5} />,
         name: "Améliorations",
-        path: "/automate/outils/ameliorations",
+        path: "/outils/ameliorations",
       },
     ],
   },
@@ -179,27 +179,27 @@ const mainNavItems: NavItem[] = [
       {
         icon: <Building2 size={18} strokeWidth={1.5} />,
         name: "Entreprises",
-        path: "/automate/donnees/entreprises",
+        path: "/donnees/entreprises",
       },
       {
         icon: <Users size={18} strokeWidth={1.5} />,
         name: "Apprenants",
-        path: "/automate/donnees/apprenants",
+        path: "/donnees/apprenants",
       },
       {
         icon: <UserCheck size={18} strokeWidth={1.5} />,
         name: "Intervenants",
-        path: "/automate/donnees/intervenants",
+        path: "/donnees/intervenants",
       },
       {
         icon: <MapPin size={18} strokeWidth={1.5} />,
         name: "Lieux",
-        path: "/automate/donnees/lieux",
+        path: "/donnees/lieux",
       },
       {
         icon: <Landmark size={18} strokeWidth={1.5} />,
         name: "Financeurs",
-        path: "/automate/donnees/financeurs",
+        path: "/donnees/financeurs",
       },
     ],
   },
@@ -207,15 +207,9 @@ const mainNavItems: NavItem[] = [
 
 const bottomNavItems: NavItem[] = [
   {
-    icon: <BookOpen size={20} strokeWidth={1.5} />,
-    name: "Documentation",
-    path: "/docs",
-    external: true,
-  },
-  {
     icon: <Settings size={20} strokeWidth={1.5} />,
     name: "Paramètres",
-    path: "/automate/settings",
+    path: "/settings",
   },
 ];
 
@@ -235,8 +229,8 @@ const AutomateSidebar: React.FC = () => {
     const isExactMatch = pathname === basePath;
 
     // Vérifier si c'est un vrai sous-chemin (pas juste un préfixe)
-    // Ex: /automate/catalogue/evaluations est un sous-chemin de /automate/catalogue
-    // mais /automate/catalogueX n'est pas un sous-chemin de /automate/catalogue
+    // Ex: /catalogue-admin/evaluations est un sous-chemin de /catalogue-admin
+    // mais /catalogue-adminX n'est pas un sous-chemin de /catalogue-admin
     const isChildPath = pathname.startsWith(basePath + "/");
 
     // Pour les liens de sous-menu, on veut une correspondance exacte
@@ -257,14 +251,14 @@ const AutomateSidebar: React.FC = () => {
     }
 
     // Pour le calendrier sans tab, vérifier qu'on n'a pas ?tab=emargement
-    if (basePath === "/automate/calendrier" && !queryString) {
+    if (basePath === "/calendrier" && !queryString) {
       const tab = searchParams.get("tab");
       return !tab || tab === "calendrier";
     }
 
     // Pour éviter la double surbrillance: si on est sur un sous-chemin,
     // seul le sous-chemin doit être actif, pas le parent
-    // Ex: sur /automate/catalogue/evaluations, /automate/catalogue ne doit pas être actif
+    // Ex: sur /catalogue-admin/evaluations, /catalogue-admin ne doit pas être actif
     if (isChildPath && !isExactMatch) {
       return false;
     }
@@ -427,7 +421,7 @@ const AutomateSidebar: React.FC = () => {
           !isExpanded && !isHovered && !isMobileOpen ? "lg:items-center" : "items-center"
         }`}
       >
-        <Link href="/automate" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           {(isExpanded || isHovered || isMobileOpen) ? (
             <Image
               src={theme === "dark" ? "/logo-workbots-dark.svg" : "/logo-workbots.svg"}

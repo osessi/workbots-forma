@@ -75,7 +75,7 @@ export async function notifyPreInscription(params: {
     message: `${params.prenom} ${params.nom} a demandé une pré-inscription à "${params.formationTitre}"${handicapInfo}`,
     resourceType: "preInscription",
     resourceId: params.preInscriptionId,
-    actionUrl: `/automate/pre-inscriptions?id=${params.preInscriptionId}`,
+    actionUrl: `/pre-inscriptions?id=${params.preInscriptionId}`,
     metadata: {
       prenom: params.prenom,
       nom: params.nom,
@@ -104,8 +104,8 @@ export async function notifyInscriptionValidee(params: {
     resourceType: "apprenant",
     resourceId: params.apprenantId,
     actionUrl: params.sessionId
-      ? `/automate/sessions/${params.sessionId}/apprenants`
-      : `/automate/apprenants/${params.apprenantId}`,
+      ? `/sessions/${params.sessionId}/apprenants`
+      : `/apprenants/${params.apprenantId}`,
     metadata: {
       prenom: params.prenom,
       nom: params.nom,
@@ -138,7 +138,7 @@ export async function notifySessionRappel(params: {
     message: `La session "${params.sessionNom}" commence ${dateStr} (${params.nombreInscrits} inscrit${params.nombreInscrits > 1 ? "s" : ""})`,
     resourceType: "session",
     resourceId: params.sessionId,
-    actionUrl: `/automate/sessions/${params.sessionId}`,
+    actionUrl: `/sessions/${params.sessionId}`,
     metadata: {
       sessionNom: params.sessionNom,
       dateDebut: params.dateDebut,
@@ -192,7 +192,7 @@ export async function notifyEvaluationComplete(params: {
     message: `${params.apprenantNom} a terminé l'évaluation "${params.evaluationType}" de "${params.formationTitre}"${scoreInfo}`,
     resourceType: "evaluation",
     resourceId: params.evaluationId,
-    actionUrl: `/automate/evaluations/${params.evaluationId}/resultats`,
+    actionUrl: `/evaluations/${params.evaluationId}/resultats`,
     metadata: {
       apprenantNom: params.apprenantNom,
       evaluationType: params.evaluationType,

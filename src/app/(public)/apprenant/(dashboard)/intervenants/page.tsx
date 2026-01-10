@@ -88,6 +88,7 @@ function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; ind
               width={96}
               height={96}
               className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 object-cover shadow-lg"
+              unoptimized
             />
           ) : (
             <div className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg">

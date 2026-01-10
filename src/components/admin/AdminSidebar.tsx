@@ -351,7 +351,7 @@ export default function AdminSidebar() {
           </button>
 
           <Link
-            href="/automate"
+            href="/"
             onClick={closeMobileMenu}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
           >

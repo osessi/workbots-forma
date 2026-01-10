@@ -89,6 +89,8 @@ export interface UserProfile {
   plan?: string;
   customDomain?: string | null;
   customDomainVerified?: boolean;
+  // Date de création du compte
+  createdAt?: string;
 }
 
 export interface Formation {
@@ -130,6 +132,8 @@ export interface Formation {
   } | null;
   // Nombre de modules
   nombreModules?: number;
+  // Archivage
+  isArchived?: boolean;
 }
 
 interface AutomateContextType {
@@ -274,6 +278,8 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           plan: org?.plan || "",
           customDomain: org?.customDomain || null,
           customDomainVerified: org?.customDomainVerified || false,
+          // Date de création
+          createdAt: data.createdAt || undefined,
         });
 
         // Appliquer la couleur immédiatement
@@ -349,7 +355,8 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const fetchFormations = useCallback(async () => {
     try {
       setIsLoadingFormations(true);
-      const response = await fetch("/api/formations?limit=100");
+      // Récupérer toutes les formations y compris archivées (le filtre se fait côté frontend)
+      const response = await fetch("/api/formations?limit=100&showArchived=true");
 
       if (response.ok) {
         const result = await response.json();
@@ -389,6 +396,7 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             nombreAvis: number;
             nombreStagiaires: number;
           } | null;
+          isArchived?: boolean;
         }) => ({
           id: f.id,
           titre: f.titre,
@@ -412,6 +420,7 @@ export const AutomateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           modalites: f.modalites,
           indicateurs: f.indicateurs,
           nombreModules: f.modules?.length || 0,
+          isArchived: f.isArchived || false,
         }));
 
         setFormations(formattedFormations);

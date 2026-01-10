@@ -614,7 +614,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   const [viewingEvaluation, setViewingEvaluation] = useState(false);
   const [viewingCorrelation, setViewingCorrelation] = useState(false);
 
-  // Fonction pour telecharger une evaluation en PDF
+  // Fonction pour telecharger une evaluation en PDF (VERSION NON CORRIGÉE - sans les bonnes réponses)
   const handleDownloadEvaluation = useCallback((evaluation: EvaluationData) => {
     const printContent = `
       <!DOCTYPE html>
@@ -636,10 +636,11 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .question-number { display: inline-block; width: 28px; height: 28px; background: #6366f1; color: white; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-right: 10px; font-size: 14px; }
           .question-text { font-weight: 600; color: #1e293b; display: inline; }
           .options { margin-top: 15px; padding-left: 40px; }
-          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; }
+          .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; }
           .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
-          .correct { background: #dcfce7; border: 1px solid #86efac; }
-          .correct .option-letter { background: #22c55e; color: white; }
+          .checkbox { display: inline-block; width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 3px; margin-right: 10px; vertical-align: middle; }
+          .response-area { margin-top: 15px; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 6px; min-height: 60px; background: #fafafa; }
+          .response-label { font-size: 11px; color: #94a3b8; margin-bottom: 5px; }
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -654,16 +655,26 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           <div class="question-block">
             <span class="question-number">${i + 1}</span>
             <span class="question-text">${q.question}</span>
-            ${q.options ? `
+            ${q.type === 'qcm' && q.options ? `
               <div class="options">
                 ${q.options.map((opt, idx) => `
-                  <div class="option ${q.correctAnswer === idx ? 'correct' : ''}">
+                  <div class="option">
+                    <span class="checkbox"></span>
                     <span class="option-letter">${String.fromCharCode(65 + idx)}</span>
                     ${opt}
                   </div>
                 `).join('')}
               </div>
-            ` : ''}
+            ` : q.type === 'vrai_faux' ? `
+              <div class="options">
+                <div class="option"><span class="checkbox"></span> Vrai</div>
+                <div class="option"><span class="checkbox"></span> Faux</div>
+              </div>
+            ` : `
+              <div class="response-area">
+                <div class="response-label">Réponse :</div>
+              </div>
+            `}
           </div>
         `).join('')}
       </body>

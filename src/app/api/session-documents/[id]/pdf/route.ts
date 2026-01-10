@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
-import { generatePDFFromHtmlRaw } from "@/lib/services/pdf-generator";
+import { generatePDFWithOrganisation, OrganisationInfo } from "@/lib/services/pdf-generator";
 
 type RouteParams = {
   params: Promise<{ id: string }>;
@@ -56,7 +56,7 @@ function decodeToken(token: string): {
 }
 
 // Wrapping HTML avec styles pour le PDF
-function wrapHtmlForPdf(html: string, title: string, orgName?: string): string {
+function wrapHtmlForPdf(html: string, title: string): string {
   return `
 <!DOCTYPE html>
 <html lang="fr">
@@ -66,7 +66,7 @@ function wrapHtmlForPdf(html: string, title: string, orgName?: string): string {
   <style>
     @page {
       size: A4;
-      margin: 20mm 15mm;
+      margin: 25mm 15mm 30mm 15mm;
     }
     * {
       box-sizing: border-box;
@@ -146,14 +146,6 @@ function wrapHtmlForPdf(html: string, title: string, orgName?: string): string {
       border: 1px dashed #ccc;
       min-height: 80px;
     }
-    .footer {
-      margin-top: 30px;
-      padding-top: 15px;
-      border-top: 1px solid #ddd;
-      font-size: 9pt;
-      color: #666;
-      text-align: center;
-    }
     ul, ol {
       margin: 10px 0;
       padding-left: 25px;
@@ -168,7 +160,6 @@ function wrapHtmlForPdf(html: string, title: string, orgName?: string): string {
 </head>
 <body>
   ${html}
-  ${orgName ? `<div class="footer">Document généré par ${orgName}</div>` : ""}
 </body>
 </html>`;
 }
@@ -203,6 +194,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
               select: {
                 name: true,
                 nomCommercial: true,
+                siret: true,
+                numeroFormateur: true,
+                prefectureRegion: true,
+                adresse: true,
+                codePostal: true,
+                ville: true,
+                telephone: true,
+                email: true,
+                logo: true,
+                representantNom: true,
+                representantPrenom: true,
               },
             },
             formation: {
@@ -231,6 +233,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 select: {
                   name: true,
                   nomCommercial: true,
+                  siret: true,
+                  numeroFormateur: true,
+                  prefectureRegion: true,
+                  adresse: true,
+                  codePostal: true,
+                  ville: true,
+                  telephone: true,
+                  email: true,
+                  logo: true,
+                  representantNom: true,
+                  representantPrenom: true,
                 },
               },
               formation: {
@@ -286,20 +299,35 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Générer le titre
     const documentTitle =
       document.titre || DOCUMENT_LABELS[document.type] || "Document";
-    const orgName =
-      document.session.organization.nomCommercial ||
-      document.session.organization.name;
+    const org = document.session.organization;
+
+    // Préparer les infos de l'organisme pour l'en-tête/pied de page
+    const organisationInfo: OrganisationInfo = {
+      nom: org.name,
+      nomCommercial: org.nomCommercial,
+      siret: org.siret,
+      numeroFormateur: org.numeroFormateur,
+      prefectureRegion: org.prefectureRegion,
+      adresse: org.adresse,
+      codePostal: org.codePostal,
+      ville: org.ville,
+      telephone: org.telephone,
+      email: org.email,
+      logo: org.logo,
+      representantNom: org.representantNom,
+      representantPrenom: org.representantPrenom,
+    };
 
     // Wrapping le HTML
-    const fullHtml = wrapHtmlForPdf(htmlContent, documentTitle, orgName);
+    const fullHtml = wrapHtmlForPdf(htmlContent, documentTitle);
 
-    // Générer le PDF
-    const pdfBuffer = await generatePDFFromHtmlRaw(fullHtml, {
+    // Générer le PDF avec en-tête/pied de page de l'organisme
+    const pdfBuffer = await generatePDFWithOrganisation(fullHtml, organisationInfo, {
       format: "A4",
       margin: {
-        top: "20mm",
+        top: "25mm",
         right: "15mm",
-        bottom: "20mm",
+        bottom: "30mm",
         left: "15mm",
       },
     });

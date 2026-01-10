@@ -19,17 +19,88 @@ export interface PDFOptions {
   footerTemplate?: string;
 }
 
+// Informations de l'organisme pour en-tête/pied de page
+export interface OrganisationInfo {
+  nom: string;
+  nomCommercial?: string | null;
+  siret?: string | null;
+  numeroFormateur?: string | null;
+  prefectureRegion?: string | null;
+  adresse?: string | null;
+  codePostal?: string | null;
+  ville?: string | null;
+  telephone?: string | null;
+  email?: string | null;
+  logo?: string | null;
+  representantNom?: string | null;
+  representantPrenom?: string | null;
+}
+
 const defaultOptions: PDFOptions = {
   format: "A4",
   landscape: false,
   margin: {
-    top: "20mm",
+    top: "25mm",
     right: "15mm",
-    bottom: "20mm",
+    bottom: "30mm",
     left: "15mm",
   },
-  displayHeaderFooter: false,
+  displayHeaderFooter: true,
 };
+
+// Génère le template d'en-tête avec le logo de l'organisme
+export function generateHeaderTemplate(org?: OrganisationInfo): string {
+  if (!org?.logo) {
+    return `<div style="width: 100%; font-size: 8px; padding: 0 15mm;"></div>`;
+  }
+
+  return `
+    <div style="width: 100%; font-size: 8px; padding: 5mm 15mm 0 15mm; display: flex; justify-content: flex-start;">
+      <img src="${org.logo}" style="max-height: 40px; max-width: 150px;" />
+    </div>
+  `;
+}
+
+// Génère le template de pied de page avec les infos de l'organisme
+export function generateFooterTemplate(org?: OrganisationInfo): string {
+  if (!org) {
+    return `
+      <div style="width: 100%; font-size: 8px; text-align: center; padding: 0 15mm; color: #666;">
+        <span class="pageNumber"></span> / <span class="totalPages"></span>
+      </div>
+    `;
+  }
+
+  const nomAffiche = org.nomCommercial || org.nom;
+  const adresseLigne = [org.adresse, org.codePostal, org.ville].filter(Boolean).join(", ");
+
+  let infoLines: string[] = [];
+
+  // Ligne 1: Nom commercial | Adresse
+  if (nomAffiche || adresseLigne) {
+    infoLines.push([nomAffiche, adresseLigne].filter(Boolean).join(" | "));
+  }
+
+  // Ligne 2: SIRET + NDA
+  const infosPro: string[] = [];
+  if (org.siret) infosPro.push(`SIRET : ${org.siret}`);
+  if (org.numeroFormateur) {
+    const regionInfo = org.prefectureRegion ? ` (${org.prefectureRegion})` : "";
+    infosPro.push(`N° d'activité : ${org.numeroFormateur}${regionInfo}`);
+  }
+  if (infosPro.length > 0) {
+    infoLines.push(infosPro.join(" – "));
+  }
+
+  return `
+    <div style="width: 100%; font-size: 7px; text-align: center; padding: 0 15mm; color: #666; border-top: 1px solid #ddd; padding-top: 3mm;">
+      ${infoLines.map(line => `<div style="margin-bottom: 1mm;">${line}</div>`).join("")}
+      <div style="margin-top: 2mm;">
+        Page <span class="pageNumber"></span> / <span class="totalPages"></span>
+      </div>
+    </div>
+  `;
+}
 
 // Template HTML de base avec styles
 function wrapHtmlContent(htmlContent: string, title: string): string {
@@ -190,6 +261,59 @@ export async function generatePDFFromHtml(
           <span class="pageNumber"></span> / <span class="totalPages"></span>
         </div>
       `,
+      printBackground: true,
+    });
+
+    return Buffer.from(pdfBuffer);
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
+// Nouvelle fonction principale avec support en-tête/pied de page organisme
+export async function generatePDFWithOrganisation(
+  fullHtml: string,
+  organisation?: OrganisationInfo,
+  options: PDFOptions = {}
+): Promise<Buffer> {
+  const headerTemplate = generateHeaderTemplate(organisation);
+  const footerTemplate = generateFooterTemplate(organisation);
+
+  const mergedOptions: PDFOptions = {
+    ...defaultOptions,
+    ...options,
+    displayHeaderFooter: true,
+    headerTemplate,
+    footerTemplate,
+  };
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(fullHtml, {
+      waitUntil: "networkidle0",
+    });
+
+    const pdfBuffer = await page.pdf({
+      format: mergedOptions.format,
+      landscape: mergedOptions.landscape,
+      margin: mergedOptions.margin,
+      displayHeaderFooter: mergedOptions.displayHeaderFooter,
+      headerTemplate: mergedOptions.headerTemplate,
+      footerTemplate: mergedOptions.footerTemplate,
       printBackground: true,
     });
 

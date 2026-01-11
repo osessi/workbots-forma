@@ -575,7 +575,21 @@ function CreateFormationContent() {
   };
 
   // Fonction pour generer la fiche pedagogique avec l'IA
+  // Correction 357: Ne génère QUE si la fiche est vide (première fois)
+  // Si la fiche a déjà des données, on passe directement à l'étape suivante
+  // L'utilisateur peut enrichir via les boutons "Enrichir" par section
   const handleGenerateFiche = useCallback(async (contexte: typeof contexteData) => {
+    // Correction 357: Si la fiche a déjà un titre (données existantes), ne pas régénérer
+    // Cela préserve les contenus saisis manuellement
+    const hasFicheData = ficheData.titre && ficheData.titre.trim().length > 0 && ficheData.titre !== "Formation sans titre";
+
+    if (hasFicheData) {
+      // Ne pas régénérer, juste passer à l'étape suivante
+      // Les données existantes sont préservées
+      goToNextStep("contexte", "fiche");
+      return;
+    }
+
     setIsGeneratingFiche(true);
     setGenerationError(null);
 
@@ -785,7 +799,7 @@ function CreateFormationContent() {
     } finally {
       setIsGeneratingFiche(false);
     }
-  }, [goToNextStep, organisationName, saveFormation]);
+  }, [goToNextStep, organisationName, saveFormation, ficheData.titre]);
 
   // Handler pour terminer le wizard de création de formation
   const handleCreateSession = useCallback(async () => {

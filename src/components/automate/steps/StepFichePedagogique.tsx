@@ -132,16 +132,28 @@ interface StepFichePedagogiqueProps {
   organisationData?: OrganisationData;
 }
 
-// Composant pour les blocs éditables avec stylo
+// Composant pour les blocs éditables avec stylo et bouton Enrichir optionnel
 interface EditableBlockProps {
   title: string;
   value: string;
   fieldName: keyof FichePedagogiqueData;
   onChange: (field: keyof FichePedagogiqueData, value: string) => void;
   isList?: boolean;
+  canEnrich?: boolean;
+  onEnrich?: (fieldName: keyof FichePedagogiqueData) => void;
+  isEnriching?: boolean;
 }
 
-const EditableBlock: React.FC<EditableBlockProps> = ({ title, value, fieldName, onChange, isList = false }) => {
+const EditableBlock: React.FC<EditableBlockProps> = ({
+  title,
+  value,
+  fieldName,
+  onChange,
+  isList = false,
+  canEnrich = false,
+  onEnrich,
+  isEnriching = false
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedValue, setEditedValue] = useState(value);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -203,15 +215,36 @@ const EditableBlock: React.FC<EditableBlockProps> = ({ title, value, fieldName, 
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {title}
         </h4>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
-            title="Modifier"
-          >
-            <EditIcon />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {/* Bouton Enrichir IA - seulement si canEnrich est true */}
+          {canEnrich && onEnrich && !isEditing && (
+            <button
+              onClick={() => onEnrich(fieldName)}
+              disabled={isEnriching}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20 disabled:opacity-50"
+              title="Enrichir avec l'IA (cohérence Qualiopi)"
+            >
+              {isEnriching ? (
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+              ) : (
+                <SparklesIcon />
+              )}
+              Enrichir
+            </button>
+          )}
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
+              title="Modifier"
+            >
+              <EditIcon />
+            </button>
+          )}
+        </div>
       </div>
       <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         {isEditing ? (
@@ -245,14 +278,24 @@ const EditableBlock: React.FC<EditableBlockProps> = ({ title, value, fieldName, 
   );
 };
 
-// Composant pour éditer les objectifs (array de strings)
+// Composant pour éditer les objectifs (array de strings) avec bouton Enrichir optionnel
 interface EditableObjectifsBlockProps {
   title: string;
   values: string[];
   onChange: (values: string[]) => void;
+  canEnrich?: boolean;
+  onEnrich?: () => void;
+  isEnriching?: boolean;
 }
 
-const EditableObjectifsBlock: React.FC<EditableObjectifsBlockProps> = ({ title, values, onChange }) => {
+const EditableObjectifsBlock: React.FC<EditableObjectifsBlockProps> = ({
+  title,
+  values,
+  onChange,
+  canEnrich = false,
+  onEnrich,
+  isEnriching = false
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedValue, setEditedValue] = useState(values.join("\n"));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -292,15 +335,36 @@ const EditableObjectifsBlock: React.FC<EditableObjectifsBlockProps> = ({ title, 
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {title}
         </h4>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
-            title="Modifier"
-          >
-            <EditIcon />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {/* Bouton Enrichir IA - seulement si canEnrich est true */}
+          {canEnrich && onEnrich && !isEditing && (
+            <button
+              onClick={onEnrich}
+              disabled={isEnriching}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20 disabled:opacity-50"
+              title="Enrichir avec l'IA (cohérence Qualiopi)"
+            >
+              {isEnriching ? (
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+              ) : (
+                <SparklesIcon />
+              )}
+              Enrichir
+            </button>
+          )}
+          {!isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors dark:hover:text-brand-400 dark:hover:bg-brand-500/10"
+              title="Modifier"
+            >
+              <EditIcon />
+            </button>
+          )}
+        </div>
       </div>
       <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
         {isEditing ? (
@@ -369,6 +433,53 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
   const [aiImageError, setAiImageError] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // État pour l'enrichissement IA par section
+  const [enrichingField, setEnrichingField] = useState<string | null>(null);
+
+  // Fonction pour enrichir une section via IA (Correction 357)
+  const handleEnrichSection = async (fieldName: keyof FichePedagogiqueData | "objectifs") => {
+    setEnrichingField(fieldName);
+    try {
+      const response = await fetch("/api/ai/enrich-section", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fieldName,
+          currentValue: fieldName === "objectifs" ? data.objectifs : data[fieldName as keyof FichePedagogiqueData],
+          context: {
+            titre: data.titre,
+            description: data.description,
+            objectifs: data.objectifs,
+            contenu: data.contenu,
+            publicVise: data.publicVise,
+            prerequis: data.prerequis,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de l'enrichissement");
+      }
+
+      const result = await response.json();
+      if (result.success && result.enrichedValue) {
+        if (fieldName === "objectifs") {
+          // Pour les objectifs, on reçoit un tableau
+          const newObjectifs = Array.isArray(result.enrichedValue)
+            ? result.enrichedValue
+            : result.enrichedValue.split("\n").filter((s: string) => s.trim());
+          onChange({ ...data, objectifs: newObjectifs });
+        } else {
+          onChange({ ...data, [fieldName]: result.enrichedValue });
+        }
+      }
+    } catch (error) {
+      console.error("Erreur enrichissement:", error);
+    } finally {
+      setEnrichingField(null);
+    }
+  };
 
   // Rechercher des images
   const handleSearchImages = async () => {
@@ -2094,45 +2205,60 @@ export const StepFichePedagogique: React.FC<StepFichePedagogiqueProps> = ({
               </div>
             </div>
 
-            {/* Description - Bloc éditable */}
+            {/* Description - Bloc éditable avec Enrichir */}
             <EditableBlock
               title="Description"
               value={data.description}
               fieldName="description"
               onChange={handleFieldChange}
+              canEnrich
+              onEnrich={handleEnrichSection}
+              isEnriching={enrichingField === "description"}
             />
 
-            {/* Objectifs pédagogiques - Bloc éditable */}
+            {/* Objectifs pédagogiques - Bloc éditable avec Enrichir */}
             <EditableObjectifsBlock
               title="Objectifs pédagogiques"
               values={data.objectifs}
               onChange={handleObjectifsChange}
+              canEnrich
+              onEnrich={() => handleEnrichSection("objectifs")}
+              isEnriching={enrichingField === "objectifs"}
             />
 
-            {/* Prérequis - Bloc éditable */}
+            {/* Prérequis - Bloc éditable avec Enrichir */}
             <EditableBlock
               title="Prérequis"
               value={data.prerequis}
               fieldName="prerequis"
               onChange={handleFieldChange}
               isList
+              canEnrich
+              onEnrich={handleEnrichSection}
+              isEnriching={enrichingField === "prerequis"}
             />
 
-            {/* Public visé - Bloc éditable */}
+            {/* Public visé - Bloc éditable avec Enrichir */}
             <EditableBlock
               title="Public visé"
               value={data.publicVise}
               fieldName="publicVise"
               onChange={handleFieldChange}
               isList
+              canEnrich
+              onEnrich={handleEnrichSection}
+              isEnriching={enrichingField === "publicVise"}
             />
 
-            {/* Contenu de la formation - Bloc éditable */}
+            {/* Contenu de la formation - Bloc éditable avec Enrichir */}
             <EditableBlock
               title="Contenu de la formation"
               value={data.contenu}
               fieldName="contenu"
               onChange={handleFieldChange}
+              canEnrich
+              onEnrich={handleEnrichSection}
+              isEnriching={enrichingField === "contenu"}
             />
 
             {/* Suivi de l'exécution et évaluation des résultats - Bloc éditable */}

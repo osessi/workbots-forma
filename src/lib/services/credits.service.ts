@@ -6,6 +6,13 @@ import { prisma } from "@/lib/db/prisma";
 import { CreditTransactionType, AIPromptType } from "@prisma/client";
 
 // ===========================================
+// COMPTES AVEC CRÉDITS ILLIMITÉS (BYPASS)
+// ===========================================
+const UNLIMITED_CREDITS_EMAILS = [
+  "fruchon59@gmail.com",
+];
+
+// ===========================================
 // CONFIGURATION DES COÛTS EN CRÉDITS
 // ===========================================
 
@@ -108,12 +115,30 @@ export async function getCreditsBalance(organizationId: string): Promise<{
 }
 
 /**
+ * Vérifie si une organisation a des crédits illimités (bypass)
+ */
+export async function hasUnlimitedCredits(organizationId: string): Promise<boolean> {
+  // Chercher si un utilisateur de cette organisation a un email bypass
+  const users = await prisma.user.findMany({
+    where: { organizationId },
+    select: { email: true },
+  });
+
+  return users.some((user) => UNLIMITED_CREDITS_EMAILS.includes(user.email.toLowerCase()));
+}
+
+/**
  * Vérifie si l'organisation a assez de crédits
  */
 export async function hasEnoughCredits(
   organizationId: string,
   requiredCredits: number
 ): Promise<boolean> {
+  // Vérifier d'abord si l'organisation a des crédits illimités
+  if (await hasUnlimitedCredits(organizationId)) {
+    return true;
+  }
+
   const balance = await getCreditsBalance(organizationId);
   return balance.credits >= requiredCredits;
 }
@@ -133,6 +158,16 @@ export async function deductCredits(params: {
   const { organizationId, userId, amount, description, promptType, aiGenerationLogId, metadata } = params;
 
   try {
+    // Vérifier si l'organisation a des crédits illimités (bypass)
+    if (await hasUnlimitedCredits(organizationId)) {
+      // Ne pas déduire de crédits, retourner succès
+      const org = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { credits: true },
+      });
+      return { success: true, newBalance: org?.credits ?? 0 };
+    }
+
     // Récupérer le solde actuel
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },

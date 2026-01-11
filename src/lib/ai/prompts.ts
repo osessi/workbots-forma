@@ -535,17 +535,51 @@ Schema JSON attendu:
 }`;
 }
 
+// Interface pour les questions du positionnement (Correction 359 - Questions miroir)
+export interface PositionnementQuestion {
+  question: string;
+  competenceEvaluee?: string;
+}
+
 export interface EvaluationInput {
   formationTitre: string;
   modules: Array<{ titre: string; objectifs: string[] }>;
   dureeEvaluation?: string;
   regenerateToken?: string; // Token pour forcer la variation des questions
+  positionnementQuestions?: PositionnementQuestion[]; // Correction 359: Questions du test de positionnement pour générer des questions miroir
 }
 
 export function generateEvaluationPrompt(input: EvaluationInput): string {
   // Ajouter une instruction de variation si regenerateToken est fourni
   const variationInstruction = input.regenerateToken
     ? `\n\n🔄 REGENERATION #${input.regenerateToken}: Cette demande est une REGENERATION. Tu DOIS generer des questions COMPLETEMENT DIFFERENTES des generations precedentes. Utilise de nouveaux angles, nouvelles formulations, nouveaux exemples et scenarios.`
+    : "";
+
+  // Correction 359: Construire la section des questions miroir si le positionnement est fourni
+  const mirrorQuestionsSection = input.positionnementQuestions && input.positionnementQuestions.length > 0
+    ? `
+
+📊 QUESTIONS MIROIR - COMPARAISON POSITIONNEMENT / EVALUATION FINALE:
+⚠️ TRES IMPORTANT: L'evaluation finale doit permettre de mesurer la PROGRESSION de l'apprenant.
+Pour cela, tu dois generer des questions "MIROIR" basees sur le test de positionnement ci-dessous.
+
+QUESTIONS DU TEST DE POSITIONNEMENT (debut de formation):
+${input.positionnementQuestions.map((q, i) => `${i + 1}. ${q.question}${q.competenceEvaluee ? ` [Competence: ${q.competenceEvaluee}]` : ''}`).join('\n')}
+
+REGLES POUR LES QUESTIONS MIROIR:
+1. Pour CHAQUE question du positionnement, generer une question "miroir" dans l'evaluation finale
+2. La question miroir doit:
+   - Evaluer la MEME competence / notion
+   - Utiliser une FORMULATION DIFFERENTE (pas de copier-coller)
+   - Aborder le sujet sous un ANGLE DIFFERENT (autre exemple, autre contexte, autre cas pratique)
+   - Etre de difficulte EQUIVALENTE ou legerement plus facile (car l'apprenant a ete forme)
+3. Objectif: permettre une comparaison CLAIRE entre niveau initial et niveau final
+4. L'apprenant qui a bien suivi la formation doit pouvoir repondre correctement aux questions miroir
+
+EXEMPLE:
+- Positionnement: "Quel pourcentage de la communication globale represente la communication non verbale ?"
+- Miroir possible: "La communication non verbale joue un role majeur dans nos echanges. Dans quelle proportion influence-t-elle nos interactions ?"
+`
     : "";
 
   return `Cree une evaluation finale QCM de 20 questions pour cette formation:
@@ -560,7 +594,7 @@ ${input.modules
 Module ${i + 1}: ${m.titre}
 Objectifs: ${m.objectifs.join(", ")}`
   )
-  .join("\n")}${variationInstruction}
+  .join("\n")}${mirrorQuestionsSection}${variationInstruction}
 
 REGLES OBLIGATOIRES:
 
@@ -586,6 +620,11 @@ REGLES OBLIGATOIRES:
    - INTERDIRE les negations ("ne pas", "jamais", "aucun") dans les options
    - Questions directes qui verifient les acquis (pas de pieges)
    - Repartir les questions equitablement sur tous les modules
+${input.positionnementQuestions && input.positionnementQuestions.length > 0 ? `
+5. QUESTIONS MIROIR (PRIORITAIRE):
+   - Reprendre les competences evaluees dans le positionnement
+   - Formuler differemment pour eviter l'effet "deja vu"
+   - Permettre de mesurer la montee en competence` : ''}
 
 L'evaluation doit couvrir tous les modules et permettre de certifier
 l'acquisition des competences. Un apprenant ayant bien suivi la formation
@@ -603,7 +642,8 @@ Schema JSON attendu:
       "reponseCorrecte": 0-3,
       "explication": "string (optionnel)",
       "difficulte": "facile|moyen|difficile",
-      "competenceEvaluee": "string"
+      "competenceEvaluee": "string",
+      "questionMiroirDe": number (optionnel, index 1-20 de la question du positionnement correspondante)
     }
   ],
   "tempsEstime": "20-30 minutes",

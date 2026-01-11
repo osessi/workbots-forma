@@ -14,12 +14,19 @@ const ModuleSchema = z.object({
   objectifs: z.array(z.string()).optional(),
 });
 
+// Correction 359: Schema pour les questions du positionnement (questions miroir)
+const PositionnementQuestionSchema = z.object({
+  question: z.string(),
+  competenceEvaluee: z.string().optional(),
+});
+
 const RequestSchema = z.object({
   formationTitre: z.string().min(1, "Le titre de la formation est requis"),
   modules: z.array(ModuleSchema).default([]),
   objectifs: z.array(z.string()).default([]),
   dureeEvaluation: z.string().optional(),
   regenerate: z.string().optional(), // Token pour forcer la régénération avec des questions différentes
+  positionnementQuestions: z.array(PositionnementQuestionSchema).optional(), // Correction 359: Questions du positionnement pour générer des questions miroir
 });
 
 export async function POST(request: NextRequest) {
@@ -61,11 +68,13 @@ export async function POST(request: NextRequest) {
     }));
 
     // Generer l'evaluation
+    // Correction 359: Passer les questions du positionnement pour générer des questions miroir
     const result = await generateEvaluation({
       formationTitre: data.formationTitre,
       modules: modulesWithObjectifs,
       dureeEvaluation: data.dureeEvaluation,
       regenerateToken: data.regenerate, // Passer le token pour forcer la variation
+      positionnementQuestions: data.positionnementQuestions, // Correction 359: Questions miroir
     });
 
     if (!result.success) {
@@ -83,6 +92,7 @@ export async function POST(request: NextRequest) {
       nbModules: validationResult.data.modules.length,
       tokens: result.tokens,
       provider: result.provider,
+      questionsMiroir: data.positionnementQuestions?.length || 0, // Correction 359: Nombre de questions miroir utilisées
     });
 
     return NextResponse.json({

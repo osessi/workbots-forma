@@ -949,6 +949,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   }, [formationTitre, formationObjectifs, modules]);
 
   // Generer l'evaluation finale
+  // Correction 359: L'évaluation finale utilise les questions du positionnement pour créer des questions "miroir"
   const handleGenerateEvaluation = useCallback(async () => {
     setGeneratingEvaluation(true);
     try {
@@ -957,6 +958,12 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
       // Ajouter un timestamp pour forcer une nouvelle génération (éviter cache + varier les questions)
       const regenerateToken = Date.now().toString();
+
+      // Correction 359: Préparer les questions du positionnement pour les questions miroir
+      const positionnementQuestions = positionnement?.questions?.map(q => ({
+        question: q.question,
+        competenceEvaluee: (q as { competenceEvaluee?: string }).competenceEvaluee,
+      })) || [];
 
       const response = await fetch("/api/ai/generate-evaluation", {
         method: "POST",
@@ -970,6 +977,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           objectifs: formationObjectifs,
           modules: modules.map(m => ({ titre: m.titre, contenu: m.contenu })),
           regenerate: regenerateToken, // Force nouvelle génération avec questions différentes
+          positionnementQuestions, // Correction 359: Questions du positionnement pour générer des questions miroir
         }),
         signal: controller.signal,
       });
@@ -1017,7 +1025,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } finally {
       setGeneratingEvaluation(false);
     }
-  }, [formationTitre, formationObjectifs, modules]);
+  }, [formationTitre, formationObjectifs, modules, positionnement]);
 
   // Generer un QCM pour un module
   const handleGenerateQCM = useCallback(async (moduleId: string) => {

@@ -116,14 +116,22 @@ export async function getCreditsBalance(organizationId: string): Promise<{
 
 /**
  * Vérifie si une organisation a des crédits illimités (bypass)
+ * - Super admins ont toujours des crédits illimités
+ * - Les emails dans UNLIMITED_CREDITS_EMAILS ont aussi des crédits illimités
  */
 export async function hasUnlimitedCredits(organizationId: string): Promise<boolean> {
-  // Chercher si un utilisateur de cette organisation a un email bypass
+  // Chercher les utilisateurs de cette organisation
   const users = await prisma.user.findMany({
     where: { organizationId },
-    select: { email: true },
+    select: { email: true, role: true },
   });
 
+  // Super admins = crédits illimités
+  if (users.some((user) => user.role === "SUPER_ADMIN")) {
+    return true;
+  }
+
+  // Emails dans la liste bypass = crédits illimités
   return users.some((user) => UNLIMITED_CREDITS_EMAILS.includes(user.email.toLowerCase()));
 }
 

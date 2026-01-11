@@ -19,7 +19,7 @@ const AutomateHeader: React.FC = () => {
   const [sentEmailsCount, setSentEmailsCount] = useState(0);
   const [devEmailsCount, setDevEmailsCount] = useState(0);
   const [isDev, setIsDev] = useState(false);
-  const [credits, setCredits] = useState<{ formatted: string; statusColor: "green" | "yellow" | "red" } | null>(null);
+  const [credits, setCredits] = useState<{ formatted: string; statusColor: "green" | "yellow" | "red"; isUnlimited?: boolean } | null>(null);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { user, formations, searchQuery, setSearchQuery } = useAutomate();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -77,6 +77,7 @@ const AutomateHeader: React.FC = () => {
         setCredits({
           formatted: data.creditsFormatted,
           statusColor: data.statusColor,
+          isUnlimited: data.isUnlimited,
         });
       }
     } catch (error) {
@@ -264,18 +265,31 @@ const AutomateHeader: React.FC = () => {
             <Link
               href="/settings/credits"
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
-              title="Voir les détails des crédits"
+              title={credits.isUnlimited ? "Crédits illimités" : "Voir les détails des crédits"}
             >
-              <Sparkles className={`w-4 h-4 ${
-                credits.statusColor === "green"
-                  ? "text-emerald-500"
-                  : credits.statusColor === "yellow"
-                    ? "text-amber-500"
-                    : "text-red-500"
-              }`} />
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                {credits.formatted}
-              </span>
+              {credits.isUnlimited ? (
+                <>
+                  <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                    Illimité
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className={`w-4 h-4 ${
+                    credits.statusColor === "green"
+                      ? "text-emerald-500"
+                      : credits.statusColor === "yellow"
+                        ? "text-amber-500"
+                        : "text-red-500"
+                  }`} />
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                    {credits.formatted}
+                  </span>
+                </>
+              )}
             </Link>
           )}
 

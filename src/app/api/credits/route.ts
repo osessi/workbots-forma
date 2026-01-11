@@ -11,6 +11,7 @@ import {
   getCreditHistory,
   formatCredits,
   getCreditStatusColor,
+  hasUnlimitedCredits,
 } from "@/lib/services/credits.service";
 
 // Helper pour créer le client Supabase
@@ -66,6 +67,9 @@ export async function GET(request: NextRequest) {
     const includeHistory = searchParams.get("history") === "true";
     const historyLimit = parseInt(searchParams.get("limit") || "20");
 
+    // Vérifier si crédits illimités
+    const isUnlimited = await hasUnlimitedCredits(dbUser.organizationId);
+
     // Récupérer le solde
     const balance = await getCreditsBalance(dbUser.organizationId);
 
@@ -78,6 +82,7 @@ export async function GET(request: NextRequest) {
       creditsResetAt: Date;
       percentUsed: number;
       statusColor: "green" | "yellow" | "red";
+      isUnlimited: boolean;
       history?: Array<{
         id: string;
         type: string;
@@ -89,8 +94,9 @@ export async function GET(request: NextRequest) {
       }>;
     } = {
       ...balance,
-      creditsFormatted: formatCredits(balance.credits),
-      statusColor: getCreditStatusColor(balance.percentUsed),
+      creditsFormatted: isUnlimited ? "∞" : formatCredits(balance.credits),
+      statusColor: isUnlimited ? "green" : getCreditStatusColor(balance.percentUsed),
+      isUnlimited,
     };
 
     // Ajouter l'historique si demandé

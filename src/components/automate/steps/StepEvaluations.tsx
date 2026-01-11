@@ -99,6 +99,18 @@ export interface EvaluationsDataSaved {
   correlationDocument: CorrelationData | null; // Qualiopi IND 11
 }
 
+// Interface pour les données de l'organisation (Correction 358 - en-tête/pied de page PDF)
+interface OrganisationData {
+  nom: string;
+  siret: string;
+  nda: string; // Numéro de Déclaration d'Activité
+  adresse: string;
+  codePostal: string;
+  ville: string;
+  prefectureRegion: string; // Région d'enregistrement du NDA
+  logoUrl?: string | null;
+}
+
 interface StepEvaluationsProps {
   modules: Module[];
   formationTitre?: string;
@@ -112,6 +124,8 @@ interface StepEvaluationsProps {
   onGeneratePositionnement?: () => void;
   onGenerateEvaluationFinale?: () => void;
   onGenerateQCM?: (moduleId: string) => void;
+  // Données de l'organisme pour l'en-tête et pied de page PDF (Correction 358)
+  organisationData?: OrganisationData;
 }
 
 // Icons
@@ -563,6 +577,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   onDataChange,
   onNext,
   onPrevious,
+  organisationData,
 }) => {
   // Etats pour les evaluations generees - initialisés avec les données sauvegardées si disponibles
   // On applique le mapping pour les données anciennes qui peuvent avoir reponseCorrecte au lieu de correctAnswer
@@ -603,8 +618,85 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   const [viewingEvaluation, setViewingEvaluation] = useState(false);
   const [viewingCorrelation, setViewingCorrelation] = useState(false);
 
+  // Helper pour générer l'en-tête et le pied de page PDF (Correction 358)
+  const getPdfHeaderFooter = useCallback(() => {
+    const dateGeneration = new Date().toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const headerHtml = organisationData?.logoUrl ? `
+      <div class="pdf-header">
+        <img src="${organisationData.logoUrl}" alt="Logo" class="logo" />
+      </div>
+    ` : '';
+
+    const footerHtml = organisationData ? `
+      <div class="pdf-footer">
+        <div class="footer-content">
+          <strong>${organisationData.nom || ''}</strong> | ${organisationData.adresse || ''}, ${organisationData.codePostal || ''} ${organisationData.ville || ''}
+        </div>
+        <div class="footer-details">
+          ${organisationData.siret ? `Numéro SIRET : ${organisationData.siret}` : ''}
+          ${organisationData.nda ? ` | Numéro de déclaration d'activité : ${organisationData.nda}${organisationData.prefectureRegion ? ` (auprès de la région ${organisationData.prefectureRegion})` : ''}` : ''}
+        </div>
+        <div class="footer-date">Document généré le ${dateGeneration}</div>
+      </div>
+    ` : '';
+
+    const headerFooterStyles = `
+      .pdf-header {
+        text-align: center;
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .pdf-header .logo {
+        max-height: 60px;
+        max-width: 200px;
+        object-fit: contain;
+      }
+      .pdf-footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 11px;
+        color: #64748b;
+        text-align: center;
+      }
+      .pdf-footer .footer-content {
+        margin-bottom: 5px;
+      }
+      .pdf-footer .footer-details {
+        margin-bottom: 5px;
+        font-size: 10px;
+      }
+      .pdf-footer .footer-date {
+        font-size: 10px;
+        font-style: italic;
+        color: #94a3b8;
+      }
+      @media print {
+        .pdf-footer {
+          position: fixed;
+          bottom: 20px;
+          left: 0;
+          right: 0;
+        }
+        body {
+          padding-bottom: 100px;
+        }
+      }
+    `;
+
+    return { headerHtml, footerHtml, headerFooterStyles };
+  }, [organisationData]);
+
   // Fonction pour telecharger une evaluation en PDF (VERSION NON CORRIGÉE - sans les bonnes réponses)
   const handleDownloadEvaluation = useCallback((evaluation: EvaluationData) => {
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
+
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -630,6 +722,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .checkbox { display: inline-block; width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 3px; margin-right: 10px; vertical-align: middle; }
           .response-area { margin-top: 15px; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 6px; min-height: 60px; background: #fafafa; }
           .response-label { font-size: 11px; color: #94a3b8; margin-bottom: 5px; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -637,6 +730,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </style>
       </head>
       <body>
+        ${headerHtml}
         <h1>${evaluation.titre}</h1>
         <p class="description">${evaluation.description}</p>
 
@@ -666,6 +760,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             `}
           </div>
         `).join('')}
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -682,10 +777,12 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, []);
+  }, [getPdfHeaderFooter]);
 
   // Fonction pour telecharger les reponses d'une evaluation (meme format que le test)
   const handleDownloadAnswers = useCallback((evaluation: EvaluationData) => {
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
+
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -712,6 +809,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .options { margin-top: 15px; padding-left: 40px; }
           .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; }
           .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -719,6 +817,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </style>
       </head>
       <body>
+        ${headerHtml}
         <h1>${evaluation.titre}<span class="badge">CORRIGÉ</span></h1>
         <p class="description">${evaluation.description}</p>
 
@@ -747,6 +846,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             </div>
           </div>
         `).join('')}
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -763,7 +863,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, []);
+  }, [getPdfHeaderFooter]);
 
   // Toggle une question QCM
   const toggleQuestion = useCallback((moduleId: string, questionIndex: number) => {
@@ -1143,6 +1243,8 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
   const handleDownloadCorrelation = useCallback(() => {
     if (!correlationDocument) return;
 
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
+
     const getCouvertureBadge = (couverture: string) => {
       switch (couverture) {
         case "complete":
@@ -1198,6 +1300,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .recommandations li { font-size: 13px; color: #0c4a6e; margin-bottom: 8px; }
           .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; }
           .footer p { font-size: 11px; color: #94a3b8; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
             .correlation-item { break-inside: avoid; }
@@ -1205,6 +1308,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </style>
       </head>
       <body>
+        ${headerHtml}
         <div class="header">
           <span class="qualiopi-badge">Qualiopi - Indicateur 11</span>
           <h1>${correlationDocument.titre}</h1>
@@ -1289,6 +1393,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           <p>Document généré conformément aux exigences Qualiopi - Indicateur 11<br/>
           "Le prestataire évalue l'atteinte par les publics bénéficiaires des objectifs de la prestation."</p>
         </div>
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -1305,10 +1410,12 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, [correlationDocument]);
+  }, [correlationDocument, getPdfHeaderFooter]);
 
   // Telecharger un QCM individuel (test vierge sans réponses)
   const handleDownloadQCM = useCallback((module: Module, qcm: QCMData) => {
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
+
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -1335,6 +1442,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .options { margin-top: 15px; padding-left: 40px; }
           .option { margin-bottom: 8px; padding: 8px 12px; background: white; border-radius: 6px; }
           .option-letter { display: inline-block; width: 22px; height: 22px; background: #e2e8f0; color: #64748b; border-radius: 50%; text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; margin-right: 8px; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -1342,6 +1450,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </style>
       </head>
       <body>
+        ${headerHtml}
         <h1>${qcm.titre}</h1>
         <p class="module-title">${module.titre}</p>
 
@@ -1366,6 +1475,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             </div>
           </div>
         `).join('')}
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -1382,10 +1492,12 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, []);
+  }, [getPdfHeaderFooter]);
 
   // Telecharger le corrigé d'un QCM individuel (avec bonnes réponses)
   const handleDownloadQCMAnswers = useCallback((module: Module, qcm: QCMData) => {
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
+
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -1417,6 +1529,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .answer-label { font-weight: 600; color: #166534; font-size: 12px; margin-bottom: 5px; }
           .answer-text { color: #15803d; font-size: 14px; }
           .explanation { margin-top: 10px; padding: 10px; background: #eff6ff; border-radius: 6px; font-size: 13px; color: #1e40af; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -1424,6 +1537,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </style>
       </head>
       <body>
+        ${headerHtml}
         <h1>${qcm.titre} <span class="badge">CORRIGÉ</span></h1>
         <p class="module-title">${module.titre}</p>
 
@@ -1458,6 +1572,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             ${q.explanation ? `<div class="explanation"><strong>Explication :</strong> ${q.explanation}</div>` : ''}
           </div>
         `).join('')}
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -1474,7 +1589,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, []);
+  }, [getPdfHeaderFooter]);
 
   // Telecharger tous les QCM en un seul document
   const handleDownloadAllQCM = useCallback(() => {
@@ -1483,6 +1598,8 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
       alert("Aucun QCM genere. Veuillez d'abord generer les QCM.");
       return;
     }
+
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
 
     const printContent = `
       <!DOCTYPE html>
@@ -1523,6 +1640,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .summary h3 { color: #166534; font-size: 16px; margin-bottom: 10px; }
           .summary ul { margin: 0; padding-left: 20px; }
           .summary li { font-size: 14px; color: #15803d; margin-bottom: 5px; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
             .question-block { break-inside: avoid; }
@@ -1530,6 +1648,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
         </style>
       </head>
       <body>
+        ${headerHtml}
         <div class="header">
           <h1>Questionnaires a Choix Multiples</h1>
           <p>${formationTitre}</p>
@@ -1579,6 +1698,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             </div>
           `;
         }).join('')}
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -1595,10 +1715,12 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, [modules, qcmByModule, formationTitre]);
+  }, [modules, qcmByModule, formationTitre, getPdfHeaderFooter]);
 
   // Telecharger un atelier individuel
   const handleDownloadAtelier = useCallback((module: Module, atelier: AtelierData) => {
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
+
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -1624,12 +1746,14 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .objectifs { background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; border-radius: 0 8px 8px 0; }
           .instructions { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 0 8px 8px 0; }
           .criteres { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; border-radius: 0 8px 8px 0; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
           }
         </style>
       </head>
       <body>
+        ${headerHtml}
         <h1>${atelier.titre}</h1>
         <p class="module-title">${module.titre}</p>
         <span class="duree">${atelier.dureeEstimee}</span>
@@ -1664,6 +1788,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             </ul>
           </div>
         </div>
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -1680,10 +1805,12 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, []);
+  }, [getPdfHeaderFooter]);
 
   // Telecharger un exemple de correction/rendu pour un atelier
   const handleDownloadAtelierCorrection = useCallback((module: Module, atelier: AtelierData) => {
+    const { headerHtml, footerHtml, headerFooterStyles } = getPdfHeaderFooter();
+
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -1719,12 +1846,14 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
           .evaluation-title { font-weight: 600; color: #166534; margin-bottom: 10px; }
           .evaluation-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
           .check-icon { color: #22c55e; font-size: 16px; }
+          ${headerFooterStyles}
           @media print {
             body { padding: 20px; }
           }
         </style>
       </head>
       <body>
+        ${headerHtml}
         <h1>${atelier.titre} <span class="badge">EXEMPLE DE RENDU</span></h1>
         <p class="module-title">${module.titre}</p>
         <span class="duree">${atelier.dureeEstimee}</span>
@@ -1769,6 +1898,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
             </div>
           `).join('')}
         </div>
+        ${footerHtml}
       </body>
       </html>
     `;
@@ -1785,7 +1915,7 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
     } else {
       alert("Veuillez autoriser les popups pour télécharger le PDF");
     }
-  }, []);
+  }, [getPdfHeaderFooter]);
 
   return (
     <div className="space-y-6">

@@ -926,6 +926,16 @@ function CreateFormationContent() {
           onDataChange={setEvaluationsData}
           onNext={handleCreateSession}
           onPrevious={() => goToPreviousStep("slides")}
+          organisationData={{
+            nom: user.entreprise || "",
+            siret: user.siret || "",
+            nda: user.numeroFormateur || "",
+            adresse: user.adresse || "",
+            codePostal: user.codePostal || "",
+            ville: user.ville || "",
+            prefectureRegion: user.prefectureRegion || "",
+            logoUrl: user.logoUrl,
+          }}
         />
       )}
     </div>

@@ -231,7 +231,7 @@ export default function AmeliorationsPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-              Plan d'amélioration
+              Améliorations
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Qualiopi IND 32 - Mesures d'amélioration continue
@@ -285,7 +285,7 @@ export default function AmeliorationsPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher une action..."
+            placeholder="Rechercher une amélioration..."
             className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
@@ -400,6 +400,7 @@ export default function AmeliorationsPage() {
             onRefresh={fetchAmeliorations}
             onDelete={handleDelete}
             onEdit={handleEdit}
+            onUpdateSelected={setSelectedAmelioration}
           />
         )}
       </div>
@@ -445,6 +446,7 @@ function AmeliorationDetail({
   onRefresh,
   onDelete,
   onEdit,
+  onUpdateSelected,
 }: {
   amelioration: ActionAmelioration;
   onClose: () => void;
@@ -452,6 +454,7 @@ function AmeliorationDetail({
   onRefresh: () => void;
   onDelete: (id: string) => void;
   onEdit: (amelioration: ActionAmelioration) => void;
+  onUpdateSelected: (updated: ActionAmelioration) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -461,6 +464,8 @@ function AmeliorationDetail({
   const [saving, setSaving] = useState(false);
   const [uploadingPreuve, setUploadingPreuve] = useState(false);
   const [deletingPreuveId, setDeletingPreuveId] = useState<string | null>(null);
+  // Correction 429: État pour prévisualisation des fichiers
+  const [previewFile, setPreviewFile] = useState<PieceJointe | null>(null);
 
   // Réinitialiser formData quand l'amélioration change
   useEffect(() => {
@@ -475,22 +480,28 @@ function AmeliorationDetail({
   const prioriteConfig = PRIORITE_CONFIG[amelioration.priorite];
   const origineConfig = ORIGINE_CONFIG[amelioration.origine];
 
-  // Upload d'une preuve
+  // Upload d'une preuve - Correction 428: Mise à jour temps réel
   const handleUploadPreuve = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
       setUploadingPreuve(true);
-      const formData = new FormData();
-      formData.append("file", file);
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
 
       const res = await fetch(`/api/outils/ameliorations/${amelioration.id}/preuves`, {
         method: "POST",
-        body: formData,
+        body: uploadFormData,
       });
 
       if (res.ok) {
+        // Correction 428: Récupérer l'amélioration mise à jour et l'afficher immédiatement
+        const updatedRes = await fetch(`/api/outils/ameliorations/${amelioration.id}`);
+        if (updatedRes.ok) {
+          const updatedAmelioration = await updatedRes.json();
+          onUpdateSelected(updatedAmelioration);
+        }
         onRefresh();
       } else {
         const error = await res.json();
@@ -529,6 +540,7 @@ function AmeliorationDetail({
     }
   };
 
+  // Correction 427: Mise à jour temps réel après enregistrement
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -538,7 +550,10 @@ function AmeliorationDetail({
         body: JSON.stringify(formData),
       });
       if (res.ok) {
+        const updatedAmelioration = await res.json();
         setEditing(false);
+        // Correction 427: Mettre à jour en temps réel sans refresh
+        onUpdateSelected(updatedAmelioration);
         onRefresh();
       }
     } catch (error) {
@@ -717,6 +732,23 @@ function AmeliorationDetail({
                 />
               </div>
 
+              {/* Correction 426: Boutons Enregistrer/Annuler repositionnés au-dessus de Preuves */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50"
+                >
+                  {saving ? "Enregistrement..." : "Enregistrer"}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  Annuler
+                </button>
+              </div>
+
               {/* Section Preuves intégrée */}
               <div className="space-y-3 pt-2 border-t dark:border-gray-700">
                 <div className="flex items-center justify-between">
@@ -763,15 +795,14 @@ function AmeliorationDetail({
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <a
-                            href={piece.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          {/* Correction 429: Bouton pour prévisualiser les fichiers */}
+                          <button
+                            onClick={() => setPreviewFile(piece)}
                             className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
                             title="Voir"
                           >
                             <Eye size={16} className="text-gray-500" />
-                          </a>
+                          </button>
                           <button
                             onClick={() => handleDeletePreuve(piece.id)}
                             disabled={deletingPreuveId === piece.id}
@@ -795,22 +826,6 @@ function AmeliorationDetail({
                     <p className="text-xs text-gray-400 mt-1">PDF et images acceptés (max 10 MB)</p>
                   </div>
                 )}
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50"
-                >
-                  {saving ? "Enregistrement..." : "Enregistrer"}
-                </button>
-                <button
-                  onClick={() => setEditing(false)}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                >
-                  Annuler
-                </button>
               </div>
             </div>
           ) : (
@@ -872,15 +887,14 @@ function AmeliorationDetail({
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <a
-                            href={piece.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          {/* Correction 429: Bouton pour prévisualiser les fichiers */}
+                          <button
+                            onClick={() => setPreviewFile(piece)}
                             className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
                             title="Voir"
                           >
                             <Eye size={16} className="text-gray-500" />
-                          </a>
+                          </button>
                           <button
                             onClick={() => handleDeletePreuve(piece.id)}
                             disabled={deletingPreuveId === piece.id}
@@ -913,6 +927,63 @@ function AmeliorationDetail({
           )}
         </div>
       </div>
+
+      {/* Correction 429: Modal de prévisualisation des fichiers */}
+      {previewFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+              <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                {previewFile.filename}
+              </h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewFile.url}
+                  download={previewFile.filename}
+                  className="px-3 py-1.5 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+                >
+                  Télécharger
+                </a>
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  <X size={20} className="text-gray-400" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-gray-100 dark:bg-gray-900">
+              {previewFile.type.startsWith("image/") ? (
+                <img
+                  src={previewFile.url}
+                  alt={previewFile.filename}
+                  className="max-w-full h-auto mx-auto rounded-lg shadow-lg"
+                />
+              ) : previewFile.type === "application/pdf" ? (
+                <iframe
+                  src={`${previewFile.url}#toolbar=1&navpanes=0`}
+                  className="w-full h-[70vh] rounded-lg border-0"
+                  title={previewFile.filename}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <File size={48} className="mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    Aperçu non disponible pour ce type de fichier
+                  </p>
+                  <a
+                    href={previewFile.url}
+                    download={previewFile.filename}
+                    className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+                  >
+                    Télécharger le fichier
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1050,53 +1121,17 @@ function NewAmeliorationModal({
               </select>
             </div>
 
+            {/* Correction 425: Champ Échéance en date complète */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Échéance
               </label>
-              <div className="flex gap-2">
-                <select
-                  value={formData.echeance ? formData.echeance.split("-")[1] : ""}
-                  onChange={(e) => {
-                    const month = e.target.value;
-                    const year = formData.echeance ? formData.echeance.split("-")[0] : new Date().getFullYear().toString();
-                    if (month) {
-                      setFormData({ ...formData, echeance: `${year}-${month}-01` });
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">Mois...</option>
-                  <option value="01">Janvier</option>
-                  <option value="02">Février</option>
-                  <option value="03">Mars</option>
-                  <option value="04">Avril</option>
-                  <option value="05">Mai</option>
-                  <option value="06">Juin</option>
-                  <option value="07">Juillet</option>
-                  <option value="08">Août</option>
-                  <option value="09">Septembre</option>
-                  <option value="10">Octobre</option>
-                  <option value="11">Novembre</option>
-                  <option value="12">Décembre</option>
-                </select>
-                <select
-                  value={formData.echeance ? formData.echeance.split("-")[0] : ""}
-                  onChange={(e) => {
-                    const year = e.target.value;
-                    const month = formData.echeance ? formData.echeance.split("-")[1] : "01";
-                    if (year) {
-                      setFormData({ ...formData, echeance: `${year}-${month}-01` });
-                    }
-                  }}
-                  className="w-24 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">Année...</option>
-                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
+              <input
+                type="date"
+                value={formData.echeance}
+                onChange={(e) => setFormData({ ...formData, echeance: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
             </div>
           </div>
 
@@ -1271,53 +1306,17 @@ function EditAmeliorationModal({
               </select>
             </div>
 
+            {/* Correction 425: Champ Échéance en date complète */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Échéance
               </label>
-              <div className="flex gap-2">
-                <select
-                  value={formData.echeance ? formData.echeance.split("-")[1] : ""}
-                  onChange={(e) => {
-                    const month = e.target.value;
-                    const year = formData.echeance ? formData.echeance.split("-")[0] : new Date().getFullYear().toString();
-                    if (month) {
-                      setFormData({ ...formData, echeance: `${year}-${month}-01` });
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">Mois...</option>
-                  <option value="01">Janvier</option>
-                  <option value="02">Février</option>
-                  <option value="03">Mars</option>
-                  <option value="04">Avril</option>
-                  <option value="05">Mai</option>
-                  <option value="06">Juin</option>
-                  <option value="07">Juillet</option>
-                  <option value="08">Août</option>
-                  <option value="09">Septembre</option>
-                  <option value="10">Octobre</option>
-                  <option value="11">Novembre</option>
-                  <option value="12">Décembre</option>
-                </select>
-                <select
-                  value={formData.echeance ? formData.echeance.split("-")[0] : ""}
-                  onChange={(e) => {
-                    const year = e.target.value;
-                    const month = formData.echeance ? formData.echeance.split("-")[1] : "01";
-                    if (year) {
-                      setFormData({ ...formData, echeance: `${year}-${month}-01` });
-                    }
-                  }}
-                  className="w-24 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">Année...</option>
-                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
+              <input
+                type="date"
+                value={formData.echeance}
+                onChange={(e) => setFormData({ ...formData, echeance: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
             </div>
           </div>
 

@@ -19,6 +19,115 @@ type RouteParams = {
   params: Promise<{ id: string; documentId: string }>;
 };
 
+// PATCH - Renommer un document (Correction 401)
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore
+            }
+          },
+        },
+      }
+    );
+
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+
+    if (!supabaseUser) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { supabaseId: supabaseUser.id },
+    });
+
+    if (!user || !user.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    const { id: apprenantId, documentId } = await params;
+    const body = await request.json();
+    const { nom } = body;
+
+    if (!nom || typeof nom !== "string" || nom.trim().length === 0) {
+      return NextResponse.json({ error: "Nom de fichier requis" }, { status: 400 });
+    }
+
+    // Vérifier que l'apprenant appartient à l'organisation
+    const apprenant = await prisma.apprenant.findFirst({
+      where: {
+        id: apprenantId,
+        organizationId: user.organizationId,
+      },
+    });
+
+    if (!apprenant) {
+      return NextResponse.json({ error: "Apprenant non trouvé" }, { status: 404 });
+    }
+
+    // Récupérer le document
+    const document = await prisma.apprenantDocument.findFirst({
+      where: {
+        id: documentId,
+        apprenantId,
+      },
+    });
+
+    if (!document) {
+      return NextResponse.json({ error: "Document non trouvé" }, { status: 404 });
+    }
+
+    // Conserver l'extension originale
+    const originalExtension = document.nom.includes(".")
+      ? document.nom.substring(document.nom.lastIndexOf("."))
+      : "";
+
+    // Retirer l'extension du nouveau nom s'il en a une, puis ajouter l'originale
+    let newName = nom.trim();
+    const newExtMatch = newName.match(/\.[a-zA-Z0-9]+$/);
+    if (newExtMatch) {
+      newName = newName.substring(0, newName.lastIndexOf("."));
+    }
+    newName = newName + originalExtension;
+
+    // Mettre à jour le nom
+    const updatedDocument = await prisma.apprenantDocument.update({
+      where: { id: documentId },
+      data: { nom: newName },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(updatedDocument);
+  } catch (error) {
+    console.error("Erreur PATCH document apprenant:", error);
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE - Supprimer un document
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {

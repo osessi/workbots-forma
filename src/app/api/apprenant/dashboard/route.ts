@@ -202,6 +202,85 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Correction 423: Compter les messages non lus de l'organisme
+    // Messages reçus par l'apprenant (direction = "outgoing" car envoyés par l'organisme)
+    // ou messages entrants avec des réponses de l'organisme non lues
+    const messagesNotifications = await prisma.notification.findMany({
+      where: {
+        organizationId,
+        resourceType: "apprenant",
+        resourceId: apprenantId,
+      },
+      select: {
+        id: true,
+        isRead: true,
+        metadata: true,
+      },
+    });
+
+    // Compter les messages avec des réponses non lues
+    let messagesNonLus = 0;
+    for (const notif of messagesNotifications) {
+      const metadata = notif.metadata as Record<string, any> | null;
+      const direction = metadata?.direction;
+
+      // Message sortant (de l'organisme vers l'apprenant) non lu
+      if (direction === "outgoing" && !notif.isRead) {
+        messagesNonLus++;
+      }
+      // Message entrant avec des réponses de l'organisme
+      else if (direction === "incoming" && metadata?.replies) {
+        const replies = metadata.replies as Array<{ fromOrganisme?: boolean; readByApprenant?: boolean }>;
+        // Compter les réponses de l'organisme non lues par l'apprenant
+        const unreadReplies = replies.filter(
+          (r) => (r.fromOrganisme !== false) && !r.readByApprenant
+        ).length;
+        if (unreadReplies > 0) {
+          messagesNonLus += unreadReplies;
+        }
+      }
+      // Message avec nouvelles réponses marqué explicitement
+      else if (metadata?.hasNewReply) {
+        messagesNonLus++;
+      }
+    }
+
+    // Correction 431: Compter les messages de l'intervenant non lus
+    // Récupérer les sessions où l'apprenant est inscrit
+    const apprenantSessions = await prisma.sessionParticipantNew.findMany({
+      where: { apprenantId },
+      select: { client: { select: { sessionId: true } } },
+    });
+    const sessionIds = apprenantSessions.map((p) => p.client.sessionId);
+
+    let messagesIntervenantNonLus = 0;
+    if (sessionIds.length > 0) {
+      // Récupérer tous les messages des intervenants pour ces sessions
+      const messagesIntervenant = await prisma.messageIntervenant.findMany({
+        where: {
+          sessionId: { in: sessionIds },
+          organizationId,
+          // Filtre: message envoyé à tous OU cet apprenant spécifiquement
+          OR: [
+            { envoyeATous: true },
+            { destinatairesIds: { has: apprenantId } },
+          ],
+        },
+        select: {
+          id: true,
+          lectures: {
+            where: { apprenantId },
+            select: { id: true },
+          },
+        },
+      });
+
+      // Compter ceux qui n'ont pas de lecture pour cet apprenant
+      messagesIntervenantNonLus = messagesIntervenant.filter(
+        (msg) => msg.lectures.length === 0
+      ).length;
+    }
+
     // Calculer les émargements en attente
     let emargementsEnAttente = 0;
     const actionsUrgentes: Array<{
@@ -256,6 +335,30 @@ export async function GET(request: NextRequest) {
         action: "Donner mon avis",
         actionUrl: "/apprenant/evaluations-satisfaction",
         priorite: "haute",
+      });
+    }
+
+    // Correction 423: Ajouter les messages non lus comme action urgente
+    if (messagesNonLus > 0) {
+      actionsUrgentes.push({
+        type: "message",
+        titre: "Messages non lus",
+        description: `${messagesNonLus} message${messagesNonLus > 1 ? "s" : ""} de votre organisme`,
+        action: "Consulter",
+        actionUrl: "/apprenant/messages",
+        priorite: "moyenne",
+      });
+    }
+
+    // Correction 431: Ajouter les messages de l'intervenant non lus comme action urgente
+    if (messagesIntervenantNonLus > 0) {
+      actionsUrgentes.push({
+        type: "message_intervenant",
+        titre: "Messages de votre intervenant",
+        description: `${messagesIntervenantNonLus} nouveau${messagesIntervenantNonLus > 1 ? "x" : ""} message${messagesIntervenantNonLus > 1 ? "s" : ""}`,
+        action: "Consulter",
+        actionUrl: "/apprenant/suivi",
+        priorite: "moyenne",
       });
     }
 
@@ -320,6 +423,8 @@ export async function GET(request: NextRequest) {
         documentsDisponibles,
         emargementsEnAttente,
         prochainsCréneaux: prochainsCréneauxLimités.length,
+        messagesNonLus, // Correction 423
+        messagesIntervenantNonLus, // Correction 431
       },
       progression: {
         global: inscription.progression,

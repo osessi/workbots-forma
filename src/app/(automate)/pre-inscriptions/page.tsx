@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ClipboardList,
   Search,
@@ -127,12 +128,37 @@ const statutConfig = {
   },
 };
 
+// Correction 393: Labels sans majuscules pour le statut (type de profil)
+const profilStatutLabels: Record<string, string> = {
+  PARTICULIER: "Particulier",
+  INDEPENDANT: "Indépendant",
+  ENTREPRISE: "Entreprise",
+  SALARIE: "Particulier", // Fallback si situationProfessionnelle utilisée
+  DEMANDEUR_EMPLOI: "Particulier",
+  ETUDIANT: "Particulier",
+  RETRAITE: "Particulier",
+  AUTRE: "Particulier",
+};
+
+// Labels pour la situation actuelle (ex: Salarié, Étudiant, etc.)
+const situationActuelleLabels: Record<string, string> = {
+  SALARIE: "Salarié(e)",
+  INDEPENDANT: "Indépendant(e)",
+  DEMANDEUR_EMPLOI: "Demandeur d'emploi",
+  ETUDIANT: "Étudiant(e)",
+  RETRAITE: "Retraité(e)",
+  PARTICULIER: "Particulier",
+  AUTRE: "Autre",
+};
+
+// Ancien dictionnaire conservé pour compatibilité
 const situationLabels: Record<string, string> = {
   SALARIE: "Salarié(e)",
   INDEPENDANT: "Indépendant(e)",
   DEMANDEUR_EMPLOI: "Demandeur d'emploi",
   ETUDIANT: "Étudiant(e)",
   RETRAITE: "Retraité(e)",
+  PARTICULIER: "Particulier",
   AUTRE: "Autre",
 };
 
@@ -147,6 +173,10 @@ const financementLabels: Record<string, string> = {
 };
 
 export default function PreInscriptionsPage() {
+  // Correction 389: Récupérer le paramètre view pour ouvrir directement un dossier
+  const searchParams = useSearchParams();
+  const viewId = searchParams.get("view");
+
   const [preInscriptions, setPreInscriptions] = useState<PreInscription[]>([]);
   const [stats, setStats] = useState<Stats>({
     NOUVELLE: 0,
@@ -174,13 +204,21 @@ export default function PreInscriptionsPage() {
         const data = await res.json();
         setPreInscriptions(data.preInscriptions);
         setStats(data.stats);
+
+        // Correction 389: Si viewId présent, ouvrir automatiquement le dossier correspondant
+        if (viewId) {
+          const preInscToView = data.preInscriptions.find((p: PreInscription) => p.id === viewId);
+          if (preInscToView) {
+            setSelectedPreInscription(preInscToView);
+          }
+        }
       }
     } catch (error) {
       console.error("Erreur chargement pré-inscriptions:", error);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, filterStatut]);
+  }, [searchQuery, filterStatut, viewId]);
 
   useEffect(() => {
     fetchPreInscriptions();
@@ -823,22 +861,35 @@ function PreInscriptionDetailModal({
                   </div>
                 </div>
 
-                {/* Situation professionnelle */}
+                {/* Correction 390: Renommé en "Profil" */}
                 <div>
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                     <Briefcase className="w-4 h-4" />
-                    Situation professionnelle
+                    Profil
                   </p>
                   {hasSituationPro ? (
                     <div className="grid md:grid-cols-2 gap-4">
+                      {/* Correction 391: Libellé "Statut" au lieu de "Situation" */}
+                      {/* Correction 393: Valeurs sans majuscules */}
                       <div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Situation</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Statut</p>
                         <p className="text-gray-900 dark:text-white">
                           {preInscription.situationProfessionnelle
-                            ? situationLabels[preInscription.situationProfessionnelle] || preInscription.situationProfessionnelle
-                            : "-"}
+                            ? profilStatutLabels[preInscription.situationProfessionnelle] || "Particulier"
+                            : "Particulier"}
                         </p>
                       </div>
+                      {/* Correction 392: Situation actuelle pour Particulier */}
+                      {preInscription.situationProfessionnelle &&
+                       preInscription.situationProfessionnelle !== "INDEPENDANT" &&
+                       !preInscription.contraintes?.includes("[APPRENANTS À FORMER]") && (
+                        <div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Situation actuelle</p>
+                          <p className="text-gray-900 dark:text-white">
+                            {situationActuelleLabels[preInscription.situationProfessionnelle] || preInscription.situationProfessionnelle}
+                          </p>
+                        </div>
+                      )}
                       {preInscription.entreprise && (
                         <div>
                           <p className="text-sm text-gray-500 dark:text-gray-400">Entreprise</p>

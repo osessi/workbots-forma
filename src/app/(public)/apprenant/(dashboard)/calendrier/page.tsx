@@ -179,7 +179,8 @@ function EventCard({ event }: { event: CalendarEvent }) {
 // =====================================
 
 export default function CalendrierPage() {
-  const { token, selectedInscription } = useApprenantPortal();
+  // Correction 430: Utiliser selectedSession pour filtrer par session
+  const { token, selectedSession } = useApprenantPortal();
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -197,8 +198,9 @@ export default function CalendrierPage() {
       try {
         setLoading(true);
         const params = new URLSearchParams({ token });
-        if (selectedInscription?.id) {
-          params.append("inscriptionId", selectedInscription.id);
+        // Correction 430: Filtrer par sessionId au lieu de inscriptionId
+        if (selectedSession?.sessionId) {
+          params.append("sessionId", selectedSession.sessionId);
         }
 
         const res = await fetch(`/api/apprenant/calendrier?${params.toString()}`);
@@ -216,7 +218,7 @@ export default function CalendrierPage() {
     };
 
     fetchCalendar();
-  }, [token, selectedInscription?.id]);
+  }, [token, selectedSession?.sessionId]);
 
   // Navigation
   const goToPreviousMonth = () => {

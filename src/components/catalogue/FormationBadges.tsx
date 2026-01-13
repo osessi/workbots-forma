@@ -12,6 +12,7 @@ import {
   GraduationCap,
   CheckCircle,
   BookOpen,
+  TrendingUp,
 } from "lucide-react";
 
 interface FormationBadgesProps {
@@ -271,6 +272,64 @@ export function CertificationBadge({
   );
 }
 
+// Correction 363: Composant pour afficher le taux de progression (Qualiopi IND 2)
+export function ProgressionBadge({
+  tauxProgression,
+  nombreApprenants,
+  primaryColor = "#4277FF",
+  size = "sm",
+}: {
+  tauxProgression: number | null;
+  nombreApprenants?: number;
+  primaryColor?: string;
+  size?: "sm" | "md";
+}) {
+  // N'afficher que si le taux est disponible (au moins 1 apprenant a complété les 2 évaluations)
+  if (tauxProgression === null || tauxProgression === undefined) return null;
+
+  const sizeClasses = {
+    sm: "px-2.5 py-1 text-xs",
+    md: "px-3 py-1.5 text-sm",
+  };
+
+  const iconSizes = {
+    sm: "w-3.5 h-3.5",
+    md: "w-4 h-4",
+  };
+
+  // Déterminer la couleur en fonction de la progression
+  // Progression positive = vert, neutre = jaune, négative = rouge
+  const getProgressionColor = (progression: number) => {
+    if (progression >= 10) return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: "text-emerald-500" };
+    if (progression >= 0) return { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", icon: "text-amber-500" };
+    return { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", icon: "text-red-500" };
+  };
+
+  const colors = getProgressionColor(tauxProgression);
+
+  // Formater le taux avec un signe + si positif
+  const formattedTaux = tauxProgression >= 0 ? `+${tauxProgression.toFixed(1)}` : tauxProgression.toFixed(1);
+
+  return (
+    <span
+      className={`
+        inline-flex items-center gap-1.5 rounded-md font-medium border
+        ${colors.bg} ${colors.text} ${colors.border}
+        ${sizeClasses[size]}
+      `}
+      title={`Taux de progression moyen des apprenants (écart entre test de positionnement et évaluation finale)${nombreApprenants ? ` - Basé sur ${nombreApprenants} apprenant(s)` : ''}`}
+    >
+      <TrendingUp className={`${iconSizes[size]} ${colors.icon}`} />
+      {formattedTaux}% progression
+      {nombreApprenants && nombreApprenants > 0 && (
+        <span className="opacity-70">
+          ({nombreApprenants})
+        </span>
+      )}
+    </span>
+  );
+}
+
 // Composant pour afficher les indicateurs de résultats (stagiaires formés, etc.)
 export function FormationIndicateurs({
   indicateurs,
@@ -282,6 +341,9 @@ export function FormationIndicateurs({
     tauxCertification?: number | null;
     nombreAvis?: number;
     nombreStagiaires?: number;
+    // Correction 363: Taux de progression
+    tauxProgression?: number | null;
+    nombreApprenantsProgression?: number;
   } | null;
   primaryColor?: string;
   size?: "sm" | "md";
@@ -305,6 +367,16 @@ export function FormationIndicateurs({
         <SatisfactionBadge
           tauxSatisfaction={indicateurs.tauxSatisfaction}
           nombreAvis={indicateurs.nombreAvis}
+          primaryColor={primaryColor}
+          size={size}
+        />
+      )}
+
+      {/* Correction 363: Taux de progression (Qualiopi IND 2) */}
+      {indicateurs.tauxProgression !== null && indicateurs.tauxProgression !== undefined && (
+        <ProgressionBadge
+          tauxProgression={indicateurs.tauxProgression}
+          nombreApprenants={indicateurs.nombreApprenantsProgression}
           primaryColor={primaryColor}
           size={size}
         />

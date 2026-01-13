@@ -299,14 +299,25 @@ export default function EntreprisesPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                  {/* Correction 396: Lien vers la fiche entreprise */}
+                  <Link
+                    href={`/donnees/entreprises/${entreprise.id}`}
+                    className="font-semibold text-gray-900 dark:text-white truncate block hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                  >
                     {entreprise.raisonSociale}
-                  </h3>
+                  </Link>
                   {entreprise.siret && (
                     <p className="text-xs text-gray-400 mt-0.5">SIRET: {entreprise.siret}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-1 ml-2">
+                  <Link
+                    href={`/donnees/entreprises/${entreprise.id}`}
+                    className="p-2 text-gray-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors dark:hover:bg-brand-500/10"
+                    title="Voir la fiche"
+                  >
+                    <ExternalLink size={16} />
+                  </Link>
                   <button
                     onClick={() => openModal(entreprise)}
                     className="p-2 text-gray-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors dark:hover:bg-brand-500/10"

@@ -1,5 +1,12 @@
 "use client";
 
+// ===========================================
+// CORRECTIONS 439-441: Page "Émargements"
+// ===========================================
+// 439: Reformuler sous-titre
+// 440: Compteurs basés sur la session sélectionnée (demi-journées)
+// 441: Affichage demi-journées + règles d'ouverture de signature
+
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
@@ -15,29 +22,40 @@ import {
   X,
   Trash2,
   Check,
+  Sun,
+  Sunset,
+  Lock,
 } from "lucide-react";
 
-interface EmargementJournee {
+// =====================================
+// TYPES
+// =====================================
+
+interface DemiJournee {
   id: string;
+  journeeId: string;
+  jour: number;
   date: string;
+  periode: "matin" | "aprem";
   heureDebut: string;
   heureFin: string;
+  statut: "a_venir" | "ouvert" | "signe";
+  feuilleId: string | null;
   sessionNom: string;
   sessionReference: string;
   lieu: string | null;
   formateur: string | null;
-  signatureMatin: boolean;
-  signatureAprem: boolean;
-  feuilleId: string;
 }
 
 interface EmargementsData {
-  emargements: EmargementJournee[];
+  demiJournees: DemiJournee[];
   stats: {
     total: number;
     signes: number;
     enAttente: number;
   };
+  formationTitre: string | null;
+  participantId: string;
 }
 
 // =====================================
@@ -48,14 +66,12 @@ function SignatureModal({
   isOpen,
   onClose,
   onSign,
-  periode,
-  journee,
+  demiJournee,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSign: (signature: string) => void;
-  periode: "matin" | "aprem";
-  journee: EmargementJournee;
+  demiJournee: DemiJournee;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -163,11 +179,11 @@ function SignatureModal({
                 Signer l&apos;émargement
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {new Date(journee.date).toLocaleDateString("fr-FR", {
-                  weekday: "long",
+                Jour {demiJournee.jour} – {new Date(demiJournee.date).toLocaleDateString("fr-FR", {
                   day: "numeric",
                   month: "long",
-                })} - {periode === "matin" ? "Matin" : "Après-midi"}
+                  year: "numeric",
+                })} – {demiJournee.periode === "matin" ? "Matin" : "Après-midi"}
               </p>
             </div>
             <button
@@ -206,17 +222,17 @@ function SignatureModal({
             {/* Info session */}
             <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm">
               <p className="font-medium text-gray-900 dark:text-white">
-                {journee.sessionNom}
+                {demiJournee.sessionNom}
               </p>
               <div className="flex flex-wrap gap-3 mt-2 text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  {periode === "matin" ? journee.heureDebut : "14:00"} - {periode === "matin" ? "12:30" : journee.heureFin}
+                  {demiJournee.heureDebut} – {demiJournee.heureFin}
                 </span>
-                {journee.lieu && (
+                {demiJournee.lieu && (
                   <span className="flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
-                    {journee.lieu}
+                    {demiJournee.lieu}
                   </span>
                 )}
               </div>
@@ -256,162 +272,125 @@ function SignatureModal({
 }
 
 // =====================================
-// COMPOSANT EMARGEMENT CARD
+// COMPOSANT DEMI-JOURNÉE CARD
 // =====================================
 
-function EmargementCard({
-  journee,
+function DemiJourneeCard({
+  demiJournee,
   index,
   onSign,
 }: {
-  journee: EmargementJournee;
+  demiJournee: DemiJournee;
   index: number;
-  onSign: (journee: EmargementJournee, periode: "matin" | "aprem") => void;
+  onSign: (demiJournee: DemiJournee) => void;
 }) {
-  const isToday = new Date(journee.date).toDateString() === new Date().toDateString();
-  const isPast = new Date(journee.date) < new Date(new Date().setHours(0, 0, 0, 0));
+  const isToday = new Date(demiJournee.date).toDateString() === new Date().toDateString();
+
+  // Icône et couleur selon la période
+  const PeriodeIcon = demiJournee.periode === "matin" ? Sun : Sunset;
+  const periodeLabel = demiJournee.periode === "matin" ? "Matin" : "Après-midi";
+
+  // Style selon le statut
+  const getStatutStyle = () => {
+    switch (demiJournee.statut) {
+      case "signe":
+        return {
+          bgClass: "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30",
+          badgeClass: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
+          badgeLabel: "Signé",
+          icon: <CheckCircle2 className="w-5 h-5 text-green-500" />,
+        };
+      case "ouvert":
+        return {
+          bgClass: "bg-brand-50 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/30",
+          badgeClass: "bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-400",
+          badgeLabel: "Ouvert",
+          icon: <PenLine className="w-5 h-5 text-brand-500" />,
+        };
+      default:
+        return {
+          bgClass: "bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600",
+          badgeClass: "bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-400",
+          badgeLabel: "À venir",
+          icon: <Lock className="w-5 h-5 text-gray-400" />,
+        };
+    }
+  };
+
+  const statutStyle = getStatutStyle();
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className={`bg-white dark:bg-gray-800 rounded-xl border ${
-        isToday
-          ? "border-brand-500 ring-2 ring-brand-500/20"
-          : "border-gray-200 dark:border-gray-700"
-      } overflow-hidden`}
+      transition={{ delay: index * 0.03 }}
+      className={`rounded-xl border overflow-hidden ${statutStyle.bgClass} ${
+        isToday ? "ring-2 ring-brand-500/30" : ""
+      }`}
     >
-      {/* Header avec date */}
-      <div
-        className={`px-4 py-3 ${
-          isToday
-            ? "bg-brand-50 dark:bg-brand-500/10"
-            : "bg-gray-50 dark:bg-gray-700/50"
-        }`}
-      >
+      <div className="p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          {/* Info principale */}
+          <div className="flex items-center gap-4">
+            {/* Icône période */}
             <div
-              className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center ${
-                isToday
-                  ? "bg-brand-500 text-white"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+              className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                demiJournee.periode === "matin"
+                  ? "bg-amber-100 dark:bg-amber-500/20"
+                  : "bg-orange-100 dark:bg-orange-500/20"
               }`}
             >
-              <span className="text-xs font-medium uppercase">
-                {new Date(journee.date).toLocaleDateString("fr-FR", { weekday: "short" })}
-              </span>
-              <span className="text-sm font-bold leading-none">
-                {new Date(journee.date).getDate()}
-              </span>
+              <PeriodeIcon
+                className={`w-6 h-6 ${
+                  demiJournee.periode === "matin"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-orange-600 dark:text-orange-400"
+                }`}
+              />
             </div>
+
+            {/* Détails */}
             <div>
-              <p className="font-medium text-gray-900 dark:text-white">
-                {new Date(journee.date).toLocaleDateString("fr-FR", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {journee.sessionNom}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Jour {demiJournee.jour} – {new Date(demiJournee.date).toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </h3>
+                {isToday && (
+                  <span className="text-xs px-2 py-0.5 bg-brand-500 text-white rounded-full">
+                    Aujourd&apos;hui
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <PeriodeIcon className="w-4 h-4" />
+                  {periodeLabel}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  {demiJournee.heureDebut} – {demiJournee.heureFin}
+                </span>
+              </div>
             </div>
           </div>
-          {isToday && (
-            <span className="text-xs font-medium px-2 py-1 bg-brand-500 text-white rounded-full">
-              Aujourd&apos;hui
-            </span>
-          )}
-        </div>
-      </div>
 
-      {/* Corps */}
-      <div className="p-4">
-        {/* Info session */}
-        <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-500 dark:text-gray-400">
-          <span className="flex items-center gap-1">
-            <Clock className="w-4 h-4" />
-            {journee.heureDebut} - {journee.heureFin}
-          </span>
-          {journee.lieu && (
-            <span className="flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              {journee.lieu}
+          {/* Statut + Action */}
+          <div className="flex items-center gap-3">
+            {/* Badge statut */}
+            <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${statutStyle.badgeClass}`}>
+              {statutStyle.icon}
+              {statutStyle.badgeLabel}
             </span>
-          )}
-          {journee.formateur && (
-            <span className="flex items-center gap-1">
-              <User className="w-4 h-4" />
-              {journee.formateur}
-            </span>
-          )}
-        </div>
 
-        {/* Signatures */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Matin */}
-          <div
-            className={`p-3 rounded-lg border ${
-              journee.signatureMatin
-                ? "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
-                : "bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                Matin
-              </span>
-              {journee.signatureMatin ? (
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-              ) : (
-                <Clock className="w-5 h-5 text-gray-400" />
-              )}
-            </div>
-            {journee.signatureMatin ? (
-              <p className="text-xs text-green-600 dark:text-green-400">
-                Signé
-              </p>
-            ) : (
+            {/* Bouton signer si ouvert */}
+            {demiJournee.statut === "ouvert" && (
               <button
-                onClick={() => onSign(journee, "matin")}
-                disabled={!isToday && !isPast}
-                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10 hover:bg-brand-100 dark:hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-              >
-                <PenLine className="w-4 h-4" />
-                Signer
-              </button>
-            )}
-          </div>
-
-          {/* Après-midi */}
-          <div
-            className={`p-3 rounded-lg border ${
-              journee.signatureAprem
-                ? "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30"
-                : "bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                Après-midi
-              </span>
-              {journee.signatureAprem ? (
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-              ) : (
-                <Clock className="w-5 h-5 text-gray-400" />
-              )}
-            </div>
-            {journee.signatureAprem ? (
-              <p className="text-xs text-green-600 dark:text-green-400">
-                Signé
-              </p>
-            ) : (
-              <button
-                onClick={() => onSign(journee, "aprem")}
-                disabled={!isToday && !isPast}
-                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10 hover:bg-brand-100 dark:hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                onClick={() => onSign(demiJournee)}
+                className="flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white font-medium rounded-lg transition-colors"
               >
                 <PenLine className="w-4 h-4" />
                 Signer
@@ -419,6 +398,24 @@ function EmargementCard({
             )}
           </div>
         </div>
+
+        {/* Info supplémentaires (lieu, formateur) - affichées seulement si présentes */}
+        {(demiJournee.lieu || demiJournee.formateur) && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
+            {demiJournee.lieu && (
+              <span className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                {demiJournee.lieu}
+              </span>
+            )}
+            {demiJournee.formateur && (
+              <span className="flex items-center gap-1">
+                <User className="w-4 h-4" />
+                {demiJournee.formateur}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -429,14 +426,12 @@ function EmargementCard({
 // =====================================
 
 export default function EmargementsPage() {
-  const { token, selectedInscription, refreshData } = useApprenantPortal();
+  // Correction 440: Utiliser selectedSession pour filtrer par session
+  const { token, selectedSession, refreshData } = useApprenantPortal();
   const [data, setData] = useState<EmargementsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [signingJournee, setSigningJournee] = useState<{
-    journee: EmargementJournee;
-    periode: "matin" | "aprem";
-  } | null>(null);
+  const [signingDemiJournee, setSigningDemiJournee] = useState<DemiJournee | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchEmargements = async () => {
@@ -444,9 +439,11 @@ export default function EmargementsPage() {
 
     try {
       setLoading(true);
+      setError(null);
       const params = new URLSearchParams({ token });
-      if (selectedInscription?.id) {
-        params.append("inscriptionId", selectedInscription.id);
+      // Correction 440: Filtrer par sessionId
+      if (selectedSession?.sessionId) {
+        params.append("sessionId", selectedSession.sessionId);
       }
 
       const res = await fetch(`/api/apprenant/emargements?${params.toString()}`);
@@ -465,10 +462,18 @@ export default function EmargementsPage() {
 
   useEffect(() => {
     fetchEmargements();
-  }, [token, selectedInscription?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, selectedSession?.sessionId]);
 
   const handleSign = async (signature: string) => {
-    if (!signingJournee || !token) return;
+    if (!signingDemiJournee || !token || !data?.participantId) return;
+
+    // Vérifier qu'une feuille existe
+    if (!signingDemiJournee.feuilleId) {
+      setError("Impossible de signer : feuille d'émargement non créée pour cette journée.");
+      setSigningDemiJournee(null);
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -478,21 +483,21 @@ export default function EmargementsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
-          feuilleId: signingJournee.journee.feuilleId,
-          periode: signingJournee.periode,
+          feuilleId: signingDemiJournee.feuilleId,
+          periode: signingDemiJournee.periode,
           signature,
         }),
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Erreur lors de la signature");
+        const responseData = await res.json();
+        throw new Error(responseData.error || "Erreur lors de la signature");
       }
 
       // Rafraîchir les données
       await fetchEmargements();
       await refreshData();
-      setSigningJournee(null);
+      setSigningDemiJournee(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
@@ -516,7 +521,13 @@ export default function EmargementsPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-900 dark:text-white font-medium">{error}</p>
+          <p className="text-gray-900 dark:text-white font-medium mb-2">{error}</p>
+          <button
+            onClick={fetchEmargements}
+            className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+          >
+            Réessayer
+          </button>
         </div>
       </div>
     );
@@ -524,17 +535,17 @@ export default function EmargementsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header - Correction 439 */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Émargements
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Signez vos feuilles de présence
+          Retrouvez ici vos feuilles d&apos;émargement et signez-les au moment prévu.
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Correction 440 */}
       {data?.stats && (
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center">
@@ -558,35 +569,39 @@ export default function EmargementsPage() {
         </div>
       )}
 
-      {/* Liste des émargements */}
-      {data?.emargements && data.emargements.length > 0 ? (
-        <div className="space-y-4">
-          {data.emargements.map((journee, index) => (
-            <EmargementCard
-              key={journee.id}
-              journee={journee}
+      {/* Liste des demi-journées - Correction 441 */}
+      {data?.demiJournees && data.demiJournees.length > 0 ? (
+        <div className="space-y-3">
+          {data.demiJournees.map((demiJournee, index) => (
+            <DemiJourneeCard
+              key={demiJournee.id}
+              demiJournee={demiJournee}
               index={index}
-              onSign={(j, p) => setSigningJournee({ journee: j, periode: p })}
+              onSign={(dj) => setSigningDemiJournee(dj)}
             />
           ))}
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-12 text-center">
           <Calendar className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Aucune journée planifiée
+          </h3>
           <p className="text-gray-500 dark:text-gray-400">
-            Aucun émargement disponible pour le moment
+            {selectedSession
+              ? "Cette session n'a pas encore de journées planifiées."
+              : "Sélectionnez une session pour voir vos émargements."}
           </p>
         </div>
       )}
 
       {/* Modal de signature */}
-      {signingJournee && (
+      {signingDemiJournee && (
         <SignatureModal
           isOpen={true}
-          onClose={() => setSigningJournee(null)}
+          onClose={() => setSigningDemiJournee(null)}
           onSign={handleSign}
-          periode={signingJournee.periode}
-          journee={signingJournee.journee}
+          demiJournee={signingDemiJournee}
         />
       )}
 

@@ -142,10 +142,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Récupérer les derniers articles pour ce type de veille
+    // Correction 408: Récupérer les articles de veille pour ce type
+    // En priorité les articles des sources de l'organisation, sinon tous les articles du type
     const recentArticles = await prisma.veilleArticle.findMany({
       where: {
         type: type as VeilleType,
+        // On récupère tous les articles du type (sources globales + sources org)
+        // pour avoir un contexte riche pour l'IA
       },
       select: {
         titre: true,
@@ -158,26 +161,27 @@ export async function POST(request: NextRequest) {
         source: {
           select: {
             nom: true,
+            organizationId: true,
           },
         },
       },
       orderBy: {
         datePublication: "desc",
       },
-      take: 10,
+      take: 30, // Augmenté de 10 à 30 pour un meilleur contexte
     });
 
-    // Construire le contexte des articles
+    // Correction 408: Construire le contexte des articles avec plus d'infos
     const articlesContext = recentArticles.length > 0
-      ? `\n\n=== DERNIERS ARTICLES DE VEILLE ===\n${recentArticles.map((a, i) => `
+      ? `\n\n=== ${recentArticles.length} ARTICLES DE VEILLE DISPONIBLES ===\n${recentArticles.map((a, i) => `
 [${i + 1}] ${a.titre}
 Source: ${a.source.nom} | Date: ${a.datePublication.toLocaleDateString("fr-FR")}
-Résumé: ${a.resumeIA || a.resume || "N/A"}
-Points clés: ${a.pointsCles.join(", ") || "N/A"}
-Impact Qualiopi: ${a.impactQualiopi || "N/A"}
+${a.resumeIA ? `Résumé IA: ${a.resumeIA}` : (a.resume ? `Résumé: ${a.resume}` : "")}
+${a.pointsCles && a.pointsCles.length > 0 ? `Points clés: ${a.pointsCles.join(", ")}` : ""}
+${a.impactQualiopi ? `Impact Qualiopi: ${a.impactQualiopi}` : ""}
 URL: ${a.url}
 `).join("\n")}`
-      : "\n\n(Aucun article de veille récent disponible pour ce type.)";
+      : "\n\n⚠️ AUCUN ARTICLE DE VEILLE DISPONIBLE pour ce type. Informe l'utilisateur qu'il n'y a pas encore d'articles dans cette catégorie de veille.";
 
     // Construire l'historique des messages
     const existingMessages: ChatMessage[] = conversation
@@ -254,11 +258,17 @@ Règles importantes:
         },
       });
     } else {
+      // Correction 409: Générer un titre automatique basé sur le premier message
+      const autoTitre = message.length > 50
+        ? message.substring(0, 47) + "..."
+        : message;
+
       conversation = await prisma.veilleConversation.create({
         data: {
           type: type as VeilleType,
           organizationId: user.organizationId,
           userId: user.id,
+          titre: autoTitre,
           messages: JSON.parse(JSON.stringify(trimmedMessages)),
         },
       });
@@ -324,6 +334,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type") as VeilleType | null;
     const conversationId = searchParams.get("conversationId");
+    const search = searchParams.get("search"); // Correction 409: recherche
+    const pinnedOnly = searchParams.get("pinnedOnly") === "true"; // Correction 409: filtre épinglés
 
     if (conversationId) {
       // Récupérer une conversation spécifique
@@ -339,7 +351,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Récupérer les conversations de l'utilisateur
-    const whereClause: Record<string, unknown> = {
+    // Correction 409: Support de la recherche et du filtre épinglés
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const whereClause: any = {
       userId: user.id,
       organizationId: user.organizationId,
     };
@@ -348,12 +362,26 @@ export async function GET(request: NextRequest) {
       whereClause.type = type;
     }
 
+    if (pinnedOnly) {
+      whereClause.isPinned = true;
+    }
+
+    // Correction 409: Recherche par titre ou contenu des messages
+    if (search && search.trim()) {
+      whereClause.OR = [
+        { titre: { contains: search.trim(), mode: "insensitive" } },
+        // Recherche dans le JSON des messages (fonctionne avec PostgreSQL)
+        { messages: { string_contains: search.trim() } },
+      ];
+    }
+
     const conversations = await prisma.veilleConversation.findMany({
       where: whereClause,
-      orderBy: {
-        updatedAt: "desc",
-      },
-      take: 10,
+      orderBy: [
+        { isPinned: "desc" }, // Épinglés en premier
+        { updatedAt: "desc" },
+      ],
+      take: 50, // Augmenté pour l'historique
     });
 
     return NextResponse.json(conversations);
@@ -430,6 +458,85 @@ export async function DELETE(request: NextRequest) {
     console.error("Erreur suppression conversation:", error);
     return NextResponse.json(
       { error: "Erreur lors de la suppression" },
+      { status: 500 }
+    );
+  }
+}
+
+// Correction 409: PATCH - Renommer ou épingler une conversation
+export async function PATCH(request: NextRequest) {
+  try {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Ignore
+            }
+          },
+        },
+      }
+    );
+
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+
+    if (!supabaseUser) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { supabaseId: supabaseUser.id },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const { conversationId, titre, isPinned } = body;
+
+    if (!conversationId) {
+      return NextResponse.json({ error: "conversationId requis" }, { status: 400 });
+    }
+
+    // Vérifier que la conversation appartient à l'utilisateur
+    const conversation = await prisma.veilleConversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation || conversation.userId !== user.id) {
+      return NextResponse.json({ error: "Conversation non trouvée" }, { status: 404 });
+    }
+
+    // Mettre à jour la conversation
+    const updateData: { titre?: string; isPinned?: boolean } = {};
+    if (titre !== undefined) {
+      updateData.titre = titre;
+    }
+    if (isPinned !== undefined) {
+      updateData.isPinned = isPinned;
+    }
+
+    const updatedConversation = await prisma.veilleConversation.update({
+      where: { id: conversationId },
+      data: updateData,
+    });
+
+    return NextResponse.json(updatedConversation);
+  } catch (error) {
+    console.error("Erreur mise à jour conversation:", error);
+    return NextResponse.json(
+      { error: "Erreur lors de la mise à jour" },
       { status: 500 }
     );
   }

@@ -18,11 +18,25 @@ import {
   RefreshCw,
   User,
   Building2,
+  Paperclip,
+  X,
+  FileText,
+  Image as ImageIcon,
+  File,
+  Download,
 } from "lucide-react";
 
 // =====================================
 // TYPES
 // =====================================
+
+// Correction 421: Type pour les pièces jointes
+interface Attachment {
+  name: string;
+  url: string;
+  size?: number;
+  type?: string;
+}
 
 interface MessageReply {
   id: string;
@@ -31,6 +45,7 @@ interface MessageReply {
   senderEmail: string;
   createdAt: string;
   fromOrganisme?: boolean;
+  attachments?: Attachment[]; // Correction 421
 }
 
 interface Message {
@@ -44,6 +59,7 @@ interface Message {
   createdAt: string;
   replies: MessageReply[];
   hasNewReply?: boolean;
+  attachments?: Attachment[]; // Correction 421
 }
 
 interface MessagesData {
@@ -84,6 +100,212 @@ function formatFullDate(dateString: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Correction 421: Formater la taille du fichier
+function formatFileSize(bytes?: number): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+// Correction 421: Icône selon le type de fichier
+function getFileIcon(type?: string) {
+  if (!type) return File;
+  if (type.startsWith("image/")) return ImageIcon;
+  if (type.includes("pdf") || type.includes("word") || type.includes("document")) return FileText;
+  return File;
+}
+
+// Correction 421: Types de fichiers autorisés
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
+
+// =====================================
+// COMPOSANT AFFICHAGE PIÈCES JOINTES
+// =====================================
+
+// Correction 421: Composant pour afficher les pièces jointes
+function AttachmentList({ attachments, variant = "default" }: { attachments: Attachment[]; variant?: "default" | "bubble" }) {
+  if (!attachments || attachments.length === 0) return null;
+
+  const isLight = variant === "bubble";
+
+  return (
+    <div className={`flex flex-wrap gap-2 ${variant === "default" ? "mt-2" : "mt-2"}`}>
+      {attachments.map((att, idx) => {
+        const FileIcon = getFileIcon(att.type);
+        return (
+          <a
+            key={idx}
+            href={att.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+              isLight
+                ? "bg-white/20 hover:bg-white/30 text-white"
+                : "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            <FileIcon className="w-3.5 h-3.5" />
+            <span className="truncate max-w-[150px]">{att.name}</span>
+            {att.size && <span className="opacity-70">({formatFileSize(att.size)})</span>}
+            <Download className="w-3 h-3" />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+// Correction 421: Composant pour uploader des fichiers
+function FileUploader({
+  files,
+  onFilesChange,
+  uploading,
+  token,
+}: {
+  files: Attachment[];
+  onFilesChange: (files: Attachment[]) => void;
+  uploading: boolean;
+  token: string;
+}) {
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) return;
+
+    setUploadError(null);
+
+    for (const file of Array.from(selectedFiles)) {
+      // Vérifier le type
+      if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+        setUploadError(`Type non autorisé: ${file.name}. Acceptés: PDF, Word, Excel, Images.`);
+        continue;
+      }
+
+      // Vérifier la taille
+      if (file.size > MAX_FILE_SIZE) {
+        setUploadError(`Fichier trop volumineux: ${file.name}. Maximum 10 Mo.`);
+        continue;
+      }
+
+      // Upload le fichier
+      setUploadingFile(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("token", token);
+
+        const res = await fetch(`/api/apprenant/messages/upload?token=${encodeURIComponent(token)}`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Erreur upload");
+        }
+
+        const result = await res.json();
+        if (result.attachment) {
+          onFilesChange([...files, result.attachment]);
+        }
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : "Erreur lors de l'upload");
+      } finally {
+        setUploadingFile(false);
+      }
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const removeFile = (index: number) => {
+    onFilesChange(files.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={handleFileSelect}
+          accept={ALLOWED_MIME_TYPES.join(",")}
+          multiple
+          className="hidden"
+          disabled={uploading || uploadingFile}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || uploadingFile}
+          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {uploadingFile ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Paperclip className="w-4 h-4" />
+          )}
+          <span>Ajouter un fichier</span>
+        </button>
+        <span className="text-xs text-gray-400">PDF, Word, Excel, Images (max 10 Mo)</span>
+      </div>
+
+      {uploadError && (
+        <p className="text-xs text-red-500 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" />
+          {uploadError}
+        </p>
+      )}
+
+      {/* Liste des fichiers sélectionnés */}
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {files.map((file, idx) => {
+            const FileIcon = getFileIcon(file.type);
+            return (
+              <div
+                key={idx}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30 rounded-lg text-sm"
+              >
+                <FileIcon className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+                <span className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">{file.name}</span>
+                {file.size && (
+                  <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeFile(idx)}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // =====================================
@@ -177,15 +399,26 @@ function MessageCard({
             {message.content}
           </p>
 
-          {/* Indicateur de réponses */}
-          {message.replies.length > 0 && (
-            <div className="mt-2 flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-              <CheckCheck className="w-3 h-3" />
-              <span>
-                {message.replies.length} réponse{message.replies.length > 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
+          {/* Indicateurs de réponses et pièces jointes */}
+          <div className="mt-2 flex items-center gap-3">
+            {message.replies.length > 0 && (
+              <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                <CheckCheck className="w-3 h-3" />
+                <span>
+                  {message.replies.length} réponse{message.replies.length > 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+            {/* Correction 421: Indicateur pièces jointes */}
+            {message.attachments && message.attachments.length > 0 && (
+              <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                <Paperclip className="w-3 h-3" />
+                <span>
+                  {message.attachments.length} fichier{message.attachments.length > 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </motion.button>
@@ -201,23 +434,30 @@ function MessageDetail({
   onBack,
   onReply,
   isReplying,
+  token,
 }: {
   message: Message;
   onBack: () => void;
-  onReply: (content: string) => Promise<void>;
+  onReply: (content: string, attachments: Attachment[]) => Promise<void>; // Correction 421
   isReplying: boolean;
+  token: string; // Correction 421
 }) {
   const [replyContent, setReplyContent] = useState("");
+  const [replyAttachments, setReplyAttachments] = useState<Attachment[]>([]); // Correction 421
   const { organization } = useApprenantPortal();
+  // Correction 423: Ref pour le scroll automatique vers le dernier message
+  const conversationEndRef = React.useRef<HTMLDivElement>(null);
+  const conversationContainerRef = React.useRef<HTMLDivElement>(null);
 
   const handleSubmitReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyContent.trim() || isReplying) return;
-    await onReply(replyContent.trim());
+    await onReply(replyContent.trim(), replyAttachments);
     setReplyContent("");
+    setReplyAttachments([]); // Correction 421: Réinitialiser les pièces jointes
   };
 
-  // Construire la conversation complète
+  // Construire la conversation complète avec pièces jointes (Correction 421)
   const conversation = [
     {
       id: message.id,
@@ -225,6 +465,7 @@ function MessageDetail({
       senderName: message.senderName,
       isFromOrganisme: message.type === "received",
       createdAt: message.createdAt,
+      attachments: message.attachments || [], // Correction 421
     },
     ...message.replies.map((reply) => ({
       id: reply.id,
@@ -232,8 +473,18 @@ function MessageDetail({
       senderName: reply.senderName,
       isFromOrganisme: reply.fromOrganisme || reply.senderEmail !== message.senderEmail,
       createdAt: reply.createdAt,
+      attachments: reply.attachments || [], // Correction 421
     })),
   ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  // Correction 423: Scroll automatique vers le dernier message au chargement
+  useEffect(() => {
+    // Petit délai pour laisser le temps au rendu
+    const timer = setTimeout(() => {
+      conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [message.id, conversation.length]);
 
   return (
     <motion.div
@@ -275,52 +526,76 @@ function MessageDetail({
       </div>
 
       {/* Conversation */}
-      <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
-        {conversation.map((msg, index) => (
-          <motion.div
-            key={msg.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className={`flex ${msg.isFromOrganisme ? "justify-start" : "justify-end"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                msg.isFromOrganisme
-                  ? "bg-gray-100 dark:bg-gray-700 rounded-tl-md"
-                  : "bg-brand-500 text-white rounded-tr-md"
-              }`}
+      <div ref={conversationContainerRef} className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
+        {conversation.map((msg, index) => {
+          // Correction 423: Identifier le dernier message de l'organisme pour le mettre en évidence
+          const isLastOrgMessage = msg.isFromOrganisme &&
+            index === conversation.findLastIndex((m) => m.isFromOrganisme);
+          const isLastMessage = index === conversation.length - 1;
+
+          return (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className={`flex ${msg.isFromOrganisme ? "justify-start" : "justify-end"}`}
             >
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  className={`text-xs font-medium ${
-                    msg.isFromOrganisme
-                      ? "text-gray-600 dark:text-gray-300"
-                      : "text-brand-100"
-                  }`}
-                >
-                  {msg.senderName}
-                </span>
-                <span
-                  className={`text-xs ${
-                    msg.isFromOrganisme
-                      ? "text-gray-400 dark:text-gray-500"
-                      : "text-brand-200"
-                  }`}
-                >
-                  {formatDate(msg.createdAt)}
-                </span>
-              </div>
-              <p
-                className={`text-sm whitespace-pre-wrap ${
-                  msg.isFromOrganisme ? "text-gray-700 dark:text-gray-200" : "text-white"
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  msg.isFromOrganisme
+                    ? `bg-gray-100 dark:bg-gray-700 rounded-tl-md ${
+                        isLastOrgMessage ? "ring-2 ring-brand-400 ring-offset-2 dark:ring-offset-gray-800" : ""
+                      }`
+                    : "bg-brand-500 text-white rounded-tr-md"
                 }`}
               >
-                {msg.content}
-              </p>
-            </div>
-          </motion.div>
-        ))}
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={`text-xs font-medium ${
+                      msg.isFromOrganisme
+                        ? "text-gray-600 dark:text-gray-300"
+                        : "text-brand-100"
+                    }`}
+                  >
+                    {msg.senderName}
+                  </span>
+                  <span
+                    className={`text-xs ${
+                      msg.isFromOrganisme
+                        ? "text-gray-400 dark:text-gray-500"
+                        : "text-brand-200"
+                    }`}
+                  >
+                    {formatDate(msg.createdAt)}
+                  </span>
+                  {/* Correction 423: Badge "Nouveau" pour le dernier message de l'organisme */}
+                  {isLastOrgMessage && message.hasNewReply && (
+                    <span className="px-1.5 py-0.5 bg-brand-500 text-white text-[10px] font-medium rounded">
+                      Nouveau
+                    </span>
+                  )}
+                </div>
+                <p
+                  className={`text-sm whitespace-pre-wrap ${
+                    msg.isFromOrganisme ? "text-gray-700 dark:text-gray-200" : "text-white"
+                  }`}
+                >
+                  {msg.content}
+                </p>
+                {/* Correction 421: Afficher les pièces jointes */}
+                {msg.attachments && msg.attachments.length > 0 && (
+                  <AttachmentList
+                    attachments={msg.attachments}
+                    variant={msg.isFromOrganisme ? "default" : "bubble"}
+                  />
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+        {/* Correction 423: Élément invisible pour le scroll automatique */}
+        <div ref={conversationEndRef} />
       </div>
 
       {/* Formulaire de réponse */}
@@ -332,6 +607,13 @@ function MessageDetail({
             placeholder="Votre réponse..."
             rows={3}
             className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all resize-none"
+          />
+          {/* Correction 421: Upload de fichiers pour les réponses */}
+          <FileUploader
+            files={replyAttachments}
+            onFilesChange={setReplyAttachments}
+            uploading={isReplying}
+            token={token}
           />
           <div className="flex justify-end">
             <button
@@ -366,19 +648,22 @@ function NewMessageForm({
   onSend,
   onCancel,
   isSending,
+  token,
 }: {
-  onSend: (subject: string, content: string) => Promise<void>;
+  onSend: (subject: string, content: string, attachments: Attachment[]) => Promise<void>; // Correction 421
   onCancel: () => void;
   isSending: boolean;
+  token: string; // Correction 421
 }) {
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]); // Correction 421
   const { organization } = useApprenantPortal();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim() || isSending) return;
-    await onSend(subject.trim(), content.trim());
+    await onSend(subject.trim(), content.trim(), attachments); // Correction 421
   };
 
   return (
@@ -428,6 +713,19 @@ function NewMessageForm({
           />
         </div>
 
+        {/* Correction 421: Pièces jointes */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Pièces jointes
+          </label>
+          <FileUploader
+            files={attachments}
+            onFilesChange={setAttachments}
+            uploading={isSending}
+            token={token}
+          />
+        </div>
+
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
@@ -464,7 +762,8 @@ function NewMessageForm({
 // =====================================
 
 export default function MessagesPage() {
-  const { token, setDashboardStats, dashboardStats } = useApprenantPortal();
+  // Correction 430: Utiliser selectedSession pour filtrer par session
+  const { token, setDashboardStats, dashboardStats, selectedSession } = useApprenantPortal();
   const [data, setData] = useState<MessagesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -480,7 +779,13 @@ export default function MessagesPage() {
       if (showLoader) setLoading(true);
       else setRefreshing(true);
 
-      const res = await fetch(`/api/apprenant/messages?token=${encodeURIComponent(token)}`);
+      // Correction 430: Ajouter sessionId au paramètre
+      const params = new URLSearchParams({ token });
+      if (selectedSession?.sessionId) {
+        params.append("sessionId", selectedSession.sessionId);
+      }
+
+      const res = await fetch(`/api/apprenant/messages?${params.toString()}`);
       if (!res.ok) {
         throw new Error("Erreur lors du chargement des messages");
       }
@@ -501,11 +806,26 @@ export default function MessagesPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token, dashboardStats, setDashboardStats]);
+  }, [token, dashboardStats, setDashboardStats, selectedSession?.sessionId]);
 
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
+
+  // Correction 423: Sélectionner automatiquement le dernier fil avec message non lu
+  useEffect(() => {
+    if (data && data.messages.length > 0 && !selectedMessage && !isNewMessage) {
+      // Trouver le premier message avec une nouvelle réponse de l'organisme
+      const messageWithUnreadReply = data.messages.find(
+        (m) => m.hasNewReply || (m.type === "received" && !m.isRead)
+      );
+
+      if (messageWithUnreadReply) {
+        // Sélectionner automatiquement ce message
+        handleSelectMessage(messageWithUnreadReply);
+      }
+    }
+  }, [data?.messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Marquer un message comme lu
   const markAsRead = async (messageId: string) => {
@@ -520,8 +840,8 @@ export default function MessagesPage() {
     }
   };
 
-  // Envoyer une réponse
-  const handleReply = async (content: string) => {
+  // Envoyer une réponse (Correction 421: avec pièces jointes)
+  const handleReply = async (content: string, attachments: Attachment[] = []) => {
     if (!token || !selectedMessage) return;
 
     setIsSending(true);
@@ -532,6 +852,7 @@ export default function MessagesPage() {
         body: JSON.stringify({
           messageId: selectedMessage.id,
           content,
+          attachments, // Correction 421
         }),
       });
 
@@ -567,8 +888,8 @@ export default function MessagesPage() {
     }
   };
 
-  // Envoyer un nouveau message
-  const handleSendNewMessage = async (subject: string, content: string) => {
+  // Envoyer un nouveau message (Correction 421: avec pièces jointes)
+  const handleSendNewMessage = async (subject: string, content: string, attachments: Attachment[] = []) => {
     if (!token) return;
 
     setIsSending(true);
@@ -576,7 +897,7 @@ export default function MessagesPage() {
       const res = await fetch(`/api/apprenant/messages?token=${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, content }),
+        body: JSON.stringify({ subject, content, attachments }), // Correction 421
       });
 
       if (!res.ok) {
@@ -705,6 +1026,7 @@ export default function MessagesPage() {
             onSend={handleSendNewMessage}
             onCancel={() => setIsNewMessage(false)}
             isSending={isSending}
+            token={token || ""} // Correction 421
           />
         ) : selectedMessage ? (
           <MessageDetail
@@ -713,6 +1035,7 @@ export default function MessagesPage() {
             onBack={() => setSelectedMessage(null)}
             onReply={handleReply}
             isReplying={isSending}
+            token={token || ""} // Correction 421
           />
         ) : (
           <motion.div

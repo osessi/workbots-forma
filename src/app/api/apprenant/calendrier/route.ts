@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
   try {
     // Récupérer le token depuis les query params
     const token = request.nextUrl.searchParams.get("token");
-    const inscriptionId = request.nextUrl.searchParams.get("inscriptionId");
+    // Correction 430: Utiliser sessionId au lieu de inscriptionId
+    const sessionId = request.nextUrl.searchParams.get("sessionId");
 
     if (!token) {
       return NextResponse.json(
@@ -55,26 +56,16 @@ export async function GET(request: NextRequest) {
 
     const { apprenantId } = decoded;
 
-    // Récupérer l'inscription pour avoir la formation
-    const inscription = await prisma.lMSInscription.findFirst({
-      where: inscriptionId
-        ? { id: inscriptionId, apprenantId }
-        : { apprenantId },
-    });
-
-    if (!inscription) {
-      return NextResponse.json({ events: [] });
-    }
-
-    // Récupérer les participations aux sessions
+    // Correction 430: Récupérer les participations aux sessions filtrées par sessionId
     const participations = await prisma.sessionParticipantNew.findMany({
       where: {
         apprenantId,
-        client: {
-          session: {
-            formationId: inscription.formationId,
+        // Filtrer par sessionId si fourni
+        ...(sessionId ? {
+          client: {
+            sessionId: sessionId,
           },
-        },
+        } : {}),
       },
       include: {
         client: {
@@ -92,6 +83,10 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+
+    if (participations.length === 0) {
+      return NextResponse.json({ events: [] });
+    }
 
     // Construire la liste des événements
     const events: Array<{

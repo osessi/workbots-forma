@@ -45,7 +45,7 @@ export function CatalogueHeader({ organization }: CatalogueHeaderProps) {
               <h1 className="text-xl font-bold text-gray-900">
                 {organization.name}
               </h1>
-              <p className="text-sm text-gray-500">Catalogue de formation</p>
+              <p className="text-sm text-gray-500">Catalogue des formations</p>
             </div>
           </div>
 

@@ -111,15 +111,8 @@ export async function GET(request: NextRequest) {
       whereClause.estEligibleCPF = eligibleCPFFilter === "true";
     }
 
-    // Filtre par modalité (via les sessions)
-    if (modaliteFilter && modaliteFilter !== "all") {
-      whereClause.trainingSessions = {
-        some: {
-          modalite: modaliteFilter,
-          status: { in: ["PLANIFIEE", "EN_COURS"] },
-        },
-      };
-    }
+    // Note: Le filtre par modalité est appliqué APRÈS récupération pour inclure fichePedagogique
+    // (Correction 393 - voir filtrage post-requête plus bas)
 
     // Filtre par lieu (via les sessions)
     if (lieuFilter) {
@@ -228,16 +221,17 @@ export async function GET(request: NextRequest) {
           methodesModalites = fiche.methodesModalites as string;
         }
 
-        // Extraire la modalité depuis la fiche pédagogique (fallback si pas de sessions)
-        if (fiche.modalite) {
-          const mod = String(fiche.modalite).toUpperCase();
+        // Correction 393: Extraire la modalité depuis typeFormation OU modalite
+        const modaliteValue = fiche.typeFormation || fiche.modalite;
+        if (modaliteValue) {
+          const mod = String(modaliteValue).toUpperCase();
           if (mod === "PRESENTIEL" || mod === "DISTANCIEL" || mod === "MIXTE") {
             modaliteFromFiche = mod;
-          } else if (mod.includes("MIXTE") || mod.includes("HYBRID")) {
+          } else if (mod.includes("MIXTE") || mod.includes("HYBRID") || mod.includes("BLENDED")) {
             modaliteFromFiche = "MIXTE";
-          } else if (mod.includes("DISTANCE") || mod.includes("DISTANCIEL")) {
+          } else if (mod.includes("DISTANCE") || mod.includes("DISTANCIEL") || mod.includes("ELEARNING") || mod.includes("EN LIGNE")) {
             modaliteFromFiche = "DISTANCIEL";
-          } else if (mod.includes("PRESENT")) {
+          } else if (mod.includes("PRESENT") || mod.includes("SALLE") || mod.includes("INTER") || mod.includes("INTRA")) {
             modaliteFromFiche = "PRESENTIEL";
           }
         }
@@ -335,12 +329,22 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Correction 393: Filtrage post-requête pour les modalités (inclut fichePedagogique)
+    let filteredFormations = formattedFormations;
+    if (modaliteFilter && modaliteFilter !== "all") {
+      filteredFormations = formattedFormations.filter((f) => {
+        // Vérifier si la modalité recherchée est dans les modalités de la formation
+        return f.modalites.includes(modaliteFilter);
+      });
+    }
+
     // Calculer les agrégations pour les filtres
     const allFormationsForAggregations = await prisma.formation.findMany({
       where: baseWhereClause,
       select: {
         isCertifiante: true,
         estEligibleCPF: true,
+        fichePedagogique: true, // Correction 393: inclure fichePedagogique pour les modalités
         trainingSessions: {
           where: {
             status: { in: ["PLANIFIEE", "EN_COURS"] },
@@ -372,6 +376,20 @@ export async function GET(request: NextRequest) {
     let eligibleCPFOui = 0;
     let eligibleCPFNon = 0;
 
+    // Helper pour extraire la modalité depuis fichePedagogique
+    const getModaliteFromFiche = (fichePedagogique: unknown): string | null => {
+      if (!fichePedagogique) return null;
+      const fiche = fichePedagogique as Record<string, unknown>;
+      const modaliteValue = fiche.typeFormation || fiche.modalite;
+      if (!modaliteValue) return null;
+      const mod = String(modaliteValue).toUpperCase();
+      if (mod === "PRESENTIEL" || mod === "DISTANCIEL" || mod === "MIXTE") return mod;
+      if (mod.includes("MIXTE") || mod.includes("HYBRID") || mod.includes("BLENDED")) return "MIXTE";
+      if (mod.includes("DISTANCE") || mod.includes("DISTANCIEL") || mod.includes("ELEARNING") || mod.includes("EN LIGNE")) return "DISTANCIEL";
+      if (mod.includes("PRESENT") || mod.includes("SALLE") || mod.includes("INTER") || mod.includes("INTRA")) return "PRESENTIEL";
+      return null;
+    };
+
     allFormationsForAggregations.forEach((f) => {
       // Compteurs certifiante
       if (f.isCertifiante) {
@@ -387,14 +405,28 @@ export async function GET(request: NextRequest) {
         eligibleCPFNon++;
       }
 
-      // Compteurs modalités
+      // Correction 393: Compteurs modalités (sessions + fichePedagogique)
       const modalitesVues = new Set<string>();
+
+      // D'abord essayer depuis fichePedagogique (priorité)
+      const modaliteFiche = getModaliteFromFiche(f.fichePedagogique);
+      if (modaliteFiche) {
+        modalitesVues.add(modaliteFiche);
+        modalitesCount[modaliteFiche] = (modalitesCount[modaliteFiche] || 0) + 1;
+      }
+
+      // Si pas de modalité dans fiche, utiliser les sessions
+      if (!modaliteFiche) {
+        f.trainingSessions.forEach((s) => {
+          if (!modalitesVues.has(s.modalite)) {
+            modalitesVues.add(s.modalite);
+            modalitesCount[s.modalite] = (modalitesCount[s.modalite] || 0) + 1;
+          }
+        });
+      }
+
+      // Compteurs lieux (toujours depuis les sessions)
       f.trainingSessions.forEach((s) => {
-        if (!modalitesVues.has(s.modalite)) {
-          modalitesVues.add(s.modalite);
-          modalitesCount[s.modalite] = (modalitesCount[s.modalite] || 0) + 1;
-        }
-        // Compteurs lieux
         if (s.lieu?.ville) {
           locationsCount[s.lieu.ville] =
             (locationsCount[s.lieu.ville] || 0) + 1;
@@ -418,6 +450,12 @@ export async function GET(request: NextRequest) {
       eligibleCPFCount: { oui: eligibleCPFOui, non: eligibleCPFNon },
     };
 
+    // Correction 393: Utiliser filteredFormations au lieu de formattedFormations
+    // et ajuster le total si filtrage par modalité
+    const finalTotal = modaliteFilter && modaliteFilter !== "all"
+      ? filteredFormations.length
+      : total;
+
     return NextResponse.json({
       organization: {
         id: organization.id,
@@ -438,14 +476,14 @@ export async function GET(request: NextRequest) {
         certificatQualiopiUrl: organization.certificatQualiopiUrl,
         categorieQualiopi: organization.categorieQualiopi,
       },
-      formations: formattedFormations,
+      formations: filteredFormations,
       filterAggregations,
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasMore: skip + formations.length < total,
+        total: finalTotal,
+        totalPages: Math.ceil(finalTotal / limit),
+        hasMore: skip + filteredFormations.length < finalTotal,
       },
     });
   } catch (error) {

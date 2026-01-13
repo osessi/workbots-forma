@@ -1,7 +1,9 @@
 // ===========================================
 // API PROGRAMME APPRENANT - GET /api/apprenant/programme
+// Correction 432: Utiliser le snapshot de la session sélectionnée
 // ===========================================
-// Récupère le programme de formation avec les modules et la progression
+// Récupère la fiche pédagogique de la formation (version "programme")
+// Synchronisé avec la session active sélectionnée
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
@@ -31,11 +33,46 @@ function decodeApprenantToken(token: string): { apprenantId: string; organizatio
   }
 }
 
+// Types pour le snapshot de la fiche pédagogique
+interface FichePedagogiqueSnapshot {
+  titre?: string;
+  objectifs?: string[];
+  publicVise?: string;
+  prerequis?: string;
+  contenu?: string;
+  dureeHeures?: number;
+  dureeJours?: string;
+  moyensPedagogiques?: string;
+  methodsPedagogiques?: string[];
+  supportsPedagogiques?: Array<{ nom: string; url?: string; type: string }>;
+  methodesEvaluation?: string[];
+  equipePedagogique?: string;
+  suiviEvaluation?: string;
+  ressourcesPedagogiques?: string;
+  accessibiliteHandicap?: string;
+  delaiAcces?: string;
+  // Qualiopi
+  modalitesAcces?: string;
+  tauxSatisfaction?: number;
+  tauxReussite?: number;
+}
+
+interface ModuleSnapshot {
+  id: string;
+  titre: string;
+  description?: string | null;
+  ordre: number;
+  duree?: number | null;
+  contenu?: unknown;
+  objectifs?: string[];
+  items?: string[];
+}
+
 export async function GET(request: NextRequest) {
   try {
-    // Récupérer le token depuis les query params
+    // Récupérer le token et sessionId depuis les query params
     const token = request.nextUrl.searchParams.get("token");
-    const inscriptionId = request.nextUrl.searchParams.get("inscriptionId");
+    const sessionId = request.nextUrl.searchParams.get("sessionId");
 
     if (!token) {
       return NextResponse.json(
@@ -53,199 +90,292 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { apprenantId } = decoded;
+    const { apprenantId, organizationId } = decoded;
 
-    // Récupérer l'inscription LMS avec la formation et les modules
-    const inscription = await prisma.lMSInscription.findFirst({
-      where: inscriptionId
-        ? { id: inscriptionId, apprenantId }
-        : { apprenantId },
-      include: {
-        formation: {
-          include: {
-            modules: {
-              orderBy: { ordre: "asc" },
+    // Si sessionId fourni, récupérer cette session spécifique
+    // Sinon, récupérer la première session de l'apprenant
+    let session;
+
+    if (sessionId) {
+      // Vérifier que l'apprenant participe à cette session
+      const participation = await prisma.sessionParticipantNew.findFirst({
+        where: {
+          apprenantId,
+          client: {
+            session: {
+              id: sessionId,
+              organizationId,
             },
-            // Récupérer TOUTES les évaluations (QCM, ateliers, positionnement, évaluation finale)
-            evaluations: {
-              orderBy: { ordre: "asc" },
-              include: {
-                resultats: {
-                  where: { apprenantId },
-                  orderBy: { createdAt: "desc" },
-                  take: 1,
+          },
+        },
+        include: {
+          client: {
+            include: {
+              session: {
+                include: {
+                  formation: {
+                    include: {
+                      modules: { orderBy: { ordre: "asc" } },
+                      intervenants: {
+                        include: {
+                          intervenant: {
+                            select: {
+                              id: true,
+                              nom: true,
+                              prenom: true,
+                              fonction: true,
+                              specialites: true,
+                              bio: true,
+                              photoUrl: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  formateur: {
+                    select: {
+                      id: true,
+                      nom: true,
+                      prenom: true,
+                      fonction: true,
+                      specialites: true,
+                      bio: true,
+                      photoUrl: true,
+                    },
+                  },
                 },
               },
             },
           },
         },
-        progressionModules: true,
-      },
-    });
+      });
 
-    // Vérifier si l'apprenant a besoin du Module 0 (score positionnement < 10%)
-    const SEUIL_ADAPTATION = 10;
-    const positionnementEval = inscription?.formation?.evaluations?.find(e => e.type === "POSITIONNEMENT");
-    const positionnementResultat = positionnementEval?.resultats?.[0];
-    const needsModuleZero = positionnementResultat && positionnementResultat.score !== null && positionnementResultat.score < SEUIL_ADAPTATION;
+      if (!participation) {
+        return NextResponse.json(
+          { error: "Session non trouvée ou accès refusé" },
+          { status: 404 }
+        );
+      }
 
-    if (!inscription) {
-      return NextResponse.json({
-        formation: null,
-        modules: [],
-        progression: {
-          global: 0,
-          modulesTermines: 0,
-          totalModules: 0,
+      session = participation.client.session;
+    } else {
+      // Récupérer la première session de l'apprenant
+      const participation = await prisma.sessionParticipantNew.findFirst({
+        where: {
+          apprenantId,
+          client: {
+            session: {
+              organizationId,
+            },
+          },
+        },
+        include: {
+          client: {
+            include: {
+              session: {
+                include: {
+                  formation: {
+                    include: {
+                      modules: { orderBy: { ordre: "asc" } },
+                      intervenants: {
+                        include: {
+                          intervenant: {
+                            select: {
+                              id: true,
+                              nom: true,
+                              prenom: true,
+                              fonction: true,
+                              specialites: true,
+                              bio: true,
+                              photoUrl: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  formateur: {
+                    select: {
+                      id: true,
+                      nom: true,
+                      prenom: true,
+                      fonction: true,
+                      specialites: true,
+                      bio: true,
+                      photoUrl: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
         },
       });
+
+      if (!participation) {
+        return NextResponse.json({
+          formation: null,
+          modules: [],
+          equipePedagogique: [],
+        });
+      }
+
+      session = participation.client.session;
     }
 
-    // Filtrer les modules selon les besoins de l'apprenant
-    // Module 0 (isModuleZero: true) n'est affiché QUE si le score de positionnement < 10%
-    const modulesFilters = inscription.formation.modules.filter((module) => {
-      // Si c'est un Module 0, ne l'afficher que si l'apprenant en a besoin
-      if (module.isModuleZero) {
-        return needsModuleZero;
-      }
-      // Sinon, afficher tous les modules normaux
-      return true;
-    });
+    const formation = session.formation;
 
-    // Calculer la progression par module
-    const modulesAvecProgression = modulesFilters.map((module) => {
-      const progression = inscription.progressionModules.find(
-        (p) => p.moduleId === module.id
-      );
+    // Correction 432: Utiliser le snapshot si disponible, sinon fallback sur formation
+    const hasSnapshot = session.snapshotCreatedAt !== null;
+
+    // Titre et description
+    const titre = hasSnapshot && session.snapshotFormationTitre
+      ? session.snapshotFormationTitre
+      : formation.titre;
+
+    const description = hasSnapshot && session.snapshotFormationDescription
+      ? session.snapshotFormationDescription
+      : formation.description;
+
+    // Fiche pédagogique (depuis snapshot ou formation)
+    const fichePedagogique: FichePedagogiqueSnapshot = hasSnapshot && session.snapshotFichePedagogique
+      ? (session.snapshotFichePedagogique as FichePedagogiqueSnapshot)
+      : (formation.fichePedagogique as FichePedagogiqueSnapshot) || {};
+
+    // Modules (depuis snapshot ou formation)
+    const modulesSnapshot: ModuleSnapshot[] = hasSnapshot && session.snapshotModules
+      ? (session.snapshotModules as ModuleSnapshot[])
+      : formation.modules.map((m) => ({
+          id: m.id,
+          titre: m.titre,
+          description: m.description,
+          ordre: m.ordre,
+          duree: m.duree,
+          contenu: m.contenu,
+          objectifs: [],
+          items: [],
+        }));
+
+    // Formater les modules pour l'affichage
+    const formattedModules = modulesSnapshot.map((module) => {
+      // Parser le contenu du module
+      const contenu = module.contenu as { items?: string[]; description?: string } | string | null;
+      let items: string[] = [];
+
+      if (module.items && module.items.length > 0) {
+        items = module.items;
+      } else if (contenu && typeof contenu === "object" && contenu.items) {
+        items = contenu.items;
+      } else if (typeof contenu === "string") {
+        items = contenu.split("\n").filter(Boolean);
+      }
+
       return {
         id: module.id,
         titre: module.titre,
-        description: module.description,
+        description: module.description || null,
         ordre: module.ordre,
-        duree: module.duree,
-        objectifs: [],
-        contenu: module.contenu,
-        progression: progression?.progression || 0,
-        statut: progression?.statut || "NON_COMMENCE",
-        isModuleZero: module.isModuleZero || false,
+        dureeHeures: module.duree ? module.duree / 60 : null,
+        items,
       };
     });
 
-    // Calculer la progression globale (exclure Module 0 du calcul de progression)
-    const modulesStandard = modulesAvecProgression.filter((m) => !m.isModuleZero);
-    const modulesTermines = modulesStandard.filter(
-      (m) => m.statut === "COMPLETE"
-    ).length;
-    const totalModules = modulesStandard.length;
-    const progressionGlobale = totalModules > 0
-      ? Math.round((modulesTermines / totalModules) * 100)
-      : 0;
+    // Équipe pédagogique
+    const equipePedagogique: Array<{
+      id: string;
+      nom: string;
+      prenom: string;
+      fonction: string | null;
+      specialites: string[];
+      bio: string | null;
+      photoUrl: string | null;
+      estFormateurPrincipal: boolean;
+    }> = [];
 
-    // Calculer la durée totale (exclure Module 0)
-    const dureeHeures = modulesStandard.reduce((sum, m) => sum + ((m.duree || 0) / 60), 0);
+    // Ajouter le formateur principal
+    if (session.formateur) {
+      equipePedagogique.push({
+        id: session.formateur.id,
+        nom: session.formateur.nom,
+        prenom: session.formateur.prenom,
+        fonction: session.formateur.fonction,
+        specialites: session.formateur.specialites || [],
+        bio: session.formateur.bio,
+        photoUrl: session.formateur.photoUrl,
+        estFormateurPrincipal: true,
+      });
+    }
 
-    // Récupérer les données de la fiche pédagogique
-    const fichePedagogique = inscription.formation.fichePedagogique as {
-      objectifs?: string[];
-      contenu?: string;
-      methodsPedagogiques?: string[];
-      supportsPedagogiques?: Array<{ nom: string; url?: string; type: string }>;
-      methodesEvaluation?: string[];
-      accessibiliteHandicap?: string;
-    } | null;
+    // Ajouter les autres intervenants de la formation
+    for (const fi of formation.intervenants) {
+      // Ne pas dupliquer le formateur principal
+      if (fi.intervenant.id !== session.formateur?.id) {
+        equipePedagogique.push({
+          id: fi.intervenant.id,
+          nom: fi.intervenant.nom,
+          prenom: fi.intervenant.prenom,
+          fonction: fi.intervenant.fonction,
+          specialites: fi.intervenant.specialites || [],
+          bio: fi.intervenant.bio,
+          photoUrl: fi.intervenant.photoUrl,
+          estFormateurPrincipal: false,
+        });
+      }
+    }
 
-    // Récupérer les slides/supports par module
-    const slidesData = inscription.formation.slidesData as Array<{
-      moduleId?: string;
-      moduleTitre?: string;
-      exportUrl?: string;
-      editUrl?: string;
-      driveUrl?: string;
-      status?: string;
-    }> | null;
+    // Calculer la durée totale
+    const dureeHeures = formattedModules.reduce((sum, m) => sum + (m.dureeHeures || 0), 0) ||
+      fichePedagogique.dureeHeures ||
+      0;
 
-    // Mapper les évaluations pour l'apprenant (sans exposer les bonnes réponses sauf si déjà complété)
-    const evaluationsApprenant = inscription.formation.evaluations.map((evaluation) => {
-      const resultat = evaluation.resultats?.[0];
-      const estComplete = resultat?.status === "termine" || resultat?.status === "valide";
-
-      // Parser le contenu de l'évaluation
-      const contenu = evaluation.contenu as {
-        questions?: Array<{
-          question: string;
-          options?: string[];
-          correctAnswer?: number;
-          explanation?: string;
-        }>;
-        consignes?: string;
-        objectifs?: string[];
-        livrables?: string[];
-        critereEvaluation?: string[];
-      } | null;
-
-      return {
-        id: evaluation.id,
-        type: evaluation.type,
-        titre: evaluation.titre,
-        description: evaluation.description,
-        dureeEstimee: evaluation.dureeEstimee,
-        nombreQuestions: evaluation.nombreQuestions,
-        tempsLimite: evaluation.tempsLimite,
-        scoreMinimum: evaluation.scoreMinimum,
-        moduleId: evaluation.moduleId,
-        ordre: evaluation.ordre,
-        // Contenu des questions (masquer les réponses si pas encore complété)
-        questions: contenu?.questions?.map((q) => ({
-          question: q.question,
-          options: q.options,
-          // Ne montrer la bonne réponse que si l'évaluation est terminée
-          correctAnswer: estComplete ? q.correctAnswer : undefined,
-          explanation: estComplete ? q.explanation : undefined,
-        })),
-        // Pour les ateliers
-        consignes: contenu?.consignes,
-        objectifs: contenu?.objectifs,
-        livrables: contenu?.livrables,
-        critereEvaluation: contenu?.critereEvaluation,
-        // Résultat de l'apprenant
-        resultat: resultat ? {
-          score: resultat.score,
-          status: resultat.status,
-          tentative: resultat.tentative,
-          completedAt: resultat.completedAt,
-          feedbackFormateur: resultat.feedbackFormateur,
-        } : null,
-      };
-    });
-
+    // Retourner les données du programme (version pédagogique, sans infos commerciales)
     return NextResponse.json({
+      // Informations de base
+      session: {
+        id: session.id,
+        reference: session.reference,
+        nom: session.nom,
+        modalite: session.modalite,
+      },
       formation: {
-        id: inscription.formation.id,
-        titre: inscription.formation.titre,
-        description: inscription.formation.description,
+        id: formation.id,
+        titre,
+        description,
+        image: formation.image,
         dureeHeures,
-        objectifsPedagogiques: fichePedagogique?.objectifs || [],
-        contenuPedagogique: fichePedagogique?.contenu || null,
-        methodsPedagogiques: fichePedagogique?.methodsPedagogiques || [],
-        supportsPedagogiques: fichePedagogique?.supportsPedagogiques || [],
-        methodesEvaluation: fichePedagogique?.methodesEvaluation || [],
-        accessibiliteHandicap: fichePedagogique?.accessibiliteHandicap || null,
-        modalite: null,
-        publicCible: null,
-        prerequis: null,
-        moyensPedagogiques: null,
-        reference: null,
+        dureeJours: fichePedagogique.dureeJours || null,
+        // Objectifs pédagogiques
+        objectifsPedagogiques: fichePedagogique.objectifs || [],
+        // Profil des bénéficiaires
+        publicVise: fichePedagogique.publicVise || null,
+        prerequis: fichePedagogique.prerequis || null,
+        // Méthodologie
+        moyensPedagogiques: fichePedagogique.moyensPedagogiques || null,
+        methodsPedagogiques: fichePedagogique.methodsPedagogiques || [],
+        supportsPedagogiques: fichePedagogique.supportsPedagogiques || [],
+        // Évaluation
+        methodesEvaluation: fichePedagogique.methodesEvaluation || [],
+        suiviEvaluation: fichePedagogique.suiviEvaluation || null,
+        // Ressources
+        ressourcesPedagogiques: fichePedagogique.ressourcesPedagogiques || null,
+        // Accessibilité
+        accessibiliteHandicap: fichePedagogique.accessibiliteHandicap || null,
+        // Équipe pédagogique texte
+        equipePedagogiqueDescription: fichePedagogique.equipePedagogique || null,
+        // Dates (pour info)
+        createdAt: formation.createdAt,
+        updatedAt: formation.updatedAt,
+        // Snapshot info
+        snapshotCreatedAt: session.snapshotCreatedAt,
       },
-      modules: modulesAvecProgression,
-      // Slides/Supports par module
-      slides: slidesData || [],
-      // Évaluations disponibles pour l'apprenant
-      evaluations: evaluationsApprenant,
-      progression: {
-        global: inscription.progression || progressionGlobale,
-        modulesTermines,
-        totalModules,
-      },
+      // Contenu de la formation (modules)
+      modules: formattedModules,
+      // Équipe pédagogique (intervenants)
+      equipePedagogique,
     });
   } catch (error) {
     console.error("Erreur API programme apprenant:", error);

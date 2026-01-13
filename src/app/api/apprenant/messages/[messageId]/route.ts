@@ -85,6 +85,7 @@ export async function PATCH(
       });
     } else {
       // Message de l'apprenant - marquer les réponses comme lues
+      // Correction 423: Aussi remettre hasNewReply à false
       await prisma.notification.update({
         where: { id: messageId },
         data: {
@@ -92,6 +93,7 @@ export async function PATCH(
             ...currentMetadata,
             repliesReadByApprenant: true,
             repliesReadByApprenantAt: new Date().toISOString(),
+            hasNewReply: false, // Correction 423: Plus de nouvelle réponse
           },
         },
       });

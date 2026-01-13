@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { WizardStep } from "./types";
-import { Users, CreditCard, MapPin, GraduationCap, FileText, Check } from "lucide-react";
+import { Users, CreditCard, MapPin, GraduationCap, FileText, Check, UserCircle } from "lucide-react";
 
 interface Step {
   id: WizardStep;
@@ -9,12 +9,14 @@ interface Step {
   icon: React.ReactNode;
 }
 
+// Correction 433a: Ajout de l'étape "Espace apprenant"
 const steps: Step[] = [
   { id: "clients", label: "Clients & Participants", icon: <Users size={18} /> },
   { id: "tarifs", label: "Tarifs", icon: <CreditCard size={18} /> },
   { id: "lieu", label: "Lieu & Dates", icon: <MapPin size={18} /> },
   { id: "formateurs", label: "Formateur(s)", icon: <GraduationCap size={18} /> },
   { id: "documents", label: "Documents", icon: <FileText size={18} /> },
+  { id: "espaceApprenant", label: "Espace apprenant", icon: <UserCircle size={18} /> },
 ];
 
 interface WizardStepperProps {

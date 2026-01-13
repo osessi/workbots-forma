@@ -17,6 +17,7 @@ import StepTarifs from "./StepTarifs";
 import StepLieu from "./StepLieu";
 import StepFormateurs from "./StepFormateurs";
 import StepDocuments from "./StepDocuments";
+import StepEspaceApprenant from "./StepEspaceApprenant";
 import { Loader2 } from "lucide-react";
 
 // Données initiales de session (pré-remplissage depuis TrainingSession)
@@ -278,12 +279,14 @@ export default function DocumentsWizard({
   }, [saveSession]);
 
   // Navigation entre les étapes
+  // Correction 433a: Ajout de l'étape "espaceApprenant"
   const stepsOrder: WizardStep[] = [
     "clients",
     "tarifs",
     "lieu",
     "formateurs",
     "documents",
+    "espaceApprenant",
   ];
 
   const goToStep = (step: WizardStep) => {
@@ -470,7 +473,19 @@ export default function DocumentsWizard({
             initialGeneratedDocs={generatedDocs}
             onGeneratedDocsChange={handleGeneratedDocsChange}
             onPrev={goPrev}
+            onNext={formation.sessionId ? goNext : undefined}
             onGenerate={handleGenerate}
+          />
+        )}
+
+        {/* Correction 433a: Étape Espace Apprenant */}
+        {currentStep === "espaceApprenant" && formation.sessionId && (
+          <StepEspaceApprenant
+            clients={data.clients}
+            formateurs={data.formateurs}
+            sessionId={formation.sessionId}
+            formationTitre={formation.titre}
+            onPrev={goPrev}
           />
         )}
       </div>

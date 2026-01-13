@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Récupérer les améliorations
-    const [ameliorations, total] = await Promise.all([
+    const [ameliorations, filteredTotal, totalGlobal] = await Promise.all([
       prisma.actionAmelioration.findMany({
         where: whereClause,
         include: {
@@ -103,6 +103,12 @@ export async function GET(request: NextRequest) {
       prisma.actionAmelioration.count({
         where: whereClause,
       }),
+      // Correction 430: Total global sans filtre pour l'onglet "Toutes"
+      prisma.actionAmelioration.count({
+        where: {
+          organizationId: user.organizationId,
+        },
+      }),
     ]);
 
     // Statistiques
@@ -124,8 +130,9 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // Correction 430: Utiliser totalGlobal pour stats.total (onglet "Toutes")
     const stats = {
-      total,
+      total: totalGlobal,
       parStatut: Object.fromEntries(statsStatut.map(s => [s.statut, s._count.id])),
       parOrigine: Object.fromEntries(statsOrigine.map(s => [s.origine, s._count.id])),
       parPriorite: Object.fromEntries(statsPriorite.map(s => [s.priorite, s._count.id])),
@@ -133,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ameliorations,
-      total,
+      total: filteredTotal,
       stats,
     });
   } catch (error) {

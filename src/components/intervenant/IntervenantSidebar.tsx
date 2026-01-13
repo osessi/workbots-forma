@@ -17,6 +17,7 @@ import {
   Loader2,
   MessageCircle,
   ClipboardList,
+  MessageSquare, // Correction 431
 } from "lucide-react";
 
 interface NavItem {
@@ -113,6 +114,13 @@ export default function IntervenantSidebar({
       name: "Documents",
       href: "/intervenant/documents",
       icon: FileText,
+      section: "main",
+    },
+    // Correction 431: Messagerie apprenants
+    {
+      name: "Messages apprenants",
+      href: "/intervenant/messages",
+      icon: MessageSquare,
       section: "main",
     },
     // Section secondaire

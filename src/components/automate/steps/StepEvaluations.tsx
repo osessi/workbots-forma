@@ -1927,6 +1927,32 @@ export const StepEvaluations: React.FC<StepEvaluationsProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Correction 364: Mention Qualiopi IND 2 - Taux de progression */}
+      {/* Affichée si les deux évaluations (positionnement + finale) existent */}
+      {(positionnement || evaluationFinale) && (
+        <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-800 dark:from-blue-900/20 dark:to-indigo-900/20">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-blue-600 dark:text-blue-400">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+                  Qualiopi - IND 2
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                Le <strong>taux de progression des apprenants</strong> affiché sur le catalogue en ligne est calculé à partir de l&apos;écart entre le score au test de positionnement et le score à l&apos;évaluation finale (par apprenant), puis moyenné sur l&apos;ensemble des apprenants de toutes les sessions liées à cette formation.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Test de positionnement et Evaluation finale */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Test de positionnement */}

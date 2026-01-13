@@ -42,6 +42,23 @@ const FIRST_PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_MM * 2 + HEADER_HEIG
 // Pages suivantes ont plus d'espace (pas de header)
 const OTHER_PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_PX - (MARGIN_MM * 2 + FOOTER_HEIGHT_MM) * MM_TO_PX;
 
+// Correction 374: Informations de l'organisme pour en-tête/pied de page
+export interface OrganisationInfo {
+  nom?: string;
+  nomCommercial?: string;
+  siret?: string;
+  numeroFormateur?: string;
+  prefectureRegion?: string;
+  adresse?: string;
+  codePostal?: string;
+  ville?: string;
+  telephone?: string;
+  email?: string;
+  logo?: string;
+  representantNom?: string;
+  representantPrenom?: string;
+}
+
 interface DocumentPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -57,6 +74,8 @@ interface DocumentPreviewModalProps {
   onSave?: (content: string) => Promise<void>;
   onExportPDF?: () => void;
   onExportWord?: () => void;
+  // Correction 374: Ajout des infos organisme pour en-tête/pied de page
+  organisation?: OrganisationInfo;
 }
 
 export default function DocumentPreviewModal({
@@ -66,6 +85,7 @@ export default function DocumentPreviewModal({
   onSave,
   onExportPDF,
   onExportWord,
+  organisation,
 }: DocumentPreviewModalProps) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedContent, setEditedContent] = useState("");
@@ -83,6 +103,62 @@ export default function DocumentPreviewModal({
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Correction 374: Générer l'en-tête automatique avec le logo de l'organisme
+  const generateAutoHeader = useCallback((org: OrganisationInfo | undefined): string => {
+    if (!org?.logo) return "";
+    return `
+      <div style="display: flex; justify-content: flex-start; align-items: center; padding-bottom: 10px;">
+        <img src="${org.logo}" alt="Logo" style="max-height: 60px; max-width: 180px; height: auto; width: auto;" onerror="this.style.display='none'" />
+      </div>
+    `;
+  }, []);
+
+  // Correction 374: Générer le pied de page automatique avec les infos de l'organisme
+  const generateAutoFooter = useCallback((org: OrganisationInfo | undefined): string => {
+    if (!org) return "";
+
+    const nomAffiche = org.nomCommercial || org.nom || "";
+    const adresseLigne = [org.adresse, org.codePostal, org.ville].filter(Boolean).join(", ");
+    const representant = [org.representantPrenom, org.representantNom].filter(Boolean).join(" ");
+
+    const lines: string[] = [];
+
+    // Ligne 1: Nom commercial | Adresse
+    if (nomAffiche || adresseLigne) {
+      lines.push([nomAffiche, adresseLigne].filter(Boolean).join(" – "));
+    }
+
+    // Ligne 2: SIRET + NDA
+    const infosPro: string[] = [];
+    if (org.siret) infosPro.push(`SIRET : ${org.siret}`);
+    if (org.numeroFormateur) {
+      const regionInfo = org.prefectureRegion ? ` (${org.prefectureRegion})` : "";
+      infosPro.push(`N° d'activité : ${org.numeroFormateur}${regionInfo}`);
+    }
+    if (infosPro.length > 0) {
+      lines.push(infosPro.join(" – "));
+    }
+
+    // Ligne 3: Représentant légal
+    if (representant) {
+      lines.push(`Représentant légal : ${representant}`);
+    }
+
+    // Ligne 4: Date de génération
+    const dateGeneration = new Date().toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric"
+    });
+    lines.push(`Document généré le ${dateGeneration}`);
+
+    return `
+      <div style="font-size: 8pt; color: #666; text-align: center; line-height: 1.4;">
+        ${lines.map(line => `<div>${line}</div>`).join("")}
+      </div>
+    `;
+  }, []);
+
   // Initialiser le contenu editable
   useEffect(() => {
     if (document?.content) {
@@ -92,6 +168,8 @@ export default function DocumentPreviewModal({
       setEditedContent(contentStr);
       setPreviewContent(document.renderedContent || "");
     }
+
+    // Correction 374: Générer automatiquement l'en-tête avec le logo si non fourni
     if (document?.renderedHeader) {
       setEditedHeader(document.renderedHeader);
       // Créer un JSON TipTap basique pour l'en-tête
@@ -100,7 +178,13 @@ export default function DocumentPreviewModal({
         content: [{ type: "paragraph", content: [{ type: "text", text: document.renderedHeader.replace(/<[^>]*>/g, '') }] }]
       });
       setEditedHeaderJson(headerJson);
+    } else if (organisation?.logo) {
+      // Générer l'en-tête automatiquement avec le logo de l'organisme
+      const autoHeader = generateAutoHeader(organisation);
+      setEditedHeader(autoHeader);
     }
+
+    // Correction 374: Générer automatiquement le pied de page si non fourni
     if (document?.renderedFooter) {
       setEditedFooter(document.renderedFooter);
       // Créer un JSON TipTap basique pour le pied de page
@@ -109,8 +193,12 @@ export default function DocumentPreviewModal({
         content: [{ type: "paragraph", content: [{ type: "text", text: document.renderedFooter.replace(/<[^>]*>/g, '') }] }]
       });
       setEditedFooterJson(footerJson);
+    } else if (organisation) {
+      // Générer le pied de page automatiquement avec les infos de l'organisme
+      const autoFooter = generateAutoFooter(organisation);
+      setEditedFooter(autoFooter);
     }
-  }, [document?.content, document?.renderedContent, document?.renderedHeader, document?.renderedFooter]);
+  }, [document?.content, document?.renderedContent, document?.renderedHeader, document?.renderedFooter, organisation, generateAutoHeader, generateAutoFooter]);
 
   // Re-render le contenu quand on quitte le mode édition
   const handleSwitchToPreview = useCallback(() => {
@@ -300,15 +388,19 @@ export default function DocumentPreviewModal({
       return;
     }
 
+    // Correction 374: Styles PDF améliorés avec titre centré, pied de page sur chaque page, et gestion des sauts de page
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>${document?.titre || "Document"}</title>
         <style>
-          @page { size: A4; margin: ${MARGIN_MM}mm; }
+          @page {
+            size: A4;
+            margin: ${MARGIN_MM}mm ${MARGIN_MM - 5}mm 30mm ${MARGIN_MM - 5}mm;
+          }
           * { box-sizing: border-box; }
-          body {
+          html, body {
             font-family: 'Georgia', 'Times New Roman', serif;
             font-size: 11pt;
             line-height: 1.6;
@@ -316,33 +408,40 @@ export default function DocumentPreviewModal({
             margin: 0;
             padding: 0;
           }
+          /* Correction 374: En-tête avec logo sur la première page uniquement */
           .header {
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 12px;
             margin-bottom: 20px;
           }
           .header img {
-            max-width: 200px;
+            max-width: 180px;
+            max-height: 60px;
             height: auto;
+            width: auto;
           }
+          /* Correction 374: Pied de page fixe sur chaque page */
           .footer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
+            padding: ${MARGIN_MM - 5}mm;
             border-top: 1px solid #ddd;
-            padding-top: 10px;
-            font-size: 9pt;
+            padding-top: 8px;
+            font-size: 8pt;
             color: #666;
+            background: white;
           }
           img { max-width: 100%; height: auto; }
-          table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+          table { border-collapse: collapse; width: 100%; margin: 15px 0; page-break-inside: avoid; }
           td, th { border: 1px solid #ddd; padding: 10px; text-align: left; }
           th { background: #f5f5f5; font-weight: 700; }
-          h1 { font-size: 18pt; font-weight: 700; color: #111; margin: 0 0 16px 0; text-transform: uppercase; }
-          h2 { font-size: 13pt; font-weight: 700; color: #222; margin: 24px 0 12px 0; border-bottom: 1px solid #e5e5e5; padding-bottom: 6px; }
-          h3, h4 { font-size: 11pt; font-weight: 700; color: #333; margin: 16px 0 8px 0; }
-          p { margin: 0; padding: 0; min-height: 1.2em; text-align: justify; }
+          /* Correction 374: Titre centré */
+          h1 { font-size: 18pt; font-weight: 700; color: #111; margin: 0 0 16px 0; text-transform: uppercase; text-align: center; letter-spacing: 1px; }
+          h2 { font-size: 13pt; font-weight: 700; color: #222; margin: 24px 0 12px 0; border-bottom: 1px solid #e5e5e5; padding-bottom: 6px; page-break-after: avoid; }
+          h3, h4 { font-size: 11pt; font-weight: 700; color: #333; margin: 16px 0 8px 0; page-break-after: avoid; }
+          p { margin: 0; padding: 0; min-height: 1.2em; text-align: justify; orphans: 2; widows: 2; }
           p:empty { min-height: 1.2em; }
           ul, ol { margin: 10px 0; padding-left: 25px; }
           li { margin: 4px 0; }
@@ -354,8 +453,9 @@ export default function DocumentPreviewModal({
             border-left: 3px solid #4277FF;
             padding: 12px 16px;
             margin: 12px 0;
+            page-break-inside: avoid;
           }
-          /* Saut de page pour l'impression */
+          /* Correction 374: Sauts de page améliorés */
           .page-break {
             display: block;
             page-break-after: always;
@@ -366,10 +466,22 @@ export default function DocumentPreviewModal({
             border: none;
             visibility: hidden;
           }
+          /* Éviter les sauts de page au milieu des éléments */
+          .section, .signature-zone, blockquote {
+            page-break-inside: avoid;
+          }
+          /* Garder les titres avec leur contenu */
+          h1, h2, h3, h4 {
+            page-break-after: avoid;
+          }
           @media print {
             .page-break {
               page-break-after: always !important;
               break-after: page !important;
+            }
+            .footer {
+              position: fixed;
+              bottom: 0;
             }
           }
         </style>
@@ -403,6 +515,7 @@ export default function DocumentPreviewModal({
     const bodyContent = previewContent || document?.renderedContent || "";
     const footerContent = editedFooter || document?.renderedFooter || "";
 
+    // Correction 374: Styles Word améliorés avec titre centré
     setIsExporting(true);
     const wordContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>
@@ -426,26 +539,30 @@ export default function DocumentPreviewModal({
             color: #1a1a1a;
           }
           .header {
-            border-bottom: 2px solid #ddd;
+            border-bottom: 1px solid #ddd;
             padding-bottom: 10px;
             margin-bottom: 20px;
           }
           .header img {
-            max-width: 200px;
+            max-width: 180px;
+            max-height: 60px;
             height: auto;
+            width: auto;
           }
           .footer {
             border-top: 1px solid #ccc;
             padding-top: 10px;
             margin-top: 20px;
-            font-size: 9pt;
+            font-size: 8pt;
             color: #666;
+            text-align: center;
           }
           img { max-width: 100%; height: auto; }
           table { border-collapse: collapse; width: 100%; margin: 15px 0; }
           td, th { border: 1px solid #ccc; padding: 8px; text-align: left; }
           th { background: #f5f5f5; font-weight: bold; }
-          h1 { font-size: 18pt; font-weight: bold; color: #111; margin: 0 0 16px 0; text-transform: uppercase; }
+          /* Correction 374: Titre centré */
+          h1 { font-size: 18pt; font-weight: bold; color: #111; margin: 0 0 16px 0; text-transform: uppercase; text-align: center; letter-spacing: 1px; }
           h2 { font-size: 13pt; font-weight: bold; color: #222; margin: 24px 0 12px 0; border-bottom: 1px solid #e5e5e5; padding-bottom: 6px; }
           h3, h4 { font-size: 11pt; font-weight: bold; color: #333; margin: 16px 0 8px 0; }
           p { margin: 0; padding: 0; min-height: 1.2em; text-align: justify; }
@@ -736,6 +853,7 @@ export default function DocumentPreviewModal({
                       line-height: 1.6;
                       color: #1a1a1a;
                     }
+                    /* Correction 374: Titre centré */
                     .document-preview h1 {
                       font-size: 18pt;
                       font-weight: 700;
@@ -743,6 +861,7 @@ export default function DocumentPreviewModal({
                       margin: 0 0 16px 0;
                       text-transform: uppercase;
                       letter-spacing: 1px;
+                      text-align: center;
                     }
                     .document-preview h2 {
                       font-size: 13pt;

@@ -257,11 +257,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Nouveaux champs Qualiopi
-    if (typeof body.certificatQualiopiUrl === "string") {
+    if (typeof body.certificatQualiopiUrl === "string" || body.certificatQualiopiUrl === null) {
       updateData.certificatQualiopiUrl = body.certificatQualiopiUrl;
     }
 
-    if (typeof body.categorieQualiopi === "string") {
+    if (typeof body.categorieQualiopi === "string" || body.categorieQualiopi === null) {
       updateData.categorieQualiopi = body.categorieQualiopi || null;
     }
 

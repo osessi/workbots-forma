@@ -76,30 +76,36 @@ async function fetchRSCompetencesFromFranceCompetences(numeroRS: string): Promis
 
 /**
  * Parse le HTML de France Compétences pour extraire les compétences
+ * Correction 367: Amélioration du parsing pour récupérer TOUTES les compétences
  */
 function parseCompetencesFromHTML(html: string, numeroRS: string): RSCompetence[] {
   const competences: RSCompetence[] = [];
 
-  // Patterns pour détecter les blocs de compétences
+  // Chercher la section "Compétences attestées" dans le HTML
   // France Compétences utilise différents formats selon les fiches
-  const patterns = [
-    // Pattern 1: Liste numérotée de compétences
-    /<li[^>]*>\s*(?:C\d+|Compétence\s*\d+)[^<]*[:\-–]?\s*([^<]+)/gi,
-    // Pattern 2: Div avec classe compétence
-    /<div[^>]*class="[^"]*competence[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-    // Pattern 3: Paragraphes dans section compétences
-    /<p[^>]*>\s*(?:C\d+|BC\d+)[^<]*[:\-–]?\s*([^<]+)/gi,
-    // Pattern 4: Tableau avec compétences
-    /<td[^>]*>\s*(?:C\d+|Compétence)[^<]*<\/td>\s*<td[^>]*>([^<]+)/gi,
-  ];
 
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const intitule = match[1]
+  // Pattern pour trouver le bloc des compétences attestées
+  const competencesBlockMatch = html.match(
+    /Comp[ée]tences\s*attest[ée]es[\s\S]*?<(?:ul|ol)[^>]*>([\s\S]*?)<\/(?:ul|ol)>/i
+  );
+
+  if (competencesBlockMatch) {
+    // Extraire les items de la liste
+    const listItems = competencesBlockMatch[1].match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+
+    listItems.forEach((item, index) => {
+      const intitule = item
         .replace(/<[^>]+>/g, '') // Supprimer les balises HTML
         .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&rsquo;/g, "'")
+        .replace(/&lsquo;/g, "'")
+        .replace(/&eacute;/g, 'é')
+        .replace(/&egrave;/g, 'è')
+        .replace(/&agrave;/g, 'à')
+        .replace(/&ccedil;/g, 'ç')
         .replace(/&#\d+;/g, '')
+        .replace(/\s+/g, ' ')
         .trim();
 
       if (intitule.length > 10 && !competences.some(c => c.intitule === intitule)) {
@@ -108,6 +114,43 @@ function parseCompetencesFromHTML(html: string, numeroRS: string): RSCompetence[
           numero: competences.length + 1,
           intitule,
         });
+      }
+    });
+  }
+
+  // Si aucune compétence trouvée, essayer d'autres patterns
+  if (competences.length === 0) {
+    const patterns = [
+      // Pattern 1: Liste numérotée de compétences
+      /<li[^>]*>\s*(?:C\d+|Compétence\s*\d+)[^<]*[:\-–]?\s*([^<]+)/gi,
+      // Pattern 2: Div avec classe compétence
+      /<div[^>]*class="[^"]*competence[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+      // Pattern 3: Paragraphes dans section compétences
+      /<p[^>]*>\s*(?:C\d+|BC\d+)[^<]*[:\-–]?\s*([^<]+)/gi,
+      // Pattern 4: Tableau avec compétences
+      /<td[^>]*>\s*(?:C\d+|Compétence)[^<]*<\/td>\s*<td[^>]*>([^<]+)/gi,
+      // Pattern 5: Lignes de texte après "Compétences attestées"
+      /Comp[ée]tences\s*attest[ée]es[\s\S]*?<p[^>]*>([^<]+)<\/p>/gi,
+    ];
+
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(html)) !== null) {
+        const intitule = match[1]
+          .replace(/<[^>]+>/g, '') // Supprimer les balises HTML
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&#\d+;/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (intitule.length > 10 && !competences.some(c => c.intitule === intitule)) {
+          competences.push({
+            id: `RS${numeroRS}-C${competences.length + 1}`,
+            numero: competences.length + 1,
+            intitule,
+          });
+        }
       }
     }
   }
@@ -120,6 +163,68 @@ function parseCompetencesFromHTML(html: string, numeroRS: string): RSCompetence[
  * Utilisée en fallback si le scraping échoue
  */
 const RS_DATABASE: Record<string, RSFicheData> = {
+  // Correction 367: Ajout RS6411 avec les 9 compétences exactes de France Compétences
+  "6411": {
+    numeroRS: "RS6411",
+    intitule: "Maîtrisez l'Art des Coiffures de Prestige",
+    nombreCompetences: 9,
+    competences: [
+      {
+        id: "RS6411-C1",
+        numero: 1,
+        intitule: "Recueillir auprès de la cliente les informations nécessaires sur la coiffure événementielle souhaitée ainsi que sur le type d'évènement",
+        description: "Analyse des besoins client, type d'événement, contraintes techniques",
+      },
+      {
+        id: "RS6411-C2",
+        numero: 2,
+        intitule: "Sélectionner les produits et le matériel nécessaires à la coiffure événementielle choisie",
+        description: "Choix des produits capillaires, outils et accessoires adaptés",
+      },
+      {
+        id: "RS6411-C3",
+        numero: 3,
+        intitule: "Réaliser la coiffure événementielle en appliquant les techniques de coiffure spécifiques",
+        description: "Mise en œuvre des techniques professionnelles de coiffure événementielle",
+      },
+      {
+        id: "RS6411-C4",
+        numero: 4,
+        intitule: "Réaliser un chignon événementiel, de mariée ou sophistiqué",
+        description: "Techniques de chignons élaborés pour événements et mariages",
+      },
+      {
+        id: "RS6411-C5",
+        numero: 5,
+        intitule: "Procéder à une pose de bijou de tête ou d'un voile de mariée",
+        description: "Intégration harmonieuse d'accessoires dans la coiffure",
+      },
+      {
+        id: "RS6411-C6",
+        numero: 6,
+        intitule: "Réaliser une pose de rajouts ou d'extensions de cheveux à clip",
+        description: "Techniques de pose d'extensions et rajouts temporaires",
+      },
+      {
+        id: "RS6411-C7",
+        numero: 7,
+        intitule: "Réaliser un changement de coiffure au cours d'un événement",
+        description: "Adaptation et transformation de la coiffure en cours d'événement",
+      },
+      {
+        id: "RS6411-C8",
+        numero: 8,
+        intitule: "Évaluer le résultat de la coiffure événementielle",
+        description: "Contrôle qualité et ajustements finaux de la coiffure",
+      },
+      {
+        id: "RS6411-C9",
+        numero: 9,
+        intitule: "Développer sa présence sur les réseaux sociaux",
+        description: "Communication digitale et promotion de son activité de coiffure événementielle",
+      },
+    ],
+  },
   "6150": {
     numeroRS: "RS6150",
     intitule: "Marketing et communication digitale",

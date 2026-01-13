@@ -10,7 +10,7 @@
 // - Documents
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -44,6 +44,12 @@ import {
   Eye,
   Reply,
   Inbox,
+  Plus,
+  Pencil,
+  Check,
+  X,
+  Paperclip,
+  Image as ImageIcon,
 } from "lucide-react";
 
 // Types
@@ -62,6 +68,11 @@ interface Formation {
   id: string;
   titre: string;
   tarifAffiche?: number | null;
+  fichePedagogique?: {
+    tarifEntreprise?: string | number;
+    tarifIndependant?: string | number;
+    tarifParticulier?: string | number;
+  } | null;
 }
 
 interface PreInscription {
@@ -180,6 +191,14 @@ interface Stats {
   totalDocuments: number;
 }
 
+// Correction 421: Type pour les pièces jointes
+interface Attachment {
+  name: string;
+  url: string;
+  size?: number;
+  type?: string;
+}
+
 // Type pour les messages
 interface MessageReply {
   id: string;
@@ -187,6 +206,7 @@ interface MessageReply {
   senderName: string;
   senderEmail: string;
   createdAt: string;
+  attachments?: Attachment[]; // Correction 421
 }
 
 interface ApprenantMessage {
@@ -200,6 +220,7 @@ interface ApprenantMessage {
   readAt: string | null;
   createdAt: string;
   replies: MessageReply[];
+  attachments?: Attachment[]; // Correction 421
 }
 
 // Labels pour les sujets de message
@@ -217,6 +238,86 @@ const statutLabels = {
   INDEPENDANT: "Indépendant",
   PARTICULIER: "Particulier",
 };
+
+// Labels pour les situations professionnelles des pré-inscriptions (Correction 394)
+const situationProLabels: Record<string, string> = {
+  SALARIE: "Particulier",
+  INDEPENDANT: "Indépendant",
+  DEMANDEUR_EMPLOI: "Particulier",
+  ETUDIANT: "Particulier",
+  RETRAITE: "Particulier",
+  PARTICULIER: "Particulier",
+  AUTRE: "Particulier",
+};
+
+// Correction 421: Constantes pour l'upload de pièces jointes
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
+
+// Correction 421: Formater la taille du fichier
+function formatFileSize(bytes?: number): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+// Correction 421: Icône selon le type de fichier
+function getFileIconType(type?: string): string {
+  if (!type) return "file";
+  if (type.startsWith("image/")) return "image";
+  if (type.includes("pdf") || type.includes("word") || type.includes("document")) return "fileText";
+  return "file";
+}
+
+// Correction 395: Helper pour parser les tarifs (format "1500 € HT", "1 500 €", etc.)
+function parseTarif(value: unknown): number | null {
+  if (!value) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const cleanValue = value.replace(/[\s\u00A0]/g, '').replace(/[€HTTTC]/gi, '');
+    const match = cleanValue.match(/(\d+(?:[.,]\d+)?)/);
+    if (match) return parseFloat(match[1].replace(',', '.'));
+  }
+  return null;
+}
+
+// Correction 395: Récupère le tarif selon le profil (situationProfessionnelle)
+function getTarifPourProfil(
+  formation: Formation,
+  situationProfessionnelle: string | null
+): { montant: number | null; type: string } {
+  const fiche = formation.fichePedagogique as Record<string, unknown> | null;
+
+  // Déterminer le type de profil
+  const profil = situationProLabels[situationProfessionnelle || ""] || "Particulier";
+
+  if (fiche) {
+    if (profil === "Indépendant") {
+      const tarif = parseTarif(fiche.tarifIndependant);
+      if (tarif) return { montant: tarif, type: "HT" };
+    } else if (profil === "Particulier") {
+      const tarif = parseTarif(fiche.tarifParticulier);
+      if (tarif) return { montant: tarif, type: "TTC" };
+    }
+    // Pour Entreprise ou fallback
+    const tarifEntreprise = parseTarif(fiche.tarifEntreprise);
+    if (tarifEntreprise) return { montant: tarifEntreprise, type: "HT" };
+  }
+
+  // Fallback sur tarifAffiche
+  return { montant: formation.tarifAffiche || null, type: "HT" };
+}
 
 const statutColors = {
   SALARIE: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
@@ -269,12 +370,26 @@ const formatDateShort = (dateStr: string) => {
 export default function ApprenantDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const apprenantId = params.id as string;
+
+  // Correction 422: Lire les paramètres URL pour redirection depuis notifications
+  const tabParam = searchParams.get("tab");
+  const messageIdParam = searchParams.get("messageId");
+
+  // Déterminer l'onglet initial depuis les paramètres URL
+  const getInitialTab = (): "info" | "preinscriptions" | "sessions" | "documents" | "messages" => {
+    if (tabParam === "messages") return "messages";
+    if (tabParam === "documents") return "documents";
+    if (tabParam === "sessions") return "sessions";
+    if (tabParam === "preinscriptions") return "preinscriptions";
+    return "info";
+  };
 
   const [apprenant, setApprenant] = useState<Apprenant | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"info" | "preinscriptions" | "sessions" | "documents" | "messages">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "preinscriptions" | "sessions" | "documents" | "messages">(getInitialTab());
   const [selectedPreInscription, setSelectedPreInscription] = useState<PreInscription | null>(null);
 
   // Qualiopi IND 5 - États pour les notes avec historique
@@ -290,6 +405,10 @@ export default function ApprenantDetailPage() {
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // Correction 401: États pour le renommage de document
+  const [renamingDocId, setRenamingDocId] = useState<string | null>(null);
+  const [renamingDocName, setRenamingDocName] = useState("");
+  const [renamingLoading, setRenamingLoading] = useState(false);
 
   // États pour les messages
   const [messages, setMessages] = useState<ApprenantMessage[]>([]);
@@ -302,6 +421,13 @@ export default function ApprenantDetailPage() {
   const [newMessageSubject, setNewMessageSubject] = useState("");
   const [newMessageContent, setNewMessageContent] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+  // Correction 421: États pour les pièces jointes
+  const [replyAttachments, setReplyAttachments] = useState<Attachment[]>([]);
+  const [newMessageAttachments, setNewMessageAttachments] = useState<Attachment[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const attachmentInputRef = React.useRef<HTMLInputElement>(null);
+  const newMessageAttachmentInputRef = React.useRef<HTMLInputElement>(null);
 
   const loadApprenant = useCallback(async () => {
     try {
@@ -448,7 +574,7 @@ export default function ApprenantDetailPage() {
   }, [activeTab, apprenantId, loadMessages]);
 
   // Marquer un message comme lu
-  const handleMarkAsRead = async (messageId: string) => {
+  const handleMarkAsRead = useCallback(async (messageId: string) => {
     try {
       await fetch(`/api/donnees/apprenants/${apprenantId}/messages/${messageId}`, {
         method: "PATCH",
@@ -464,9 +590,88 @@ export default function ApprenantDetailPage() {
     } catch (error) {
       console.error("Erreur marquage message:", error);
     }
+  }, [apprenantId]);
+
+  // Correction 422: Sélectionner automatiquement le message depuis l'URL
+  useEffect(() => {
+    if (messageIdParam && messages.length > 0 && !selectedMessage) {
+      const targetMessage = messages.find((m) => m.id === messageIdParam);
+      if (targetMessage) {
+        setSelectedMessage(targetMessage);
+        // Marquer comme lu si c'est un message entrant non lu
+        if (targetMessage.type === "incoming" && !targetMessage.isRead) {
+          handleMarkAsRead(targetMessage.id);
+        }
+      }
+    }
+  }, [messageIdParam, messages, selectedMessage, handleMarkAsRead]);
+
+  // Correction 421: Upload de pièce jointe pour les messages
+  const handleAttachmentUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    targetList: "reply" | "newMessage"
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || uploadingAttachment) return;
+
+    // Vérifier le type
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      setUploadError(`Type non autorisé: ${file.name}. Acceptés: PDF, Word, Excel, Images.`);
+      return;
+    }
+
+    // Vérifier la taille
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError(`Fichier trop volumineux: ${file.name}. Maximum 10 Mo.`);
+      return;
+    }
+
+    setUploadingAttachment(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/messages/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.attachment) {
+          if (targetList === "reply") {
+            setReplyAttachments((prev) => [...prev, data.attachment]);
+          } else {
+            setNewMessageAttachments((prev) => [...prev, data.attachment]);
+          }
+        }
+      } else {
+        const err = await res.json();
+        setUploadError(err.error || "Erreur lors de l'upload");
+      }
+    } catch (error) {
+      console.error("Erreur upload pièce jointe:", error);
+      setUploadError("Erreur lors de l'upload du fichier");
+    } finally {
+      setUploadingAttachment(false);
+      // Reset input
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
   };
 
-  // Répondre à un message
+  // Correction 421: Supprimer une pièce jointe
+  const removeAttachment = (index: number, targetList: "reply" | "newMessage") => {
+    if (targetList === "reply") {
+      setReplyAttachments((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setNewMessageAttachments((prev) => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  // Répondre à un message (Correction 421: avec pièces jointes)
   const handleReplyMessage = async () => {
     if (!selectedMessage || !replyContent.trim() || sendingReply) return;
 
@@ -478,6 +683,7 @@ export default function ApprenantDetailPage() {
         body: JSON.stringify({
           messageId: selectedMessage.id,
           content: replyContent.trim(),
+          attachments: replyAttachments, // Correction 421
         }),
       });
 
@@ -495,6 +701,7 @@ export default function ApprenantDetailPage() {
           prev ? { ...prev, replies: [...prev.replies, data.reply] } : null
         );
         setReplyContent("");
+        setReplyAttachments([]); // Correction 421: Réinitialiser les pièces jointes
       }
     } catch (error) {
       console.error("Erreur envoi réponse:", error);
@@ -503,7 +710,7 @@ export default function ApprenantDetailPage() {
     }
   };
 
-  // Envoyer un nouveau message
+  // Envoyer un nouveau message (Correction 421: avec pièces jointes)
   const handleSendNewMessage = async () => {
     if (!newMessageContent.trim() || sendingMessage) return;
 
@@ -515,6 +722,7 @@ export default function ApprenantDetailPage() {
         body: JSON.stringify({
           subject: newMessageSubject.trim() || "Message de l'organisme",
           content: newMessageContent.trim(),
+          attachments: newMessageAttachments, // Correction 421
         }),
       });
 
@@ -523,6 +731,7 @@ export default function ApprenantDetailPage() {
         setMessages((prev) => [data.message, ...prev]);
         setNewMessageSubject("");
         setNewMessageContent("");
+        setNewMessageAttachments([]); // Correction 421: Réinitialiser les pièces jointes
         setShowNewMessageForm(false);
       }
     } catch (error) {
@@ -575,6 +784,48 @@ export default function ApprenantDetailPage() {
       }
     } catch (error) {
       console.error("Erreur suppression document:", error);
+    }
+  };
+
+  // Correction 401: Renommer un document
+  const startRenameDocument = (doc: ApprenantDocument) => {
+    // Extraire le nom sans extension
+    const lastDotIndex = doc.nom.lastIndexOf(".");
+    const nameWithoutExt = lastDotIndex > 0 ? doc.nom.substring(0, lastDotIndex) : doc.nom;
+    setRenamingDocId(doc.id);
+    setRenamingDocName(nameWithoutExt);
+  };
+
+  const cancelRenameDocument = () => {
+    setRenamingDocId(null);
+    setRenamingDocName("");
+  };
+
+  const handleRenameDocument = async (documentId: string) => {
+    if (!renamingDocName.trim()) {
+      cancelRenameDocument();
+      return;
+    }
+
+    setRenamingLoading(true);
+    try {
+      const res = await fetch(`/api/donnees/apprenants/${apprenantId}/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: renamingDocName.trim() }),
+      });
+
+      if (res.ok) {
+        const updatedDoc = await res.json();
+        setDocuments((prev) =>
+          prev.map((d) => (d.id === documentId ? { ...d, nom: updatedDoc.nom } : d))
+        );
+      }
+    } catch (error) {
+      console.error("Erreur renommage document:", error);
+    } finally {
+      setRenamingLoading(false);
+      cancelRenameDocument();
     }
   };
 
@@ -695,7 +946,7 @@ export default function ApprenantDetailPage() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push(`/donnees/apprenants?edit=${apprenant.id}`)}
+              onClick={() => router.push(`/donnees/apprenants?edit=${apprenant.id}&from=fiche`)}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
             >
               <Edit size={16} />
@@ -873,7 +1124,7 @@ export default function ApprenantDetailPage() {
                 {/* Statut et entreprise */}
                 <div className="space-y-6">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b dark:border-gray-700 pb-2">
-                    Situation professionnelle
+                    Profil
                   </h3>
 
                   <div className="space-y-4">
@@ -1138,11 +1389,18 @@ export default function ApprenantDetailPage() {
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                               {selectedPreInscription.formation.titre}
                             </h3>
-                            {selectedPreInscription.formation.tarifAffiche && (
-                              <p className="text-brand-600 font-medium mt-1">
-                                {selectedPreInscription.formation.tarifAffiche.toLocaleString("fr-FR")} € HT
-                              </p>
-                            )}
+{/* Correction 395: Afficher le tarif selon le profil */}
+                            {(() => {
+                              const tarifInfo = getTarifPourProfil(
+                                selectedPreInscription.formation,
+                                selectedPreInscription.situationProfessionnelle
+                              );
+                              return tarifInfo.montant ? (
+                                <p className="text-brand-600 font-medium mt-1">
+                                  {tarifInfo.montant.toLocaleString("fr-FR")} € {tarifInfo.type}
+                                </p>
+                              ) : null;
+                            })()}
                           </div>
                           <span className={`px-3 py-1 text-sm font-medium rounded-full ${preInscriptionStatutConfig[selectedPreInscription.statut]?.color}`}>
                             {preInscriptionStatutConfig[selectedPreInscription.statut]?.label}
@@ -1218,12 +1476,13 @@ export default function ApprenantDetailPage() {
                           </div>
                         )}
 
-                        {/* Situation pro au moment de la demande */}
+                        {/* Correction 393: Libellé "Statut lors de la demande" */}
+                        {/* Correction 394: Affichage en casse normale (Particulier, Indépendant, Entreprise) */}
                         {selectedPreInscription.situationProfessionnelle && (
                           <div>
-                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Situation lors de la demande</h4>
+                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Statut lors de la demande</h4>
                             <p className="text-gray-900 dark:text-white">
-                              {selectedPreInscription.situationProfessionnelle}
+                              {situationProLabels[selectedPreInscription.situationProfessionnelle] || "Particulier"}
                               {selectedPreInscription.entreprise && ` chez ${selectedPreInscription.entreprise}`}
                               {selectedPreInscription.poste && ` (${selectedPreInscription.poste})`}
                             </p>
@@ -1237,13 +1496,26 @@ export default function ApprenantDetailPage() {
                           )}
                         </div>
 
-                        <Link
-                          href={`/pre-inscriptions?view=${selectedPreInscription.id}`}
-                          className="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700"
-                        >
-                          Voir la pré-inscription complète
-                          <ChevronRight size={14} />
-                        </Link>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <Link
+                            href={`/pre-inscriptions?view=${selectedPreInscription.id}`}
+                            className="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700"
+                          >
+                            Voir la pré-inscription complète
+                            <ChevronRight size={14} />
+                          </Link>
+
+                          {/* Correction 399: Bouton "Créer une session" si pré-inscription acceptée */}
+                          {selectedPreInscription.statut === "ACCEPTEE" && (
+                            <Link
+                              href={`/sessions/creer?formationId=${selectedPreInscription.formation.id}&apprenantId=${apprenant?.id}&preinscriptionId=${selectedPreInscription.id}`}
+                              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors"
+                            >
+                              <Plus size={16} />
+                              Créer une session
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="text-center py-12 text-gray-500">
@@ -1313,7 +1585,15 @@ export default function ApprenantDetailPage() {
                 <div className="text-center py-12 text-gray-500">
                   <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                   <p className="text-lg mb-2">Aucune session</p>
-                  <p className="text-sm">Cet apprenant n'est inscrit à aucune session de formation.</p>
+                  <p className="text-sm mb-4">Cet apprenant n'est inscrit à aucune session de formation.</p>
+                  {/* Correction 400: Bouton Créer une session */}
+                  <Link
+                    href={`/sessions?create=true&apprenantId=${apprenant?.id}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors"
+                  >
+                    <Plus size={16} />
+                    Créer une session
+                  </Link>
                 </div>
               )}
 
@@ -1400,57 +1680,109 @@ export default function ApprenantDetailPage() {
                 </div>
               ) : documents.length > 0 ? (
                 <div className="space-y-3">
-                  {documents.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center flex-shrink-0">
-                        <File className="w-5 h-5 text-brand-600 dark:text-brand-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-white truncate">
-                          {doc.nom}
-                        </p>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          <span>{formatFileSize(doc.taille)}</span>
-                          <span>•</span>
-                          <span>{formatDateShort(doc.createdAt)}</span>
-                          {doc.createdBy && (
-                            <>
-                              <span>•</span>
-                              <span>par {doc.createdBy.firstName || doc.createdBy.email.split("@")[0]}</span>
-                            </>
+                  {documents.map((doc) => {
+                    const isRenaming = renamingDocId === doc.id;
+                    const extension = doc.nom.includes(".") ? doc.nom.substring(doc.nom.lastIndexOf(".")) : "";
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center flex-shrink-0">
+                          <File className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {/* Correction 401: Mode renommage inline */}
+                          {isRenaming ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={renamingDocName}
+                                onChange={(e) => setRenamingDocName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleRenameDocument(doc.id);
+                                  if (e.key === "Escape") cancelRenameDocument();
+                                }}
+                                autoFocus
+                                className="flex-1 px-2 py-1 text-sm font-medium bg-white dark:bg-gray-800 border border-brand-300 dark:border-brand-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                disabled={renamingLoading}
+                              />
+                              <span className="text-sm text-gray-500">{extension}</span>
+                              <button
+                                onClick={() => handleRenameDocument(doc.id)}
+                                disabled={renamingLoading}
+                                className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                title="Valider"
+                              >
+                                {renamingLoading ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <Check size={16} />
+                                )}
+                              </button>
+                              <button
+                                onClick={cancelRenameDocument}
+                                disabled={renamingLoading}
+                                className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                title="Annuler"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                              {doc.nom}
+                            </p>
                           )}
+                          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <span>{formatFileSize(doc.taille)}</span>
+                            <span>•</span>
+                            <span>{formatDateShort(doc.createdAt)}</span>
+                            {doc.createdBy && (
+                              <>
+                                <span>•</span>
+                                <span>par {doc.createdBy.firstName || doc.createdBy.email.split("@")[0]}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* Correction 401: Bouton renommer */}
+                          <button
+                            onClick={() => startRenameDocument(doc)}
+                            className="p-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            title="Renommer"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                          <a
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            title="Voir"
+                          >
+                            <Eye size={18} />
+                          </a>
+                          <button
+                            onClick={() => handleDownloadDocument(doc.url, doc.nom)}
+                            className="p-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            title="Télécharger"
+                          >
+                            <Download size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={18} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                          title="Voir"
-                        >
-                          <Eye size={18} />
-                        </a>
-                        <button
-                          onClick={() => handleDownloadDocument(doc.url, doc.nom)}
-                          className="p-2 text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                          title="Télécharger"
-                        >
-                          <Download size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteDocument(doc.id)}
-                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">
@@ -1512,12 +1844,74 @@ export default function ApprenantDetailPage() {
                         rows={4}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                       />
+                      {/* Correction 421: Upload de pièces jointes pour nouveau message */}
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={newMessageAttachmentInputRef}
+                            type="file"
+                            onChange={(e) => handleAttachmentUpload(e, "newMessage")}
+                            accept={ALLOWED_MIME_TYPES.join(",")}
+                            className="hidden"
+                            disabled={uploadingAttachment || sendingMessage}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => newMessageAttachmentInputRef.current?.click()}
+                            disabled={uploadingAttachment || sendingMessage}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {uploadingAttachment ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Paperclip className="w-3 h-3" />
+                            )}
+                            Ajouter une pièce jointe
+                          </button>
+                          <span className="text-xs text-gray-400">PDF, Word, Excel, Images (max 10 Mo)</span>
+                        </div>
+                        {uploadError && (
+                          <p className="text-xs text-red-500 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {uploadError}
+                          </p>
+                        )}
+                        {/* Liste des pièces jointes */}
+                        {newMessageAttachments.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {newMessageAttachments.map((att, idx) => (
+                              <div
+                                key={idx}
+                                className="inline-flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs"
+                              >
+                                {getFileIconType(att.type) === "image" ? (
+                                  <ImageIcon className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                                ) : getFileIconType(att.type) === "fileText" ? (
+                                  <FileText className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                                ) : (
+                                  <File className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                                )}
+                                <span className="text-gray-700 dark:text-gray-300 truncate max-w-[120px]">{att.name}</span>
+                                {att.size && <span className="text-gray-400">({formatFileSize(att.size)})</span>}
+                                <button
+                                  type="button"
+                                  onClick={() => removeAttachment(idx, "newMessage")}
+                                  className="text-gray-400 hover:text-red-500 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <div className="flex justify-end gap-2 mt-3">
                         <button
                           onClick={() => {
                             setShowNewMessageForm(false);
                             setNewMessageSubject("");
                             setNewMessageContent("");
+                            setNewMessageAttachments([]); // Correction 421
                           }}
                           className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                         >
@@ -1663,6 +2057,31 @@ export default function ApprenantDetailPage() {
                             <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-sm">
                               {selectedMessage.content}
                             </p>
+                            {/* Correction 421: Afficher les pièces jointes du message original */}
+                            {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {selectedMessage.attachments.map((att, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-2 py-1 bg-white/50 dark:bg-gray-800/50 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                                  >
+                                    {getFileIconType(att.type) === "image" ? (
+                                      <ImageIcon className="w-3 h-3" />
+                                    ) : getFileIconType(att.type) === "fileText" ? (
+                                      <FileText className="w-3 h-3" />
+                                    ) : (
+                                      <File className="w-3 h-3" />
+                                    )}
+                                    <span className="truncate max-w-[100px]">{att.name}</span>
+                                    {att.size && <span className="opacity-70">({formatFileSize(att.size)})</span>}
+                                    <Download className="w-3 h-3" />
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                             <p className="text-xs text-gray-500 mt-2">
                               {selectedMessage.senderName} - {new Date(selectedMessage.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                             </p>
@@ -1677,6 +2096,31 @@ export default function ApprenantDetailPage() {
                               <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-sm">
                                 {reply.content}
                               </p>
+                              {/* Correction 421: Afficher les pièces jointes de la réponse */}
+                              {reply.attachments && reply.attachments.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {reply.attachments.map((att, idx) => (
+                                    <a
+                                      key={idx}
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 px-2 py-1 bg-white/50 dark:bg-gray-800/50 rounded text-xs text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                                    >
+                                      {getFileIconType(att.type) === "image" ? (
+                                        <ImageIcon className="w-3 h-3" />
+                                      ) : getFileIconType(att.type) === "fileText" ? (
+                                        <FileText className="w-3 h-3" />
+                                      ) : (
+                                        <File className="w-3 h-3" />
+                                      )}
+                                      <span className="truncate max-w-[100px]">{att.name}</span>
+                                      {att.size && <span className="opacity-70">({formatFileSize(att.size)})</span>}
+                                      <Download className="w-3 h-3" />
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
                               <p className="text-xs text-gray-500 mt-2">
                                 {reply.senderName} - {new Date(reply.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                               </p>
@@ -1686,7 +2130,7 @@ export default function ApprenantDetailPage() {
 
                         {/* Zone de réponse (uniquement pour les messages reçus) */}
                         {selectedMessage.type === "incoming" && (
-                          <div className="pt-4 border-t dark:border-gray-700">
+                          <div className="pt-4 border-t dark:border-gray-700 space-y-3">
                             <div className="flex items-start gap-3">
                               <div className="flex-1">
                                 <textarea
@@ -1698,7 +2142,67 @@ export default function ApprenantDetailPage() {
                                 />
                               </div>
                             </div>
-                            <div className="flex justify-end mt-2">
+                            {/* Correction 421: Upload de pièces jointes pour les réponses */}
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  ref={attachmentInputRef}
+                                  type="file"
+                                  onChange={(e) => handleAttachmentUpload(e, "reply")}
+                                  accept={ALLOWED_MIME_TYPES.join(",")}
+                                  className="hidden"
+                                  disabled={uploadingAttachment || sendingReply}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => attachmentInputRef.current?.click()}
+                                  disabled={uploadingAttachment || sendingReply}
+                                  className="inline-flex items-center gap-1.5 px-2 py-1 text-xs border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                  {uploadingAttachment ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Paperclip className="w-3 h-3" />
+                                  )}
+                                  Pièce jointe
+                                </button>
+                                <span className="text-xs text-gray-400">PDF, Word, Excel, Images (max 10 Mo)</span>
+                              </div>
+                              {uploadError && (
+                                <p className="text-xs text-red-500 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  {uploadError}
+                                </p>
+                              )}
+                              {/* Liste des pièces jointes */}
+                              {replyAttachments.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {replyAttachments.map((att, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="inline-flex items-center gap-1.5 px-2 py-1 bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30 rounded text-xs"
+                                    >
+                                      {getFileIconType(att.type) === "image" ? (
+                                        <ImageIcon className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                                      ) : getFileIconType(att.type) === "fileText" ? (
+                                        <FileText className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                                      ) : (
+                                        <File className="w-3 h-3 text-brand-600 dark:text-brand-400" />
+                                      )}
+                                      <span className="text-gray-700 dark:text-gray-300 truncate max-w-[100px]">{att.name}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => removeAttachment(idx, "reply")}
+                                        className="text-gray-400 hover:text-red-500 transition-colors"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex justify-end">
                               <button
                                 onClick={handleReplyMessage}
                                 disabled={!replyContent.trim() || sendingReply}

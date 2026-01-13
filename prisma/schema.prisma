@@ -343,6 +343,10 @@ model Organization {
   veilleSources         VeilleSource[]
   veilleArticleLectures VeilleArticleLecture[]
   veilleConversations   VeilleConversation[]
+  veilleActions         VeilleAction[]        @relation("VeilleActions")
+
+  // Correction 431: Messages intervenant → apprenants
+  messagesIntervenant MessageIntervenant[]
 
   // Qualiopi IND 26 - Procédures qualité
   procedures Procedure[]
@@ -430,6 +434,8 @@ model User {
   // Qualiopi IND 23, 24, 25 - Veille réglementaire
   veilleArticleLectures VeilleArticleLecture[]
   veilleConversations   VeilleConversation[]
+  veilleActionsCreated  VeilleAction[]        @relation("VeilleActionsCreatedBy")
+  veillePreuvesCreated  VeilleActionPreuve[]  @relation("VeillePreuvesCreatedBy")
 
   // Module 7 & 8 - Qualiopi & Agent IA
   actionsCorrectivesResponsable ActionCorrective[]
@@ -1444,6 +1450,9 @@ model Apprenant {
   // Participants aux réunions vidéo
   videoParticipants VideoParticipant[]
 
+  // Correction 431: Lectures des messages intervenant
+  lecturesMessagesIntervenant MessageIntervenantLecture[] @relation("MessageIntervenantLectureApprenant")
+
   @@index([organizationId])
   @@index([entrepriseId])
   @@index([statut])
@@ -1568,6 +1577,9 @@ model Intervenant {
 
   // Participants aux réunions vidéo
   videoParticipants VideoParticipant[]
+
+  // Correction 431: Messages envoyés aux apprenants
+  messagesEnvoyes MessageIntervenant[] @relation("MessageIntervenantSender")
 
   @@index([organizationId])
   @@index([nom])
@@ -2091,11 +2103,10 @@ model SignatureEmargement {
 // ===========================================
 
 enum CRMStage {
-  ENTRANT // Nouveau prospect entrant
-  DISCUSSION // En discussion avec le prospect
-  DEVIS // Devis envoyé
-  CONVENTION // Convention en cours
-  FACTURE // Facturé
+  A_TRAITER // À traiter - nouveau prospect entrant
+  EN_COURS // En cours de discussion
+  PROPOSITION_ENVOYEE // Proposition/Devis envoyé
+  RELANCE // En attente de relance
   GAGNE // Affaire gagnée
   PERDU // Affaire perdue
 }
@@ -2119,7 +2130,7 @@ model CRMOpportunite {
   description String? @db.Text
 
   // Étape du pipeline
-  stage CRMStage @default(ENTRANT)
+  stage CRMStage @default(A_TRAITER)
   ordre Int      @default(0) // Ordre dans la colonne
 
   // Valeur et probabilité
@@ -2907,9 +2918,20 @@ model Session {
   signatures       SignatureDocumentNew[] // Documents de signature
   fichesMission    FicheMissionIntervenant[] @relation("FicheMissionSession") // Fiches mission (Qualiopi IND 17)
   reclamations     Reclamation[]
+  messagesIntervenant MessageIntervenant[] @relation("MessageIntervenantSession") // Correction 431
 
   // Lien vers le wizard documents (ancien système)
   documentSession  DocumentSession? @relation("DocumentSessionTrainingSession")
+
+  // Correction 433b: Snapshot des données Formation (figées à la création de la session)
+  // Ces données ne changent pas même si la Formation est modifiée ultérieurement
+  snapshotFichePedagogique     Json?    // Copie de Formation.fichePedagogique
+  snapshotEvaluationsData      Json?    // Copie de Formation.evaluationsData
+  snapshotModules              Json?    // Copie des modules (titre, contenu, ordre, duree)
+  snapshotSlidesData           Json?    // Copie de Formation.slidesData
+  snapshotFormationTitre       String?  // Titre de la formation au moment du snapshot
+  snapshotFormationDescription String?  @db.Text // Description de la formation
+  snapshotCreatedAt            DateTime? // Date de création du snapshot
 
   @@index([formationId])
   @@index([organizationId])
@@ -3353,6 +3375,10 @@ model FormationIndicateurs {
   tauxReussite      Float? // Taux de réussite évaluation finale (%)
   tauxCertification Float? // Taux d'obtention certification (si certifiante)
   tauxAbandon       Float? // Taux d'abandon (%)
+
+  // Correction 363: Taux de progression (Qualiopi IND 2)
+  tauxProgression          Float? // Moyenne des progressions des apprenants (%) - écart entre positionnement et évaluation finale
+  nombreApprenantsProgression Int @default(0) // Nombre d'apprenants ayant complété les 2 évaluations
 
   // Période de calcul
   annee         Int? // Année de référence (N-1)
@@ -4486,6 +4512,9 @@ model VeilleArticle {
   // Statut de lecture par organisation
   lecturesParOrg VeilleArticleLecture[]
 
+  // Actions d'exploitation liées (Corrections 402-407)
+  actionsExploitation VeilleAction[] @relation("VeilleArticleActions")
+
   // Metadata
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4528,6 +4557,7 @@ model VeilleArticleLecture {
 }
 
 // Historique des conversations avec l'agent IA de veille
+// Correction 409: Ajout titre et épinglage pour l'historique
 model VeilleConversation {
   id String @id @default(cuid())
 
@@ -4540,6 +4570,12 @@ model VeilleConversation {
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Correction 409: Titre de la conversation (auto-généré ou personnalisé)
+  titre String?
+
+  // Correction 409: Épinglage de conversation
+  isPinned Boolean @default(false)
+
   // Historique des messages
   messages Json @default("[]") // [{role: "user"|"assistant", content: string, timestamp: string}]
 
@@ -4550,6 +4586,7 @@ model VeilleConversation {
   @@index([organizationId])
   @@index([userId])
   @@index([type])
+  @@index([isPinned])
 }
 
 // ===========================================
@@ -4557,11 +4594,27 @@ model VeilleConversation {
 // ===========================================
 // Gestion des réclamations et difficultés rencontrées
 
+// Correction 423: Enum étendu avec toutes les origines possibles
 enum ReclamationOrigine {
   EMAIL
   TELEPHONE
   COURRIER
   FORMULAIRE
+  SESSION_FORMATION
+  ESPACE_APPRENANT
+  ESPACE_INTERVENANT
+  DOCUMENTS
+  CATALOGUE
+  EVALUATION
+  LMS
+  SIGNATURE
+  FACTURATION
+  SUPPORT
+  SMS
+  SITE_WEB
+  RESEAUX_SOCIAUX
+  AVIS_EN_LIGNE
+  SUR_PLACE
   AUTRE
 }
 
@@ -6054,4 +6107,155 @@ model EmailDomain {
 
   @@index([organizationId])
   @@index([status])
+}
+
+// ===========================================
+// VEILLE - EXPLOITATION (Corrections 402-407)
+// Qualiopi : Traçabilité de l'exploitation de la veille
+// ===========================================
+
+enum VeilleActionStatut {
+  A_TRAITER   // Action à traiter
+  EN_COURS    // Action en cours
+  CLOTUREE    // Action clôturée
+}
+
+// Action d'exploitation de veille
+model VeilleAction {
+  id             String   @id @default(cuid())
+
+  // Organisation (multi-tenant)
+  organizationId String
+  organization   Organization @relation("VeilleActions", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Lien vers l'article source
+  veilleArticleId String
+  veilleArticle   VeilleArticle @relation("VeilleArticleActions", fields: [veilleArticleId], references: [id], onDelete: Cascade)
+
+  // Informations de l'article (pour historique si article supprimé)
+  articleTitre    String
+  articleUrl      String
+  articleSource   String   // Nom de la source
+  typeVeille      String   // LEGALE, METIER, INNOVATION, HANDICAP
+
+  // Exploitation
+  analyse               String?  @db.Text // Analyse / impact
+  actionAMettreEnPlace  String?  @db.Text // Action concrète à réaliser
+  personnesConcernees   String?  // Qui est concerné
+
+  // Statut et dates
+  statut          VeilleActionStatut @default(A_TRAITER)
+  dateCreation    DateTime @default(now())
+  dateCloture     DateTime?
+
+  // Créateur
+  createdById     String
+  createdBy       User @relation("VeilleActionsCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  preuves         VeilleActionPreuve[]
+
+  @@index([organizationId])
+  @@index([veilleArticleId])
+  @@index([typeVeille])
+  @@index([statut])
+  @@index([createdById])
+}
+
+// Preuves / justificatifs associés à une action
+model VeilleActionPreuve {
+  id             String   @id @default(cuid())
+
+  // Action parent
+  actionId       String
+  action         VeilleAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  // Fichier
+  nom            String   // Nom du fichier
+  url            String   // URL du fichier (storage)
+  storagePath    String?  // Chemin dans le storage
+  type           String   // MIME type
+  taille         Int      // Taille en bytes
+
+  // Créateur
+  createdById    String
+  createdBy      User @relation("VeillePreuvesCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt      DateTime @default(now())
+
+  @@index([actionId])
+  @@index([createdById])
+}
+
+// ===========================================
+// MESSAGES INTERVENANT → APPRENANTS (Correction 431)
+// ===========================================
+// Messages envoyés par l'intervenant aux apprenants d'une session
+// Pour un suivi pédagogique orienté présentiel/distanciel synchrone
+
+model MessageIntervenant {
+  id String @id @default(cuid())
+
+  // Session de formation liée (contexte du message)
+  sessionId String
+  session   Session @relation("MessageIntervenantSession", fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Intervenant qui envoie le message
+  intervenantId String
+  intervenant   Intervenant @relation("MessageIntervenantSender", fields: [intervenantId], references: [id], onDelete: Cascade)
+
+  // Contenu du message
+  sujet   String? // Sujet optionnel
+  contenu String  @db.Text // Contenu du message
+
+  // Pièces jointes (stockées en JSON)
+  // Format: [{ name: string, url: string, size?: number, type?: string }]
+  attachments Json?
+
+  // Destinataires
+  // Si null ou vide = tous les apprenants de la session
+  // Sinon = liste d'IDs d'apprenants spécifiques
+  destinatairesIds String[] // IDs des apprenants ciblés (vide = tous)
+  envoyeATous      Boolean  @default(true) // Envoyé à tous les apprenants
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  lectures MessageIntervenantLecture[] // Suivi des lectures
+
+  @@index([sessionId])
+  @@index([intervenantId])
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+// Suivi de lecture des messages par les apprenants
+model MessageIntervenantLecture {
+  id String @id @default(cuid())
+
+  // Message lu
+  messageId String
+  message   MessageIntervenant @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  // Apprenant qui a lu
+  apprenantId String
+  apprenant   Apprenant @relation("MessageIntervenantLectureApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Date de lecture
+  readAt DateTime @default(now())
+
+  @@unique([messageId, apprenantId]) // Un apprenant ne peut lire un message qu'une fois
+  @@index([messageId])
+  @@index([apprenantId])
 }

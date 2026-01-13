@@ -48,20 +48,20 @@ const defaultOptions: PDFOptions = {
   displayHeaderFooter: true,
 };
 
-// Génère le template d'en-tête avec le logo de l'organisme
+// Correction 374: Génère le template d'en-tête avec le logo de l'organisme (première page uniquement)
 export function generateHeaderTemplate(org?: OrganisationInfo): string {
   if (!org?.logo) {
     return `<div style="width: 100%; font-size: 8px; padding: 0 15mm;"></div>`;
   }
 
   return `
-    <div style="width: 100%; font-size: 8px; padding: 5mm 15mm 0 15mm; display: flex; justify-content: flex-start;">
-      <img src="${org.logo}" style="max-height: 40px; max-width: 150px;" />
+    <div style="width: 100%; font-size: 8px; padding: 5mm 15mm 0 15mm; display: flex; justify-content: flex-start; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 10px;">
+      <img src="${org.logo}" style="max-height: 50px; max-width: 180px;" onerror="this.style.display='none'" />
     </div>
   `;
 }
 
-// Génère le template de pied de page avec les infos de l'organisme
+// Correction 374: Génère le template de pied de page avec les infos de l'organisme (sur chaque page)
 export function generateFooterTemplate(org?: OrganisationInfo): string {
   if (!org) {
     return `
@@ -73,12 +73,13 @@ export function generateFooterTemplate(org?: OrganisationInfo): string {
 
   const nomAffiche = org.nomCommercial || org.nom;
   const adresseLigne = [org.adresse, org.codePostal, org.ville].filter(Boolean).join(", ");
+  const representant = [org.representantPrenom, org.representantNom].filter(Boolean).join(" ");
 
-  let infoLines: string[] = [];
+  const infoLines: string[] = [];
 
-  // Ligne 1: Nom commercial | Adresse
+  // Ligne 1: Nom commercial – Adresse
   if (nomAffiche || adresseLigne) {
-    infoLines.push([nomAffiche, adresseLigne].filter(Boolean).join(" | "));
+    infoLines.push([nomAffiche, adresseLigne].filter(Boolean).join(" – "));
   }
 
   // Ligne 2: SIRET + NDA
@@ -92,10 +93,23 @@ export function generateFooterTemplate(org?: OrganisationInfo): string {
     infoLines.push(infosPro.join(" – "));
   }
 
+  // Ligne 3: Représentant légal (si disponible)
+  if (representant) {
+    infoLines.push(`Représentant légal : ${representant}`);
+  }
+
+  // Ligne 4: Date de génération
+  const dateGeneration = new Date().toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
+  infoLines.push(`Document généré le ${dateGeneration}`);
+
   return `
     <div style="width: 100%; font-size: 7px; text-align: center; padding: 0 15mm; color: #666; border-top: 1px solid #ddd; padding-top: 3mm;">
       ${infoLines.map(line => `<div style="margin-bottom: 1mm;">${line}</div>`).join("")}
-      <div style="margin-top: 2mm;">
+      <div style="margin-top: 2mm; font-weight: 500;">
         Page <span class="pageNumber"></span> / <span class="totalPages"></span>
       </div>
     </div>
@@ -123,12 +137,15 @@ function wrapHtmlContent(htmlContent: string, title: string): string {
       margin: 0;
       padding: 20px;
     }
+    /* Correction 374: Titre centré */
     h1 {
       font-size: 18pt;
       color: #1a1a1a;
       margin-bottom: 15px;
       border-bottom: 2px solid #4277FF;
       padding-bottom: 10px;
+      text-align: center;
+      letter-spacing: 1px;
     }
     h2 {
       font-size: 14pt;
@@ -210,8 +227,29 @@ function wrapHtmlContent(htmlContent: string, title: string): string {
       background-color: #fff3cd;
       padding: 2px 5px;
     }
+    /* Correction 374: Amélioration des sauts de page */
     @page {
       margin: 0;
+    }
+    /* Éviter les sauts de page au milieu des éléments */
+    h1, h2, h3, h4 {
+      page-break-after: avoid;
+    }
+    table {
+      page-break-inside: avoid;
+    }
+    .section, .signature-zone, blockquote {
+      page-break-inside: avoid;
+    }
+    /* Sauts de page manuels */
+    .page-break {
+      page-break-after: always;
+      break-after: page;
+    }
+    /* Orphelins et veuves */
+    p {
+      orphans: 2;
+      widows: 2;
     }
   </style>
 </head>

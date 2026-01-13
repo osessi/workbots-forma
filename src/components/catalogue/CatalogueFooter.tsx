@@ -91,7 +91,7 @@ export function CatalogueFooter({ organization }: CatalogueFooterProps) {
             className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >
             <span>Propulsé par</span>
-            <span className="font-medium">WORKBOTS Formation</span>
+            <span className="font-medium">Workbots Formations</span>
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>

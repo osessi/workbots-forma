@@ -55,6 +55,7 @@ interface DashboardStats {
   emargementsEnAttente: number;
   prochainsCréneaux: number;
   messagesNonLus?: number;
+  messagesIntervenantNonLus?: number; // Correction 431 - Messages de l'intervenant non lus
 }
 
 // Qualiopi IND 3 - Certification obtenue par l'apprenant
@@ -67,6 +68,51 @@ interface Certification {
   sessionReference: string;
   dateCertification: string | null;
   numeroCertificat: string | null;
+}
+
+// Correction 430 - Session de formation
+interface SessionJournee {
+  id: string;
+  date: string;
+  ordre: number;
+  heureDebutMatin: string;
+  heureFinMatin: string;
+  heureDebutAprem: string;
+  heureFinAprem: string;
+}
+
+interface ApprenantSession {
+  participationId: string;
+  sessionId: string;
+  reference: string;
+  nom: string | null;
+  status: string;
+  modalite: string;
+  formation: {
+    id: string;
+    titre: string;
+    image: string | null;
+    description: string | null;
+  };
+  entreprise: {
+    id: string;
+    raisonSociale: string;
+  } | null;
+  formateur: {
+    id: string;
+    nom: string;
+    prenom: string;
+  } | null;
+  lieu: {
+    id: string;
+    nom: string;
+    ville: string | null;
+  } | null;
+  journees: SessionJournee[];
+  dateDebut: string | null;
+  dateFin: string | null;
+  estConfirme: boolean;
+  aAssiste: boolean;
 }
 
 interface ApprenantPortalContextType {
@@ -82,11 +128,15 @@ interface ApprenantPortalContextType {
   selectedInscription: LMSInscription | null;
   dashboardStats: DashboardStats | null;
   certifications: Certification[]; // Qualiopi IND 3
+  // Correction 430 - Sessions de formation
+  sessions: ApprenantSession[];
+  selectedSession: ApprenantSession | null;
 
   // Actions
   login: (token: string) => void;
   logout: () => void;
   selectInscription: (inscriptionId: string) => void;
+  selectSession: (sessionId: string) => void; // Correction 430
   refreshData: () => Promise<void>;
   setDashboardStats: (stats: DashboardStats) => void;
 }
@@ -115,10 +165,15 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
   const [selectedInscriptionId, setSelectedInscriptionId] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [certifications, setCertifications] = useState<Certification[]>([]); // Qualiopi IND 3
+  // Correction 430 - Sessions de formation
+  const [sessions, setSessions] = useState<ApprenantSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   // Computed
   const isAuthenticated = !!token && !!apprenant;
   const selectedInscription = inscriptions.find(i => i.id === selectedInscriptionId) || inscriptions[0] || null;
+  // Correction 430 - Session sélectionnée
+  const selectedSession = sessions.find(s => s.sessionId === selectedSessionId) || sessions[0] || null;
 
   // =====================================
   // FETCH DATA
@@ -148,10 +203,17 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
       setOrganization(data.organization);
       setInscriptions(data.inscriptions || []);
       setCertifications(data.certifications || []); // Qualiopi IND 3
+      // Correction 430 - Sessions de formation
+      setSessions(data.sessions || []);
 
       // Sélectionner la première inscription par défaut
       if (data.inscriptions?.length > 0 && !selectedInscriptionId) {
         setSelectedInscriptionId(data.inscriptions[0].id);
+      }
+
+      // Correction 430 - Sélectionner la première session par défaut
+      if (data.sessions?.length > 0 && !selectedSessionId) {
+        setSelectedSessionId(data.sessions[0].sessionId);
       }
 
       return true;
@@ -171,11 +233,18 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
 
       const storedToken = localStorage.getItem("apprenant_token");
       const storedInscriptionId = localStorage.getItem("apprenant_selected_inscription");
+      // Correction 430 - Session sauvegardée
+      const storedSessionId = localStorage.getItem("apprenant_selected_session");
 
       console.log("[ApprenantPortalContext] Init auth - token présent:", !!storedToken);
 
       if (storedInscriptionId) {
         setSelectedInscriptionId(storedInscriptionId);
+      }
+
+      // Correction 430
+      if (storedSessionId) {
+        setSelectedSessionId(storedSessionId);
       }
 
       if (storedToken) {
@@ -223,9 +292,13 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
     setSelectedInscriptionId(null);
     setDashboardStats(null);
     setCertifications([]); // Qualiopi IND 3
+    // Correction 430
+    setSessions([]);
+    setSelectedSessionId(null);
 
     localStorage.removeItem("apprenant_token");
     localStorage.removeItem("apprenant_selected_inscription");
+    localStorage.removeItem("apprenant_selected_session"); // Correction 430
 
     router.push("/apprenant");
   }, [router]);
@@ -233,6 +306,12 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
   const selectInscription = useCallback((inscriptionId: string) => {
     setSelectedInscriptionId(inscriptionId);
     localStorage.setItem("apprenant_selected_inscription", inscriptionId);
+  }, []);
+
+  // Correction 430 - Sélectionner une session
+  const selectSession = useCallback((sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    localStorage.setItem("apprenant_selected_session", sessionId);
   }, []);
 
   const refreshData = useCallback(async () => {
@@ -258,11 +337,15 @@ export function ApprenantPortalProvider({ children }: { children: ReactNode }) {
     selectedInscription,
     dashboardStats,
     certifications, // Qualiopi IND 3
+    // Correction 430 - Sessions
+    sessions,
+    selectedSession,
 
     // Actions
     login,
     logout,
     selectInscription,
+    selectSession, // Correction 430
     refreshData,
     setDashboardStats,
   };

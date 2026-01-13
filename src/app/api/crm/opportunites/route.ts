@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
     const maxOrdre = await prisma.cRMOpportunite.aggregate({
       where: {
         organizationId: user.organizationId,
-        stage: stage || "ENTRANT",
+        stage: stage || "A_TRAITER",
       },
       _max: {
         ordre: true,
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
       data: {
         titre,
         description,
-        stage: stage || "ENTRANT",
+        stage: stage || "A_TRAITER",
         ordre: (maxOrdre._max.ordre || 0) + 1,
         montantHT: montantHT ? parseFloat(montantHT) : null,
         probabilite: probabilite || 50,

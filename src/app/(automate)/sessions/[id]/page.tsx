@@ -251,6 +251,9 @@ export default function SessionDetailPage() {
   });
   const [updatingCertification, setUpdatingCertification] = useState(false);
 
+  // Correction 377: État du dropdown pour changer le statut de la session
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
   // Form state
   const [clientForm, setClientForm] = useState({
     typeClient: "SALARIE",
@@ -753,31 +756,81 @@ export default function SessionDetailPage() {
           )}
         </div>
 
-        {/* Status actions */}
-        <div className="flex gap-2">
-          {session.status === "BROUILLON" && (
-            <button
-              onClick={() => updateStatus("PLANIFIEE")}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-colors"
+        {/* Correction 377: Dropdown "État de la session" */}
+        <div className="relative">
+          <button
+            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors border ${statusStyle.bg} ${statusStyle.text} border-current/20 hover:opacity-80`}
+          >
+            <span className={`w-2 h-2 rounded-full ${statusStyle.dot}`} />
+            <span>{statusLabels[session.status] || session.status}</span>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`transition-transform ${showStatusDropdown ? "rotate-180" : ""}`}
             >
-              Planifier
-            </button>
-          )}
-          {session.status === "PLANIFIEE" && (
-            <button
-              onClick={() => updateStatus("EN_COURS")}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium transition-colors"
-            >
-              Démarrer
-            </button>
-          )}
-          {session.status === "EN_COURS" && (
-            <button
-              onClick={() => updateStatus("TERMINEE")}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium transition-colors"
-            >
-              Terminer
-            </button>
+              <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {/* Dropdown menu */}
+          {showStatusDropdown && (
+            <>
+              {/* Overlay pour fermer le dropdown */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowStatusDropdown(false)}
+              />
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 overflow-hidden">
+                <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
+                    État de la session
+                  </p>
+                </div>
+                <div className="p-1">
+                  {(["BROUILLON", "PLANIFIEE", "EN_COURS", "TERMINEE", "ANNULEE"] as const).map((status) => {
+                    const isCurrentStatus = session.status === status;
+                    const style = statusColors[status];
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          if (!isCurrentStatus) {
+                            updateStatus(status);
+                          }
+                          setShowStatusDropdown(false);
+                        }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                          isCurrentStatus
+                            ? `${style.bg} ${style.text}`
+                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+                        <span>{statusLabels[status]}</span>
+                        {isCurrentStatus && (
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            className="ml-auto"
+                          >
+                            <path d="M3 8l4 4 6-8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -22,6 +22,9 @@ const preInscriptionSchema = z.object({
   organizationSlug: z.string().min(1, "Organisation requise"),
   formationId: z.string().min(1, "Formation requise"),
 
+  // Type de profil (Correction 395)
+  profileType: z.enum(["particulier", "independant", "entreprise"]).optional(),
+
   // ===========================================
   // PARTIE 1 : ANALYSE DU BESOIN (Qualiopi)
   // ===========================================
@@ -34,7 +37,7 @@ const preInscriptionSchema = z.object({
   // ===========================================
   // PARTIE 2 : FICHE DE RENSEIGNEMENTS
   // ===========================================
-  // Identité
+  // Identité (obligatoire - pour entreprise: représentant légal)
   civilite: z.enum(["M.", "Mme"]).optional(),
   nom: z.string().min(1, "Le nom est requis"),
   prenom: z.string().min(1, "Le prénom est requis"),
@@ -62,6 +65,28 @@ const preInscriptionSchema = z.object({
   entreprise: z.string().optional(),
   poste: z.string().optional(),
   siret: z.string().optional(),
+
+  // ===========================================
+  // ENTREPRISE : Champs additionnels (Correction 395)
+  // ===========================================
+  raisonSociale: z.string().optional(),
+  numeroTVA: z.string().optional(),
+  representantCivilite: z.string().optional(),
+  representantNom: z.string().optional(),
+  representantPrenom: z.string().optional(),
+  representantEmail: z.string().optional(),
+  representantTelephone: z.string().optional(),
+  representantFonction: z.string().optional(),
+  // Apprenants (liste de personnes à former)
+  apprenants: z.array(z.object({
+    nom: z.string(),
+    prenom: z.string(),
+    email: z.string(),
+    telephone: z.string().optional(),
+    dateNaissance: z.string().optional(),
+    lieuNaissance: z.string().optional(),
+    poste: z.string().optional(),
+  })).optional(),
 
   // ===========================================
   // HANDICAP (OBLIGATOIRE QUALIOPI)
@@ -191,6 +216,23 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get("user-agent") || "unknown";
     const sourceUrl = request.headers.get("referer") || undefined;
 
+    // Correction 395: Construire les informations entreprise si profil entreprise
+    let entrepriseInfo = data.entreprise;
+    let contraintesData = data.contraintes;
+
+    if (data.profileType === "entreprise") {
+      // Stocker les infos entreprise dans le champ entreprise
+      entrepriseInfo = data.raisonSociale || data.entreprise;
+
+      // Stocker les apprenants dans le champ contraintes (format JSON)
+      if (data.apprenants && data.apprenants.length > 0) {
+        const apprenantsText = data.apprenants.map((a, i) =>
+          `Apprenant ${i + 1}: ${a.prenom} ${a.nom} (${a.email})${a.telephone ? ` - Tél: ${a.telephone}` : ''}${a.poste ? ` - Poste: ${a.poste}` : ''}`
+        ).join('\n');
+        contraintesData = `[APPRENANTS À FORMER]\n${apprenantsText}${data.contraintes ? `\n\n[CONTRAINTES]\n${data.contraintes}` : ''}`;
+      }
+    }
+
     // Créer la pré-inscription
     const preInscription = await prisma.preInscription.create({
       data: {
@@ -202,7 +244,7 @@ export async function POST(request: NextRequest) {
         contexte: data.contexte,
         experiencePrealable: data.experiencePrealable,
         attentesSpecifiques: data.attentesSpecifiques,
-        contraintes: data.contraintes,
+        contraintes: contraintesData,
 
         // Partie 2 : Fiche de renseignements
         civilite: data.civilite,
@@ -219,7 +261,7 @@ export async function POST(request: NextRequest) {
         pays: data.pays,
 
         situationProfessionnelle: data.situationProfessionnelle,
-        entreprise: data.entreprise,
+        entreprise: entrepriseInfo,
         poste: data.poste,
         siret: data.siret,
 

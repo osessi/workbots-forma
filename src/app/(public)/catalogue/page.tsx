@@ -386,7 +386,7 @@ function FormationCard({
   return (
     <Link
       href={`/catalogue/${formation.id}?org=${orgSlug}`}
-      className="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300"
+      className="group bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col h-full"
     >
       {/* Image */}
       <div className="relative h-48 bg-gray-100">
@@ -432,19 +432,19 @@ function FormationCard({
       </div>
 
       {/* Contenu */}
-      <div className="p-5">
-        <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+      <div className="p-5 flex flex-col flex-1">
+        {/* Titre - hauteur fixe pour 2 lignes */}
+        <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2 min-h-[3.5rem] group-hover:text-blue-600 transition-colors">
           {formation.titre}
         </h3>
 
-        {formation.description && (
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-            {formation.description}
-          </p>
-        )}
+        {/* Description - hauteur fixe pour 2 lignes */}
+        <p className="text-sm text-gray-600 mb-3 line-clamp-2 min-h-[2.5rem]">
+          {formation.description || ""}
+        </p>
 
         {/* Badges - Tous les badges importants */}
-        <div className="mb-4">
+        <div className="mb-4 flex-grow">
           <FormationBadges
             formation={{
               modalites: formation.modalites,
@@ -473,20 +473,13 @@ function FormationCard({
           </div>
         )}
 
-        {/* Prix et CTA */}
-        <div className="flex items-center justify-between pt-4 border-t">
-          {formation.tarif ? (
-            <span className="text-lg font-bold text-gray-900">
-              {formation.tarif.toLocaleString("fr-FR")} € HT
-            </span>
-          ) : (
-            <span className="text-sm text-gray-500">Fiche pédagogique</span>
-          )}
+        {/* CTA centré - toujours en bas */}
+        <div className="flex items-center justify-center pt-4 border-t mt-auto">
           <span
             className="inline-flex items-center text-sm font-medium group-hover:translate-x-1 transition-transform"
             style={{ color: primaryColor }}
           >
-            Voir détails
+            Voir la fiche pédagogique
             <ChevronRight className="w-4 h-4 ml-1" />
           </span>
         </div>

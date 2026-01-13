@@ -117,7 +117,7 @@ export function CatalogueBanner({ organization, stats }: CatalogueBannerProps) {
           {/* Texte principal */}
           <div className="text-center md:text-left text-white">
             <h1 className="text-3xl md:text-4xl font-bold mb-3">
-              Catalogue de formations
+              Catalogue des formations
             </h1>
             <p className="text-lg md:text-xl opacity-90 max-w-xl">
               Découvrez nos formations professionnelles et choisissez celle qui correspond à vos objectifs.

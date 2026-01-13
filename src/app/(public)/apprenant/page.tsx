@@ -142,7 +142,15 @@ function ApprenantPortalContent() {
     // Check for magic link token in URL
     const urlToken = searchParams.get("token");
     if (urlToken) {
-      validateMagicToken(urlToken);
+      // Correction 433a: Si admin=true, c'est un accès admin direct (impersonation)
+      // Le token est déjà un session token, pas besoin de passer par verify-token
+      const isAdminAccess = searchParams.get("admin") === "true";
+      if (isAdminAccess) {
+        // Utiliser directement le token comme session token
+        validateToken(urlToken);
+      } else {
+        validateMagicToken(urlToken);
+      }
       return;
     }
 

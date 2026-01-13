@@ -280,6 +280,99 @@ export async function GET(request: NextRequest) {
       numeroCertificat: cert.numeroCertificat,
     }));
 
+    // Correction 430: Récupérer les sessions auxquelles l'apprenant est inscrit
+    const sessionParticipations = await prisma.sessionParticipantNew.findMany({
+      where: {
+        apprenantId: apprenant.id,
+      },
+      include: {
+        client: {
+          include: {
+            session: {
+              include: {
+                formation: {
+                  select: {
+                    id: true,
+                    titre: true,
+                    image: true,
+                    description: true,
+                  },
+                },
+                journees: {
+                  orderBy: { ordre: "asc" },
+                  select: {
+                    id: true,
+                    date: true,
+                    ordre: true,
+                    heureDebutMatin: true,
+                    heureFinMatin: true,
+                    heureDebutAprem: true,
+                    heureFinAprem: true,
+                  },
+                },
+                formateur: {
+                  select: {
+                    id: true,
+                    nom: true,
+                    prenom: true,
+                  },
+                },
+                lieu: {
+                  select: {
+                    id: true,
+                    nom: true,
+                    ville: true,
+                  },
+                },
+              },
+            },
+            entreprise: {
+              select: {
+                id: true,
+                raisonSociale: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Formater les sessions pour l'apprenant
+    const formattedSessions = sessionParticipations.map((participation) => {
+      const session = participation.client.session;
+      const journees = session.journees;
+      const firstDate = journees.length > 0 ? journees[0].date : null;
+      const lastDate = journees.length > 0 ? journees[journees.length - 1].date : null;
+
+      return {
+        participationId: participation.id,
+        sessionId: session.id,
+        reference: session.reference,
+        nom: session.nom,
+        status: session.status,
+        modalite: session.modalite,
+        formation: session.formation,
+        entreprise: participation.client.entreprise,
+        formateur: session.formateur,
+        lieu: session.lieu,
+        journees: journees.map(j => ({
+          id: j.id,
+          date: j.date.toISOString(),
+          ordre: j.ordre,
+          heureDebutMatin: j.heureDebutMatin,
+          heureFinMatin: j.heureFinMatin,
+          heureDebutAprem: j.heureDebutAprem,
+          heureFinAprem: j.heureFinAprem,
+        })),
+        dateDebut: firstDate?.toISOString() || null,
+        dateFin: lastDate?.toISOString() || null,
+        estConfirme: participation.estConfirme,
+        aAssiste: participation.aAssiste,
+      };
+    });
+
+    console.log("[API /api/apprenant/auth GET] Sessions trouvées:", formattedSessions.length);
+
     return NextResponse.json({
       apprenant: {
         id: apprenant.id,
@@ -314,6 +407,8 @@ export async function GET(request: NextRequest) {
       scormTrackings: apprenant.scormTrackings,
       // Qualiopi IND 3 - Certifications obtenues
       certifications: formattedCertifications,
+      // Correction 430 - Sessions de formation
+      sessions: formattedSessions,
     });
   } catch (error) {
     console.error("[API /api/apprenant/auth GET] Erreur validation token:", error);

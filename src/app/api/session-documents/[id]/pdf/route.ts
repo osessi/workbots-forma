@@ -55,7 +55,7 @@ function decodeToken(token: string): {
   }
 }
 
-// Wrapping HTML avec styles pour le PDF
+// Correction 374: Wrapping HTML avec styles améliorés pour le PDF
 function wrapHtmlForPdf(html: string, title: string): string {
   return `
 <!DOCTYPE html>
@@ -79,32 +79,41 @@ function wrapHtmlForPdf(html: string, title: string): string {
       margin: 0;
       padding: 0;
     }
+    /* Correction 374: Titre centré */
     h1 {
       font-size: 18pt;
       color: #1a1a1a;
       margin-bottom: 15px;
       border-bottom: 2px solid #4277FF;
       padding-bottom: 10px;
+      text-align: center;
+      letter-spacing: 1px;
+      text-transform: uppercase;
     }
     h2 {
       font-size: 14pt;
       color: #333;
       margin-top: 20px;
       margin-bottom: 10px;
+      page-break-after: avoid;
     }
     h3 {
       font-size: 12pt;
       color: #555;
       margin-top: 15px;
       margin-bottom: 8px;
+      page-break-after: avoid;
     }
     p {
       margin: 8px 0;
+      orphans: 2;
+      widows: 2;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       margin: 15px 0;
+      page-break-inside: avoid;
     }
     th, td {
       border: 1px solid #ddd;
@@ -139,12 +148,14 @@ function wrapHtmlForPdf(html: string, title: string): string {
       padding: 15px;
       background: #f9f9f9;
       border-radius: 5px;
+      page-break-inside: avoid;
     }
     .signature-zone {
       margin-top: 40px;
       padding: 20px;
       border: 1px dashed #ccc;
       min-height: 80px;
+      page-break-inside: avoid;
     }
     ul, ol {
       margin: 10px 0;
@@ -155,6 +166,11 @@ function wrapHtmlForPdf(html: string, title: string): string {
     }
     strong {
       font-weight: 600;
+    }
+    /* Correction 374: Sauts de page manuels */
+    .page-break {
+      page-break-after: always;
+      break-after: page;
     }
   </style>
 </head>

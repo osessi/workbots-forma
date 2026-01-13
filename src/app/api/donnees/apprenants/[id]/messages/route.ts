@@ -105,21 +105,29 @@ export async function GET(
     // Pour l'instant, on récupère les messages depuis les notifications
     // et on formatera les réponses depuis les metadata
 
-    // Formater les messages pour l'affichage
+    // Formater les messages pour l'affichage (Correction 421: avec pièces jointes)
     const messages = notifications.map((notif) => {
       const metadata = notif.metadata as Record<string, any> || {};
+      const direction = metadata.direction || "incoming";
+
       return {
         id: notif.id,
-        type: "incoming", // Message reçu de l'apprenant
+        type: direction, // "incoming" = reçu de l'apprenant, "outgoing" = envoyé par l'organisme
         subject: metadata.subject || "Message",
         content: metadata.messageOriginal || notif.message,
-        senderName: metadata.apprenantNom || `${apprenant.prenom} ${apprenant.nom}`,
-        senderEmail: metadata.apprenantEmail || apprenant.email,
+        senderName: direction === "outgoing"
+          ? (metadata.senderName || "Organisme")
+          : (metadata.apprenantNom || `${apprenant.prenom} ${apprenant.nom}`),
+        senderEmail: direction === "outgoing"
+          ? (metadata.senderEmail || "")
+          : (metadata.apprenantEmail || apprenant.email),
         isRead: notif.isRead,
         readAt: notif.readAt,
         createdAt: notif.createdAt,
         // Réponses associées (si présentes dans metadata)
         replies: metadata.replies || [],
+        // Correction 421: Pièces jointes
+        attachments: metadata.attachments || [],
       };
     });
 
@@ -189,7 +197,8 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { messageId, content, subject } = body;
+    // Correction 421: Ajout du support des pièces jointes
+    const { messageId, content, subject, attachments } = body;
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json(
@@ -197,6 +206,14 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    // Correction 421: Valider les pièces jointes si présentes
+    const validAttachments = Array.isArray(attachments)
+      ? attachments.filter(
+          (att: { name?: string; url?: string; size?: number; type?: string }) =>
+            att.name && att.url
+        )
+      : [];
 
     // Récupérer l'organisation pour l'envoi d'email
     const organization = await prisma.organization.findUnique({
@@ -230,25 +247,30 @@ export async function POST(
       const currentMetadata = notification.metadata as Record<string, any> || {};
       const replies = currentMetadata.replies || [];
 
+      // Correction 421: Inclure les pièces jointes dans la réponse
       const newReply = {
         id: `reply_${Date.now()}`,
         content: content.trim(),
         senderName: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim() || dbUser.email,
         senderEmail: dbUser.email,
         createdAt: new Date().toISOString(),
+        attachments: validAttachments,
       };
 
       replies.push(newReply);
 
       // Mettre à jour la notification avec la nouvelle réponse
+      // Correction 423: Réinitialiser repliesReadByApprenant pour déclencher le badge non lu
       await prisma.notification.update({
         where: { id: messageId },
         data: {
           metadata: {
             ...currentMetadata,
             replies,
+            repliesReadByApprenant: false, // Correction 423: Nouvelle réponse = non lu par l'apprenant
+            hasNewReply: true, // Correction 423: Indicateur de nouvelle réponse
           },
-          // Marquer comme lu
+          // Marquer comme lu côté organisme
           isRead: true,
           readAt: notification.readAt || new Date(),
         },
@@ -290,7 +312,8 @@ export async function POST(
       });
     } else {
       // Nouveau message de l'organisme vers l'apprenant
-      // Créer une nouvelle notification sortante
+      // Créer une nouvelle notification sortante (Correction 421: avec pièces jointes)
+      // Correction 422: actionUrl vers l'onglet Messages avec messageId
       const notification = await prisma.notification.create({
         data: {
           organizationId: dbUser.organizationId,
@@ -299,7 +322,7 @@ export async function POST(
           message: content.trim(),
           resourceType: "apprenant",
           resourceId: apprenantId,
-          actionUrl: `/apprenants/${apprenantId}`,
+          actionUrl: `/apprenants/${apprenantId}?tab=messages`, // Correction 422: redirection onglet Messages
           isRead: true, // Déjà "lu" car c'est nous qui l'envoyons
           readAt: new Date(),
           metadata: {
@@ -309,8 +332,17 @@ export async function POST(
             senderName: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim() || dbUser.email,
             senderEmail: dbUser.email,
             sentAt: new Date().toISOString(),
+            attachments: validAttachments, // Correction 421
             replies: [],
           },
+        },
+      });
+
+      // Correction 422: Mettre à jour l'actionUrl avec le messageId
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data: {
+          actionUrl: `/apprenants/${apprenantId}?tab=messages&messageId=${notification.id}`,
         },
       });
 
@@ -343,6 +375,7 @@ export async function POST(
         // On ne bloque pas si l'email échoue
       }
 
+      // Correction 421: Inclure les pièces jointes dans la réponse
       return NextResponse.json({
         success: true,
         message: {
@@ -354,6 +387,7 @@ export async function POST(
           senderEmail: dbUser.email,
           isRead: true,
           createdAt: notification.createdAt,
+          attachments: validAttachments,
           replies: [],
         },
       });

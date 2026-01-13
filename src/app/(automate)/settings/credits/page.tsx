@@ -12,6 +12,7 @@ interface CreditData {
   creditsResetAt: string;
   percentUsed: number;
   statusColor: "green" | "yellow" | "red";
+  isUnlimited: boolean;
   history?: CreditTransaction[];
 }
 
@@ -166,8 +167,15 @@ export default function CreditsPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Solde actuel</p>
-                <p className="text-4xl font-bold text-gray-900 dark:text-white">
-                  {formatCredits(creditData.credits)}
+                <p className="text-4xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  {creditData.isUnlimited ? (
+                    <>
+                      <span>Illimité</span>
+                      <span className="text-2xl">∞</span>
+                    </>
+                  ) : (
+                    formatCredits(creditData.credits)
+                  )}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {formatCredits(creditData.creditsUsedThisMonth)} crédits utilisés
@@ -183,37 +191,51 @@ export default function CreditsPage() {
             </button>
           </div>
 
-          {/* Progress Bar */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-500 dark:text-gray-400">
-                Utilisés ce mois
-              </span>
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                {formatCredits(creditData.creditsUsedThisMonth)} ({creditData.percentUsed}%)
-              </span>
+          {/* Progress Bar - masqué pour les crédits illimités */}
+          {!creditData.isUnlimited && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-500 dark:text-gray-400">
+                  Utilisés ce mois
+                </span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {formatCredits(creditData.creditsUsedThisMonth)} ({creditData.percentUsed}%)
+                </span>
+              </div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    creditData.statusColor === "green"
+                      ? "bg-emerald-500"
+                      : creditData.statusColor === "yellow"
+                        ? "bg-amber-500"
+                        : "bg-red-500"
+                  }`}
+                  style={{ width: `${Math.min(creditData.percentUsed, 100)}%` }}
+                />
+              </div>
             </div>
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  creditData.statusColor === "green"
-                    ? "bg-emerald-500"
-                    : creditData.statusColor === "yellow"
-                      ? "bg-amber-500"
-                      : "bg-red-500"
-                }`}
-                style={{ width: `${Math.min(creditData.percentUsed, 100)}%` }}
-              />
-            </div>
-          </div>
+          )}
 
-          {/* Reset Info */}
-          <div className="mt-6 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <Clock className="w-4 h-4" />
-            <span>
-              Renouvellement des crédits dans <strong className="text-gray-700 dark:text-gray-300">{daysUntilReset} jours</strong>
-            </span>
-          </div>
+          {/* Reset Info - masqué pour les crédits illimités */}
+          {!creditData.isUnlimited && (
+            <div className="mt-6 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <Clock className="w-4 h-4" />
+              <span>
+                Renouvellement des crédits dans <strong className="text-gray-700 dark:text-gray-300">{daysUntilReset} jours</strong>
+              </span>
+            </div>
+          )}
+
+          {/* Message pour les crédits illimités */}
+          {creditData.isUnlimited && (
+            <div className="mt-6 flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+              <Sparkles className="w-4 h-4" />
+              <span>
+                Vous disposez de crédits illimités en tant que Super Admin
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Transaction History */}

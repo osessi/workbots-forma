@@ -1,12 +1,20 @@
 "use client";
 
+// ===========================================
+// CORRECTIONS 434-439: Page "Liste des apprenants" (groupe)
+// ===========================================
+// 434: Renommer titre "Apprenants" → "Liste des apprenants"
+// 435: Reformuler sous-titre
+// 436: Bandeau bleu: afficher "Formation : [Nom]"
+// 438: Minimum 1 participant (l'apprenant connecté)
+// 439: Synchronisation avec session active (déjà implémenté via selectedSession)
+
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
 import {
   Users,
   Mail,
-  User,
   Loader2,
   AlertCircle,
   Building2,
@@ -88,7 +96,8 @@ function ApprenantCard({ apprenant, index, isCurrentUser }: { apprenant: Apprena
 // =====================================
 
 export default function GroupePage() {
-  const { token, apprenant: currentApprenant, selectedInscription } = useApprenantPortal();
+  // Correction 439: Utiliser selectedSession pour filtrer par session
+  const { token, apprenant: currentApprenant, selectedSession } = useApprenantPortal();
   const [data, setData] = useState<GroupeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,8 +109,9 @@ export default function GroupePage() {
       try {
         setLoading(true);
         const params = new URLSearchParams({ token });
-        if (selectedInscription?.id) {
-          params.append("inscriptionId", selectedInscription.id);
+        // Correction 439: Filtrer par sessionId - synchronisation avec session active
+        if (selectedSession?.sessionId) {
+          params.append("sessionId", selectedSession.sessionId);
         }
 
         const res = await fetch(`/api/apprenant/groupe?${params.toString()}`);
@@ -119,14 +129,17 @@ export default function GroupePage() {
     };
 
     fetchGroupe();
-  }, [token, selectedInscription?.id]);
+  }, [token, selectedSession?.sessionId]);
+
+  // Correction 438: Calculer le nombre de participants (minimum 1 = l'apprenant connecté)
+  const nombreParticipants = Math.max(data?.totalApprenants || 0, 1);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-brand-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Chargement du groupe...</p>
+          <p className="text-gray-600 dark:text-gray-400">Chargement des participants...</p>
         </div>
       </div>
     );
@@ -145,23 +158,27 @@ export default function GroupePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header - Correction 434 & 435 */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Apprenants
+          Liste des apprenants
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Les participants de votre formation
+          Retrouvez ici les participants inscrits à votre session de formation.
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Correction 436 & 438 */}
       <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{data?.formationTitre || "Formation"}</h2>
+            {/* Correction 436: Afficher "Formation : [Nom de la formation]" */}
+            <h2 className="text-lg font-semibold">
+              Formation : {data?.formationTitre || "Non définie"}
+            </h2>
+            {/* Correction 438: Minimum 1 participant */}
             <p className="text-white/80 text-sm mt-1">
-              {data?.totalApprenants || 0} participant{(data?.totalApprenants || 0) > 1 ? "s" : ""} inscrit{(data?.totalApprenants || 0) > 1 ? "s" : ""}
+              {nombreParticipants} participant{nombreParticipants > 1 ? "s" : ""} inscrit{nombreParticipants > 1 ? "s" : ""}
             </p>
           </div>
           <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">

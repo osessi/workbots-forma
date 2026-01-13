@@ -1,6 +1,7 @@
 // Types pour le wizard Documents
 
-export type WizardStep = "clients" | "tarifs" | "lieu" | "formateurs" | "documents";
+// Correction 433a: Ajout de l'étape "espaceApprenant"
+export type WizardStep = "clients" | "tarifs" | "lieu" | "formateurs" | "documents" | "espaceApprenant";
 
 export type ClientType = "ENTREPRISE" | "INDEPENDANT" | "PARTICULIER";
 

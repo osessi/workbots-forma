@@ -76,8 +76,36 @@ const financeurTypes: FinanceurType[] = [
 ];
 
 // Helper pour calculer les montants
-const calculateTarifAmounts = (tarifHT: number, tauxTVA: number, financements: ClientFinancement[]): Partial<SessionTarif> => {
+// Correction 375: Différencier le calcul selon le type de client (HT vs TTC)
+const calculateTarifAmounts = (
+  tarifHT: number,
+  tauxTVA: number,
+  financements: ClientFinancement[],
+  clientType?: ClientType
+): Partial<SessionTarif> & { montantHT?: number } => {
   const totalFinance = financements.reduce((acc, f) => acc + f.montant, 0);
+
+  // Correction 375: Pour les Particuliers, le tarif saisi est TTC
+  // On doit calculer le HT à partir du TTC
+  if (clientType === "PARTICULIER") {
+    const tarifTTC = tarifHT; // Pour les particuliers, tarifHT contient en fait le TTC
+    const montantHT = tarifTTC / (1 + tauxTVA / 100); // Conversion TTC → HT
+    const montantTVA = tarifTTC - montantHT;
+    // Le reste à charge TTC = TTC initial - financements (les financements sont en HT)
+    // Mais pour simplifier, on considère que le reste à charge TTC ne peut pas dépasser le TTC initial
+    const resteAChargeTTC = Math.max(0, tarifTTC - totalFinance);
+    const resteAChargeHT = resteAChargeTTC / (1 + tauxTVA / 100);
+
+    return {
+      totalFinance,
+      resteAChargeHT: Math.round(resteAChargeHT * 100) / 100,
+      montantTVA: Math.round(montantTVA * 100) / 100,
+      resteAChargeTTC: Math.round(resteAChargeTTC * 100) / 100,
+      montantHT: Math.round(montantHT * 100) / 100, // Correction 373: montant HT calculé
+    };
+  }
+
+  // Pour Entreprise et Indépendant, le tarif est HT
   const resteAChargeHT = Math.max(0, tarifHT - totalFinance);
   const montantTVA = resteAChargeHT * (tauxTVA / 100);
   const resteAChargeTTC = resteAChargeHT + montantTVA;
@@ -174,7 +202,9 @@ export default function StepTarifs({
           });
         }
 
-        const calculated = calculateTarifAmounts(oldTarif.tarifHT || 0, tauxTVA, financements);
+        // Correction 375: Passer le type de client pour un calcul correct
+        const clientType = clients.find((c) => c.id === t.clientId)?.type;
+        const calculated = calculateTarifAmounts(oldTarif.tarifHT || 0, tauxTVA, financements, clientType);
         return {
           clientId: t.clientId,
           tarifHT: oldTarif.tarifHT || 0,
@@ -191,7 +221,8 @@ export default function StepTarifs({
       const newTarifs: SessionTarif[] = missingClients.map((client) => {
         const defaultTarif = getDefaultTarif(client.type);
         const tauxTVA = 20;
-        const calculated = calculateTarifAmounts(defaultTarif, tauxTVA, []);
+        // Correction 375: Passer le type de client pour un calcul correct
+        const calculated = calculateTarifAmounts(defaultTarif, tauxTVA, [], client.type);
         return {
           clientId: client.id,
           tarifHT: defaultTarif,
@@ -209,20 +240,27 @@ export default function StepTarifs({
   }, [clients, tarifs, getDefaultTarif, onChange]);
 
   // Recalculer un tarif
-  const recalculateTarif = (tarif: SessionTarif): SessionTarif => {
-    const calculated = calculateTarifAmounts(tarif.tarifHT, tarif.tauxTVA, tarif.financements);
+  // Correction 375: Passer le type de client pour un calcul correct
+  const recalculateTarif = (tarif: SessionTarif, clientType?: ClientType): SessionTarif => {
+    const calculated = calculateTarifAmounts(tarif.tarifHT, tarif.tauxTVA, tarif.financements, clientType);
     return {
       ...tarif,
       ...calculated,
     } as SessionTarif;
   };
 
+  // Helper pour trouver le type de client
+  const getClientType = (clientId: string): ClientType | undefined => {
+    return clients.find((c) => c.id === clientId)?.type;
+  };
+
   // Mettre à jour le tarif HT d'un client
   const updateTarifHT = (clientId: string, value: number) => {
+    const clientType = getClientType(clientId);
     onChange(
       tarifs.map((t) => {
         if (t.clientId === clientId) {
-          return recalculateTarif({ ...t, tarifHT: value });
+          return recalculateTarif({ ...t, tarifHT: value }, clientType);
         }
         return t;
       })
@@ -231,10 +269,11 @@ export default function StepTarifs({
 
   // Mettre à jour la TVA d'un client
   const updateTauxTVA = (clientId: string, value: number) => {
+    const clientType = getClientType(clientId);
     onChange(
       tarifs.map((t) => {
         if (t.clientId === clientId) {
-          return recalculateTarif({ ...t, tauxTVA: value });
+          return recalculateTarif({ ...t, tauxTVA: value }, clientType);
         }
         return t;
       })
@@ -243,6 +282,7 @@ export default function StepTarifs({
 
   // Ajouter un financement à un client
   const addFinancement = (clientId: string, financeur: Financeur, montant: number) => {
+    const clientType = getClientType(clientId);
     onChange(
       tarifs.map((t) => {
         if (t.clientId === clientId) {
@@ -253,7 +293,7 @@ export default function StepTarifs({
             montant,
           };
           const updatedFinancements = [...t.financements, newFinancement];
-          return recalculateTarif({ ...t, financements: updatedFinancements });
+          return recalculateTarif({ ...t, financements: updatedFinancements }, clientType);
         }
         return t;
       })
@@ -262,11 +302,12 @@ export default function StepTarifs({
 
   // Supprimer un financement
   const removeFinancement = (clientId: string, financementId: string) => {
+    const clientType = getClientType(clientId);
     onChange(
       tarifs.map((t) => {
         if (t.clientId === clientId) {
           const updatedFinancements = t.financements.filter((f) => f.id !== financementId);
-          return recalculateTarif({ ...t, financements: updatedFinancements });
+          return recalculateTarif({ ...t, financements: updatedFinancements }, clientType);
         }
         return t;
       })
@@ -275,13 +316,14 @@ export default function StepTarifs({
 
   // Mettre à jour le montant d'un financement
   const updateFinancementMontant = (clientId: string, financementId: string, montant: number) => {
+    const clientType = getClientType(clientId);
     onChange(
       tarifs.map((t) => {
         if (t.clientId === clientId) {
           const updatedFinancements = t.financements.map((f) =>
             f.id === financementId ? { ...f, montant } : f
           );
-          return recalculateTarif({ ...t, financements: updatedFinancements });
+          return recalculateTarif({ ...t, financements: updatedFinancements }, clientType);
         }
         return t;
       })
@@ -456,9 +498,10 @@ export default function StepTarifs({
 
               {/* Tarif, TVA et financement */}
               <div className="space-y-4">
-                {/* Ligne 1: Tarif HT + Financements + TVA (ordre logique du calcul) */}
-                <div className="grid grid-cols-[1fr_1fr_0.5fr] gap-3">
-                  {/* 1. Tarif HT */}
+                {/* Ligne 1: Tarif HT + Financements + TVA (+ Montant HT pour Particulier) */}
+                {/* Correction 373: Ajout colonne Montant HT pour Particulier */}
+                <div className={`grid gap-3 ${client.type === "PARTICULIER" ? "grid-cols-[1fr_1fr_0.5fr_0.7fr]" : "grid-cols-[1fr_1fr_0.5fr]"}`}>
+                  {/* 1. Tarif HT (ou TTC pour Particulier) */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                       {clientTypeLabels[client.type].tarifLabel}
@@ -529,6 +572,28 @@ export default function StepTarifs({
                       = {tarif.montantTVA.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
                     </p>
                   </div>
+
+                  {/* Correction 373: 4. Montant HT calculé (uniquement pour Particulier) */}
+                  {client.type === "PARTICULIER" && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        Montant HT
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          readOnly
+                          value={(tarif.tarifHT / (1 + tarif.tauxTVA / 100)).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          className="w-full pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed"
+                          title="Calculé automatiquement depuis le TTC"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5 italic">
+                        Calculé auto
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Ligne 2: Liste des financements (si présents) */}
@@ -598,7 +663,8 @@ export default function StepTarifs({
                 {tarif.financements.length > 0 && (
                   <div className="flex items-center gap-4 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs">
                     <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                      <span>Financé:</span>
+                      {/* Correction 372: Préciser HT */}
+                      <span>Financé (HT):</span>
                       <span className="font-medium text-green-600">-{tarif.totalFinance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
@@ -638,13 +704,15 @@ export default function StepTarifs({
             </p>
           </div>
           <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
-            <p className="text-xs text-green-600 dark:text-green-400 mb-1">Financements externes</p>
+            {/* Correction 374: Préciser HT */}
+            <p className="text-xs text-green-600 dark:text-green-400 mb-1">Financements externes (HT)</p>
             <p className="text-lg font-semibold text-green-700 dark:text-green-400">
               - {totalFinance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
             </p>
           </div>
           <div className="p-3 rounded-lg bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30">
-            <p className="text-xs text-brand-600 dark:text-brand-400 mb-1">Reste à charge clients</p>
+            {/* Correction 374: Préciser TTC */}
+            <p className="text-xs text-brand-600 dark:text-brand-400 mb-1">Reste à charge clients (TTC)</p>
             <p className="text-lg font-semibold text-brand-700 dark:text-brand-400">
               {totalResteAChargeTTC.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
             </p>

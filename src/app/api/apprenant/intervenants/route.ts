@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
   try {
     // Récupérer le token depuis les query params
     const token = request.nextUrl.searchParams.get("token");
-    const inscriptionId = request.nextUrl.searchParams.get("inscriptionId");
+    // Correction 430: Utiliser sessionId au lieu de inscriptionId
+    const sessionId = request.nextUrl.searchParams.get("sessionId");
 
     if (!token) {
       return NextResponse.json(
@@ -53,13 +54,54 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { apprenantId, organizationId } = decoded;
+    const { apprenantId } = decoded;
 
-    // Récupérer l'inscription pour avoir la formation
+    // Correction 430: Si sessionId fourni, récupérer les intervenants de la session spécifique
+    if (sessionId) {
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        include: {
+          formateur: true,
+          // Inclure aussi les co-formateurs s'ils existent
+        },
+      });
+
+      if (!session) {
+        return NextResponse.json({ intervenants: [] });
+      }
+
+      const intervenants: Array<{
+        id: string;
+        nom: string;
+        prenom: string;
+        email: string | null;
+        telephone: string | null;
+        fonction: string | null;
+        specialites: string[];
+        structure: string | null;
+        role: "formateur" | "tuteur" | "expert";
+      }> = [];
+
+      if (session.formateur) {
+        intervenants.push({
+          id: session.formateur.id,
+          nom: session.formateur.nom,
+          prenom: session.formateur.prenom,
+          email: session.formateur.email,
+          telephone: session.formateur.telephone,
+          fonction: session.formateur.fonction,
+          specialites: session.formateur.specialites || [],
+          structure: session.formateur.structure,
+          role: "formateur",
+        });
+      }
+
+      return NextResponse.json({ intervenants });
+    }
+
+    // Fallback: comportement original si pas de sessionId
     const inscription = await prisma.lMSInscription.findFirst({
-      where: inscriptionId
-        ? { id: inscriptionId, apprenantId }
-        : { apprenantId },
+      where: { apprenantId },
     });
 
     if (!inscription) {

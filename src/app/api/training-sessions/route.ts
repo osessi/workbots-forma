@@ -86,16 +86,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier que la formation existe et appartient à l'organisation
+    // Correction 433b: Récupérer toutes les données nécessaires pour le snapshot
     const formation = await prisma.formation.findFirst({
       where: {
         id: formationId,
         organizationId: user.organizationId,
+      },
+      include: {
+        modules: {
+          orderBy: { ordre: "asc" },
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+            ordre: true,
+            duree: true,
+            contenu: true,
+            isModuleZero: true,
+          },
+        },
       },
     });
 
     if (!formation) {
       return NextResponse.json({ error: "Formation non trouvée" }, { status: 404 });
     }
+
+    // Correction 433b: Préparer le snapshot des données Formation
+    const snapshotModules = formation.modules.map(m => ({
+      id: m.id,
+      titre: m.titre,
+      description: m.description,
+      ordre: m.ordre,
+      duree: m.duree,
+      contenu: m.contenu,
+      isModuleZero: m.isModuleZero,
+    }));
 
     // Compter les sessions existantes pour cette formation cette année
     const currentYear = new Date().getFullYear();
@@ -121,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     // Créer la session avec ses journées dans une transaction
     const session = await prisma.$transaction(async (tx) => {
-      // 1. Créer la session
+      // 1. Créer la session avec snapshot des données Formation
       const newSession = await tx.session.create({
         data: {
           reference,
@@ -138,6 +164,14 @@ export async function POST(request: NextRequest) {
           tarifParDefautHT: tarifParDefautHT ? parseFloat(tarifParDefautHT) : null,
           tauxTVA: parseFloat(tauxTVA),
           notes: notes || null,
+          // Correction 433b: Snapshot des données Formation
+          snapshotFormationTitre: formation.titre,
+          snapshotFormationDescription: formation.description,
+          snapshotFichePedagogique: formation.fichePedagogique || undefined,
+          snapshotEvaluationsData: formation.evaluationsData || undefined,
+          snapshotModules: snapshotModules,
+          snapshotSlidesData: formation.slidesData || undefined,
+          snapshotCreatedAt: new Date(),
           journees: journees && journees.length > 0 ? {
             create: journees.map((j: { date: string; ordre?: number; heureDebutMatin?: string; heureFinMatin?: string; heureDebutAprem?: string; heureFinAprem?: string }, index: number) => ({
               ordre: j.ordre || index + 1,

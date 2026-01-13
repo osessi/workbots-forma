@@ -2,11 +2,11 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
 import {
   Home,
-  BarChart3,
   BookOpen,
   Users,
   PenLine,
@@ -21,6 +21,9 @@ import {
   Loader2,
   MessageCircle,
   MessageSquare,
+  ChevronDown,
+  Check,
+  GraduationCap,
 } from "lucide-react";
 
 interface NavItem {
@@ -41,12 +44,15 @@ export default function ApprenantSidebar({
   onClose,
 }: ApprenantSidebarProps) {
   const pathname = usePathname();
-  const { dashboardStats, apprenant, organization, token } = useApprenantPortal();
+  // Correction 430: Ajout sessions et selectSession
+  const { dashboardStats, apprenant, organization, token, sessions, selectedSession, selectSession } = useApprenantPortal();
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactMessage, setContactMessage] = useState("");
   const [contactSubject, setContactSubject] = useState("question");
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
+  // Correction 430: État pour le sélecteur de session
+  const [isSessionSelectorOpen, setIsSessionSelectorOpen] = useState(false);
 
   const handleSendMessage = async () => {
     if (!contactMessage.trim() || !token) return;
@@ -89,7 +95,8 @@ export default function ApprenantSidebar({
     {
       name: "Suivi pédagogique",
       href: "/apprenant/suivi",
-      icon: BarChart3,
+      icon: MessageSquare, // Correction 431: Changé en icône message
+      badge: dashboardStats?.messagesIntervenantNonLus || 0, // Correction 431
       section: "main",
     },
     {
@@ -206,8 +213,115 @@ export default function ApprenantSidebar({
     );
   };
 
+  // Correction 430: Formater l'affichage de la session
+  const formatSessionDisplay = (session: typeof selectedSession): { titre: string; dates: string } => {
+    if (!session) return { titre: "", dates: "" };
+    const formationTitre = session.formation.titre;
+    const dates = session.dateDebut && session.dateFin
+      ? `${new Date(session.dateDebut).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} - ${new Date(session.dateFin).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
+      : "";
+    return { titre: formationTitre, dates };
+  };
+
+  // Correction 430: Handler pour sélectionner une session
+  const handleSelectSession = (sessionId: string) => {
+    selectSession(sessionId);
+    setIsSessionSelectorOpen(false);
+  };
+
   const sidebarContent = (
     <div className="flex flex-col h-full">
+      {/* Correction 430: Sélecteur de session */}
+      {sessions.length > 0 && (
+        <div className="px-3 pt-4 pb-2">
+          <div className="relative">
+            <button
+              onClick={() => setIsSessionSelectorOpen(!isSessionSelectorOpen)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-brand-50 to-brand-100 dark:from-brand-900/30 dark:to-brand-800/30 border border-brand-200 dark:border-brand-700 rounded-xl hover:border-brand-300 dark:hover:border-brand-600 transition-colors"
+            >
+              {selectedSession?.formation.image ? (
+                <Image
+                  src={selectedSession.formation.image}
+                  alt={selectedSession.formation.titre}
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+                />
+              ) : (
+                <div className="w-9 h-9 bg-brand-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <GraduationCap className="w-5 h-5 text-white" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {selectedSession ? formatSessionDisplay(selectedSession).titre : "Sélectionner"}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {selectedSession ? formatSessionDisplay(selectedSession).dates : "une session"}
+                </p>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${
+                  isSessionSelectorOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {/* Dropdown des sessions */}
+            {isSessionSelectorOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
+                    Vos sessions ({sessions.length})
+                  </p>
+                </div>
+                <div className="max-h-64 overflow-y-auto p-2">
+                  {sessions.map((session) => {
+                    const display = formatSessionDisplay(session);
+                    return (
+                      <button
+                        key={session.participationId}
+                        onClick={() => handleSelectSession(session.sessionId)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
+                          selectedSession?.sessionId === session.sessionId
+                            ? "bg-brand-50 dark:bg-brand-500/10"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                        }`}
+                      >
+                        {session.formation.image ? (
+                          <Image
+                            src={session.formation.image}
+                            alt={session.formation.titre}
+                            width={36}
+                            height={36}
+                            className="w-9 h-9 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 bg-gradient-to-br from-brand-100 to-brand-200 dark:from-brand-900 dark:to-brand-800 rounded-lg flex items-center justify-center">
+                            <GraduationCap className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {display.titre}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {display.dates || session.reference}
+                          </p>
+                        </div>
+                        {selectedSession?.sessionId === session.sessionId && (
+                          <Check className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Navigation principale */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {/* Section principale */}

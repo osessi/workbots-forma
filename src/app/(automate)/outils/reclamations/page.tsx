@@ -371,6 +371,7 @@ export default function ReclamationsPage() {
             onRefresh={fetchReclamations}
             onDelete={handleDelete}
             onEdit={handleEdit}
+            onUpdateSelected={setSelectedReclamation}
           />
         )}
       </div>
@@ -416,6 +417,7 @@ function ReclamationDetail({
   onRefresh,
   onDelete,
   onEdit,
+  onUpdateSelected,
 }: {
   reclamation: Reclamation;
   onClose: () => void;
@@ -423,6 +425,7 @@ function ReclamationDetail({
   onRefresh: () => void;
   onDelete: (id: string) => void;
   onEdit: (reclamation: Reclamation) => void;
+  onUpdateSelected: (updated: Reclamation) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -433,6 +436,8 @@ function ReclamationDetail({
   const [saving, setSaving] = useState(false);
   const [uploadingPreuve, setUploadingPreuve] = useState(false);
   const [deletingPreuveId, setDeletingPreuveId] = useState<string | null>(null);
+  // Correction 422: État pour prévisualisation des fichiers
+  const [previewFile, setPreviewFile] = useState<PieceJointe | null>(null);
 
   // Réinitialiser formData quand la réclamation change
   useEffect(() => {
@@ -446,22 +451,28 @@ function ReclamationDetail({
 
   const statutConfig = STATUT_CONFIG[reclamation.statut];
 
-  // Upload d'une preuve
+  // Upload d'une preuve - Correction 421: Mise à jour temps réel
   const handleUploadPreuve = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
       setUploadingPreuve(true);
-      const formData = new FormData();
-      formData.append("file", file);
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
 
       const res = await fetch(`/api/outils/reclamations/${reclamation.id}/preuves`, {
         method: "POST",
-        body: formData,
+        body: uploadFormData,
       });
 
       if (res.ok) {
+        // Correction 421: Récupérer la réclamation mise à jour et l'afficher immédiatement
+        const updatedRes = await fetch(`/api/outils/reclamations/${reclamation.id}`);
+        if (updatedRes.ok) {
+          const updatedReclamation = await updatedRes.json();
+          onUpdateSelected(updatedReclamation);
+        }
         onRefresh();
       } else {
         const error = await res.json();
@@ -509,7 +520,10 @@ function ReclamationDetail({
         body: JSON.stringify(formData),
       });
       if (res.ok) {
+        const updatedReclamation = await res.json();
         setEditing(false);
+        // Correction 419: Mettre à jour en temps réel sans refresh
+        onUpdateSelected(updatedReclamation);
         onRefresh();
       }
     } catch (error) {
@@ -775,7 +789,7 @@ function ReclamationDetail({
         {/* Section Preuves */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-gray-900 dark:text-white">Preuves / Pièces jointes</h3>
+            <h3 className="font-medium text-gray-900 dark:text-white">Preuves</h3>
             <label className="flex items-center gap-2 px-3 py-1.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 cursor-pointer text-sm transition-colors">
               {uploadingPreuve ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -816,15 +830,14 @@ function ReclamationDetail({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <a
-                      href={piece.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    {/* Correction 422: Bouton pour prévisualiser les fichiers */}
+                    <button
+                      onClick={() => setPreviewFile(piece)}
                       className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
                       title="Voir"
                     >
                       <Eye size={16} className="text-gray-500" />
-                    </a>
+                    </button>
                     <button
                       onClick={() => handleDeletePreuve(piece.id)}
                       disabled={deletingPreuveId === piece.id}
@@ -850,6 +863,63 @@ function ReclamationDetail({
           )}
         </div>
       </div>
+
+      {/* Correction 422: Modal de prévisualisation des fichiers */}
+      {previewFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+              <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                {previewFile.filename}
+              </h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewFile.url}
+                  download={previewFile.filename}
+                  className="px-3 py-1.5 text-sm bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+                >
+                  Télécharger
+                </a>
+                <button
+                  onClick={() => setPreviewFile(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  <X size={20} className="text-gray-400" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-gray-100 dark:bg-gray-900">
+              {previewFile.type.startsWith("image/") ? (
+                <img
+                  src={previewFile.url}
+                  alt={previewFile.filename}
+                  className="max-w-full h-auto mx-auto rounded-lg shadow-lg"
+                />
+              ) : previewFile.type === "application/pdf" ? (
+                <iframe
+                  src={`${previewFile.url}#toolbar=1&navpanes=0`}
+                  className="w-full h-[70vh] rounded-lg border-0"
+                  title={previewFile.filename}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <File size={48} className="mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    Aperçu non disponible pour ce type de fichier
+                  </p>
+                  <a
+                    href={previewFile.url}
+                    download={previewFile.filename}
+                    className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+                  >
+                    Télécharger le fichier
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -909,16 +979,26 @@ function NewReclamationModal({
     e.preventDefault();
     try {
       setSaving(true);
+      // Correction 423: S'assurer que sessionId est null si vide (pas une chaîne vide)
+      const dataToSend = {
+        ...formData,
+        sessionId: formData.sessionId || null,
+      };
       const res = await fetch("/api/outils/reclamations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       });
       if (res.ok) {
         onCreated();
+      } else {
+        // Correction 423: Afficher l'erreur si la création échoue
+        const error = await res.json();
+        alert(error.error || "Erreur lors de la création de la réclamation");
       }
     } catch (error) {
       console.error("Erreur création:", error);
+      alert("Erreur lors de la création de la réclamation");
     } finally {
       setSaving(false);
     }

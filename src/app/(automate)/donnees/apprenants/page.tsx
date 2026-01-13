@@ -87,6 +87,8 @@ function ApprenantsPageContent() {
   const router = useRouter();
   const entrepriseIdFromUrl = searchParams.get("entreprise");
   const editIdFromUrl = searchParams.get("edit");
+  // Correction 398: Paramètre "from" pour savoir d'où vient l'utilisateur (fiche apprenant)
+  const fromUrl = searchParams.get("from");
 
   const [apprenants, setApprenants] = useState<Apprenant[]>([]);
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
@@ -99,6 +101,8 @@ function ApprenantsPageContent() {
   const [editingApprenant, setEditingApprenant] = useState<Apprenant | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  // Correction 397: Flag pour éviter la ré-ouverture du modal après fermeture
+  const [hasOpenedFromUrl, setHasOpenedFromUrl] = useState(false);
 
   // Qualiopi IND 5 - États pour les notes avec historique
   const [notes, setNotes] = useState<ApprenantNote[]>([]);
@@ -177,8 +181,9 @@ function ApprenantsPageContent() {
   }, [entrepriseIdFromUrl]);
 
   // Ouvrir automatiquement le modal d'édition si paramètre edit dans l'URL
+  // Correction 397: Utiliser hasOpenedFromUrl pour éviter la ré-ouverture après fermeture
   useEffect(() => {
-    if (editIdFromUrl && apprenants.length > 0 && !isModalOpen) {
+    if (editIdFromUrl && apprenants.length > 0 && !hasOpenedFromUrl) {
       const apprenantToEdit = apprenants.find((a) => a.id === editIdFromUrl);
       if (apprenantToEdit) {
         setEditingApprenant(apprenantToEdit);
@@ -200,9 +205,10 @@ function ApprenantsPageContent() {
         });
         loadNotes(apprenantToEdit.id);
         setIsModalOpen(true);
+        setHasOpenedFromUrl(true);
       }
     }
-  }, [editIdFromUrl, apprenants, isModalOpen]);
+  }, [editIdFromUrl, apprenants, hasOpenedFromUrl]);
 
   const resetForm = () => {
     setFormData({
@@ -313,11 +319,17 @@ function ApprenantsPageContent() {
     setIsModalOpen(true);
   };
 
-  const closeModal = () => {
+  const closeModal = (redirectToFiche = false) => {
     setIsModalOpen(false);
     resetForm();
-    // Nettoyer le paramètre edit de l'URL si présent
-    if (editIdFromUrl) {
+    // Correction 398: Rediriger vers la fiche apprenant si demandé ou si venu de là
+    if (redirectToFiche && editIdFromUrl) {
+      router.push(`/apprenants/${editIdFromUrl}`);
+    } else if (fromUrl === "fiche" && editIdFromUrl) {
+      // Si on vient de la fiche apprenant (paramètre from=fiche), y retourner
+      router.push(`/apprenants/${editIdFromUrl}`);
+    } else if (editIdFromUrl) {
+      // Sinon, nettoyer le paramètre edit de l'URL
       router.replace("/donnees/apprenants", { scroll: false });
     }
   };
@@ -339,8 +351,12 @@ function ApprenantsPageContent() {
       });
 
       if (res.ok) {
-        closeModal();
-        fetchApprenants();
+        // Correction 398: Rediriger vers la fiche apprenant si on vient de là
+        const shouldRedirectToFiche = fromUrl === "fiche" && !!editingApprenant;
+        closeModal(shouldRedirectToFiche);
+        if (!shouldRedirectToFiche) {
+          fetchApprenants();
+        }
       } else {
         const error = await res.json();
         alert(error.error || "Erreur lors de l'enregistrement");
@@ -571,7 +587,7 @@ function ApprenantsPageContent() {
                 {editingApprenant ? "Modifier l'apprenant" : "Nouvel apprenant"}
               </h2>
               <button
-                onClick={closeModal}
+                onClick={() => closeModal()}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors dark:hover:bg-gray-800"
               >
                 <X size={20} />
@@ -926,7 +942,7 @@ function ApprenantsPageContent() {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={() => closeModal()}
                   className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors dark:text-gray-400 dark:hover:text-gray-200"
                 >
                   Annuler

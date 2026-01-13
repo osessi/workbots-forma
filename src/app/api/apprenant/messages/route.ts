@@ -63,6 +63,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const token = searchParams.get("token");
+    // Correction 430: Récupérer sessionId pour filtrer
+    const sessionId = searchParams.get("sessionId");
 
     if (!token) {
       return NextResponse.json({ error: "Token requis" }, { status: 401 });
@@ -102,17 +104,30 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Correction 430: Filtrer par sessionId si fourni (dans metadata)
+    const filteredNotifications = sessionId
+      ? notifications.filter((n) => {
+          const metadata = (n.metadata as Record<string, unknown>) || {};
+          // Garder les messages liés à cette session ou les messages généraux (sans sessionId)
+          return metadata.sessionId === sessionId || !metadata.sessionId;
+        })
+      : notifications;
+
     // Formater les messages pour l'affichage côté apprenant
-    const messages = notifications.map((notif) => {
+    const messages = filteredNotifications.map((notif) => {
       const metadata = (notif.metadata as Record<string, unknown>) || {};
       const direction = metadata.direction as string || "incoming";
+      // Correction 421: Inclure les pièces jointes dans les réponses
       const replies = (metadata.replies as Array<{
         id: string;
         content: string;
         senderName: string;
         senderEmail: string;
         createdAt: string;
+        attachments?: Array<{ name: string; url: string; size?: number; type?: string }>;
       }>) || [];
+      // Correction 421: Récupérer les pièces jointes du message principal
+      const attachments = (metadata.attachments as Array<{ name: string; url: string; size?: number; type?: string }>) || [];
 
       // Pour les messages "incoming" (envoyés par l'apprenant),
       // les réponses sont celles de l'organisme
@@ -130,6 +145,7 @@ export async function GET(request: NextRequest) {
           senderEmail: (metadata.senderEmail as string) || apprenant.organization.email || "",
           isRead: metadata.readByApprenant as boolean || false,
           createdAt: notif.createdAt,
+          attachments, // Correction 421
           replies: replies.filter(r => r.senderEmail === apprenant.email), // Réponses de l'apprenant
         };
       } else {
@@ -143,6 +159,7 @@ export async function GET(request: NextRequest) {
           senderEmail: apprenant.email,
           isRead: true, // L'apprenant a envoyé, donc il l'a "lu"
           createdAt: notif.createdAt,
+          attachments, // Correction 421
           // Les réponses sont celles de l'organisme
           replies: replies.map(r => ({
             ...r,
@@ -196,7 +213,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { messageId, content, subject } = body;
+    // Correction 421: Ajout du support des pièces jointes
+    const { messageId, content, subject, attachments } = body;
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json(
@@ -204,6 +222,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Correction 421: Valider les pièces jointes si présentes
+    const validAttachments = Array.isArray(attachments)
+      ? attachments.filter(
+          (att: { name?: string; url?: string; size?: number; type?: string }) =>
+            att.name && att.url
+        )
+      : [];
 
     // Si messageId est fourni, c'est une réponse à un message existant
     if (messageId) {
@@ -228,12 +254,14 @@ export async function POST(request: NextRequest) {
       const currentMetadata = (notification.metadata as Record<string, unknown>) || {};
       const replies = (currentMetadata.replies as Array<Record<string, unknown>>) || [];
 
+      // Correction 421: Inclure les pièces jointes dans la réponse
       const newReply = {
         id: `reply_${Date.now()}`,
         content: content.trim(),
         senderName: `${apprenant.prenom} ${apprenant.nom}`,
         senderEmail: apprenant.email,
         createdAt: new Date().toISOString(),
+        attachments: validAttachments, // Correction 421
       };
 
       replies.push(newReply);
@@ -284,6 +312,8 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Nouveau message de l'apprenant vers l'organisme
+      // Correction 421: Inclure les pièces jointes dans les metadata
+      // Correction 422: actionUrl vers l'onglet Messages avec messageId
       const notification = await prisma.notification.create({
         data: {
           organizationId: apprenant.organizationId,
@@ -292,7 +322,7 @@ export async function POST(request: NextRequest) {
           message: `Nouveau message de ${apprenant.prenom} ${apprenant.nom}`,
           resourceType: "apprenant",
           resourceId: apprenant.id,
-          actionUrl: `/apprenants/${apprenant.id}`,
+          actionUrl: `/apprenants/${apprenant.id}?tab=messages`, // Correction 422: redirection onglet Messages
           isRead: false,
           metadata: {
             direction: "incoming",
@@ -301,8 +331,17 @@ export async function POST(request: NextRequest) {
             apprenantNom: `${apprenant.prenom} ${apprenant.nom}`,
             apprenantEmail: apprenant.email,
             sentAt: new Date().toISOString(),
+            attachments: validAttachments, // Correction 421
             replies: [],
           },
+        },
+      });
+
+      // Correction 422: Mettre à jour l'actionUrl avec le messageId
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data: {
+          actionUrl: `/apprenants/${apprenant.id}?tab=messages&messageId=${notification.id}`,
         },
       });
 
@@ -331,6 +370,7 @@ export async function POST(request: NextRequest) {
         console.error("[API] Erreur envoi email message apprenant:", emailError);
       }
 
+      // Correction 421: Inclure les pièces jointes dans la réponse
       return NextResponse.json({
         success: true,
         message: {
@@ -342,6 +382,7 @@ export async function POST(request: NextRequest) {
           senderEmail: apprenant.email,
           isRead: true,
           createdAt: notification.createdAt,
+          attachments: validAttachments, // Correction 421
           replies: [],
         },
       });

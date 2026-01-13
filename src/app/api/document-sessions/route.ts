@@ -131,6 +131,7 @@ async function handleTrainingSessionSave(
     }
 
     // Créer/Mettre à jour les documents générés
+    // Correction 381: Utiliser entrepriseId au lieu de clientId car les clients sont recréés à chaque sauvegarde
     if (generatedDocs && generatedDocs.length > 0) {
       const docTypeMap: Record<string, DocumentType> = {
         convention: "CONVENTION",
@@ -145,13 +146,44 @@ async function handleTrainingSessionSave(
       for (const doc of generatedDocs) {
         const documentType = docTypeMap[doc.type] || ("AUTRE" as DocumentType);
 
-        // Chercher un document existant
+        // Correction 381: Utiliser des identifiants stables pour matcher les documents
+        // - CONVENTION : entrepriseId (pour entreprises et indépendants)
+        // - CONTRAT_FORMATION : apprenantId (pour particuliers)
+        // - FACTURE : entrepriseId si dispo, sinon apprenantId
+        // - Documents apprenant (CONVOCATION, ATTESTATION_FIN, CERTIFICAT) : apprenantId
+
+        const isConvention = documentType === "CONVENTION";
+        const isContrat = documentType === "CONTRAT_FORMATION";
+        const isFacture = documentType === "FACTURE";
+        const isApprenantDocument = ["CONVOCATION", "ATTESTATION_FIN", "CERTIFICAT"].includes(documentType);
+
+        // Déterminer l'identifiant stable pour ce document
+        let stableClientId: string | null = null;
+        let stableParticipantId: string | null = null;
+
+        if (isConvention) {
+          // Convention = entrepriseId (entreprise ou indépendant avec SIRET)
+          stableClientId = doc.entrepriseId || null;
+        } else if (isContrat) {
+          // Contrat = apprenantId (particulier sans SIRET)
+          stableParticipantId = doc.apprenantId || null;
+        } else if (isFacture) {
+          // Facture = entrepriseId si dispo, sinon apprenantId
+          stableClientId = doc.entrepriseId || null;
+          if (!stableClientId) {
+            stableParticipantId = doc.apprenantId || null;
+          }
+        } else if (isApprenantDocument) {
+          // Documents par apprenant
+          stableParticipantId = doc.apprenantId || null;
+        }
+
         const existingDoc = await prisma.sessionDocumentNew.findFirst({
           where: {
             sessionId: trainingSessionId,
             type: documentType,
-            clientId: doc.clientId || null,
-            participantId: doc.apprenantId || null,
+            clientId: stableClientId,
+            participantId: stableParticipantId,
           },
         });
 
@@ -170,8 +202,8 @@ async function handleTrainingSessionSave(
             data: {
               sessionId: trainingSessionId,
               type: documentType,
-              clientId: doc.clientId || null,
-              participantId: doc.apprenantId || null,
+              clientId: stableClientId,
+              participantId: stableParticipantId,
               titre: doc.titre,
               content: { html: doc.renderedContent, json: doc.jsonContent },
               isGenerated: true,
@@ -609,17 +641,52 @@ export async function GET(request: NextRequest) {
           coformateursIds: trainingSession.coFormateurs.map((cf) => cf.intervenantId),
           coformateurs: trainingSession.coFormateurs.map((cf) => cf.intervenant),
         },
+        // Correction 381: Mapper les documents générés avec les bons clientId actuels
         generatedDocs: trainingSession.documentsGeneres.map((d) => {
           const content = d.content as { html?: string; json?: string } | null;
+          const docType = d.type.toLowerCase();
+
+          // Normaliser le type pour le frontend
+          const normalizedType = docType === "contrat_formation" ? "contrat" :
+                                 docType === "attestation_fin" ? "attestation" :
+                                 docType === "certificat" ? "certificat_realisation" :
+                                 docType === "attestation_presence" ? "emargement" : docType;
+
+          // Correction 381: Mapper les identifiants stables vers les clientId actuels
+          // - Convention : d.clientId = entrepriseId → trouver le client avec cette entrepriseId
+          // - Contrat : d.participantId = apprenantId → trouver le client avec cet apprenantId
+          // - Facture : d.clientId = entrepriseId OU d.participantId = apprenantId
+
+          let mappedClientId: string | null = null;
+
+          if (d.clientId) {
+            // d.clientId contient entrepriseId pour convention/facture
+            const matchingClient = trainingSession.clients.find((c) => c.entrepriseId === d.clientId);
+            if (matchingClient) {
+              mappedClientId = matchingClient.id;
+            }
+          }
+
+          if (!mappedClientId && d.participantId) {
+            // Pour contrat ou si pas trouvé par entreprise, chercher par apprenant
+            const matchingClient = trainingSession.clients.find((c) =>
+              c.participants.some((p) => p.apprenant.id === d.participantId)
+            );
+            if (matchingClient) {
+              mappedClientId = matchingClient.id;
+            }
+          }
+
           return {
             id: d.id,
-            type: d.type.toLowerCase(),
+            type: normalizedType,
             titre: d.titre || `Document ${d.type}`,
-            clientId: d.clientId,
-            apprenantId: d.participantId, // Mapping participantId -> apprenantId pour compatibilité
+            clientId: mappedClientId,
+            entrepriseId: d.clientId, // L'entrepriseId stocké
+            apprenantId: d.participantId, // L'apprenantId stocké
             renderedContent: content?.html || "",
             jsonContent: content?.json,
-            savedToDrive: d.isGenerated, // Utiliser isGenerated au lieu de status
+            savedToDrive: d.isGenerated,
           };
         }),
       };

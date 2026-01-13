@@ -30,7 +30,13 @@ import {
   Rocket,
   PartyPopper,
   MessageSquareText,
+  Pen,
+  QrCode,
+  Send,
+  Copy,
+  Link,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   SessionClient,
   SessionTarif,
@@ -71,6 +77,7 @@ interface StepDocumentsProps {
   initialGeneratedDocs?: GeneratedDocument[]; // Documents déjà générés (persistés)
   onGeneratedDocsChange?: (docs: GeneratedDocument[]) => void; // Callback pour sauvegarder
   onPrev: () => void;
+  onNext?: () => void; // Correction 433a: Navigation vers étape suivante (Espace apprenant)
   onGenerate: (selectedDocs: string[]) => Promise<void>;
   onPublish?: () => void; // Callback optionnel quand on publie
 }
@@ -418,12 +425,17 @@ export default function StepDocuments({
   initialGeneratedDocs = [],
   onGeneratedDocsChange,
   onPrev,
+  onNext,
   onPublish,
 }: StepDocumentsProps) {
   // États - initialiser avec les documents existants
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocument[]>(initialGeneratedDocs);
   const [generatingDocType, setGeneratingDocType] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Correction 375: État pour la génération de tous les documents
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generateAllProgress, setGenerateAllProgress] = useState({ current: 0, total: 0 });
 
   // Modal de sélection pour documents multiples
   const [showSelectionModal, setShowSelectionModal] = useState(false);
@@ -468,6 +480,16 @@ export default function StepDocuments({
   const [emailMessage, setEmailMessage] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState<Set<string>>(new Set());
+
+  // Correction 382: Modal de signature électronique
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signatureDoc, setSignatureDoc] = useState<GeneratedDocument | null>(null);
+  const [signatureMode, setSignatureMode] = useState<"qrcode" | "email">("qrcode");
+  const [signatureEmail, setSignatureEmail] = useState("");
+  const [signatureUrl, setSignatureUrl] = useState<string>("");
+  const [isCreatingSignature, setIsCreatingSignature] = useState(false);
+  const [signatureCopied, setSignatureCopied] = useState(false);
+  const [signatureCreated, setSignatureCreated] = useState(false);
 
   // Synchroniser avec initialGeneratedDocs quand ils changent (rechargement)
   useEffect(() => {
@@ -1048,6 +1070,115 @@ export default function StepDocuments({
     }
   };
 
+  // Vérifier si un document a été généré pour un destinataire (déplacé ici pour être utilisé par generateAllDocuments)
+  const isDocGenerated = useCallback((docType: DocumentType, targetId: string) => {
+    return generatedDocs.some((d) => {
+      if (d.type !== docType) return false;
+      // Documents pour toute la session
+      if (docType === "emargement") return true;
+      // Pour les documents par apprenant (convocation, attestation, certificat_realisation)
+      if (["convocation", "attestation", "certificat_realisation"].includes(docType)) {
+        return d.apprenantId === targetId;
+      }
+      // Pour les documents par client (convention, contrat, facture)
+      return d.clientId === targetId;
+    });
+  }, [generatedDocs]);
+
+  // Correction 375: Calculer les documents restants à générer
+  const remainingDocuments = useMemo(() => {
+    let remaining = 0;
+    let total = 0;
+    for (const docConfig of documentsConfig) {
+      const destinataires = getDestinataires(docConfig.id);
+      total += destinataires.length;
+      for (const dest of destinataires) {
+        if (!isDocGenerated(docConfig.id, dest.id)) {
+          remaining++;
+        }
+      }
+    }
+    return { remaining, total, generated: total - remaining };
+  }, [clients, generatedDocs, isDocGenerated]);
+
+  // Correction 375: Générer TOUS les documents de la session
+  const generateAllDocuments = async () => {
+    setIsGeneratingAll(true);
+    setError(null);
+
+    // Collecter tous les documents à générer
+    const documentsToGenerate: Array<{ docType: DocumentType; destId: string; destName: string }> = [];
+
+    for (const docConfig of documentsConfig) {
+      const destinataires = getDestinataires(docConfig.id);
+      for (const dest of destinataires) {
+        // Vérifier si le document n'est pas déjà généré
+        if (!isDocGenerated(docConfig.id, dest.id)) {
+          documentsToGenerate.push({
+            docType: docConfig.id,
+            destId: dest.id,
+            destName: dest.name,
+          });
+        }
+      }
+    }
+
+    if (documentsToGenerate.length === 0) {
+      setIsGeneratingAll(false);
+      return;
+    }
+
+    setGenerateAllProgress({ current: 0, total: documentsToGenerate.length });
+
+    try {
+      for (let i = 0; i < documentsToGenerate.length; i++) {
+        const { docType, destId, destName } = documentsToGenerate[i];
+        setGenerateAllProgress({ current: i + 1, total: documentsToGenerate.length });
+        setGeneratingDocType(`${docType}-${destId}`);
+
+        try {
+          const response = await fetch("/api/documents/generate-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              formation,
+              clients: clients,
+              tarifs: tarifs,
+              lieu: lieu,
+              formateurs: formateurs,
+              selectedDocuments: [docType],
+              targetId: destId,
+            }),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.documents && result.documents.length > 0) {
+              const relevantDoc = result.documents.find((d: GeneratedDocument) =>
+                d.clientId === destId || d.apprenantId === destId || (docType === "emargement" && d.type === "emargement")
+              ) || result.documents[0];
+
+              setGeneratedDocs((prev) => {
+                const exists = prev.find((d) => d.id === relevantDoc.id);
+                if (exists) {
+                  return prev.map((d) => (d.id === relevantDoc.id ? relevantDoc : d));
+                }
+                return [...prev, relevantDoc];
+              });
+            }
+          }
+        } catch (docErr) {
+          console.error(`Erreur génération ${docType} pour ${destName}:`, docErr);
+          // Continuer avec les autres documents même en cas d'erreur
+        }
+      }
+    } finally {
+      setGeneratingDocType(null);
+      setIsGeneratingAll(false);
+      setGenerateAllProgress({ current: 0, total: 0 });
+    }
+  };
+
   // Télécharger un document en PDF
   const downloadPDF = (doc: GeneratedDocument) => {
     const printWindow = window.open("", "_blank");
@@ -1137,6 +1268,154 @@ export default function StepDocuments({
       setError(err instanceof Error ? err.message : "Erreur lors de l'envoi de l'email");
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  // Correction 382: Ouvrir la modal de signature
+  const openSignatureModal = (doc: GeneratedDocument) => {
+    setSignatureDoc(doc);
+    setSignatureMode("qrcode");
+    setSignatureUrl("");
+    setSignatureCreated(false);
+    setSignatureCopied(false);
+
+    // Pré-remplir l'email du destinataire selon le type de document
+    let defaultEmail = "";
+    if (doc.apprenantId) {
+      // Pour convocation, attestation, etc. → email de l'apprenant
+      const apprenant = clients
+        .flatMap(c => c.apprenants)
+        .find(a => a.id === doc.apprenantId);
+      defaultEmail = apprenant?.email || "";
+    } else if (doc.clientId) {
+      // Pour convention, contrat, facture → email du représentant ou de l'apprenant
+      const client = clients.find(c => c.id === doc.clientId);
+      if (client?.type === "ENTREPRISE" && client?.entreprise?.contactEmail) {
+        defaultEmail = client.entreprise.contactEmail;
+      } else if (client?.apprenant?.email) {
+        defaultEmail = client.apprenant.email;
+      }
+    }
+    setSignatureEmail(defaultEmail);
+    setShowSignatureModal(true);
+  };
+
+  // Correction 382: Créer une demande de signature
+  const createSignatureRequest = async () => {
+    if (!signatureDoc || !formation.sessionId) {
+      setError("Session non disponible pour la signature");
+      return;
+    }
+
+    setIsCreatingSignature(true);
+    setError(null);
+
+    try {
+      // Déterminer le nom du destinataire
+      let destinataireNom = "";
+      let destinataireEmail = signatureEmail;
+
+      if (signatureDoc.apprenantId) {
+        const apprenant = clients
+          .flatMap(c => c.apprenants)
+          .find(a => a.id === signatureDoc.apprenantId);
+        destinataireNom = apprenant ? `${apprenant.prenom} ${apprenant.nom}` : "Apprenant";
+        if (!destinataireEmail && apprenant?.email) {
+          destinataireEmail = apprenant.email;
+        }
+      } else if (signatureDoc.clientId) {
+        const client = clients.find(c => c.id === signatureDoc.clientId);
+        if (client?.type === "ENTREPRISE" && client?.entreprise) {
+          destinataireNom = client.entreprise.raisonSociale;
+          if (!destinataireEmail && client.entreprise.contactEmail) {
+            destinataireEmail = client.entreprise.contactEmail;
+          }
+        } else if (client?.apprenant) {
+          destinataireNom = `${client.apprenant.prenom} ${client.apprenant.nom}`;
+          if (!destinataireEmail && client.apprenant.email) {
+            destinataireEmail = client.apprenant.email;
+          }
+        }
+      }
+
+      // Mapper les types de documents locaux vers les types Prisma
+      const documentTypeMapping: Record<string, string> = {
+        convention: "CONVENTION",
+        contrat: "CONTRAT_FORMATION",
+        convocation: "CONVOCATION",
+        attestation: "ATTESTATION_FIN",
+        certificat_realisation: "CERTIFICAT",
+        emargement: "FEUILLE_EMARGEMENT",
+        facture: "FACTURE",
+      };
+      const mappedDocType = documentTypeMapping[signatureDoc.type || ""] || "AUTRE";
+
+      const response = await fetch("/api/signatures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titre: signatureDoc.titre,
+          documentType: mappedDocType,
+          contenuHtml: signatureDoc.renderedContent,
+          destinataireNom: destinataireNom || "Destinataire",
+          destinataireEmail: destinataireEmail || signatureEmail,
+          sessionId: formation.sessionId,
+          apprenantId: signatureDoc.apprenantId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la création de la demande de signature");
+      }
+
+      const result = await response.json();
+
+      // Utiliser l'URL de signature retournée par l'API ou construire depuis le token
+      const url = result.document?.signatureUrl || `${window.location.origin}/signer/${result.document?.token}`;
+      setSignatureUrl(url);
+      setSignatureCreated(true);
+
+      // Si mode email, envoyer automatiquement
+      if (signatureMode === "email" && (destinataireEmail || signatureEmail)) {
+        await sendSignatureEmail(url, destinataireNom || "Destinataire", destinataireEmail || signatureEmail);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la création de la signature");
+    } finally {
+      setIsCreatingSignature(false);
+    }
+  };
+
+  // Correction 382: Envoyer l'email de signature
+  const sendSignatureEmail = async (url: string, nom: string, email: string) => {
+    try {
+      const response = await fetch("/api/signatures/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signatureUrl: url,
+          destinataireNom: nom,
+          destinataireEmail: email,
+          documentTitre: signatureDoc?.titre,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de l'envoi de l'email");
+      }
+    } catch (err) {
+      console.error("Erreur envoi email signature:", err);
+      // Ne pas throw, l'URL QR code est quand même disponible
+    }
+  };
+
+  // Correction 382: Copier l'URL de signature
+  const copySignatureUrl = () => {
+    if (signatureUrl) {
+      navigator.clipboard.writeText(signatureUrl);
+      setSignatureCopied(true);
+      setTimeout(() => setSignatureCopied(false), 2000);
     }
   };
 
@@ -1305,21 +1584,6 @@ export default function StepDocuments({
     }
   };
 
-  // Vérifier si un document a été généré pour un destinataire
-  const isDocGenerated = (docType: DocumentType, targetId: string) => {
-    return generatedDocs.some((d) => {
-      if (d.type !== docType) return false;
-      // Documents pour toute la session
-      if (docType === "emargement") return true;
-      // Pour les documents par apprenant (convocation, attestation, certificat_realisation)
-      if (["convocation", "attestation", "certificat_realisation"].includes(docType)) {
-        return d.apprenantId === targetId;
-      }
-      // Pour les documents par client (convention, contrat, facture)
-      return d.clientId === targetId;
-    });
-  };
-
   // Obtenir le document généré
   const getGeneratedDoc = (docType: DocumentType, targetId: string) => {
     return generatedDocs.find((d) => {
@@ -1348,7 +1612,7 @@ export default function StepDocuments({
               Documents à générer
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Générez les documents un par un et visualisez-les avant téléchargement
+              Générez et retrouvez ici l&apos;ensemble des documents liés à votre session
             </p>
           </div>
         </div>
@@ -1374,14 +1638,14 @@ export default function StepDocuments({
           </div>
           <div className="p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-              <Euro size={12} /> Tarif total
+              <Euro size={12} /> Tarif total (HT)
             </p>
             <p className="text-lg font-semibold text-gray-900 dark:text-white">
               {totalTarif.toLocaleString("fr-FR")} €
             </p>
             {totalFinance > 0 && (
               <p className="text-xs text-green-500">
-                dont {totalFinance.toLocaleString("fr-FR")} € financé
+                dont {totalFinance.toLocaleString("fr-FR")} € financé(s)
               </p>
             )}
           </div>
@@ -1405,6 +1669,85 @@ export default function StepDocuments({
           </div>
         </div>
       </div>
+
+      {/* Correction 375: Bouton Tout générer */}
+      {remainingDocuments.remaining > 0 && (
+        <div className="rounded-xl border border-brand-200 bg-gradient-to-r from-brand-50 to-blue-50 dark:from-brand-500/10 dark:to-blue-500/10 dark:border-brand-500/30 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-400">
+                <Rocket size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  Génération rapide
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {remainingDocuments.generated}/{remainingDocuments.total} documents générés
+                  {remainingDocuments.remaining > 0 && (
+                    <span className="ml-1 text-brand-600 dark:text-brand-400">
+                      • {remainingDocuments.remaining} restant{remainingDocuments.remaining > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={generateAllDocuments}
+              disabled={isGeneratingAll || generatingDocType !== null}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGeneratingAll ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>
+                    {generateAllProgress.current}/{generateAllProgress.total}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Play size={16} />
+                  <span>Tout générer</span>
+                </>
+              )}
+            </button>
+          </div>
+          {/* Barre de progression pendant la génération */}
+          {isGeneratingAll && generateAllProgress.total > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span>Génération en cours...</span>
+                <span>{Math.round((generateAllProgress.current / generateAllProgress.total) * 100)}%</span>
+              </div>
+              <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-brand-500 transition-all duration-300"
+                  style={{ width: `${(generateAllProgress.current / generateAllProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Message quand tous les documents sont générés */}
+      {remainingDocuments.remaining === 0 && remainingDocuments.total > 0 && (
+        <div className="rounded-xl border border-green-200 bg-green-50 dark:bg-green-500/10 dark:border-green-500/30 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-white dark:bg-gray-800 text-green-600 dark:text-green-400">
+              <CheckCircle2 size={20} />
+            </div>
+            <div>
+              <p className="font-medium text-green-800 dark:text-green-300">
+                Tous les documents sont générés
+              </p>
+              <p className="text-xs text-green-600 dark:text-green-400">
+                {remainingDocuments.total} document{remainingDocuments.total > 1 ? "s" : ""} prêt{remainingDocuments.total > 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Types de documents */}
       <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -1524,6 +1867,14 @@ export default function StepDocuments({
                                 >
                                   <Download size={12} />
                                   PDF
+                                </button>
+                                <button
+                                  onClick={() => openSignatureModal(generatedDoc)}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 dark:bg-purple-500/10 dark:border-purple-500/30 dark:text-purple-400"
+                                  title="Faire signer"
+                                >
+                                  <Pen size={12} />
+                                  Signer
                                 </button>
                               </>
                             ) : (
@@ -1824,6 +2175,13 @@ export default function StepDocuments({
                   >
                     {isSent ? <CheckCircle2 size={14} /> : <Mail size={14} />}
                   </button>
+                  <button
+                    onClick={() => openSignatureModal(doc)}
+                    className="p-1 text-purple-500 hover:text-purple-600"
+                    title="Faire signer"
+                  >
+                    <Pen size={14} />
+                  </button>
                 </div>
               );
             })}
@@ -1925,6 +2283,17 @@ export default function StepDocuments({
               <CheckCircle2 size={16} />
               Session planifiée
             </span>
+          )}
+
+          {/* Correction 433a: Bouton Suivant vers Espace apprenant */}
+          {onNext && (
+            <button
+              onClick={onNext}
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-brand-500 rounded-xl hover:bg-brand-600 transition-colors"
+            >
+              Espace apprenant
+              <ChevronRight size={18} />
+            </button>
           )}
         </div>
       </div>
@@ -2356,6 +2725,177 @@ export default function StepDocuments({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de signature électronique - Correction 382 */}
+      {showSignatureModal && signatureDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Pen size={20} className="text-purple-500" />
+                Signature électronique
+              </h3>
+              <button
+                onClick={() => {
+                  setShowSignatureModal(false);
+                  setSignatureDoc(null);
+                  setSignatureUrl("");
+                  setSignatureCreated(false);
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Document concerné */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Document :</p>
+                <p className="font-medium text-gray-900 dark:text-white">{signatureDoc.titre}</p>
+              </div>
+
+              {/* Choix du mode */}
+              {!signatureCreated && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Mode de signature
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSignatureMode("qrcode")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                          signatureMode === "qrcode"
+                            ? "border-purple-500 bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                        }`}
+                      >
+                        <QrCode size={20} />
+                        <span className="font-medium">QR Code</span>
+                      </button>
+                      <button
+                        onClick={() => setSignatureMode("email")}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                          signatureMode === "email"
+                            ? "border-purple-500 bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                        }`}
+                      >
+                        <Send size={20} />
+                        <span className="font-medium">Email</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Email du destinataire (pour mode email) */}
+                  {signatureMode === "email" && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Email du destinataire *
+                      </label>
+                      <input
+                        type="email"
+                        value={signatureEmail}
+                        onChange={(e) => setSignatureEmail(e.target.value)}
+                        placeholder="email@exemple.com"
+                        className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Résultat après création */}
+              {signatureCreated && signatureUrl && (
+                <div className="space-y-4">
+                  {signatureMode === "qrcode" ? (
+                    <>
+                      <div className="flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <QRCodeSVG
+                          value={signatureUrl}
+                          size={180}
+                          level="H"
+                          includeMargin
+                          className="mb-3"
+                        />
+                        <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                          Scannez ce QR code pour signer le document
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={signatureUrl}
+                          readOnly
+                          className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-600 dark:text-gray-400"
+                        />
+                        <button
+                          onClick={copySignatureUrl}
+                          className={`p-2 rounded-lg transition-colors ${
+                            signatureCopied
+                              ? "bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+                          }`}
+                          title={signatureCopied ? "Copié !" : "Copier le lien"}
+                        >
+                          {signatureCopied ? <Check size={18} /> : <Copy size={18} />}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center p-6 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-200 dark:border-green-500/30">
+                      <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-500/20 flex items-center justify-center mb-3">
+                        <Check size={24} className="text-green-600 dark:text-green-400" />
+                      </div>
+                      <p className="text-sm font-medium text-green-700 dark:text-green-400 text-center">
+                        Email envoyé avec succès !
+                      </p>
+                      <p className="text-sm text-green-600 dark:text-green-500 text-center mt-1">
+                        Un lien de signature a été envoyé à {signatureEmail}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 p-5 border-t border-gray-200 dark:border-gray-800">
+              <button
+                onClick={() => {
+                  setShowSignatureModal(false);
+                  setSignatureDoc(null);
+                  setSignatureUrl("");
+                  setSignatureCreated(false);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                {signatureCreated ? "Fermer" : "Annuler"}
+              </button>
+              {!signatureCreated && (
+                <button
+                  onClick={createSignatureRequest}
+                  disabled={isCreatingSignature || (signatureMode === "email" && !signatureEmail)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingSignature ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Création...
+                    </>
+                  ) : (
+                    <>
+                      {signatureMode === "qrcode" ? <QrCode size={16} /> : <Send size={16} />}
+                      {signatureMode === "qrcode" ? "Générer le QR Code" : "Envoyer"}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

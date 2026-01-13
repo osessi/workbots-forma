@@ -1,7 +1,8 @@
 // ===========================================
 // API EVALUATIONS APPRENANT - GET /api/apprenant/evaluations
 // ===========================================
-// Récupère les évaluations disponibles pour l'apprenant
+// Corrections 447-450: QCM & Ateliers avec stats et module associé
+// Récupère les évaluations de type QCM_MODULE et ATELIER_MODULE
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   try {
     // Récupérer le token depuis les query params
     const token = request.nextUrl.searchParams.get("token");
-    const inscriptionId = request.nextUrl.searchParams.get("inscriptionId");
+    const sessionId = request.nextUrl.searchParams.get("sessionId");
 
     if (!token) {
       return NextResponse.json(
@@ -55,25 +56,45 @@ export async function GET(request: NextRequest) {
 
     const { apprenantId } = decoded;
 
-    // Récupérer l'inscription pour avoir la formation
-    const inscription = await prisma.lMSInscription.findFirst({
-      where: inscriptionId
-        ? { id: inscriptionId, apprenantId }
-        : { apprenantId },
-    });
+    // Récupérer la formationId depuis la session
+    let formationId: string | null = null;
 
-    if (!inscription) {
+    if (sessionId) {
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        select: { formationId: true },
+      });
+      if (session) {
+        formationId = session.formationId;
+      }
+    }
+
+    // Fallback: récupérer depuis l'inscription LMS si pas de session
+    if (!formationId) {
+      const inscription = await prisma.lMSInscription.findFirst({
+        where: { apprenantId },
+      });
+      if (inscription) {
+        formationId = inscription.formationId;
+      }
+    }
+
+    if (!formationId) {
       return NextResponse.json({
         evaluations: [],
-        stats: { total: 0, terminees: 0, enAttente: 0, moyenneScore: null },
+        stats: { total: 0, aFaire: 0, enCours: 0, terminees: 0 },
       });
     }
 
-    // Récupérer les évaluations de la formation
+    // Correction 447-450: Récupérer uniquement les QCM_MODULE et ATELIER_MODULE
+    // avec les informations du module associé
     const evaluations = await prisma.evaluation.findMany({
       where: {
-        formationId: inscription.formationId,
+        formationId: formationId,
         isActive: true,
+        type: {
+          in: ["QCM_MODULE", "ATELIER_MODULE"],
+        },
       },
       include: {
         resultats: {
@@ -85,44 +106,73 @@ export async function GET(request: NextRequest) {
       orderBy: { ordre: "asc" },
     });
 
-    // Formater les données
-    const formattedEvaluations = evaluations.map((evaluation) => ({
-      id: evaluation.id,
-      titre: evaluation.titre,
-      type: evaluation.type,
-      description: evaluation.description,
-      dureeEstimee: evaluation.dureeEstimee,
-      scoreMinimum: evaluation.scoreMinimum,
-      ordre: evaluation.ordre,
-      resultat: evaluation.resultats[0]
-        ? {
-            id: evaluation.resultats[0].id,
-            status: evaluation.resultats[0].status,
-            score: evaluation.resultats[0].score,
-            datePassage: evaluation.resultats[0].completedAt?.toISOString() || null,
-            tempsTotal: evaluation.resultats[0].tempsPassé,
-          }
-        : null,
-    }));
+    // Récupérer les modules de la formation pour avoir leurs titres
+    const modules = await prisma.module.findMany({
+      where: { formationId },
+      select: { id: true, titre: true, ordre: true },
+      orderBy: { ordre: "asc" },
+    });
 
-    // Calculer les stats
-    const terminees = formattedEvaluations.filter(
-      (e) => e.resultat?.status === "termine" || e.resultat?.status === "valide"
-    ).length;
-    const scores = formattedEvaluations
-      .filter((e) => e.resultat?.score !== null && e.resultat?.score !== undefined)
-      .map((e) => e.resultat!.score!);
-    const moyenneScore = scores.length > 0
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-      : null;
+    const modulesMap = new Map(modules.map((m) => [m.id, m]));
+
+    // Correction 449: Formater les données avec module concerné
+    const formattedEvaluations = evaluations.map((evaluation) => {
+      const module = evaluation.moduleId ? modulesMap.get(evaluation.moduleId) : null;
+      const resultat = evaluation.resultats[0];
+
+      // Déterminer le statut : a_faire / en_cours / termine
+      let statut: "a_faire" | "en_cours" | "termine" = "a_faire";
+      if (resultat) {
+        if (resultat.status === "termine" || resultat.status === "valide") {
+          statut = "termine";
+        } else if (resultat.status === "en_cours") {
+          statut = "en_cours";
+        }
+      }
+
+      return {
+        id: evaluation.id,
+        titre: evaluation.titre,
+        type: evaluation.type, // QCM_MODULE ou ATELIER_MODULE
+        description: evaluation.description,
+        dureeEstimee: evaluation.dureeEstimee,
+        scoreMinimum: evaluation.scoreMinimum,
+        ordre: evaluation.ordre,
+        // Correction 449: Module concerné
+        module: module
+          ? {
+              id: module.id,
+              titre: module.titre,
+              ordre: module.ordre,
+            }
+          : null,
+        // Statut simplifié
+        statut,
+        resultat: resultat
+          ? {
+              id: resultat.id,
+              status: resultat.status,
+              score: resultat.score,
+              datePassage: resultat.completedAt?.toISOString() || null,
+              tempsTotal: resultat.tempsPassé,
+            }
+          : null,
+      };
+    });
+
+    // Correction 447: Stats adaptées (Total, À faire, En cours, Terminées)
+    const total = formattedEvaluations.length;
+    const aFaire = formattedEvaluations.filter((e) => e.statut === "a_faire").length;
+    const enCours = formattedEvaluations.filter((e) => e.statut === "en_cours").length;
+    const terminees = formattedEvaluations.filter((e) => e.statut === "termine").length;
 
     return NextResponse.json({
       evaluations: formattedEvaluations,
       stats: {
-        total: evaluations.length,
+        total,
+        aFaire,
+        enCours,
         terminees,
-        enAttente: evaluations.length - terminees,
-        moyenneScore,
       },
     });
   } catch (error) {

@@ -195,6 +195,7 @@ interface FormationDetail {
   nombreParticipants?: string | null;
   suiviEvaluation?: string | null;
   ressourcesPedagogiques?: string | null;
+  equipePedagogique?: string | null;
   qualiteSatisfaction?: string | null;
   accessibiliteHandicap: string | null;
   delaiAcces: string | null;
@@ -400,7 +401,7 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                 <h1 className="text-xl font-bold text-gray-900">
                   {formation.organization.name}
                 </h1>
-                <p className="text-sm text-gray-500">Catalogue de formation</p>
+                <p className="text-sm text-gray-500">Catalogue des formations</p>
               </div>
             </Link>
 
@@ -634,6 +635,24 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                         <p className="text-xs text-gray-500 mb-1.5">Accessibilité</p>
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border bg-teal-50 text-teal-700 border-teal-200">
                           {formation.accessibiliteHandicap ? "Accessible PSH" : "Accessible PSH"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Participants max / session */}
+                    <div className="flex items-start gap-3">
+                      <Users className="w-5 h-5 mt-0.5" style={{ color: primaryColor }} />
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1.5">Participants max / session</p>
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border"
+                          style={{
+                            backgroundColor: `${primaryColor}10`,
+                            color: primaryColor,
+                            borderColor: `${primaryColor}30`,
+                          }}
+                        >
+                          {formation.nombreParticipants || "-"}
                         </span>
                       </div>
                     </div>
@@ -912,8 +931,8 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
                     <GraduationCap className="w-6 h-6" style={{ color: primaryColor }} />
                   </div>
                   <h3 className="text-center font-bold text-gray-900 mt-4 mb-4">Équipe pédagogique</h3>
-                  <p className="text-sm text-gray-600 text-center">
-                    {`${formation.organization.name} est une équipe de formateurs experts, dont l'objectif est d'optimiser la performance et les compétences. En mettant l'accent sur l'efficacité tout en préservant le bien-être, nous aidons à concilier performance durable et épanouissement professionnel.`}
+                  <p className="text-sm text-gray-600 text-center whitespace-pre-line">
+                    {formation.equipePedagogique || `${formation.organization.name} est une équipe de formateurs experts, dont l'objectif est d'optimiser la performance et les compétences. En mettant l'accent sur l'efficacité tout en préservant le bien-être, nous aidons à concilier performance durable et épanouissement professionnel.`}
                   </p>
                 </div>
 
@@ -1189,14 +1208,76 @@ function PreInscriptionModal({
     setError(null);
 
     try {
+      // Correction 396: Mapper les champs du formulaire vers ceux attendus par l'API
+      // Construire l'analyse du besoin à partir des différentes questions
+      const objectifsProfessionnels = [
+        formData.objectifPrincipal && `Objectif principal : ${formData.objectifPrincipal}`,
+        formData.utiliteFormation && `Utilité pour l'activité : ${formData.utiliteFormation}`,
+      ].filter(Boolean).join('\n\n') || undefined;
+
+      const experiencePrealable = formData.niveauActuel
+        ? `Niveau actuel : ${formData.niveauActuel}`
+        : undefined;
+
+      // Mapper l'accessibilité
+      const situationHandicap = formData.besoinAccessibilite === "OUI";
+      const besoinsAmenagements = situationHandicap && formData.besoinAccessibiliteDetails
+        ? formData.besoinAccessibiliteDetails
+        : undefined;
+
+      // Mapper la situation professionnelle pour les particuliers
+      let situationProfessionnelleAPI = formData.situationProfessionnelle;
+      if (profileType === "particulier" && formData.situationActuelle) {
+        // Mapper les valeurs du select vers l'enum API
+        const situationMap: Record<string, string> = {
+          "ETUDIANT": "ETUDIANT",
+          "DEMANDEUR_EMPLOI": "DEMANDEUR_EMPLOI",
+          "SALARIE": "SALARIE",
+          "RETRAITE": "RETRAITE",
+          "EN_RECONVERSION": "DEMANDEUR_EMPLOI", // Reconversion = souvent demandeur d'emploi
+          "AUTRE": "AUTRE",
+        };
+        situationProfessionnelleAPI = situationMap[formData.situationActuelle] || "PARTICULIER";
+      }
+
+      // Correction 395 & 396: Construire le payload avec les mappings corrects
+      let payload: Record<string, unknown> = {
+        organizationSlug: formation.organization.slug,
+        formationId: formation.id,
+        profileType,
+        ...formData,
+        // Mappings pour l'analyse du besoin (Correction 396)
+        objectifsProfessionnels,
+        experiencePrealable,
+        situationHandicap,
+        besoinsAmenagements,
+        situationProfessionnelle: situationProfessionnelleAPI,
+      };
+
+      // Pour les entreprises: mapper les champs du représentant vers nom/prenom/email/telephone
+      // et ajouter les informations des apprenants
+      if (profileType === "entreprise") {
+        payload = {
+          ...payload,
+          // Mapper le représentant vers les champs obligatoires de l'API
+          nom: formData.representantNom,
+          prenom: formData.representantPrenom,
+          email: formData.representantEmail,
+          telephone: formData.representantTelephone,
+          // Ajouter l'entreprise comme contexte
+          entreprise: formData.raisonSociale,
+          siret: formData.siret,
+          // Situation professionnelle entreprise
+          situationProfessionnelle: "SALARIE",
+          // Ajouter les apprenants en JSON
+          apprenants: apprenants.filter(a => a.nom && a.prenom && a.email),
+        };
+      }
+
       const response = await fetch("/api/public/pre-inscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizationSlug: formation.organization.slug,
-          formationId: formation.id,
-          ...formData,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {

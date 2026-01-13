@@ -10,12 +10,14 @@ import { prisma } from "@/lib/db/prisma";
 export const dynamic = "force-dynamic";
 export const revalidate = 0; // Désactive le cache - toujours récupérer les données fraîches
 
-// Helper pour parser les tarifs (format "1500 € HT" ou "1500")
+// Helper pour parser les tarifs (format "1500 € HT", "1 500 €", "1500" ou nombre)
 function parseTarif(value: unknown): number | null {
   if (!value) return null;
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
-    const match = value.match(/(\d+(?:[.,]\d+)?)/);
+    // Supprimer tous les espaces (normaux et insécables) et caractères non-numériques sauf , et .
+    const cleanValue = value.replace(/[\s\u00A0]/g, '').replace(/[€HTTTC]/gi, '');
+    const match = cleanValue.match(/(\d+(?:[.,]\d+)?)/);
     if (match) return parseFloat(match[1].replace(',', '.'));
   }
   return null;
@@ -162,6 +164,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             tauxCertification: true,
             annee: true,
             dernierCalcul: true,
+            // Correction 363: Taux de progression (Qualiopi IND 2)
+            tauxProgression: true,
+            nombreApprenantsProgression: true,
           },
         },
         // Sessions à venir (pour afficher les dates disponibles)
@@ -258,6 +263,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     let accessibiliteFromFiche: string | null = null;
     let typeFormation: string | null = null;
     let nombreParticipants: string | null = null;
+    let equipePedagogique: string | null = null;
     let contenuModulesParsed: Array<{ titre: string; items: string[] }> = [];
 
     if (formation.fichePedagogique) {
@@ -337,6 +343,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         accessibiliteFromFiche = fiche.accessibilite as string;
       } else if (fiche.accessibiliteHandicap) {
         accessibiliteFromFiche = fiche.accessibiliteHandicap as string;
+      }
+
+      // Équipe pédagogique
+      if (fiche.equipePedagogique) {
+        equipePedagogique = fiche.equipePedagogique as string;
       }
 
       // Contenu des modules - Parser depuis le format texte ou array
@@ -447,6 +458,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       // Ressources techniques et pédagogiques
       ressourcesPedagogiques: ressourcesPedagogiques,
 
+      // Équipe pédagogique
+      equipePedagogique: equipePedagogique,
+
       // Accessibilité handicap (priorité : fiche > champ direct)
       accessibiliteHandicap: accessibiliteFromFiche || formation.accessibiliteHandicap,
 
@@ -481,12 +495,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
 
       // ===========================================
-      // MODALITÉS (depuis les sessions ou fiche pédagogique)
-      // LOGIQUE: Si au moins une session est MIXTE, la formation est MIXTE
-      // Si sessions en présentiel ET distanciel, c'est aussi MIXTE
-      // Fallback sur fichePedagogique.modalite si pas de sessions
+      // MODALITÉS (depuis fiche pédagogique en priorité, puis sessions)
+      // Correction 391: Priorité à fichePedagogique.typeFormation pour synchronisation
       // ===========================================
       modalites: (() => {
+        // Priorité 1: fichePedagogique.typeFormation ou fichePedagogique.modalite
+        if (formation.fichePedagogique) {
+          const fiche = formation.fichePedagogique as Record<string, unknown>;
+          const modaliteValue = fiche.typeFormation || fiche.modalite;
+          if (modaliteValue) {
+            const mod = String(modaliteValue).toUpperCase();
+            if (mod === "PRESENTIEL" || mod === "DISTANCIEL" || mod === "MIXTE") {
+              return [mod];
+            } else if (mod.includes("MIXTE") || mod.includes("HYBRID") || mod.includes("BLENDED")) {
+              return ["MIXTE"];
+            } else if (mod.includes("DISTANCE") || mod.includes("DISTANCIEL") || mod.includes("ELEARNING") || mod.includes("EN LIGNE")) {
+              return ["DISTANCIEL"];
+            } else if (mod.includes("PRESENT") || mod.includes("SALLE") || mod.includes("INTER") || mod.includes("INTRA")) {
+              return ["PRESENTIEL"];
+            }
+          }
+        }
+
+        // Priorité 2: déduire des sessions si pas de modalité dans fiche
         const modalitesSet = new Set(formation.trainingSessions.map((s) => s.modalite));
         const hasPresen = modalitesSet.has("PRESENTIEL");
         const hasDistan = modalitesSet.has("DISTANCIEL");
@@ -499,22 +530,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           return [...modalitesSet];
         }
 
-        // Fallback sur la fiche pédagogique si pas de sessions
-        if (formation.fichePedagogique) {
-          const fiche = formation.fichePedagogique as Record<string, unknown>;
-          if (fiche.modalite) {
-            const mod = String(fiche.modalite).toUpperCase();
-            if (mod === "PRESENTIEL" || mod === "DISTANCIEL" || mod === "MIXTE") {
-              return [mod];
-            } else if (mod.includes("MIXTE") || mod.includes("HYBRID")) {
-              return ["MIXTE"];
-            } else if (mod.includes("DISTANCE") || mod.includes("DISTANCIEL")) {
-              return ["DISTANCIEL"];
-            } else if (mod.includes("PRESENT")) {
-              return ["PRESENTIEL"];
-            }
-          }
-        }
         return [];
       })(),
 
@@ -530,6 +545,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             tauxCertification: formation.indicateurs.tauxCertification,
             annee: formation.indicateurs.annee,
             derniereMiseAJour: formation.indicateurs.dernierCalcul,
+            // Correction 363: Taux de progression des apprenants (Qualiopi IND 2)
+            tauxProgression: formation.indicateurs.tauxProgression,
+            nombreApprenantsProgression: formation.indicateurs.nombreApprenantsProgression,
           }
         : null,
 

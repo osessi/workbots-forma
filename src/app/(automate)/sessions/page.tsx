@@ -11,6 +11,7 @@ interface Formation {
   id: string;
   titre: string;
   dureeHeures: number | null;
+  dureeJours: number | null; // Correction 366
 }
 
 interface Session {
@@ -41,8 +42,11 @@ interface Session {
   clients: Array<{
     id: string;
     typeClient: string;
-    entreprise: { raisonSociale: string } | null;
-    participants: Array<{ id: string }>;
+    entreprise: { id: string; raisonSociale: string } | null;
+    participants: Array<{
+      id: string;
+      apprenant: { id: string; nom: string; prenom: string } | null;
+    }>;
   }>;
   createdAt: string;
 }
@@ -166,20 +170,35 @@ function SessionsPageContent() {
     nom: "",
     modalite: "PRESENTIEL",
     lieuId: "",
+    salleVirtuelleId: "", // Correction 370: pour modalité Mixte
     lienConnexion: "",
     formateurId: "",
     journees: [{ date: "", heureDebutMatin: "09:00", heureFinMatin: "12:30", heureDebutAprem: "14:00", heureFinAprem: "17:30" }],
   });
 
+  // Correction 399: Stocker l'apprenant et pré-inscription pour pré-remplissage
+  const [pendingApprenantId, setPendingApprenantId] = useState<string | null>(null);
+  const [pendingPreinscriptionId, setPendingPreinscriptionId] = useState<string | null>(null);
+
   // Check URL params for auto-opening create modal
   useEffect(() => {
     const shouldCreate = searchParams.get("create") === "true";
     const formationIdFromUrl = searchParams.get("formationId");
+    // Correction 399: Récupérer les paramètres de pré-remplissage
+    const apprenantIdFromUrl = searchParams.get("apprenantId");
+    const preinscriptionIdFromUrl = searchParams.get("preinscriptionId");
 
-    if (shouldCreate) {
+    if (formationIdFromUrl || apprenantIdFromUrl) {
       setShowCreateModal(true);
       if (formationIdFromUrl) {
         setFormData(prev => ({ ...prev, formationId: formationIdFromUrl }));
+      }
+      // Correction 399: Stocker pour utilisation après création
+      if (apprenantIdFromUrl) {
+        setPendingApprenantId(apprenantIdFromUrl);
+      }
+      if (preinscriptionIdFromUrl) {
+        setPendingPreinscriptionId(preinscriptionIdFromUrl);
       }
       // Clean up URL params
       router.replace("/sessions", { scroll: false });
@@ -269,6 +288,31 @@ function SessionsPageContent() {
     }));
   };
 
+  // Correction 366: Calculer le total des heures planifiées
+  const calculateTotalHours = useCallback(() => {
+    let totalMinutes = 0;
+    formData.journees.forEach(journee => {
+      // Calculer heures du matin
+      if (journee.heureDebutMatin && journee.heureFinMatin) {
+        const [debutH, debutM] = journee.heureDebutMatin.split(':').map(Number);
+        const [finH, finM] = journee.heureFinMatin.split(':').map(Number);
+        totalMinutes += (finH * 60 + finM) - (debutH * 60 + debutM);
+      }
+      // Calculer heures de l'après-midi
+      if (journee.heureDebutAprem && journee.heureFinAprem) {
+        const [debutH, debutM] = journee.heureDebutAprem.split(':').map(Number);
+        const [finH, finM] = journee.heureFinAprem.split(':').map(Number);
+        totalMinutes += (finH * 60 + finM) - (debutH * 60 + debutM);
+      }
+    });
+    return Math.round(totalMinutes / 60 * 10) / 10; // Arrondi à 1 décimale
+  }, [formData.journees]);
+
+  // Correction 366: Obtenir la formation sélectionnée
+  const selectedFormation = formations.find(f => f.id === formData.formationId);
+  const totalHeuresPlanifiees = calculateTotalHours();
+  const nombreJoursPlanifies = formData.journees.filter(j => j.date).length;
+
   // Create session
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,7 +360,21 @@ function SessionsPageContent() {
       // (clients, participants, tarifs, documents)
       const sessionId = data.id;
       if (sessionId) {
-        router.push(`/sessions/${sessionId}/configure`);
+        // Correction 399: Passer les paramètres de pré-remplissage si présents
+        let configureUrl = `/sessions/${sessionId}/configure`;
+        const params = new URLSearchParams();
+        if (pendingApprenantId) {
+          params.set("apprenantId", pendingApprenantId);
+          setPendingApprenantId(null);
+        }
+        if (pendingPreinscriptionId) {
+          params.set("preinscriptionId", pendingPreinscriptionId);
+          setPendingPreinscriptionId(null);
+        }
+        if (params.toString()) {
+          configureUrl += `?${params.toString()}`;
+        }
+        router.push(configureUrl);
       } else {
         // Fallback: fermer le modal et rafraîchir
         setFormData({
@@ -324,6 +382,7 @@ function SessionsPageContent() {
           nom: "",
           modalite: "PRESENTIEL",
           lieuId: "",
+          salleVirtuelleId: "", // Correction 370
           lienConnexion: "",
           formateurId: "",
           journees: [{ date: "", heureDebutMatin: "09:00", heureFinMatin: "12:30", heureDebutAprem: "14:00", heureFinAprem: "17:30" }],
@@ -399,6 +458,39 @@ function SessionsPageContent() {
     const last = format(new Date(sorted[sorted.length - 1].date), "d MMM yyyy", { locale: fr });
     if (sorted.length === 1) return format(new Date(sorted[0].date), "d MMMM yyyy", { locale: fr });
     return `${first} - ${last}`;
+  };
+
+  // Correction 371: Formater les clients et participants pour l'affichage sur la carte
+  const getClientsParticipantsLabel = (session: Session): string => {
+    if (!session.clients || session.clients.length === 0) {
+      return "Aucun client/participant";
+    }
+
+    const labels: string[] = [];
+
+    session.clients.forEach(client => {
+      if (client.typeClient === "ENTREPRISE" && client.entreprise) {
+        // Entreprise : afficher le nom de l'entreprise
+        labels.push(client.entreprise.raisonSociale);
+      } else if (client.typeClient === "INDEPENDANT" || client.typeClient === "PARTICULIER") {
+        // Indépendant ou Particulier : afficher les noms des participants
+        client.participants.forEach(p => {
+          if (p.apprenant) {
+            labels.push(`${p.apprenant.prenom} ${p.apprenant.nom.toUpperCase()}`);
+          }
+        });
+      }
+    });
+
+    if (labels.length === 0) {
+      return "Aucun client/participant";
+    }
+
+    // Limiter à 3 éléments pour éviter un affichage trop long
+    if (labels.length <= 3) {
+      return labels.join(", ");
+    }
+    return `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
   };
 
   if (loading) {
@@ -515,6 +607,13 @@ function SessionsPageContent() {
                       {session.nom && (
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{session.nom}</p>
                       )}
+                      {/* Correction 371: Affichage clients & participants */}
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span className="font-medium text-gray-600 dark:text-gray-300">Clients & participants :</span>{' '}
+                        <span className={getClientsParticipantsLabel(session) === "Aucun client/participant" ? "italic text-gray-400" : ""}>
+                          {getClientsParticipantsLabel(session)}
+                        </span>
+                      </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
@@ -602,7 +701,7 @@ function SessionsPageContent() {
                   type="text"
                   value={formData.nom}
                   onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
-                  placeholder="Ex: Session Janvier - Entreprise ABC"
+                  placeholder="Ex. : Nom de l'entreprise du client – 10 Janvier 2026"
                   className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
@@ -636,7 +735,26 @@ function SessionsPageContent() {
               </div>
 
               {/* Lieu / Lien de connexion selon la modalité */}
-              {formData.modalite === "DISTANCIEL" ? (
+              {/* Correction 370: Gestion des 3 modalités */}
+              {formData.modalite === "PRESENTIEL" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Lieu
+                  </label>
+                  <select
+                    value={formData.lieuId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, lieuId: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  >
+                    <option value="">Sélectionner un lieu</option>
+                    {lieux.filter(l => l.typeLieu !== "VISIOCONFERENCE").map((l) => (
+                      <option key={l.id} value={l.id}>{l.nom}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formData.modalite === "DISTANCIEL" && (
                 <div className="space-y-4">
                   {/* Sélection d'une salle virtuelle existante */}
                   <div>
@@ -671,21 +789,54 @@ function SessionsPageContent() {
                     </p>
                   </div>
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Lieu
-                  </label>
-                  <select
-                    value={formData.lieuId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, lieuId: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  >
-                    <option value="">Sélectionner un lieu</option>
-                    {lieux.filter(l => l.typeLieu !== "VISIOCONFERENCE").map((l) => (
-                      <option key={l.id} value={l.id}>{l.nom}</option>
-                    ))}
-                  </select>
+              )}
+
+              {/* Correction 370: Modalité MIXTE - afficher les deux volets */}
+              {formData.modalite === "MIXTE" && (
+                <div className="space-y-4">
+                  {/* Lieu présentiel */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Lieu (présentiel)
+                    </label>
+                    <select
+                      value={formData.lieuId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lieuId: e.target.value }))}
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    >
+                      <option value="">Sélectionner un lieu</option>
+                      {lieux.filter(l => l.typeLieu !== "VISIOCONFERENCE").map((l) => (
+                        <option key={l.id} value={l.id}>{l.nom}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Accès distanciel */}
+                  <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Accès distanciel
+                    </label>
+                    <div className="space-y-3">
+                      <select
+                        value={formData.salleVirtuelleId}
+                        onChange={(e) => setFormData(prev => ({ ...prev, salleVirtuelleId: e.target.value }))}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      >
+                        <option value="">Sélectionner une salle virtuelle</option>
+                        {lieux.filter(l => l.typeLieu === "VISIOCONFERENCE").map((l) => (
+                          <option key={l.id} value={l.id}>{l.nom}</option>
+                        ))}
+                      </select>
+                      <div className="text-center text-xs text-gray-500 dark:text-gray-400">ou</div>
+                      <input
+                        type="url"
+                        value={formData.lienConnexion}
+                        onChange={(e) => setFormData(prev => ({ ...prev, lienConnexion: e.target.value }))}
+                        placeholder="https://meet.google.com/... ou https://zoom.us/..."
+                        className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -720,6 +871,63 @@ function SessionsPageContent() {
                     + Ajouter une journée
                   </button>
                 </div>
+
+                {/* Correction 366: Affichage durée cible + contrôle cohérence */}
+                {selectedFormation && (selectedFormation.dureeHeures || selectedFormation.dureeJours) && (
+                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="text-sm text-blue-800 dark:text-blue-300">
+                        <span className="font-medium">Durée de la formation :</span>{' '}
+                        {selectedFormation.dureeJours && <span>{selectedFormation.dureeJours} jour{selectedFormation.dureeJours > 1 ? 's' : ''}</span>}
+                        {selectedFormation.dureeJours && selectedFormation.dureeHeures && <span> / </span>}
+                        {selectedFormation.dureeHeures && <span>{selectedFormation.dureeHeures} h</span>}
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        {/* Indicateur Jours */}
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${
+                            selectedFormation.dureeJours
+                              ? nombreJoursPlanifies === selectedFormation.dureeJours
+                                ? 'bg-green-500'
+                                : 'bg-red-500'
+                              : 'bg-gray-400'
+                          }`} />
+                          <span className={`${
+                            selectedFormation.dureeJours
+                              ? nombreJoursPlanifies === selectedFormation.dureeJours
+                                ? 'text-green-700 dark:text-green-400'
+                                : 'text-red-700 dark:text-red-400'
+                              : 'text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {nombreJoursPlanifies} jour{nombreJoursPlanifies > 1 ? 's' : ''}
+                            {selectedFormation.dureeJours && ` / ${selectedFormation.dureeJours}`}
+                          </span>
+                        </div>
+                        {/* Indicateur Heures */}
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${
+                            selectedFormation.dureeHeures
+                              ? totalHeuresPlanifiees === selectedFormation.dureeHeures
+                                ? 'bg-green-500'
+                                : 'bg-red-500'
+                              : 'bg-gray-400'
+                          }`} />
+                          <span className={`${
+                            selectedFormation.dureeHeures
+                              ? totalHeuresPlanifiees === selectedFormation.dureeHeures
+                                ? 'text-green-700 dark:text-green-400'
+                                : 'text-red-700 dark:text-red-400'
+                              : 'text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {totalHeuresPlanifiees} h
+                            {selectedFormation.dureeHeures && ` / ${selectedFormation.dureeHeures} h`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {formData.journees.map((journee, index) => (
                     <div key={index} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">

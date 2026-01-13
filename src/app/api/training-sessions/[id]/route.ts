@@ -200,6 +200,45 @@ export async function PATCH(
     // Qualiopi IND 3 - Certification par session
     if (body.delivreCertification !== undefined) updateData.delivreCertification = body.delivreCertification;
 
+    // Correction 433b: Rafraîchir le snapshot si demandé
+    if (body.refreshSnapshot === true) {
+      const formation = await prisma.formation.findUnique({
+        where: { id: existingSession.formationId },
+        include: {
+          modules: {
+            orderBy: { ordre: "asc" },
+            select: {
+              id: true,
+              titre: true,
+              description: true,
+              ordre: true,
+              duree: true,
+              contenu: true,
+              isModuleZero: true,
+            },
+          },
+        },
+      });
+
+      if (formation) {
+        updateData.snapshotFormationTitre = formation.titre;
+        updateData.snapshotFormationDescription = formation.description;
+        updateData.snapshotFichePedagogique = formation.fichePedagogique || null;
+        updateData.snapshotEvaluationsData = formation.evaluationsData || null;
+        updateData.snapshotModules = formation.modules.map(m => ({
+          id: m.id,
+          titre: m.titre,
+          description: m.description,
+          ordre: m.ordre,
+          duree: m.duree,
+          contenu: m.contenu,
+          isModuleZero: m.isModuleZero,
+        }));
+        updateData.snapshotSlidesData = formation.slidesData || null;
+        updateData.snapshotCreatedAt = new Date();
+      }
+    }
+
     // Mettre à jour la session
     const session = await prisma.session.update({
       where: { id },

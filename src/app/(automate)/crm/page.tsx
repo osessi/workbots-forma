@@ -523,13 +523,29 @@ function OpportuniteModal({
     montantHT: opportunite?.montantHT?.toString() || "",
     probabilite: opportunite?.probabilite || 50,
     source: opportunite?.source || "AUTRE",
+    // Informations entreprise
     entrepriseNom: opportunite?.entreprise?.raisonSociale || "",
-    formationId: opportunite?.formation?.id || "",
-    contactNom: opportunite?.contactNom || "",
+    entrepriseSiret: "",
+    entrepriseTva: "",
+    // Interlocuteur principal / Contact
+    contactCivilite: "",
+    contactFonction: opportunite?.contactFonction || "",
     contactPrenom: "",
+    contactNom: opportunite?.contactNom || "",
     contactEmail: opportunite?.contactEmail || "",
     contactTelephone: opportunite?.contactTelephone || "",
-    contactFonction: opportunite?.contactFonction || "",
+    // Champs indépendant (raison sociale et SIRET)
+    independantRaisonSociale: "",
+    independantSiret: "",
+    // Champs particulier (situation actuelle)
+    particulierSituation: "",
+    // Adresse (partagée entreprise/indépendant/particulier)
+    adresse: "",
+    codePostal: "",
+    ville: "",
+    pays: "France",
+    // Autres champs
+    formationId: opportunite?.formation?.id || "",
     dateRelance: opportunite?.dateRelance?.split("T")[0] || "",
     dateCloturePrevu: opportunite?.dateCloturePrevu?.split("T")[0] || "",
     notes: opportunite?.notes || "",
@@ -542,8 +558,8 @@ function OpportuniteModal({
     return "Montant HT";
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
     onSave({
       titre: formData.titre,
       description: formData.description || null,
@@ -630,77 +646,511 @@ function OpportuniteModal({
             </div>
           </div>
 
-          {/* Nom entreprise (champ libre) - affiché uniquement pour Entreprise/Indépendant */}
-          {(clientType === "ENTREPRISE" || clientType === "INDEPENDANT") && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                {clientType === "ENTREPRISE" ? "Nom de l'entreprise" : "Nom de l'activité"}
-              </label>
-              <input
-                type="text"
-                value={formData.entrepriseNom}
-                onChange={(e) => setFormData({ ...formData, entrepriseNom: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                placeholder={clientType === "ENTREPRISE" ? "Nom de l'entreprise" : "Nom de l'activité / SIRET"}
-              />
-            </div>
+          {/* Message d'aide */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Pour gagner du temps par la suite, nous vous recommandons de renseigner l'ensemble des informations demandées.
+            </p>
+          </div>
+
+          {/* ===== CHAMPS ENTREPRISE (structure complète comme "Nouvelle entreprise") ===== */}
+          {clientType === "ENTREPRISE" && (
+            <>
+              {/* Informations principales */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Informations principales
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Raison sociale *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.entrepriseNom}
+                    onChange={(e) => setFormData({ ...formData, entrepriseNom: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    placeholder="Nom de l'entreprise"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      SIRET *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.entrepriseSiret}
+                      onChange={(e) => setFormData({ ...formData, entrepriseSiret: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="123 456 789 00012"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      TVA intracommunautaire
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.entrepriseTva}
+                      onChange={(e) => setFormData({ ...formData, entrepriseTva: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="FR12345678901"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Interlocuteur principal */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Interlocuteur principal
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Civilité
+                    </label>
+                    <select
+                      value={formData.contactCivilite}
+                      onChange={(e) => setFormData({ ...formData, contactCivilite: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    >
+                      <option value="">Sélectionner</option>
+                      <option value="M.">M.</option>
+                      <option value="Mme">Mme</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Fonction
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.contactFonction}
+                      onChange={(e) => setFormData({ ...formData, contactFonction: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Ex: Gérant, PDG, DRH..."
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Prénom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.contactPrenom}
+                      onChange={(e) => setFormData({ ...formData, contactPrenom: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Prénom"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Nom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.contactNom}
+                      onChange={(e) => setFormData({ ...formData, contactNom: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Nom"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.contactEmail}
+                      onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="email@exemple.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Téléphone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.contactTelephone}
+                      onChange={(e) => setFormData({ ...formData, contactTelephone: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="06 12 34 56 78"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Adresse de l'entreprise */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Adresse de l'entreprise
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Adresse
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.adresse}
+                    onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    placeholder="123 rue de la Formation"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Code postal
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.codePostal}
+                      onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="75001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Ville
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ville}
+                      onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Paris"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Pays
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.pays}
+                      onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="France"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Nom et Prénom */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Nom
-              </label>
-              <input
-                type="text"
-                value={formData.contactNom}
-                onChange={(e) => setFormData({ ...formData, contactNom: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                placeholder="Nom"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Prénom
-              </label>
-              <input
-                type="text"
-                value={formData.contactPrenom}
-                onChange={(e) => setFormData({ ...formData, contactPrenom: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                placeholder="Prénom"
-              />
-            </div>
-          </div>
+          {/* ===== CHAMPS INDEPENDANT (aligné avec "Nouvel apprenant" statut Indépendant) ===== */}
+          {clientType === "INDEPENDANT" && (
+            <>
+              {/* Informations personnelles */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Informations personnelles
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Prénom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.contactPrenom}
+                      onChange={(e) => setFormData({ ...formData, contactPrenom: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Prénom"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Nom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.contactNom}
+                      onChange={(e) => setFormData({ ...formData, contactNom: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Nom"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.contactEmail}
+                      onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="email@exemple.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Téléphone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.contactTelephone}
+                      onChange={(e) => setFormData({ ...formData, contactTelephone: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="06 12 34 56 78"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Raison sociale
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.independantRaisonSociale}
+                      onChange={(e) => setFormData({ ...formData, independantRaisonSociale: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Nom de l'activité"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Numéro SIRET
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.independantSiret}
+                      onChange={(e) => setFormData({ ...formData, independantSiret: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="123 456 789 00012"
+                    />
+                  </div>
+                </div>
+              </div>
 
-          {/* Email et Téléphone */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.contactEmail}
-                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                placeholder="email@exemple.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Téléphone
-              </label>
-              <input
-                type="tel"
-                value={formData.contactTelephone}
-                onChange={(e) => setFormData({ ...formData, contactTelephone: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                placeholder="06 12 34 56 78"
-              />
-            </div>
-          </div>
+              {/* Adresse */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Adresse
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Adresse
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.adresse}
+                    onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    placeholder="123 rue de la Formation"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Code postal
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.codePostal}
+                      onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="75001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Ville
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ville}
+                      onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Paris"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Pays
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.pays}
+                      onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="France"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ===== CHAMPS PARTICULIER (aligné avec "Nouvel apprenant" statut Particulier) ===== */}
+          {clientType === "PARTICULIER" && (
+            <>
+              {/* Informations personnelles */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Informations personnelles
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Prénom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.contactPrenom}
+                      onChange={(e) => setFormData({ ...formData, contactPrenom: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Prénom"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Nom *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.contactNom}
+                      onChange={(e) => setFormData({ ...formData, contactNom: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Nom"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.contactEmail}
+                      onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="email@exemple.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Téléphone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.contactTelephone}
+                      onChange={(e) => setFormData({ ...formData, contactTelephone: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="06 12 34 56 78"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Situation actuelle */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Situation actuelle
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Situation actuelle
+                  </label>
+                  <select
+                    value={formData.particulierSituation}
+                    onChange={(e) => setFormData({ ...formData, particulierSituation: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                  >
+                    <option value="">Sélectionner...</option>
+                    <option value="CDI">En poste (CDI)</option>
+                    <option value="CDD">En poste (CDD)</option>
+                    <option value="INTERIM">Intérim</option>
+                    <option value="ALTERNANCE">Alternance</option>
+                    <option value="RECHERCHE_EMPLOI">En recherche d'emploi</option>
+                    <option value="RECONVERSION">En reconversion professionnelle</option>
+                    <option value="AUTRE">Autre</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Adresse */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-2">
+                  Adresse
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Adresse
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.adresse}
+                    onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    placeholder="123 rue de la Formation"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Code postal
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.codePostal}
+                      onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="75001"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Ville
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.ville}
+                      onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="Paris"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Pays
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.pays}
+                      onChange={(e) => setFormData({ ...formData, pays: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      placeholder="France"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Formation associée */}
           <div>
@@ -1003,7 +1453,8 @@ export default function CRMPipelinePage() {
 
       if (formRes.ok) {
         const data = await formRes.json();
-        setFormations(data.formations || []);
+        // L'API /api/formations retourne "data" pas "formations"
+        setFormations(data.data || data.formations || []);
       }
     } catch (error) {
       console.error("Erreur:", error);
@@ -1251,7 +1702,9 @@ export default function CRMPipelinePage() {
       <div className="flex flex-wrap items-center gap-3">
         {/* Recherche */}
         <div className="relative flex-1 max-w-md">
-          <SearchIcon />
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <SearchIcon />
+          </div>
           <input
             type="text"
             value={searchQuery}

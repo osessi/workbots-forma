@@ -75,22 +75,22 @@ export default function ApprenantHeader({
             )}
           </button>
 
-          {/* Logo organisation */}
-          <Link href="/apprenant" className="flex items-center gap-3">
+          {/* Logo organisation - Correction 429: Taille réduite pour un rendu plus équilibré */}
+          <Link href="/apprenant" className="flex items-center gap-2">
             {organization?.logoUrl ? (
               <Image
                 src={organization.logoUrl}
                 alt={organization.nomCommercial || organization.name}
-                width={160}
-                height={64}
-                className="h-12 w-auto object-contain"
+                width={120}
+                height={40}
+                className="h-8 w-auto object-contain"
               />
             ) : (
               <div className="flex items-center gap-2">
-                <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
+                <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5 text-white" />
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-white hidden sm:block">
+                <span className="font-semibold text-gray-900 dark:text-white hidden sm:block text-sm">
                   {organization?.nomCommercial || organization?.name || "Espace Apprenant"}
                 </span>
               </div>

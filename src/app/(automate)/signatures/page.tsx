@@ -17,6 +17,15 @@ interface Apprenant {
   email: string;
 }
 
+// Correction 378: Interface Entreprise pour les signataires entreprise
+interface Entreprise {
+  id: string;
+  raisonSociale: string;
+  contactNom?: string;
+  contactPrenom?: string;
+  contactEmail?: string;
+}
+
 interface Formation {
   id: string;
   titre: string;
@@ -26,6 +35,15 @@ interface Formation {
     dateDebut: string;
     dateFin: string;
     participants: Apprenant[];
+    // Correction 378: Ajouter les clients entreprise
+    clients?: {
+      id: string;
+      typeClient: string;
+      entreprise?: Entreprise;
+      contactNom?: string;
+      contactPrenom?: string;
+      contactEmail?: string;
+    }[];
   }[];
 }
 
@@ -80,6 +98,16 @@ const UserIcon = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M10 10C12.0711 10 13.75 8.32107 13.75 6.25C13.75 4.17893 12.0711 2.5 10 2.5C7.92893 2.5 6.25 4.17893 6.25 6.25C6.25 8.32107 7.92893 10 10 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     <path d="M16.25 17.5C16.25 14.3934 13.4518 11.875 10 11.875C6.54822 11.875 3.75 14.3934 3.75 17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Correction 378: Icône pour les entreprises
+const BuildingIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.5 17.5V5C2.5 4.33696 2.76339 3.70107 3.23223 3.23223C3.70107 2.76339 4.33696 2.5 5 2.5H11.25C11.913 2.5 12.5489 2.76339 13.0178 3.23223C13.4866 3.70107 13.75 4.33696 13.75 5V17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M13.75 10H15C15.663 10 16.2989 10.2634 16.7678 10.7322C17.2366 11.2011 17.5 11.837 17.5 12.5V17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M5.83333 6.66667H7.5M5.83333 10H7.5M10 6.66667H10.8333M10 10H10.8333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M8.33333 17.5V14.1667C8.33333 13.725 8.50893 13.3014 8.82149 12.9882C9.13405 12.6749 9.55797 12.5 10 12.5H6.25C5.80797 12.5 5.38405 12.6749 5.07149 12.9882C4.75893 13.3014 4.58333 13.725 4.58333 14.1667V17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -231,7 +259,11 @@ const formatDateTime = (dateStr: string | null | undefined): string => {
 };
 
 // Étapes du wizard
-type WizardStep = "formation" | "apprenant" | "documents" | "confirm";
+// Correction 378: Renommer "apprenant" en "destinataire"
+type WizardStep = "formation" | "destinataire" | "documents" | "confirm";
+
+// Correction 378: Type d'onglet pour l'étape destinataire
+type DestinataireTab = "apprenant" | "entreprise";
 
 export default function SignaturesPage() {
   // États principaux
@@ -248,6 +280,11 @@ export default function SignaturesPage() {
   const [selectedDocuments, setSelectedDocuments] = useState<GeneratedDocument[]>([]);
   const [availableDocuments, setAvailableDocuments] = useState<GeneratedDocument[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
+
+  // Correction 378: États pour l'étape Destinataire (onglets + recherche + entreprise)
+  const [destinataireTab, setDestinataireTab] = useState<DestinataireTab>("apprenant");
+  const [destinataireSearch, setDestinataireSearch] = useState("");
+  const [selectedEntreprise, setSelectedEntreprise] = useState<Entreprise | null>(null);
 
   // États QR Code / Envoi
   const [showQRModal, setShowQRModal] = useState(false);
@@ -381,15 +418,28 @@ export default function SignaturesPage() {
     setSelectedFormation(formation);
     setSelectedApprenant(null);
     setSelectedDocuments([]);
-    setWizardStep("apprenant");
+    setWizardStep("destinataire");
   };
 
   // Sélection apprenant
   const handleSelectApprenant = (apprenant: Apprenant) => {
     setSelectedApprenant(apprenant);
+    setSelectedEntreprise(null); // Reset entreprise
     setSelectedDocuments([]);
     if (selectedFormation) {
       fetchApprenantDocuments(selectedFormation.id, apprenant.id);
+    }
+    setWizardStep("documents");
+  };
+
+  // Correction 378: Sélection entreprise
+  const handleSelectEntreprise = (entreprise: Entreprise) => {
+    setSelectedEntreprise(entreprise);
+    setSelectedApprenant(null); // Reset apprenant
+    setSelectedDocuments([]);
+    // Pour l'entreprise, on récupère les documents associés au client
+    if (selectedFormation) {
+      fetchApprenantDocuments(selectedFormation.id, entreprise.id);
     }
     setWizardStep("documents");
   };
@@ -609,6 +659,24 @@ export default function SignaturesPage() {
     return Array.from(map.values());
   };
 
+  // Correction 378: Obtenir toutes les entreprises de la formation
+  const getFormationEntreprises = (formation: Formation): Entreprise[] => {
+    const map = new Map<string, Entreprise>();
+    formation.sessions.forEach((session) => {
+      session.clients?.forEach((client) => {
+        if (client.typeClient === "ENTREPRISE" && client.entreprise && !map.has(client.entreprise.id)) {
+          map.set(client.entreprise.id, {
+            ...client.entreprise,
+            contactNom: client.contactNom || client.entreprise.contactNom,
+            contactPrenom: client.contactPrenom || client.entreprise.contactPrenom,
+            contactEmail: client.contactEmail || client.entreprise.contactEmail,
+          });
+        }
+      });
+    });
+    return Array.from(map.values());
+  };
+
   // Filtrer les formations
   const filteredFormations = formations.filter((f) =>
     f.titre.toLowerCase().includes(searchQuery.toLowerCase())
@@ -704,7 +772,7 @@ export default function SignaturesPage() {
               Aucune demande de signature
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-              Commencez par sélectionner un document à faire signer par un apprenant
+              Commencez par sélectionner un document à faire signer par un apprenant ou une entreprise.
             </p>
             <button
               onClick={() => {
@@ -833,7 +901,7 @@ export default function SignaturesPage() {
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
                     {wizardStep === "formation" && "Sélectionnez une formation"}
-                    {wizardStep === "apprenant" && "Sélectionnez un apprenant"}
+                    {wizardStep === "destinataire" && "Sélectionnez un destinataire"}
                     {wizardStep === "documents" && "Sélectionnez les documents à signer"}
                     {wizardStep === "confirm" && "Confirmez et choisissez le mode d'envoi"}
                   </p>
@@ -846,14 +914,14 @@ export default function SignaturesPage() {
                 </button>
               </div>
 
-              {/* Breadcrumb */}
+              {/* Breadcrumb - Correction 378: Renommer "Apprenant" en "Destinataire" */}
               <div className="flex items-center gap-2 px-6 py-3 bg-gray-50 dark:bg-gray-800/50 text-sm">
                 <span className={wizardStep === "formation" ? "text-brand-600 font-medium" : "text-gray-500"}>
                   Formation
                 </span>
                 <ChevronRightIcon />
-                <span className={wizardStep === "apprenant" ? "text-brand-600 font-medium" : "text-gray-500"}>
-                  Apprenant
+                <span className={wizardStep === "destinataire" ? "text-brand-600 font-medium" : "text-gray-500"}>
+                  Destinataire
                 </span>
                 <ChevronRightIcon />
                 <span className={wizardStep === "documents" ? "text-brand-600 font-medium" : "text-gray-500"}>
@@ -919,14 +987,15 @@ export default function SignaturesPage() {
                   </div>
                 )}
 
-                {/* Étape 2: Sélection apprenant */}
-                {wizardStep === "apprenant" && selectedFormation && (
+                {/* Étape 2: Sélection destinataire - Correction 378 */}
+                {wizardStep === "destinataire" && selectedFormation && (
                   <div className="space-y-4">
                     {/* Back button */}
                     <button
                       onClick={() => {
                         setWizardStep("formation");
                         setSelectedFormation(null);
+                        setDestinataireSearch("");
                       }}
                       className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                     >
@@ -942,50 +1011,169 @@ export default function SignaturesPage() {
                       </span>
                     </div>
 
-                    {/* Apprenants */}
-                    <div className="space-y-2">
-                      {getFormationApprenants(selectedFormation).map((apprenant) => (
-                        <button
-                          key={apprenant.id}
-                          onClick={() => handleSelectApprenant(apprenant)}
-                          className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 bg-white hover:border-brand-300 hover:shadow-md transition-all text-left dark:border-gray-700 dark:bg-gray-800 dark:hover:border-brand-500"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center text-brand-600">
-                            <UserIcon />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {apprenant.firstName} {apprenant.lastName}
-                            </p>
-                            <p className="text-sm text-gray-500 truncate">{apprenant.email}</p>
-                          </div>
-                          <ChevronRightIcon />
-                        </button>
-                      ))}
+                    {/* Correction 378: Onglets Apprenant / Entreprise */}
+                    <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                      <button
+                        onClick={() => {
+                          setDestinataireTab("apprenant");
+                          setDestinataireSearch("");
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                          destinataireTab === "apprenant"
+                            ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-sm"
+                            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        }`}
+                      >
+                        <UserIcon />
+                        Apprenant
+                        <span className="px-1.5 py-0.5 text-xs bg-gray-200 dark:bg-gray-600 rounded">
+                          {getFormationApprenants(selectedFormation).length}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDestinataireTab("entreprise");
+                          setDestinataireSearch("");
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                          destinataireTab === "entreprise"
+                            ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-sm"
+                            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        }`}
+                      >
+                        <BuildingIcon />
+                        Entreprise
+                        <span className="px-1.5 py-0.5 text-xs bg-gray-200 dark:bg-gray-600 rounded">
+                          {getFormationEntreprises(selectedFormation).length}
+                        </span>
+                      </button>
                     </div>
 
-                    {getFormationApprenants(selectedFormation).length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        Aucun apprenant inscrit à cette formation
-                      </div>
-                    )}
+                    {/* Correction 378: Champ de recherche */}
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <SearchIcon />
+                      </span>
+                      <input
+                        type="text"
+                        placeholder={destinataireTab === "apprenant"
+                          ? "Rechercher par nom, prénom ou email..."
+                          : "Rechercher par raison sociale..."}
+                        value={destinataireSearch}
+                        onChange={(e) => setDestinataireSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                    </div>
+
+                    {/* Liste des destinataires selon l'onglet actif */}
+                    <div className="space-y-2">
+                      {destinataireTab === "apprenant" && (
+                        <>
+                          {getFormationApprenants(selectedFormation)
+                            .filter((apprenant) => {
+                              if (!destinataireSearch) return true;
+                              const search = destinataireSearch.toLowerCase();
+                              return (
+                                apprenant.firstName.toLowerCase().includes(search) ||
+                                apprenant.lastName.toLowerCase().includes(search) ||
+                                apprenant.email.toLowerCase().includes(search)
+                              );
+                            })
+                            .map((apprenant) => (
+                              <button
+                                key={apprenant.id}
+                                onClick={() => handleSelectApprenant(apprenant)}
+                                className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 bg-white hover:border-brand-300 hover:shadow-md transition-all text-left dark:border-gray-700 dark:bg-gray-800 dark:hover:border-brand-500"
+                              >
+                                <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-500/20 flex items-center justify-center text-brand-600">
+                                  <UserIcon />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 dark:text-white">
+                                    {apprenant.firstName} {apprenant.lastName}
+                                  </p>
+                                  <p className="text-sm text-gray-500 truncate">{apprenant.email}</p>
+                                </div>
+                                <ChevronRightIcon />
+                              </button>
+                            ))}
+                          {getFormationApprenants(selectedFormation).filter((a) => {
+                            if (!destinataireSearch) return true;
+                            const search = destinataireSearch.toLowerCase();
+                            return a.firstName.toLowerCase().includes(search) || a.lastName.toLowerCase().includes(search) || a.email.toLowerCase().includes(search);
+                          }).length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                              {destinataireSearch
+                                ? `Aucun apprenant trouvé pour "${destinataireSearch}"`
+                                : "Aucun apprenant inscrit à cette formation"}
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {destinataireTab === "entreprise" && (
+                        <>
+                          {getFormationEntreprises(selectedFormation)
+                            .filter((entreprise) => {
+                              if (!destinataireSearch) return true;
+                              return entreprise.raisonSociale.toLowerCase().includes(destinataireSearch.toLowerCase());
+                            })
+                            .map((entreprise) => (
+                              <button
+                                key={entreprise.id}
+                                onClick={() => handleSelectEntreprise(entreprise)}
+                                className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-200 bg-white hover:border-purple-300 hover:shadow-md transition-all text-left dark:border-gray-700 dark:bg-gray-800 dark:hover:border-purple-500"
+                              >
+                                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600">
+                                  <BuildingIcon />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 dark:text-white">
+                                    {entreprise.raisonSociale}
+                                  </p>
+                                  {(entreprise.contactNom || entreprise.contactPrenom) && (
+                                    <p className="text-sm text-gray-500 truncate">
+                                      Contact : {entreprise.contactPrenom} {entreprise.contactNom}
+                                    </p>
+                                  )}
+                                  {entreprise.contactEmail && (
+                                    <p className="text-xs text-gray-400 truncate">{entreprise.contactEmail}</p>
+                                  )}
+                                </div>
+                                <ChevronRightIcon />
+                              </button>
+                            ))}
+                          {getFormationEntreprises(selectedFormation).filter((e) => {
+                            if (!destinataireSearch) return true;
+                            return e.raisonSociale.toLowerCase().includes(destinataireSearch.toLowerCase());
+                          }).length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                              {destinataireSearch
+                                ? `Aucune entreprise trouvée pour "${destinataireSearch}"`
+                                : "Aucune entreprise liée à cette formation"}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {/* Étape 3: Sélection documents */}
-                {wizardStep === "documents" && selectedFormation && selectedApprenant && (
+                {/* Étape 3: Sélection documents - Correction 378: Supporte apprenant OU entreprise */}
+                {wizardStep === "documents" && selectedFormation && (selectedApprenant || selectedEntreprise) && (
                   <div className="space-y-4">
                     {/* Back button */}
                     <button
                       onClick={() => {
-                        setWizardStep("apprenant");
+                        setWizardStep("destinataire");
                         setSelectedApprenant(null);
+                        setSelectedEntreprise(null);
                         setSelectedDocuments([]);
                       }}
                       className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                     >
                       <ChevronLeftIcon />
-                      Retour aux apprenants
+                      Retour aux destinataires
                     </button>
 
                     {/* Selection résumé */}
@@ -994,12 +1182,22 @@ export default function SignaturesPage() {
                         <FolderIcon />
                         <span className="text-brand-700 dark:text-brand-300">{selectedFormation.titre}</span>
                       </div>
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 text-sm">
-                        <UserIcon />
-                        <span className="text-purple-700 dark:text-purple-300">
-                          {selectedApprenant.firstName} {selectedApprenant.lastName}
-                        </span>
-                      </div>
+                      {selectedApprenant && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 text-sm">
+                          <UserIcon />
+                          <span className="text-purple-700 dark:text-purple-300">
+                            {selectedApprenant.firstName} {selectedApprenant.lastName}
+                          </span>
+                        </div>
+                      )}
+                      {selectedEntreprise && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 text-sm">
+                          <BuildingIcon />
+                          <span className="text-purple-700 dark:text-purple-300">
+                            {selectedEntreprise.raisonSociale}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Documents */}
@@ -1049,7 +1247,7 @@ export default function SignaturesPage() {
 
                         {availableDocuments.length === 0 && (
                           <div className="text-center py-8 text-gray-500">
-                            Aucun document disponible pour cet apprenant
+                            Aucun document disponible pour ce destinataire
                           </div>
                         )}
                       </div>
@@ -1057,8 +1255,8 @@ export default function SignaturesPage() {
                   </div>
                 )}
 
-                {/* Étape 4: Confirmation */}
-                {wizardStep === "confirm" && selectedFormation && selectedApprenant && selectedDocuments.length > 0 && (
+                {/* Étape 4: Confirmation - Correction 378: Supporte apprenant OU entreprise */}
+                {wizardStep === "confirm" && selectedFormation && (selectedApprenant || selectedEntreprise) && selectedDocuments.length > 0 && (
                   <div className="space-y-6">
                     {/* Back button */}
                     <button
@@ -1084,14 +1282,28 @@ export default function SignaturesPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="w-6 h-6 flex items-center justify-center">
-                            <UserIcon />
+                            {selectedApprenant ? <UserIcon /> : <BuildingIcon />}
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Destinataire</p>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {selectedApprenant.firstName} {selectedApprenant.lastName}
-                            </p>
-                            <p className="text-sm text-gray-500">{selectedApprenant.email}</p>
+                            {selectedApprenant && (
+                              <>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {selectedApprenant.firstName} {selectedApprenant.lastName}
+                                </p>
+                                <p className="text-sm text-gray-500">{selectedApprenant.email}</p>
+                              </>
+                            )}
+                            {selectedEntreprise && (
+                              <>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {selectedEntreprise.raisonSociale}
+                                </p>
+                                {selectedEntreprise.contactEmail && (
+                                  <p className="text-sm text-gray-500">{selectedEntreprise.contactEmail}</p>
+                                )}
+                              </>
+                            )}
                           </div>
                         </div>
                         <div>

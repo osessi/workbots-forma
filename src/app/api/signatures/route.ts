@@ -229,6 +229,19 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
+    // Vérifier que la session existe si un sessionId est fourni
+    let validSessionId = sessionId;
+    if (sessionId) {
+      const sessionExists = await prisma.documentSession.findUnique({
+        where: { id: sessionId },
+        select: { id: true },
+      });
+      if (!sessionExists) {
+        console.log(`[SIGNATURE] Session "${sessionId}" non trouvée, sessionId sera null`);
+        validSessionId = null;
+      }
+    }
+
     // Créer le document
     const document = await prisma.signatureDocument.create({
       data: {
@@ -238,9 +251,9 @@ export async function POST(request: NextRequest) {
         destinataireNom,
         destinataireEmail: destinataireEmail.toLowerCase(),
         destinataireTel,
-        apprenantId,
-        entrepriseId,
-        sessionId,
+        apprenantId: apprenantId || null,
+        entrepriseId: entrepriseId || null,
+        sessionId: validSessionId || null,
         authMethod: authMethod as SignatureAuthMethod,
         expiresAt,
         token,
@@ -268,8 +281,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erreur création document signature:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return NextResponse.json(
-      { error: "Erreur lors de la création du document" },
+      { error: `Erreur lors de la création du document: ${errorMessage}` },
       { status: 500 }
     );
   }

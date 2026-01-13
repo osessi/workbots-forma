@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Récupérer les réclamations
-    const [reclamations, total] = await Promise.all([
+    const [reclamations, filteredTotal, totalGlobal] = await Promise.all([
       prisma.reclamation.findMany({
         where: whereClause,
         include: {
@@ -111,6 +111,12 @@ export async function GET(request: NextRequest) {
       prisma.reclamation.count({
         where: whereClause,
       }),
+      // Correction 431: Total global sans filtre pour l'onglet "Toutes"
+      prisma.reclamation.count({
+        where: {
+          organizationId: user.organizationId,
+        },
+      }),
     ]);
 
     // Statistiques
@@ -124,8 +130,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Correction 431: Utiliser totalGlobal pour stats.total (onglet "Toutes")
     const statsFormatted = {
-      total,
+      total: totalGlobal,
       parStatut: Object.fromEntries(
         stats.map(s => [s.statut, s._count.id])
       ),
@@ -133,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       reclamations,
-      total,
+      total: filteredTotal,
       stats: statsFormatted,
     });
   } catch (error) {

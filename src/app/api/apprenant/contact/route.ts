@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
     const notificationTitre = `${subjectTitle} - ${apprenant.prenom} ${apprenant.nom}`;
     const notificationMessage = `Message de ${apprenant.prenom} ${apprenant.nom} (${apprenant.email}):\n\n${message}`;
 
-    await prisma.notification.create({
+    // Correction 422: actionUrl vers l'onglet Messages avec messageId
+    const notification = await prisma.notification.create({
       data: {
         organizationId,
         userId: null, // null = notification pour tous les admins
@@ -103,14 +104,24 @@ export async function POST(request: NextRequest) {
         message: notificationMessage,
         resourceType: "apprenant",
         resourceId: apprenantId,
-        actionUrl: `/apprenants/${apprenantId}`,
+        actionUrl: `/apprenants/${apprenantId}?tab=messages`, // Sera mis à jour avec messageId
         metadata: {
+          direction: "incoming", // Correction 422: Ajouter direction pour cohérence
           subject,
           apprenantEmail: apprenant.email,
           apprenantNom: `${apprenant.prenom} ${apprenant.nom}`,
           messageOriginal: message,
           sentAt: new Date().toISOString(),
+          replies: [], // Correction 422: Ajouter replies pour cohérence avec la messagerie
         },
+      },
+    });
+
+    // Correction 422: Mettre à jour l'actionUrl avec le messageId
+    await prisma.notification.update({
+      where: { id: notification.id },
+      data: {
+        actionUrl: `/apprenants/${apprenantId}?tab=messages&messageId=${notification.id}`,
       },
     });
 

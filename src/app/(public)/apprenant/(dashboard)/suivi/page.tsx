@@ -1,181 +1,273 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+// ===========================================
+// CORRECTION 431: Page "Suivi pédagogique" → "Messages de l'intervenant"
+// ===========================================
+// Affiche les messages envoyés par l'intervenant pour la session sélectionnée
+
+import React, { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
 import {
-  BarChart3,
+  MessageSquare,
   Clock,
-  CheckCircle2,
-  Play,
-  TrendingUp,
-  Calendar,
-  Award,
-  Target,
+  User,
   Loader2,
   AlertCircle,
-  BookOpen,
+  Paperclip,
+  FileText,
+  Image as ImageIcon,
+  File,
+  Download,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Inbox,
 } from "lucide-react";
 
-interface Module {
+// =====================================
+// TYPES
+// =====================================
+
+interface Attachment {
+  name: string;
+  url: string;
+  size?: number;
+  type?: string;
+}
+
+interface MessageIntervenant {
   id: string;
-  titre: string;
-  ordre: number;
-  duree: number | null;
-  progression: number;
-  statut: string;
-  tempsConsacre: number;
-}
-
-interface SuiviData {
-  progression: {
-    global: number;
-    statut: string;
-    tempsTotal: number;
-    modulesTermines: number;
-    totalModules: number;
+  sujet: string | null;
+  contenu: string;
+  attachments: Attachment[];
+  createdAt: string;
+  isRead: boolean;
+  readAt: string | null;
+  intervenant: {
+    id: string;
+    nom: string;
+    prenom: string;
+    photoUrl: string | null;
   };
-  modules: Module[];
-  evaluations: {
-    total: number;
-    reussies: number;
-    moyenneScore: number | null;
-  };
-  presence: {
-    joursPresents: number;
-    joursTotal: number;
-    tauxPresence: number;
-  };
-  statistiques: {
-    tempsHebdo: number;
-    dernierAcces: string | null;
-    joursConsecutifs: number;
+  session: {
+    id: string;
+    reference: string;
+    nom: string | null;
+    formationTitre: string;
   };
 }
 
 // =====================================
-// COMPOSANT STAT CARD
+// HELPERS
 // =====================================
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  subValue,
-  color,
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return `Aujourd'hui à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+  } else if (diffDays === 1) {
+    return `Hier à ${date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+  } else if (diffDays < 7) {
+    return date.toLocaleDateString("fr-FR", { weekday: "long", hour: "2-digit", minute: "2-digit" });
+  }
+
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+function getFileIcon(type?: string) {
+  if (!type) return File;
+  if (type.startsWith("image/")) return ImageIcon;
+  if (type.includes("pdf") || type.includes("word") || type.includes("document")) return FileText;
+  return File;
+}
+
+// =====================================
+// COMPOSANT CARTE MESSAGE
+// =====================================
+
+function MessageCard({
+  message,
+  onMarkAsRead,
 }: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  subValue?: string;
-  color: string;
+  message: MessageIntervenant;
+  onMarkAsRead: (messageId: string) => void;
 }) {
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-          {subValue && (
-            <p className="text-xs text-brand-600 dark:text-brand-400 mt-0.5">{subValue}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+  const [isExpanded, setIsExpanded] = useState(!message.isRead);
 
-// =====================================
-// COMPOSANT MODULE PROGRESSION
-// =====================================
+  const handleExpand = () => {
+    const newExpanded = !isExpanded;
+    setIsExpanded(newExpanded);
 
-function ModuleProgressionCard({ module, index }: { module: Module; index: number }) {
-  const getStatusConfig = () => {
-    switch (module.statut) {
-      case "TERMINE":
-        return {
-          bg: "bg-green-100 dark:bg-green-500/20",
-          text: "text-green-600 dark:text-green-400",
-          icon: CheckCircle2,
-          label: "Terminé",
-        };
-      case "EN_COURS":
-        return {
-          bg: "bg-brand-100 dark:bg-brand-500/20",
-          text: "text-brand-600 dark:text-brand-400",
-          icon: Play,
-          label: "En cours",
-        };
-      default:
-        return {
-          bg: "bg-gray-100 dark:bg-gray-700",
-          text: "text-gray-500 dark:text-gray-400",
-          icon: Clock,
-          label: "À venir",
-        };
+    // Marquer comme lu si on ouvre le message
+    if (newExpanded && !message.isRead) {
+      onMarkAsRead(message.id);
     }
   };
 
-  const config = getStatusConfig();
-  const StatusIcon = config.icon;
-
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`bg-white dark:bg-gray-800 rounded-xl border transition-all ${
+        message.isRead
+          ? "border-gray-200 dark:border-gray-700"
+          : "border-brand-300 dark:border-brand-500 shadow-md"
+      }`}
     >
-      {/* Numéro */}
-      <div className={`w-10 h-10 rounded-lg ${config.bg} flex items-center justify-center flex-shrink-0`}>
-        <span className={`font-bold ${config.text}`}>{module.ordre}</span>
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <h4 className="font-medium text-gray-900 dark:text-white truncate">
-            {module.titre}
-          </h4>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${config.bg} ${config.text}`}>
-            {config.label}
-          </span>
+      {/* Header du message */}
+      <button
+        onClick={handleExpand}
+        className="w-full p-4 flex items-start gap-3 text-left"
+      >
+        {/* Avatar intervenant */}
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center flex-shrink-0">
+          {message.intervenant.photoUrl ? (
+            <img
+              src={message.intervenant.photoUrl}
+              alt={`${message.intervenant.prenom} ${message.intervenant.nom}`}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <User className="w-5 h-5 text-white" />
+          )}
         </div>
-        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-          {module.duree && (
+
+        {/* Contenu header */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-medium text-gray-900 dark:text-white">
+              {message.intervenant.prenom} {message.intervenant.nom}
+            </span>
+            {!message.isRead && (
+              <span className="px-1.5 py-0.5 bg-brand-500 text-white text-[10px] font-medium rounded">
+                Nouveau
+              </span>
+            )}
+          </div>
+
+          {message.sujet && (
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1">
+              {message.sujet}
+            </h3>
+          )}
+
+          <p className={`text-sm text-gray-600 dark:text-gray-400 ${isExpanded ? "" : "line-clamp-2"}`}>
+            {message.contenu}
+          </p>
+
+          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
-              {module.duree}h prévues
+              {formatDate(message.createdAt)}
             </span>
-          )}
-          {module.tempsConsacre > 0 && (
-            <span className="flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" />
-              {Math.round(module.tempsConsacre / 60)}h passées
-            </span>
-          )}
+            {message.attachments.length > 0 && (
+              <span className="flex items-center gap-1">
+                <Paperclip className="w-3.5 h-3.5" />
+                {message.attachments.length} fichier{message.attachments.length > 1 ? "s" : ""}
+              </span>
+            )}
+            {message.isRead && (
+              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                <Check className="w-3.5 h-3.5" />
+                Lu
+              </span>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Progression */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <div className="w-24 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-          <motion.div
-            className={`h-full rounded-full ${
-              module.statut === "TERMINE" ? "bg-green-500" : "bg-brand-500"
-            }`}
-            initial={{ width: 0 }}
-            animate={{ width: `${module.progression}%` }}
-            transition={{ duration: 0.8, delay: index * 0.1 }}
-          />
+        {/* Chevron */}
+        <div className="flex-shrink-0">
+          {isExpanded ? (
+            <ChevronUp className="w-5 h-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          )}
         </div>
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-200 w-10 text-right">
-          {module.progression}%
-        </span>
-      </div>
+      </button>
+
+      {/* Contenu expandé */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pt-0 border-t border-gray-100 dark:border-gray-700">
+              {/* Message complet */}
+              <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
+                  {message.contenu}
+                </p>
+              </div>
+
+              {/* Pièces jointes */}
+              {message.attachments.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Pièces jointes
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {message.attachments.map((att, idx) => {
+                      const FileIcon = getFileIcon(att.type);
+                      return (
+                        <a
+                          key={idx}
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                        >
+                          <FileIcon className="w-4 h-4 text-brand-500" />
+                          <span className="text-gray-700 dark:text-gray-300 truncate max-w-[200px]">
+                            {att.name}
+                          </span>
+                          {att.size && (
+                            <span className="text-xs text-gray-500">
+                              ({formatFileSize(att.size)})
+                            </span>
+                          )}
+                          <Download className="w-4 h-4 text-gray-400" />
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Session */}
+              <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Formation : <span className="font-medium text-gray-700 dark:text-gray-300">{message.session.formationTitre}</span>
+                  {message.session.reference && (
+                    <> ({message.session.reference})</>
+                  )}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -185,45 +277,95 @@ function ModuleProgressionCard({ module, index }: { module: Module; index: numbe
 // =====================================
 
 export default function SuiviPage() {
-  const { token, selectedInscription } = useApprenantPortal();
-  const [data, setData] = useState<SuiviData | null>(null);
+  const { token, selectedSession, dashboardStats, setDashboardStats } = useApprenantPortal();
+  const [messages, setMessages] = useState<MessageIntervenant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Récupérer les messages
+  const fetchMessages = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      setError(null);
+      const params = new URLSearchParams({ token });
+      if (selectedSession?.sessionId) {
+        params.append("sessionId", selectedSession.sessionId);
+      }
+
+      const res = await fetch(`/api/apprenant/messages-intervenant?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error("Erreur lors du chargement des messages");
+      }
+
+      const data = await res.json();
+      setMessages(data.messages || []);
+      setUnreadCount(data.unreadCount || 0);
+
+      // Mettre à jour le compteur dans le context si fourni
+      if (dashboardStats && setDashboardStats) {
+        setDashboardStats({
+          ...dashboardStats,
+          messagesIntervenantNonLus: data.unreadCount || 0,
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token, selectedSession?.sessionId, dashboardStats, setDashboardStats]);
 
   useEffect(() => {
-    const fetchSuivi = async () => {
-      if (!token) return;
+    fetchMessages();
+  }, [fetchMessages]);
 
-      try {
-        setLoading(true);
-        const params = new URLSearchParams({ token });
-        if (selectedInscription?.id) {
-          params.append("inscriptionId", selectedInscription.id);
-        }
+  // Marquer un message comme lu
+  const handleMarkAsRead = async (messageId: string) => {
+    if (!token) return;
 
-        const res = await fetch(`/api/apprenant/suivi?${params.toString()}`);
-        if (!res.ok) {
-          throw new Error("Erreur lors du chargement du suivi");
-        }
+    try {
+      await fetch(`/api/apprenant/messages-intervenant?token=${encodeURIComponent(token)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId }),
+      });
 
-        const suiviData = await res.json();
-        setData(suiviData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erreur inconnue");
-      } finally {
-        setLoading(false);
+      // Mettre à jour localement
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, isRead: true, readAt: new Date().toISOString() } : m
+        )
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
+      // Mettre à jour le compteur global
+      if (dashboardStats && setDashboardStats) {
+        setDashboardStats({
+          ...dashboardStats,
+          messagesIntervenantNonLus: Math.max(0, (dashboardStats.messagesIntervenantNonLus || 0) - 1),
+        });
       }
-    };
+    } catch (err) {
+      console.error("Erreur marquage comme lu:", err);
+    }
+  };
 
-    fetchSuivi();
-  }, [token, selectedInscription?.id]);
+  // Rafraîchir
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchMessages();
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-brand-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Chargement du suivi...</p>
+          <p className="text-gray-600 dark:text-gray-400">Chargement des messages...</p>
         </div>
       </div>
     );
@@ -234,165 +376,93 @@ export default function SuiviPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
-          <p className="text-gray-900 dark:text-white font-medium">{error}</p>
+          <p className="text-gray-900 dark:text-white font-medium mb-2">{error}</p>
+          <button
+            onClick={handleRefresh}
+            className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+          >
+            Réessayer
+          </button>
         </div>
       </div>
     );
   }
 
-  const progressionPercentage = data?.progression?.global || 0;
-  const circumference = 2 * Math.PI * 60;
-  const strokeDashoffset = circumference - (progressionPercentage / 100) * circumference;
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Suivi pédagogique
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Suivez votre progression et vos performances
-        </p>
-      </div>
-
-      {/* Progression globale */}
-      <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-2xl p-6 text-white">
-        <div className="flex flex-col md:flex-row md:items-center gap-6">
-          {/* Cercle de progression */}
-          <div className="relative w-32 h-32 mx-auto md:mx-0 flex-shrink-0">
-            <svg className="w-full h-full transform -rotate-90">
-              <circle
-                cx="64"
-                cy="64"
-                r="60"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                className="text-white/20"
-              />
-              <motion.circle
-                cx="64"
-                cy="64"
-                r="60"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                strokeLinecap="round"
-                className="text-white"
-                initial={{ strokeDashoffset: circumference }}
-                animate={{ strokeDashoffset }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                style={{ strokeDasharray: circumference }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <span className="text-3xl font-bold">{progressionPercentage}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="flex-1">
-            <h2 className="text-xl font-semibold mb-4">Progression globale</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-white/70 text-sm">Modules</p>
-                <p className="text-lg font-semibold">
-                  {data?.progression?.modulesTermines || 0}/{data?.progression?.totalModules || 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-white/70 text-sm">Temps total</p>
-                <p className="text-lg font-semibold">
-                  {Math.round((data?.progression?.tempsTotal || 0) / 60)}h
-                </p>
-              </div>
-              <div>
-                <p className="text-white/70 text-sm">Évaluations</p>
-                <p className="text-lg font-semibold">
-                  {data?.evaluations?.reussies || 0}/{data?.evaluations?.total || 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-white/70 text-sm">Présence</p>
-                <p className="text-lg font-semibold">
-                  {data?.presence?.tauxPresence || 0}%
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats rapides */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          icon={Clock}
-          label="Temps cette semaine"
-          value={`${Math.round((data?.statistiques?.tempsHebdo || 0) / 60)}h`}
-          color="bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
-        />
-        <StatCard
-          icon={Calendar}
-          label="Jours consécutifs"
-          value={data?.statistiques?.joursConsecutifs || 0}
-          subValue="de connexion"
-          color="bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400"
-        />
-        <StatCard
-          icon={Target}
-          label="Score moyen"
-          value={data?.evaluations?.moyenneScore !== null ? `${data?.evaluations?.moyenneScore}%` : "—"}
-          color="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400"
-        />
-        <StatCard
-          icon={Award}
-          label="Taux présence"
-          value={`${data?.presence?.tauxPresence || 0}%`}
-          subValue={`${data?.presence?.joursPresents || 0}/${data?.presence?.joursTotal || 0} jours`}
-          color="bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400"
-        />
-      </div>
-
-      {/* Progression par module */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Progression par module
-          </h2>
-          <div className="flex items-center gap-4 text-xs">
-            <span className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
-              Terminé
-            </span>
-            <span className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-brand-500" />
-              En cours
-            </span>
-            <span className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600" />
-              À venir
-            </span>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <MessageSquare className="w-6 h-6 text-brand-500" />
+            Suivi pédagogique
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Retrouvez ici les messages et documents partagés par votre intervenant
+            {selectedSession && ` pour la session ${selectedSession.reference}`}
+          </p>
         </div>
 
-        {data?.modules && data.modules.length > 0 ? (
-          <div className="space-y-3">
-            {data.modules.map((module, index) => (
-              <ModuleProgressionCard key={module.id} module={module} index={index} />
-            ))}
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          Actualiser
+        </button>
+      </div>
+
+      {/* Compteur messages non lus */}
+      {unreadCount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-xl p-4 flex items-center gap-3"
+        >
+          <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0">
+            <MessageSquare className="w-5 h-5 text-white" />
           </div>
-        ) : (
-          <div className="text-center py-8">
-            <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Aucun module disponible
+          <div>
+            <p className="font-medium text-brand-700 dark:text-brand-300">
+              {unreadCount} nouveau{unreadCount > 1 ? "x" : ""} message{unreadCount > 1 ? "s" : ""}
+            </p>
+            <p className="text-sm text-brand-600 dark:text-brand-400">
+              Cliquez sur un message pour le consulter et le marquer comme lu
             </p>
           </div>
-        )}
-      </div>
+        </motion.div>
+      )}
+
+      {/* Liste des messages */}
+      {messages.length > 0 ? (
+        <div className="space-y-4">
+          {messages.map((message) => (
+            <MessageCard
+              key={message.id}
+              message={message}
+              onMarkAsRead={handleMarkAsRead}
+            />
+          ))}
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-12 text-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mx-auto mb-4">
+            <Inbox className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Aucun message pour le moment
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+            Votre intervenant n'a pas encore envoyé de message pour cette session.
+            Les messages et documents partagés apparaîtront ici.
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 }

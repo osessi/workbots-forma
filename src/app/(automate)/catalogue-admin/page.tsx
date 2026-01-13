@@ -58,7 +58,7 @@ interface FormationPubliee {
 
 // Options de catégories Qualiopi
 const CATEGORIES_QUALIOPI = [
-  "Action de formation",
+  "Actions de formation",
   "Bilans de compétences",
   "Actions permettant de faire valider les acquis de l'expérience",
   "Actions de formation par apprentissage",
@@ -660,10 +660,10 @@ export default function CataloguePage() {
       {/* Action rapide - Paramètres organisation */}
       <Link
         href="/settings"
-        className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-brand-300 dark:hover:border-brand-600 transition-colors"
+        className="block group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:border-brand-300 dark:hover:border-brand-600 transition-colors overflow-hidden"
       >
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
             <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
           </div>
           <div className="flex-1">

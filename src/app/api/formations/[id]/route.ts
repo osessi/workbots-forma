@@ -107,15 +107,76 @@ export async function GET(
   }
 }
 
-// Helper pour parser les tarifs
+// Helper pour parser les tarifs (format "1500 € HT", "1 500 €", "1500" ou nombre)
 function parseTarif(value: unknown): number | null {
   if (!value) return null;
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
-    const match = value.match(/(\d+(?:[.,]\d+)?)/);
+    // Supprimer tous les espaces (normaux et insécables) et caractères non-numériques sauf , et .
+    const cleanValue = value.replace(/[\s\u00A0]/g, '').replace(/[€HTTTC]/gi, '');
+    const match = cleanValue.match(/(\d+(?:[.,]\d+)?)/);
     if (match) return parseFloat(match[1].replace(',', '.'));
   }
   return null;
+}
+
+// Helper pour parser le contenu textuel en modules
+// Format attendu: "Module 1 - Titre\n• item1\n• item2\n\nModule 2 - ..."
+function parseContenuToModules(contenu: string): Array<{ titre: string; ordre: number; contenu: { items: string[] } }> {
+  if (!contenu || typeof contenu !== 'string') return [];
+
+  const modules: Array<{ titre: string; ordre: number; contenu: { items: string[] } }> = [];
+  const lines = contenu.split('\n');
+  let currentModule: { titre: string; items: string[] } | null = null;
+  let moduleIndex = 0;
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+
+    // Détecter un nouveau module (format: "Module X - Titre" ou "X. Titre" ou "X) Titre")
+    const moduleMatch = trimmedLine.match(/^(?:Module\s*(\d+)\s*[-–:]?\s*|(\d+)[.\)]\s*)(.+)/i);
+    if (moduleMatch) {
+      // Sauvegarder le module précédent
+      if (currentModule && currentModule.titre) {
+        modules.push({
+          titre: currentModule.titre,
+          ordre: moduleIndex,
+          contenu: { items: currentModule.items },
+        });
+      }
+      moduleIndex++;
+      const moduleName = moduleMatch[3] || `Module ${moduleMatch[1] || moduleMatch[2]}`;
+      currentModule = {
+        titre: moduleName.trim(),
+        items: [],
+      };
+    } else if (currentModule) {
+      // Ajouter la ligne comme item du module courant (nettoyer les puces)
+      const cleanLine = trimmedLine.replace(/^[-•*]\s*/, '').trim();
+      if (cleanLine) {
+        currentModule.items.push(cleanLine);
+      }
+    } else {
+      // Pas encore de module détecté, créer un module par défaut
+      moduleIndex++;
+      currentModule = {
+        titre: trimmedLine.replace(/^[-•*]\s*/, '').trim(),
+        items: [],
+      };
+    }
+  }
+
+  // Ajouter le dernier module
+  if (currentModule && currentModule.titre) {
+    modules.push({
+      titre: currentModule.titre,
+      ordre: moduleIndex,
+      contenu: { items: currentModule.items },
+    });
+  }
+
+  return modules;
 }
 
 // PATCH - Mettre à jour une formation
@@ -243,6 +304,13 @@ export async function PATCH(
           contenu: { items: m.items || (m.sousModules?.map(s => s.titre) || []) },
           duree: undefined,
         }));
+      } else if (fiche.contenu && typeof fiche.contenu === 'string') {
+        // Correction 389: Parser le contenu textuel en modules
+        // Format: "Module 1 - Titre\n• item1\n• item2\n\nModule 2 - ..."
+        const parsedModules = parseContenuToModules(fiche.contenu as string);
+        if (parsedModules.length > 0) {
+          modulesToSync = parsedModules;
+        }
       }
     }
 

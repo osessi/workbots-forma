@@ -52,6 +52,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 id: true,
                 titre: true,
                 tarifAffiche: true,
+                fichePedagogique: true, // Correction 395: Inclure les tarifs par profil
               },
             },
           },

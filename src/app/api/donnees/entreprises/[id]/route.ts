@@ -59,6 +59,49 @@ export async function GET(
         apprenants: {
           where: { isActive: true },
           orderBy: { nom: "asc" },
+          include: {
+            // Correction 396: Inclure les pré-inscriptions de chaque apprenant
+            preInscriptions: {
+              orderBy: { createdAt: "desc" },
+              include: {
+                formation: {
+                  select: {
+                    id: true,
+                    titre: true,
+                    tarifAffiche: true,
+                  },
+                },
+              },
+            },
+            // Inclure les participations aux sessions
+            sessionParticipationsNew: {
+              orderBy: { createdAt: "desc" },
+              include: {
+                client: {
+                  include: {
+                    session: {
+                      select: {
+                        id: true,
+                        reference: true,
+                        nom: true,
+                        status: true,
+                        formation: {
+                          select: {
+                            id: true,
+                            titre: true,
+                          },
+                        },
+                        journees: {
+                          select: { date: true },
+                          orderBy: { date: "asc" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
@@ -67,7 +110,23 @@ export async function GET(
       return NextResponse.json({ error: "Entreprise non trouvée" }, { status: 404 });
     }
 
-    return NextResponse.json(entreprise);
+    // Correction 396: Agréger les statistiques
+    const allPreInscriptions = entreprise.apprenants.flatMap(a => a.preInscriptions);
+    const allSessions = entreprise.apprenants.flatMap(a => a.sessionParticipationsNew);
+
+    const stats = {
+      totalApprenants: entreprise.apprenants.length,
+      totalPreInscriptions: allPreInscriptions.length,
+      preInscriptionsAcceptees: allPreInscriptions.filter(p => p.statut === "ACCEPTEE").length,
+      totalSessions: allSessions.length,
+      sessionsEnCours: allSessions.filter(s => s.client.session.status === "EN_COURS").length,
+      sessionsTerminees: allSessions.filter(s => s.client.session.status === "TERMINEE").length,
+    };
+
+    return NextResponse.json({
+      ...entreprise,
+      stats,
+    });
   } catch (error) {
     console.error("Erreur récupération entreprise:", error);
     return NextResponse.json(

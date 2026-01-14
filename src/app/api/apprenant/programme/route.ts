@@ -94,10 +94,16 @@ export async function GET(request: NextRequest) {
 
     // Si sessionId fourni, récupérer cette session spécifique
     // Sinon, récupérer la première session de l'apprenant
+    // Support des deux systèmes : NOUVEAU (Session/SessionParticipantNew) et ANCIEN (DocumentSession/SessionParticipant)
     let session;
 
+    // Variable pour distinguer le type de session (nouveau ou ancien système)
+    let isNewSystem = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let oldSession: any = null;
+
     if (sessionId) {
-      // Vérifier que l'apprenant participe à cette session
+      // ÉTAPE 1: Essayer le NOUVEAU système (Session/SessionParticipantNew)
       const participation = await prisma.sessionParticipantNew.findFirst({
         where: {
           apprenantId,
@@ -125,11 +131,10 @@ export async function GET(request: NextRequest) {
                       prenom: true,
                       fonction: true,
                       specialites: true,
-                      bio: true,
+                      biographie: true,
                       photoUrl: true,
                     },
                   },
-                  // Correction: Inclure les co-formateurs via la table de jonction
                   coFormateurs: {
                     include: {
                       intervenant: {
@@ -139,7 +144,7 @@ export async function GET(request: NextRequest) {
                           prenom: true,
                           fonction: true,
                           specialites: true,
-                          bio: true,
+                          biographie: true,
                           photoUrl: true,
                         },
                       },
@@ -152,16 +157,52 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      if (!participation) {
-        return NextResponse.json(
-          { error: "Session non trouvée ou accès refusé" },
-          { status: 404 }
-        );
-      }
+      if (participation) {
+        session = participation.client.session;
+      } else {
+        // ÉTAPE 2: Fallback vers ANCIEN système (DocumentSession/SessionParticipant)
+        const oldParticipation = await prisma.sessionParticipant.findFirst({
+          where: {
+            apprenantId,
+            client: {
+              session: {
+                id: sessionId,
+                organizationId,
+              },
+            },
+          },
+          include: {
+            client: {
+              include: {
+                session: {
+                  include: {
+                    formation: {
+                      include: {
+                        modules: { orderBy: { ordre: "asc" } },
+                      },
+                    },
+                    journees: {
+                      orderBy: { date: "asc" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
 
-      session = participation.client.session;
+        if (!oldParticipation) {
+          return NextResponse.json(
+            { error: "Session non trouvée ou accès refusé" },
+            { status: 404 }
+          );
+        }
+
+        isNewSystem = false;
+        oldSession = oldParticipation.client.session;
+      }
     } else {
-      // Récupérer la première session de l'apprenant
+      // Récupérer la première session de l'apprenant (essayer nouveau puis ancien système)
       const participation = await prisma.sessionParticipantNew.findFirst({
         where: {
           apprenantId,
@@ -188,11 +229,10 @@ export async function GET(request: NextRequest) {
                       prenom: true,
                       fonction: true,
                       specialites: true,
-                      bio: true,
+                      biographie: true,
                       photoUrl: true,
                     },
                   },
-                  // Correction: Inclure les co-formateurs via la table de jonction
                   coFormateurs: {
                     include: {
                       intervenant: {
@@ -202,7 +242,7 @@ export async function GET(request: NextRequest) {
                           prenom: true,
                           fonction: true,
                           specialites: true,
-                          bio: true,
+                          biographie: true,
                           photoUrl: true,
                         },
                       },
@@ -218,15 +258,129 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      if (!participation) {
-        return NextResponse.json({
-          formation: null,
-          modules: [],
-          equipePedagogique: [],
+      if (participation) {
+        session = participation.client.session;
+      } else {
+        // Fallback vers ancien système
+        const oldParticipation = await prisma.sessionParticipant.findFirst({
+          where: {
+            apprenantId,
+            client: {
+              session: {
+                organizationId,
+              },
+            },
+          },
+          include: {
+            client: {
+              include: {
+                session: {
+                  include: {
+                    formation: {
+                      include: {
+                        modules: { orderBy: { ordre: "asc" } },
+                      },
+                    },
+                    journees: {
+                      orderBy: { date: "asc" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
         });
-      }
 
-      session = participation.client.session;
+        if (!oldParticipation) {
+          return NextResponse.json({
+            formation: null,
+            modules: [],
+            equipePedagogique: [],
+          });
+        }
+
+        isNewSystem = false;
+        oldSession = oldParticipation.client.session;
+      }
+    }
+
+    // TRAITEMENT ANCIEN SYSTÈME (DocumentSession)
+    if (!isNewSystem && oldSession) {
+      const formation = oldSession.formation;
+      const fichePedagogique = (formation.fichePedagogique as FichePedagogiqueSnapshot) || {};
+
+      // Formater les modules
+      const formattedModules = formation.modules.map((module: { id: string; titre: string; description?: string | null; ordre: number; duree?: number | null; contenu?: unknown }) => {
+        const contenu = module.contenu as { items?: string[]; description?: string } | string | null;
+        let items: string[] = [];
+
+        if (contenu && typeof contenu === "object" && contenu.items) {
+          items = contenu.items;
+        } else if (typeof contenu === "string") {
+          items = contenu.split("\n").filter(Boolean);
+        }
+
+        return {
+          id: module.id,
+          titre: module.titre,
+          description: module.description || null,
+          ordre: module.ordre,
+          dureeHeures: module.duree ? module.duree / 60 : null,
+          items,
+        };
+      });
+
+      // Calculer la durée totale
+      const dureeHeures = formattedModules.reduce((sum: number, m: { dureeHeures: number | null }) => sum + (m.dureeHeures || 0), 0) ||
+        fichePedagogique.dureeHeures ||
+        0;
+
+      // Pour l'ancien système, pas d'équipe pédagogique détaillée
+      return NextResponse.json({
+        session: {
+          id: oldSession.id,
+          reference: oldSession.reference || oldSession.id,
+          nom: oldSession.nom || formation.titre,
+          modalite: oldSession.modalite || "PRESENTIEL",
+        },
+        formation: {
+          id: formation.id,
+          titre: formation.titre,
+          description: formation.description,
+          image: formation.image,
+          dureeHeures,
+          dureeJours: fichePedagogique.dureeJours || null,
+          objectifsPedagogiques: fichePedagogique.objectifs || [],
+          publicVise: fichePedagogique.publicVise || null,
+          prerequis: fichePedagogique.prerequis || null,
+          moyensPedagogiques: fichePedagogique.moyensPedagogiques || null,
+          methodsPedagogiques: fichePedagogique.methodsPedagogiques || [],
+          supportsPedagogiques: fichePedagogique.supportsPedagogiques || [],
+          methodesEvaluation: fichePedagogique.methodesEvaluation || [],
+          suiviEvaluation: fichePedagogique.suiviEvaluation || null,
+          ressourcesPedagogiques: fichePedagogique.ressourcesPedagogiques || null,
+          accessibiliteHandicap: fichePedagogique.accessibiliteHandicap || null,
+          equipePedagogiqueDescription: fichePedagogique.equipePedagogique || null,
+          createdAt: formation.createdAt,
+          updatedAt: formation.updatedAt,
+          snapshotCreatedAt: null,
+        },
+        modules: formattedModules,
+        equipePedagogique: [],
+      });
+    }
+
+    // TRAITEMENT NOUVEAU SYSTÈME (Session)
+    // À ce point, session doit être défini (sinon on aurait retourné ci-dessus)
+    if (!session) {
+      return NextResponse.json({
+        formation: null,
+        modules: [],
+        equipePedagogique: [],
+      });
     }
 
     const formation = session.formation;
@@ -250,7 +404,7 @@ export async function GET(request: NextRequest) {
 
     // Modules (depuis snapshot ou formation)
     const modulesSnapshot: ModuleSnapshot[] = hasSnapshot && session.snapshotModules
-      ? (session.snapshotModules as ModuleSnapshot[])
+      ? (session.snapshotModules as unknown as ModuleSnapshot[])
       : formation.modules.map((m) => ({
           id: m.id,
           titre: m.titre,
@@ -306,7 +460,7 @@ export async function GET(request: NextRequest) {
         prenom: session.formateur.prenom,
         fonction: session.formateur.fonction,
         specialites: session.formateur.specialites || [],
-        bio: session.formateur.bio,
+        bio: session.formateur.biographie,
         photoUrl: session.formateur.photoUrl,
         estFormateurPrincipal: true,
       });
@@ -324,7 +478,7 @@ export async function GET(request: NextRequest) {
             prenom: coFormateur.prenom,
             fonction: coFormateur.fonction,
             specialites: coFormateur.specialites || [],
-            bio: coFormateur.bio,
+            bio: coFormateur.biographie,
             photoUrl: coFormateur.photoUrl,
             estFormateurPrincipal: false,
           });

@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
                     titre: true,
                     evaluations: {
                       where: {
-                        type: "EVALUATION_FINALE",
+                        type: "FINALE",
                         isActive: true,
                       },
                     },

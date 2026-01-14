@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
           specialites: session.formateur.specialites || [],
           structure: session.formateur.structure,
           photoUrl: session.formateur.photoUrl || null,
-          bio: session.formateur.bio || null,
+          bio: session.formateur.biographie || null,
           role: "formateur",
         });
       }
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
               specialites: coFormateur.specialites || [],
               structure: coFormateur.structure,
               photoUrl: coFormateur.photoUrl || null,
-              bio: coFormateur.bio || null,
+              bio: coFormateur.biographie || null,
               role: "formateur",
             });
           }
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
           specialites: session.formateur.specialites || [],
           structure: session.formateur.structure,
           photoUrl: session.formateur.photoUrl || null,
-          bio: session.formateur.bio || null,
+          bio: session.formateur.biographie || null,
           role: "formateur",
         });
       }
@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
               specialites: coFormateur.specialites || [],
               structure: coFormateur.structure,
               photoUrl: coFormateur.photoUrl || null,
-              bio: coFormateur.bio || null,
+              bio: coFormateur.biographie || null,
               role: "formateur",
             });
           }
@@ -240,7 +240,7 @@ export async function GET(request: NextRequest) {
           specialites: session.formateur.specialites || [],
           structure: session.formateur.structure,
           photoUrl: session.formateur.photoUrl || null,
-          bio: session.formateur.bio || null,
+          bio: session.formateur.biographie || null,
           role: "formateur",
         });
       }
@@ -260,7 +260,7 @@ export async function GET(request: NextRequest) {
               specialites: coFormateur.specialites || [],
               structure: coFormateur.structure,
               photoUrl: coFormateur.photoUrl || null,
-              bio: coFormateur.bio || null,
+              bio: coFormateur.biographie || null,
               role: "formateur",
             });
           }

@@ -158,7 +158,7 @@ function EvaluationQCMAtelierCard({
     switch (evaluation.statut) {
       case "termine":
         return {
-          badge: isQCM && evaluation.resultat?.score !== null
+          badge: isQCM && evaluation.resultat?.score !== null && evaluation.resultat?.score !== undefined
             ? `${Math.round(evaluation.resultat.score)}%`
             : "Terminé",
           badgeClass: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400",
@@ -291,19 +291,19 @@ function EvaluationQCMAtelierCard({
           <div className="flex-shrink-0">{renderActionButton()}</div>
         </div>
       </div>
-      {isQCM && evaluation.statut === "termine" && evaluation.resultat?.score !== null && (
+      {isQCM && evaluation.statut === "termine" && evaluation.resultat && evaluation.resultat.score !== null && (
         <div className="px-5 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
               <motion.div
-                className={`h-full rounded-full ${(evaluation.resultat.score ?? 0) >= (evaluation.scoreMinimum || 50) ? "bg-green-500" : "bg-red-500"}`}
+                className={`h-full rounded-full ${(evaluation.resultat.score) >= (evaluation.scoreMinimum || 50) ? "bg-green-500" : "bg-red-500"}`}
                 initial={{ width: 0 }}
-                animate={{ width: `${evaluation.resultat.score ?? 0}%` }}
+                animate={{ width: `${evaluation.resultat.score}%` }}
                 transition={{ duration: 0.8, delay: 0.2 }}
               />
             </div>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200 w-12 text-right">
-              {Math.round(evaluation.resultat.score ?? 0)}%
+              {Math.round(evaluation.resultat.score)}%
             </span>
           </div>
         </div>

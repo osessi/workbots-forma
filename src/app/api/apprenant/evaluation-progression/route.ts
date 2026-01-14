@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       where: {
         formationId: session.formation.id,
         type: {
-          in: ["POSITIONNEMENT", "EVALUATION_FINALE"],
+          in: ["POSITIONNEMENT", "FINALE"],
         },
       },
       include: {
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
 
     // Créer un map des évaluations par type
     const evaluationPositionnement = evaluationsFormation.find((e) => e.type === "POSITIONNEMENT");
-    const evaluationFinale = evaluationsFormation.find((e) => e.type === "EVALUATION_FINALE");
+    const evaluationFinale = evaluationsFormation.find((e) => e.type === "FINALE");
 
     // Construire les évaluations de progression
     interface EvaluationProgression {
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
       description: "Évaluez vos connaissances avant le début de la formation",
       statut: positionnementStatut,
       dateOuverture: positionnementDateOuverture?.toISOString() || null,
-      dateCompletion: positionnementResultat?.datePassage?.toISOString() || null,
+      dateCompletion: positionnementResultat?.completedAt?.toISOString() || null,
       score: positionnementResultat?.score || null,
       canAccess: positionnementCanAccess,
       evaluationId: evaluationPositionnement?.id || null,
@@ -233,7 +233,7 @@ export async function GET(request: NextRequest) {
       description: "Évaluez vos acquis à l'issue de la formation",
       statut: finaleStatut,
       dateOuverture: finaleDateOuverture?.toISOString() || null,
-      dateCompletion: finaleResultat?.datePassage?.toISOString() || null,
+      dateCompletion: finaleResultat?.completedAt?.toISOString() || null,
       score: finaleResultat?.score || null,
       canAccess: finaleCanAccess,
       evaluationId: evaluationFinale?.id || null,

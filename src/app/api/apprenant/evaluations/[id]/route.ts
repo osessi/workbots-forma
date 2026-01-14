@@ -72,13 +72,6 @@ export async function GET(
             titre: true,
           },
         },
-        module: {
-          select: {
-            id: true,
-            titre: true,
-            ordre: true,
-          },
-        },
         resultats: {
           where: {
             apprenantId,
@@ -136,7 +129,7 @@ export async function GET(
         questionsCount: questions.length,
         questions,
         formation: evaluation.formation,
-        module: evaluation.module,
+        moduleId: evaluation.moduleId,
       },
       resultat: resultat ? {
         id: resultat.id,

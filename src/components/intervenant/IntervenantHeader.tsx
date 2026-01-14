@@ -1,5 +1,11 @@
 "use client";
 
+// ===========================================
+// CORRECTIONS 490, 495: Header intervenant simplifié
+// ===========================================
+// 490: Logo agrandi (w-12 h-12)
+// 495: Sélecteur de session déplacé dans le menu gauche
+
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,7 +17,6 @@ import {
   Menu,
   X,
   Briefcase,
-  Check,
 } from "lucide-react";
 
 interface IntervenantHeaderProps {
@@ -26,37 +31,24 @@ export default function IntervenantHeader({
   const {
     intervenant,
     organization,
-    sessions,
-    selectedSession,
-    selectSession,
     logout,
   } = useIntervenantPortal();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isSessionSelectorOpen, setIsSessionSelectorOpen] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
-  const sessionRef = useRef<HTMLDivElement>(null);
 
-  // Fermer les dropdowns au clic extérieur
+  // Fermer le dropdown au clic extérieur
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
-      }
-      if (sessionRef.current && !sessionRef.current.contains(event.target as Node)) {
-        setIsSessionSelectorOpen(false);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleSelectSession = (sessionId: string) => {
-    selectSession(sessionId);
-    setIsSessionSelectorOpen(false);
-  };
 
   return (
     <header className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
@@ -75,93 +67,26 @@ export default function IntervenantHeader({
             )}
           </button>
 
-          {/* Logo organisation */}
+          {/* Logo organisation - Correction 490: Logo agrandi */}
           <Link href="/intervenant/accueil" className="flex items-center gap-3">
             {organization?.logoUrl ? (
-              <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-800 flex-shrink-0">
+              <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-800 flex-shrink-0">
                 <Image
                   src={organization.logoUrl}
                   alt={organization.nomCommercial || organization.name}
                   fill
-                  className="object-contain p-1"
+                  className="object-contain p-1.5"
                 />
               </div>
             ) : (
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                <Briefcase className="w-5 h-5 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                <Briefcase className="w-6 h-6 text-white" />
               </div>
             )}
           </Link>
         </div>
 
-        {/* Centre: Sélecteur de session (desktop) */}
-        {sessions.length > 0 && (
-          <div ref={sessionRef} className="hidden md:block relative">
-            <button
-              onClick={() => setIsSessionSelectorOpen(!isSessionSelectorOpen)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-700 transition-colors max-w-md"
-            >
-              <Briefcase className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-                {selectedSession?.formation.titre || "Sélectionner une session"}
-              </span>
-              <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
-                  isSessionSelectorOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {/* Dropdown sessions */}
-            {isSessionSelectorOpen && (
-              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-96 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="p-2 border-b border-gray-100 dark:border-gray-700">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
-                    Vos sessions de formation
-                  </p>
-                </div>
-                <div className="max-h-64 overflow-y-auto p-2">
-                  {sessions.map((session) => (
-                    <button
-                      key={session.id}
-                      onClick={() => handleSelectSession(session.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
-                        selectedSession?.id === session.id
-                          ? "bg-emerald-50 dark:bg-emerald-500/10"
-                          : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      }`}
-                    >
-                      {session.formation.image ? (
-                        <Image
-                          src={session.formation.image}
-                          alt={session.formation.titre}
-                          width={40}
-                          height={40}
-                          className="w-10 h-10 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900 dark:to-emerald-800 rounded-lg flex items-center justify-center">
-                          <Briefcase className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {session.formation.titre}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {session.reference} - {session.nombreApprenants} apprenant{session.nombreApprenants > 1 ? "s" : ""}
-                        </p>
-                      </div>
-                      {selectedSession?.id === session.id && (
-                        <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Correction 495: Sélecteur de session déplacé dans le menu gauche - Suppression du header */}
 
         {/* Droite: Profil */}
         <div ref={profileRef} className="relative">
@@ -238,28 +163,7 @@ export default function IntervenantHeader({
           )}
         </div>
       </div>
-
-      {/* Sélecteur de session mobile */}
-      {sessions.length > 0 && (
-        <div className="md:hidden px-4 pb-3">
-          <button
-            onClick={() => setIsSessionSelectorOpen(!isSessionSelectorOpen)}
-            className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Briefcase className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-                {selectedSession?.formation.titre || "Sélectionner"}
-              </span>
-            </div>
-            <ChevronDown
-              className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
-                isSessionSelectorOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-        </div>
-      )}
+      {/* Correction 495: Sélecteur de session mobile déplacé dans le menu gauche */}
     </header>
   );
 }

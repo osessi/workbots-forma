@@ -1,7 +1,13 @@
 "use client";
 
+// ===========================================
+// CORRECTIONS 495: Sélecteur de session dans sidebar
+// ===========================================
+// 495: Sélecteur de session ajouté en haut du menu gauche
+
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import {
@@ -17,7 +23,10 @@ import {
   Loader2,
   MessageCircle,
   ClipboardList,
-  MessageSquare, // Correction 431
+  MessageSquare,
+  ChevronDown,
+  Check,
+  Briefcase,
 } from "lucide-react";
 
 interface NavItem {
@@ -38,12 +47,19 @@ export default function IntervenantSidebar({
   onClose,
 }: IntervenantSidebarProps) {
   const pathname = usePathname();
-  const { dashboardStats, intervenant, organization, token } = useIntervenantPortal();
+  const { dashboardStats, intervenant, organization, token, sessions, selectedSession, selectSession } = useIntervenantPortal();
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactMessage, setContactMessage] = useState("");
   const [contactSubject, setContactSubject] = useState("question");
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
+  const [isSessionSelectorOpen, setIsSessionSelectorOpen] = useState(false);
+
+  // Correction 495: Fonction pour sélectionner une session
+  const handleSelectSession = (sessionId: string) => {
+    selectSession(sessionId);
+    setIsSessionSelectorOpen(false);
+  };
 
   const handleSendMessage = async () => {
     if (!contactMessage.trim() || !token) return;
@@ -187,6 +203,94 @@ export default function IntervenantSidebar({
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
+      {/* Correction 495: Sélecteur de session en haut du menu */}
+      {sessions.length > 0 && (
+        <div className="px-3 pt-4 pb-2">
+          <div className="relative">
+            <button
+              onClick={() => setIsSessionSelectorOpen(!isSessionSelectorOpen)}
+              className="w-full flex items-center gap-3 px-3 py-3 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl border border-emerald-200 dark:border-emerald-500/30 transition-colors"
+            >
+              {selectedSession?.formation.image ? (
+                <Image
+                  src={selectedSession.formation.image}
+                  alt={selectedSession.formation.titre}
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  Session sélectionnée
+                </p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {selectedSession?.formation.titre || "Sélectionner"}
+                </p>
+              </div>
+              <ChevronDown
+                className={`w-5 h-5 text-emerald-500 flex-shrink-0 transition-transform ${
+                  isSessionSelectorOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {/* Dropdown sessions */}
+            {isSessionSelectorOpen && (
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-2 border-b border-gray-100 dark:border-gray-700">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
+                    Vos sessions
+                  </p>
+                </div>
+                <div className="max-h-64 overflow-y-auto p-2">
+                  {sessions.map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => handleSelectSession(session.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left ${
+                        selectedSession?.id === session.id
+                          ? "bg-emerald-50 dark:bg-emerald-500/10"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      }`}
+                    >
+                      {session.formation.image ? (
+                        <Image
+                          src={session.formation.image}
+                          alt={session.formation.titre}
+                          width={36}
+                          height={36}
+                          className="w-9 h-9 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900 dark:to-emerald-800 rounded-lg flex items-center justify-center">
+                          <Briefcase className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {session.formation.titre}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {session.nombreApprenants} apprenant{session.nombreApprenants > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      {selectedSession?.id === session.id && (
+                        <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Navigation principale */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {/* Section principale */}

@@ -1,6 +1,15 @@
 "use client";
 
-import React from "react";
+// ===========================================
+// CORRECTIONS 491-497: Tableau de bord intervenant
+// ===========================================
+// 491: Encart "Session en cours" - ne pas afficher si terminée
+// 492: Tuiles stats = Sessions planifiées/en cours/terminées/total
+// 494: Suppression bloc "Session active"
+// 496: Badges statut sessions synchronisés avec dates
+// 497: Pop-up détails session au clic
+
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
@@ -12,31 +21,170 @@ import {
   ArrowRight,
   Clock,
   MapPin,
-  ChevronRight,
   BookOpen,
   Star,
   FileText,
   Video,
-  Building2,
+  X,
+  CheckCircle2,
+  PlayCircle,
+  CalendarClock,
+  LayoutGrid,
 } from "lucide-react";
+
+// Types
+interface SessionJournee {
+  date: string;
+  heureDebutMatin?: string | null;
+  heureFinMatin?: string | null;
+  heureDebutAprem?: string | null;
+  heureFinAprem?: string | null;
+}
+
+interface SessionData {
+  id: string;
+  reference: string;
+  nom?: string | null;
+  dateDebut: string | null;
+  dateFin: string | null;
+  status: string;
+  nombreApprenants: number;
+  formation: {
+    titre: string;
+    image?: string | null;
+  };
+  lieu?: {
+    nom: string;
+    typeLieu?: string | null;
+    lienVisio?: string | null;
+  } | null;
+  journees?: SessionJournee[];
+  prochaineJournee?: SessionJournee | null;
+}
+
+// Correction 496: Calculer le statut réel basé sur les dates
+function getSessionRealStatus(session: SessionData): "planifiee" | "en_cours" | "terminee" {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Utiliser les journées pour déterminer les vraies dates
+  if (session.journees && session.journees.length > 0) {
+    const sortedJournees = [...session.journees].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const premiereJournee = new Date(sortedJournees[0].date);
+    premiereJournee.setHours(0, 0, 0, 0);
+    const derniereJournee = new Date(sortedJournees[sortedJournees.length - 1].date);
+    derniereJournee.setHours(23, 59, 59, 999);
+
+    if (today > derniereJournee) {
+      return "terminee";
+    }
+    if (today >= premiereJournee && today <= derniereJournee) {
+      return "en_cours";
+    }
+    return "planifiee";
+  }
+
+  // Fallback sur dateDebut/dateFin
+  if (session.dateDebut) {
+    const dateDebut = new Date(session.dateDebut);
+    dateDebut.setHours(0, 0, 0, 0);
+
+    if (session.dateFin) {
+      const dateFin = new Date(session.dateFin);
+      dateFin.setHours(23, 59, 59, 999);
+
+      if (today > dateFin) {
+        return "terminee";
+      }
+      if (today >= dateDebut && today <= dateFin) {
+        return "en_cours";
+      }
+    }
+
+    if (today < dateDebut) {
+      return "planifiee";
+    }
+  }
+
+  // Fallback sur le status existant
+  if (session.status === "EN_COURS") return "en_cours";
+  if (session.status === "TERMINEE") return "terminee";
+  return "planifiee";
+}
+
+// Correction 496: Badge config
+function getStatusBadge(status: "planifiee" | "en_cours" | "terminee") {
+  switch (status) {
+    case "en_cours":
+      return {
+        label: "En cours",
+        className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400",
+      };
+    case "terminee":
+      return {
+        label: "Terminée",
+        className: "bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400",
+      };
+    default:
+      return {
+        label: "Planifiée",
+        className: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
+      };
+  }
+}
 
 export default function IntervenantAccueilPage() {
   useRequireIntervenantAuth();
-  const { intervenant, dashboardStats, sessions, selectedSession, isLoading, selectSession } = useIntervenantPortal();
+  const { intervenant, dashboardStats, sessions, isLoading } = useIntervenantPortal();
+
+  // Correction 497: État pour la pop-up détails session
+  const [selectedSessionDetails, setSelectedSessionDetails] = useState<SessionData | null>(null);
+
+  // Correction 491 & 496: Calculer les stats réelles basées sur les dates
+  const sessionStats = React.useMemo(() => {
+    let planifiees = 0;
+    let enCours = 0;
+    let terminees = 0;
+
+    for (const session of sessions) {
+      const realStatus = getSessionRealStatus(session);
+      if (realStatus === "planifiee") planifiees++;
+      else if (realStatus === "en_cours") enCours++;
+      else if (realStatus === "terminee") terminees++;
+    }
+
+    return {
+      planifiees,
+      enCours,
+      terminees,
+      total: sessions.length,
+    };
+  }, [sessions]);
+
+  // Correction 491: Trouver la session réellement en cours pour le bandeau
+  const sessionEnCoursReelle = React.useMemo(() => {
+    for (const session of sessions) {
+      const realStatus = getSessionRealStatus(session);
+      if (realStatus === "en_cours") {
+        return session;
+      }
+    }
+    return null;
+  }, [sessions]);
 
   // Trouver la vraie prochaine journée parmi toutes les sessions (dans le futur uniquement)
   const prochaineJourneeGlobale = React.useMemo(() => {
-    const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let prochaine: { session: typeof sessions[0]; journee: NonNullable<typeof sessions[0]["prochaineJournee"]> } | null = null;
+    let prochaine: { session: SessionData; journee: SessionJournee } | null = null;
 
     for (const session of sessions) {
       if (session.prochaineJournee) {
         const journeeDate = new Date(session.prochaineJournee.date);
         journeeDate.setHours(0, 0, 0, 0);
-        // La prochaine session doit être strictement dans le futur (pas aujourd'hui)
         if (journeeDate > today) {
           if (!prochaine || journeeDate < new Date(prochaine.journee.date)) {
             prochaine = { session, journee: session.prochaineJournee };
@@ -48,36 +196,6 @@ export default function IntervenantAccueilPage() {
     return prochaine;
   }, [sessions]);
 
-  // Trouver la session active (en cours aujourd'hui)
-  const sessionActiveAujourdhui = React.useMemo(() => {
-    const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (const session of sessions) {
-      // Vérifier si la session a une journée aujourd'hui
-      if (session.journees) {
-        for (const journee of session.journees) {
-          const journeeDate = new Date(journee.date);
-          journeeDate.setHours(0, 0, 0, 0);
-          if (journeeDate.getTime() === today.getTime()) {
-            return { session, journee };
-          }
-        }
-      }
-      // Sinon vérifier si la prochaineJournee est aujourd'hui
-      if (session.prochaineJournee) {
-        const journeeDate = new Date(session.prochaineJournee.date);
-        journeeDate.setHours(0, 0, 0, 0);
-        if (journeeDate.getTime() === today.getTime()) {
-          return { session, journee: session.prochaineJournee };
-        }
-      }
-    }
-
-    return null;
-  }, [sessions]);
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -86,35 +204,31 @@ export default function IntervenantAccueilPage() {
     );
   }
 
-  // Stats cards
+  // Correction 492: Stats cards remplacées
   const statsCards = [
     {
-      label: "Sessions en cours",
-      value: dashboardStats?.sessionsEnCours || 0,
-      icon: Briefcase,
-      color: "emerald",
-      href: "/intervenant/programme",
-    },
-    {
-      label: "Apprenants",
-      value: dashboardStats?.totalApprenants || 0,
-      icon: Users,
-      color: "blue",
-      href: "/intervenant/apprenants",
-    },
-    {
-      label: "Émargements en attente",
-      value: dashboardStats?.emargementsEnAttente || 0,
-      icon: PenLine,
-      color: "amber",
-      href: "/intervenant/emargements",
-    },
-    {
       label: "Sessions planifiées",
-      value: dashboardStats?.sessionsAVenir || 0,
-      icon: Calendar,
+      value: sessionStats.planifiees,
+      icon: CalendarClock,
+      color: "blue",
+    },
+    {
+      label: "Sessions en cours",
+      value: sessionStats.enCours,
+      icon: PlayCircle,
+      color: "emerald",
+    },
+    {
+      label: "Sessions terminées",
+      value: sessionStats.terminees,
+      icon: CheckCircle2,
+      color: "gray",
+    },
+    {
+      label: "Total sessions",
+      value: sessionStats.total,
+      icon: LayoutGrid,
       color: "purple",
-      href: "/intervenant/calendrier",
     },
   ];
 
@@ -130,10 +244,10 @@ export default function IntervenantAccueilPage() {
         text: "text-blue-600 dark:text-blue-400",
         iconBg: "bg-blue-100 dark:bg-blue-500/20",
       },
-      amber: {
-        bg: "bg-amber-50 dark:bg-amber-500/10",
-        text: "text-amber-600 dark:text-amber-400",
-        iconBg: "bg-amber-100 dark:bg-amber-500/20",
+      gray: {
+        bg: "bg-gray-50 dark:bg-gray-500/10",
+        text: "text-gray-600 dark:text-gray-400",
+        iconBg: "bg-gray-100 dark:bg-gray-500/20",
       },
       purple: {
         bg: "bg-purple-50 dark:bg-purple-500/10",
@@ -151,6 +265,21 @@ export default function IntervenantAccueilPage() {
       day: "numeric",
       month: "short",
     });
+  };
+
+  const formatDateLong = (date: Date | string | null) => {
+    if (!date) return "Non défini";
+    return new Date(date).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  // Correction 497: Fonction pour ouvrir la pop-up détails
+  const handleOpenSessionDetails = (session: SessionData) => {
+    setSelectedSessionDetails(session);
   };
 
   return (
@@ -171,28 +300,33 @@ export default function IntervenantAccueilPage() {
               )}
             </p>
           </div>
-          {selectedSession && (
+          {/* Correction 491: N'afficher que si une session est REELLEMENT en cours */}
+          {sessionEnCoursReelle ? (
             <div className="bg-white/10 backdrop-blur rounded-xl p-4">
               <p className="text-xs text-emerald-100 mb-1">Session en cours</p>
-              <p className="font-semibold">{selectedSession.formation.titre}</p>
+              <p className="font-semibold">{sessionEnCoursReelle.formation.titre}</p>
               <p className="text-sm text-emerald-100">
-                {selectedSession.nombreApprenants} apprenant{selectedSession.nombreApprenants > 1 ? "s" : ""}
+                {sessionEnCoursReelle.nombreApprenants} apprenant{sessionEnCoursReelle.nombreApprenants > 1 ? "s" : ""}
               </p>
+            </div>
+          ) : (
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+              <p className="text-xs text-emerald-100 mb-1">Session en cours</p>
+              <p className="font-medium text-emerald-50 italic">Aucune session en cours</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Correction 492: Stats Grid avec nouvelles tuiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statsCards.map((stat) => {
           const colorClasses = getColorClasses(stat.color);
           const Icon = stat.icon;
           return (
-            <Link
+            <div
               key={stat.label}
-              href={stat.href}
-              className={`${colorClasses.bg} rounded-xl p-4 hover:scale-[1.02] transition-transform`}
+              className={`${colorClasses.bg} rounded-xl p-4`}
             >
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 ${colorClasses.iconBg} rounded-lg flex items-center justify-center`}>
@@ -207,7 +341,7 @@ export default function IntervenantAccueilPage() {
                   </p>
                 </div>
               </div>
-            </Link>
+            </div>
           );
         })}
       </div>
@@ -221,7 +355,7 @@ export default function IntervenantAccueilPage() {
               Mes sessions
             </h2>
             <Link
-              href="/intervenant/programme"
+              href="/intervenant/calendrier"
               className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
             >
               Voir tout
@@ -238,84 +372,83 @@ export default function IntervenantAccueilPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {sessions.slice(0, 4).map((session) => (
-                <Link
-                  key={session.id}
-                  href={`/intervenant/programme?session=${session.id}`}
-                  onClick={() => selectSession(session.id)}
-                  className="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
-                >
-                  <div className="flex gap-4">
-                    {/* Image formation */}
-                    <div className="flex-shrink-0">
-                      {session.formation.image ? (
-                        <Image
-                          src={session.formation.image}
-                          alt={session.formation.titre}
-                          width={80}
-                          height={80}
-                          className="w-20 h-20 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900 dark:to-emerald-800 rounded-lg flex items-center justify-center">
-                          <BookOpen className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                      )}
-                    </div>
+              {sessions.slice(0, 4).map((session) => {
+                // Correction 496: Utiliser le statut réel
+                const realStatus = getSessionRealStatus(session);
+                const badge = getStatusBadge(realStatus);
 
-                    {/* Infos */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                            {session.formation.titre}
-                          </h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {session.reference}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            session.status === "EN_COURS"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
-                              : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400"
-                          }`}
-                        >
-                          {session.status === "EN_COURS" ? "En cours" : "Planifiée"}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          {session.nombreApprenants} apprenant{session.nombreApprenants > 1 ? "s" : ""}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {formatDate(session.dateDebut)}
-                        </span>
-                        {session.lieu && (
-                          <span className="flex items-center gap-1">
-                            {session.lieu.typeLieu === "DISTANCIEL" ? (
-                              <Video className="w-4 h-4" />
-                            ) : (
-                              <MapPin className="w-4 h-4" />
-                            )}
-                            {session.lieu.nom}
-                          </span>
+                return (
+                  // Correction 497: Au clic, ouvrir pop-up au lieu de rediriger
+                  <button
+                    key={session.id}
+                    onClick={() => handleOpenSessionDetails(session)}
+                    className="w-full text-left block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-emerald-300 dark:hover:border-emerald-600 transition-colors"
+                  >
+                    <div className="flex gap-4">
+                      {/* Image formation */}
+                      <div className="flex-shrink-0">
+                        {session.formation.image ? (
+                          <Image
+                            src={session.formation.image}
+                            alt={session.formation.titre}
+                            width={80}
+                            height={80}
+                            className="w-20 h-20 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900 dark:to-emerald-800 rounded-lg flex items-center justify-center">
+                            <BookOpen className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+                          </div>
                         )}
                       </div>
-                    </div>
 
-                    <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0 self-center" />
-                  </div>
-                </Link>
-              ))}
+                      {/* Infos */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                              {session.formation.titre}
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {session.reference}
+                            </p>
+                          </div>
+                          {/* Correction 496: Badge synchronisé */}
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${badge.className}`}>
+                            {badge.label}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Users className="w-4 h-4" />
+                            {session.nombreApprenants} apprenant{session.nombreApprenants > 1 ? "s" : ""}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {formatDate(session.dateDebut)}
+                          </span>
+                          {session.lieu && (
+                            <span className="flex items-center gap-1">
+                              {session.lieu.typeLieu === "DISTANCIEL" ? (
+                                <Video className="w-4 h-4" />
+                              ) : (
+                                <MapPin className="w-4 h-4" />
+                              )}
+                              {session.lieu.nom}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Sidebar */}
+        {/* Sidebar - Correction 494: Suppression du bloc "Session active" */}
         <div className="space-y-4">
           {/* Accès rapide */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
@@ -408,52 +541,171 @@ export default function IntervenantAccueilPage() {
             </div>
           )}
 
-          {/* Session active aujourd'hui */}
-          {sessionActiveAujourdhui ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-emerald-200 dark:border-emerald-500/30 p-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-emerald-500" />
-                Session active
-              </h3>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-600 dark:text-gray-300">
-                  <span className="font-medium">{sessionActiveAujourdhui.session.formation.titre}</span>
-                </p>
-                <p className="text-gray-500 dark:text-gray-400">
-                  Réf: {sessionActiveAujourdhui.session.reference}
-                </p>
-                <p className="text-gray-500 dark:text-gray-400">
-                  {sessionActiveAujourdhui.session.nombreApprenants} participant{sessionActiveAujourdhui.session.nombreApprenants > 1 ? "s" : ""}
-                </p>
-                <div className="text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-700 mt-2">
-                  <p>
-                    Matin : {sessionActiveAujourdhui.journee.heureDebutMatin || "09:00"} – {sessionActiveAujourdhui.journee.heureFinMatin || "12:30"}
-                  </p>
-                  <p>
-                    Après-midi : {sessionActiveAujourdhui.journee.heureDebutAprem || "14:00"} – {sessionActiveAujourdhui.journee.heureFinAprem || "17:30"}
-                  </p>
-                </div>
-                {sessionActiveAujourdhui.session.lieu && (
-                  <p className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    {sessionActiveAujourdhui.session.lieu.nom}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-gray-400" />
-                Session active
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                Aucune session en cours aujourd&apos;hui
-              </p>
-            </div>
-          )}
+          {/* Correction 494: Bloc "Session active" SUPPRIMÉ */}
         </div>
       </div>
+
+      {/* Correction 497: Pop-up détails session */}
+      {selectedSessionDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setSelectedSessionDetails(null)}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Détails de la session
+              </h3>
+              <button
+                onClick={() => setSelectedSessionDetails(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {/* Formation */}
+              <div className="flex gap-4">
+                {selectedSessionDetails.formation.image ? (
+                  <Image
+                    src={selectedSessionDetails.formation.image}
+                    alt={selectedSessionDetails.formation.titre}
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900 dark:to-emerald-800 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                )}
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white">
+                    {selectedSessionDetails.formation.titre}
+                  </h4>
+                  {selectedSessionDetails.nom && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {selectedSessionDetails.nom}
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Réf: {selectedSessionDetails.reference}
+                  </p>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+                <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Dates de session
+                </h5>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Début</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatDateLong(selectedSessionDetails.dateDebut)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Fin</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatDateLong(selectedSessionDetails.dateFin)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Planning journées */}
+              {selectedSessionDetails.journees && selectedSessionDetails.journees.length > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+                  <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Planning des journées
+                  </h5>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {selectedSessionDetails.journees.map((journee, idx) => (
+                      <div key={idx} className="text-sm">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          Jour {idx + 1} : {formatDateLong(journee.date)}
+                        </p>
+                        <p className="text-gray-500 dark:text-gray-400 text-xs">
+                          Matin : {journee.heureDebutMatin || "09:00"} – {journee.heureFinMatin || "12:30"} |
+                          Après-midi : {journee.heureDebutAprem || "14:00"} – {journee.heureFinAprem || "17:30"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Infos complémentaires */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Modalité */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Modalité</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                    {selectedSessionDetails.lieu?.typeLieu === "DISTANCIEL" ? (
+                      <>
+                        <Video className="w-4 h-4 text-blue-500" />
+                        Distanciel
+                      </>
+                    ) : selectedSessionDetails.lieu?.typeLieu === "MIXTE" ? (
+                      <>
+                        <MapPin className="w-4 h-4 text-purple-500" />
+                        Mixte
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-4 h-4 text-emerald-500" />
+                        Présentiel
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                {/* Apprenants */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Apprenants</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                    <Users className="w-4 h-4 text-blue-500" />
+                    {selectedSessionDetails.nombreApprenants} participant{selectedSessionDetails.nombreApprenants > 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+
+              {/* Lieu */}
+              {selectedSessionDetails.lieu && (
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    {selectedSessionDetails.lieu.typeLieu === "DISTANCIEL" ? "Lien visio" : "Lieu"}
+                  </p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {selectedSessionDetails.lieu.lienVisio || selectedSessionDetails.lieu.nom}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end p-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setSelectedSessionDetails(null)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

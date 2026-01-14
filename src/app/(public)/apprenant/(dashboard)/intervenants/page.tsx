@@ -2,16 +2,14 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
 import {
-  User,
-  Mail,
-  Phone,
-  Briefcase,
   Award,
   Loader2,
   AlertCircle,
   Users,
+  MessageSquare,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -33,10 +31,20 @@ interface IntervenantsData {
 }
 
 // =====================================
-// COMPOSANT INTERVENANT CARD
+// Correction 475 & 476: COMPOSANT INTERVENANT CARD
 // =====================================
 
-function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; index: number }) {
+function IntervenantCard({
+  intervenant,
+  index,
+  onContact,
+}: {
+  intervenant: Intervenant;
+  index: number;
+  onContact: (intervenant: Intervenant) => void;
+}) {
+  const [imageError, setImageError] = useState(false);
+
   const getRoleBadge = () => {
     switch (intervenant.role) {
       case "formateur":
@@ -79,9 +87,9 @@ function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; ind
           <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-white transform -translate-x-1/2 translate-y-1/2" />
         </div>
 
-        {/* Photo */}
+        {/* Correction 475: Photo de l'intervenant */}
         <div className="absolute -bottom-12 left-1/2 -translate-x-1/2">
-          {intervenant.photoUrl ? (
+          {intervenant.photoUrl && !imageError ? (
             <Image
               src={intervenant.photoUrl}
               alt={`${intervenant.prenom} ${intervenant.nom}`}
@@ -89,12 +97,13 @@ function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; ind
               height={96}
               className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 object-cover shadow-lg"
               unoptimized
+              onError={() => setImageError(true)}
             />
           ) : (
             <div className="w-24 h-24 rounded-full border-4 border-white dark:border-gray-800 bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-lg">
               <span className="text-2xl font-bold text-white">
-                {intervenant.prenom[0]}
-                {intervenant.nom[0]}
+                {intervenant.prenom?.[0] || ""}
+                {intervenant.nom?.[0] || ""}
               </span>
             </div>
           )}
@@ -103,7 +112,7 @@ function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; ind
 
       {/* Contenu */}
       <div className="pt-14 px-6 pb-6">
-        {/* Nom et rôle */}
+        {/* Correction 475: Nom + prénom et rôle */}
         <div className="text-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {intervenant.prenom} {intervenant.nom}
@@ -125,7 +134,7 @@ function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; ind
           </p>
         )}
 
-        {/* Spécialités */}
+        {/* Correction 475: Spécialités */}
         {intervenant.specialites && intervenant.specialites.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
@@ -147,26 +156,15 @@ function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; ind
           </div>
         )}
 
-        {/* Contact */}
-        <div className="space-y-2 pt-4 border-t border-gray-100 dark:border-gray-700">
-          {intervenant.email && (
-            <a
-              href={`mailto:${intervenant.email}`}
-              className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-            >
-              <Mail className="w-4 h-4" />
-              <span className="truncate">{intervenant.email}</span>
-            </a>
-          )}
-          {intervenant.telephone && (
-            <a
-              href={`tel:${intervenant.telephone}`}
-              className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-            >
-              <Phone className="w-4 h-4" />
-              {intervenant.telephone}
-            </a>
-          )}
+        {/* Correction 476: Bouton Contacter */}
+        <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+          <button
+            onClick={() => onContact(intervenant)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium rounded-xl hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Contacter
+          </button>
         </div>
       </div>
     </motion.div>
@@ -178,6 +176,7 @@ function IntervenantCard({ intervenant, index }: { intervenant: Intervenant; ind
 // =====================================
 
 export default function IntervenantsPage() {
+  const router = useRouter();
   // Correction 430: Utiliser selectedSession pour filtrer par session
   const { token, selectedSession } = useApprenantPortal();
   const [data, setData] = useState<IntervenantsData | null>(null);
@@ -191,7 +190,7 @@ export default function IntervenantsPage() {
       try {
         setLoading(true);
         const params = new URLSearchParams({ token });
-        // Correction 430: Filtrer par sessionId au lieu de inscriptionId
+        // Correction 475: Filtrer par sessionId
         if (selectedSession?.sessionId) {
           params.append("sessionId", selectedSession.sessionId);
         }
@@ -212,6 +211,17 @@ export default function IntervenantsPage() {
 
     fetchIntervenants();
   }, [token, selectedSession?.sessionId]);
+
+  // Correction 476: Handler pour contacter l'intervenant via messagerie
+  const handleContactIntervenant = (intervenant: Intervenant) => {
+    // Rediriger vers la messagerie avec l'intervenant pré-sélectionné
+    const params = new URLSearchParams({
+      recipient: intervenant.id,
+      recipientType: "formateur",
+      recipientName: `${intervenant.prenom} ${intervenant.nom}`,
+    });
+    router.push(`/apprenant/messages?${params.toString()}`);
+  };
 
   if (loading) {
     return (
@@ -239,15 +249,17 @@ export default function IntervenantsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
+        {/* Correction 473: Titre "Intervenant(s)" */}
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Intervenants
+          Intervenant(s)
         </h1>
+        {/* Correction 474: Nouveau sous-titre */}
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Les experts qui vous accompagnent dans votre formation
+          Retrouvez les intervenants associés à votre session de formation.
         </p>
       </div>
 
-      {/* Liste des intervenants */}
+      {/* Correction 475: Liste des intervenants de la session */}
       {data?.intervenants && data.intervenants.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.intervenants.map((intervenant, index) => (
@@ -255,6 +267,7 @@ export default function IntervenantsPage() {
               key={intervenant.id}
               intervenant={intervenant}
               index={index}
+              onContact={handleContactIntervenant}
             />
           ))}
         </div>
@@ -262,7 +275,9 @@ export default function IntervenantsPage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-12 text-center">
           <Users className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <p className="text-gray-500 dark:text-gray-400">
-            Aucun intervenant disponible pour le moment
+            {selectedSession
+              ? "Aucun intervenant assigné à cette session pour le moment."
+              : "Sélectionnez une session pour voir les intervenants associés."}
           </p>
         </div>
       )}

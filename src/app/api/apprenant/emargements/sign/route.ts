@@ -2,6 +2,7 @@
 // API SIGNATURE EMARGEMENT - POST /api/apprenant/emargements/sign
 // ===========================================
 // Permet à l'apprenant de signer une feuille d'émargement
+// Utilise le NOUVEAU système (FeuilleEmargementNew + SignatureEmargementNew)
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
@@ -34,7 +35,8 @@ function decodeApprenantToken(token: string): { apprenantId: string; organizatio
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { token, feuilleId, periode, signature } = body;
+    // Accepter feuilleId OU journeeId pour créer la feuille automatiquement
+    const { token, feuilleId, journeeId, periode, signature } = body;
 
     if (!token) {
       return NextResponse.json(
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!feuilleId || !periode || !signature) {
+    if ((!feuilleId && !journeeId) || !periode || !signature) {
       return NextResponse.json(
         { error: "Données manquantes" },
         { status: 400 }
@@ -68,18 +70,22 @@ export async function POST(request: NextRequest) {
 
     const { apprenantId } = decoded;
 
-    // Vérifier que la feuille existe
-    const feuille = await prisma.feuilleEmargement.findUnique({
-      where: { id: feuilleId },
-      include: {
-        journee: {
-          include: {
-            session: {
-              include: {
-                clients: {
-                  include: {
-                    participants: {
-                      where: { apprenantId },
+    let feuille;
+
+    if (feuilleId) {
+      // Mode classique: utiliser la feuille existante (NOUVEAU système)
+      feuille = await prisma.feuilleEmargementNew.findUnique({
+        where: { id: feuilleId },
+        include: {
+          journee: {
+            include: {
+              session: {
+                include: {
+                  clients: {
+                    include: {
+                      participants: {
+                        where: { apprenantId },
+                      },
                     },
                   },
                 },
@@ -87,14 +93,107 @@ export async function POST(request: NextRequest) {
             },
           },
         },
-      },
-    });
+      });
 
-    if (!feuille) {
-      return NextResponse.json(
-        { error: "Feuille d'émargement non trouvée" },
-        { status: 404 }
-      );
+      if (!feuille) {
+        return NextResponse.json(
+          { error: "Feuille d'émargement non trouvée" },
+          { status: 404 }
+        );
+      }
+    } else {
+      // Créer la feuille automatiquement si elle n'existe pas
+      // Vérifier que la journée existe (NOUVEAU système: SessionJourneeNew)
+      const journee = await prisma.sessionJourneeNew.findUnique({
+        where: { id: journeeId },
+        include: {
+          session: {
+            include: {
+              clients: {
+                include: {
+                  participants: {
+                    where: { apprenantId },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!journee) {
+        return NextResponse.json(
+          { error: "Journée non trouvée" },
+          { status: 404 }
+        );
+      }
+
+      // Vérifier que l'apprenant participe à la session
+      let participantFound = false;
+      for (const client of journee.session.clients) {
+        if (client.participants.length > 0) {
+          participantFound = true;
+          break;
+        }
+      }
+
+      if (!participantFound) {
+        return NextResponse.json(
+          { error: "Vous n'êtes pas inscrit à cette session" },
+          { status: 403 }
+        );
+      }
+
+      // Chercher ou créer la feuille d'émargement (NOUVEAU système)
+      const existingFeuille = await prisma.feuilleEmargementNew.findFirst({
+        where: { journeeId },
+        include: {
+          journee: {
+            include: {
+              session: {
+                include: {
+                  clients: {
+                    include: {
+                      participants: {
+                        where: { apprenantId },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (existingFeuille) {
+        feuille = existingFeuille;
+      } else {
+        // Créer la feuille automatiquement (NOUVEAU système)
+        const newFeuille = await prisma.feuilleEmargementNew.create({
+          data: {
+            journeeId,
+          },
+          include: {
+            journee: {
+              include: {
+                session: {
+                  include: {
+                    clients: {
+                      include: {
+                        participants: {
+                          where: { apprenantId },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        feuille = newFeuille;
+      }
     }
 
     // Trouver le participant correspondant à l'apprenant
@@ -114,10 +213,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérifier si la signature existe déjà
-    const existingSignature = await prisma.signatureEmargement.findFirst({
+    // Vérifier si la signature existe déjà (NOUVEAU système)
+    const existingSignature = await prisma.signatureEmargementNew.findFirst({
       where: {
-        feuilleId,
+        feuilleId: feuille.id,
         participantId,
         periode,
       },
@@ -130,16 +229,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Créer la signature
-    const newSignature = await prisma.signatureEmargement.create({
+    // Créer la signature (NOUVEAU système)
+    const newSignature = await prisma.signatureEmargementNew.create({
       data: {
-        feuilleId,
+        feuilleId: feuille.id,
         participantId,
+        typeSignataire: "apprenant",
         periode,
         signatureData: signature,
         signedAt: new Date(),
         ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null,
-        userAgent: request.headers.get("user-agent") || null,
       },
     });
 

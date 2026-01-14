@@ -8,12 +8,18 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
 // Correction 453: Constantes de configuration
 const EVAL_CHAUD_HOURS_BEFORE_END = 2; // Heures avant la fin de la session
 const EVAL_FROID_MONTHS_AFTER = 3; // Mois après la fin de la session
+
+// Génère un token unique pour l'évaluation de satisfaction
+function generateSatisfactionToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
 
 // Décoder et valider le token apprenant
 function decodeApprenantToken(token: string): { apprenantId: string; organizationId: string } | null {
@@ -164,8 +170,15 @@ export async function GET(request: NextRequest) {
     });
 
     // Créer un map par type
-    const evalChaud = existingEvaluations.find(e => e.type === "CHAUD");
-    const evalFroid = existingEvaluations.find(e => e.type === "FROID");
+    let evalChaud = existingEvaluations.find(e => e.type === "CHAUD");
+    let evalFroid = existingEvaluations.find(e => e.type === "FROID");
+
+    // Récupérer l'organizationId depuis la session
+    const sessionWithOrg = await prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { organizationId: true },
+    });
+    const organizationId = sessionWithOrg?.organizationId;
 
     // Correction 452-455: Construire les 2 évaluations (toujours affichées)
     const evaluations: FormattedSatisfaction[] = [];
@@ -186,6 +199,29 @@ export async function GET(request: NextRequest) {
       } else if (now >= chaudDateOuverture) {
         chaudStatut = "disponible";
         chaudIsAvailable = true;
+
+        // Correction: Créer automatiquement l'évaluation si elle n'existe pas et qu'on a les permissions
+        if (!evalChaud && organizationId) {
+          const newToken = generateSatisfactionToken();
+          evalChaud = await prisma.evaluationSatisfaction.create({
+            data: {
+              apprenantId,
+              sessionId,
+              organizationId,
+              type: "CHAUD",
+              token: newToken,
+              status: "PENDING",
+            },
+            include: {
+              reponse: {
+                select: {
+                  noteGlobale: true,
+                  scoreMoyen: true,
+                },
+              },
+            },
+          });
+        }
       }
     }
 
@@ -219,6 +255,29 @@ export async function GET(request: NextRequest) {
       } else if (now >= froidDateOuverture) {
         froidStatut = "disponible";
         froidIsAvailable = true;
+
+        // Correction: Créer automatiquement l'évaluation si elle n'existe pas
+        if (!evalFroid && organizationId) {
+          const newToken = generateSatisfactionToken();
+          evalFroid = await prisma.evaluationSatisfaction.create({
+            data: {
+              apprenantId,
+              sessionId,
+              organizationId,
+              type: "FROID",
+              token: newToken,
+              status: "PENDING",
+            },
+            include: {
+              reponse: {
+                select: {
+                  noteGlobale: true,
+                  scoreMoyen: true,
+                },
+              },
+            },
+          });
+        }
       }
     }
 

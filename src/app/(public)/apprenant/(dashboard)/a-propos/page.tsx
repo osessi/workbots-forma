@@ -1,5 +1,17 @@
 "use client";
 
+// ===========================================
+// CORRECTIONS 461-468: Page "À propos"
+// ===========================================
+// 461: Afficher adresse complète (code postal + ville)
+// 462: Corriger lien "Visiter le site web" (404)
+// 463: Renommer "Certifications" → "Informations légales" + bouton certificat
+// 464: Reformuler sous-titre "Notre équipe"
+// 465: Corriger affichage photos organigramme
+// 466: Forcer libellés rôles sur une ligne
+// 467: Documents légaux: garder RI + CGV uniquement
+// 468: Ajuster sous-titres documents
+
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
@@ -17,6 +29,8 @@ import {
   Accessibility,
   GraduationCap,
   UserCircle,
+  Download,
+  Scale,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -38,20 +52,21 @@ interface OrganigrammePoste {
 
 // Couleurs et gradients par type de poste
 const POSTE_STYLES: Record<OrganigrammePoste["type"], { bg: string; text: string; gradient: string; icon: React.ReactNode }> = {
-  DIRIGEANT: { bg: "bg-purple-50 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", gradient: "from-purple-500 to-purple-600", icon: <UserCircle className="w-4 h-4" /> },
-  REFERENT_HANDICAP: { bg: "bg-blue-50 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300", gradient: "from-blue-500 to-blue-600", icon: <Accessibility className="w-4 h-4" /> },
-  REFERENT_PEDAGOGIQUE: { bg: "bg-green-50 dark:bg-green-900/30", text: "text-green-700 dark:text-green-300", gradient: "from-green-500 to-green-600", icon: <GraduationCap className="w-4 h-4" /> },
-  REFERENT_QUALITE: { bg: "bg-amber-50 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", gradient: "from-amber-500 to-amber-600", icon: <Award className="w-4 h-4" /> },
-  FORMATEUR: { bg: "bg-cyan-50 dark:bg-cyan-900/30", text: "text-cyan-700 dark:text-cyan-300", gradient: "from-cyan-500 to-cyan-600", icon: <GraduationCap className="w-4 h-4" /> },
-  ADMINISTRATIF: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300", gradient: "from-gray-500 to-gray-600", icon: <Users className="w-4 h-4" /> },
-  AUTRE: { bg: "bg-slate-100 dark:bg-slate-800", text: "text-slate-700 dark:text-slate-300", gradient: "from-slate-500 to-slate-600", icon: <Users className="w-4 h-4" /> },
+  DIRIGEANT: { bg: "bg-purple-50 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", gradient: "from-purple-500 to-purple-600", icon: <UserCircle className="w-3.5 h-3.5" /> },
+  REFERENT_HANDICAP: { bg: "bg-blue-50 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300", gradient: "from-blue-500 to-blue-600", icon: <Accessibility className="w-3.5 h-3.5" /> },
+  REFERENT_PEDAGOGIQUE: { bg: "bg-green-50 dark:bg-green-900/30", text: "text-green-700 dark:text-green-300", gradient: "from-green-500 to-green-600", icon: <GraduationCap className="w-3.5 h-3.5" /> },
+  REFERENT_QUALITE: { bg: "bg-amber-50 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", gradient: "from-amber-500 to-amber-600", icon: <Award className="w-3.5 h-3.5" /> },
+  FORMATEUR: { bg: "bg-cyan-50 dark:bg-cyan-900/30", text: "text-cyan-700 dark:text-cyan-300", gradient: "from-cyan-500 to-cyan-600", icon: <GraduationCap className="w-3.5 h-3.5" /> },
+  ADMINISTRATIF: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-700 dark:text-gray-300", gradient: "from-gray-500 to-gray-600", icon: <Users className="w-3.5 h-3.5" /> },
+  AUTRE: { bg: "bg-slate-100 dark:bg-slate-800", text: "text-slate-700 dark:text-slate-300", gradient: "from-slate-500 to-slate-600", icon: <Users className="w-3.5 h-3.5" /> },
 };
 
+// Correction 466: Labels plus courts pour tenir sur une ligne
 const POSTE_LABELS: Record<OrganigrammePoste["type"], string> = {
   DIRIGEANT: "Dirigeant",
-  REFERENT_HANDICAP: "Référent Handicap",
-  REFERENT_PEDAGOGIQUE: "Référent Pédagogique",
-  REFERENT_QUALITE: "Référent Qualité",
+  REFERENT_HANDICAP: "Réf. Handicap",
+  REFERENT_PEDAGOGIQUE: "Réf. Pédago.",
+  REFERENT_QUALITE: "Réf. Qualité",
   FORMATEUR: "Formateur",
   ADMINISTRATIF: "Administratif",
   AUTRE: "Équipe",
@@ -60,6 +75,8 @@ const POSTE_LABELS: Record<OrganigrammePoste["type"], string> = {
 // Composant carte de poste pyramidale
 function PyramidPosteCard({ poste, index }: { poste: OrganigrammePoste; index: number }) {
   const style = POSTE_STYLES[poste.type];
+  // Correction 465: État pour gérer les erreurs de chargement d'image
+  const [imageError, setImageError] = useState(false);
 
   return (
     <motion.div
@@ -73,38 +90,40 @@ function PyramidPosteCard({ poste, index }: { poste: OrganigrammePoste; index: n
 
       {/* Contenu */}
       <div className="p-4">
-        {/* Avatar */}
+        {/* Avatar - Correction 465: Gestion correcte des photos */}
         <div className="flex justify-center mb-3">
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-br ${style.gradient} text-white shadow-lg ring-3 ring-white dark:ring-gray-800`}>
-            {poste.photo ? (
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-br ${style.gradient} text-white shadow-lg ring-3 ring-white dark:ring-gray-800 overflow-hidden`}>
+            {poste.photo && !imageError ? (
               <Image
                 src={poste.photo}
                 alt={`${poste.prenom} ${poste.nom}`}
                 width={56}
                 height={56}
                 className="w-14 h-14 rounded-full object-cover"
+                onError={() => setImageError(true)}
+                unoptimized={poste.photo.startsWith("data:") || poste.photo.includes("blob:")}
               />
             ) : (
               <span className="text-lg font-bold">
-                {poste.prenom.charAt(0)}{poste.nom.charAt(0)}
+                {poste.prenom?.charAt(0) || ""}{poste.nom?.charAt(0) || ""}
               </span>
             )}
           </div>
         </div>
 
-        {/* Badge type */}
+        {/* Badge type - Correction 466: Forcer sur une ligne avec truncate */}
         <div className="flex justify-center mb-2">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-white dark:bg-gray-800 ${style.text} shadow-sm`}>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-white dark:bg-gray-800 ${style.text} shadow-sm whitespace-nowrap`}>
             {style.icon}
-            {POSTE_LABELS[poste.type]}
+            <span className="truncate max-w-[80px]">{POSTE_LABELS[poste.type]}</span>
           </span>
         </div>
 
         {/* Nom */}
-        <h4 className="text-center font-bold text-gray-900 dark:text-white text-sm">
+        <h4 className="text-center font-bold text-gray-900 dark:text-white text-sm truncate">
           {poste.prenom} {poste.nom}
         </h4>
-        <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+        <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
           {poste.titre}
         </p>
 
@@ -127,9 +146,10 @@ function PyramidPosteCard({ poste, index }: { poste: OrganigrammePoste; index: n
 // =====================================
 
 export default function AProposPage() {
-  const { organization, selectedInscription } = useApprenantPortal();
+  const { organization, selectedInscription, token } = useApprenantPortal();
   const [organigramme, setOrganigramme] = useState<OrganigrammePoste[]>([]);
   const [isLoadingOrg, setIsLoadingOrg] = useState(true);
+  const [documents, setDocuments] = useState<{ reglementInterieurUrl?: string; cgvUrl?: string }>({});
 
   // Charger l'organigramme
   useEffect(() => {
@@ -152,6 +172,31 @@ export default function AProposPage() {
     loadOrganigramme();
   }, [organization?.id]);
 
+  // Charger les documents légaux (RI et CGV)
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!token) return;
+
+      try {
+        const response = await fetch(`/api/apprenant/documents?token=${token}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Chercher le règlement intérieur et les CGV
+          const ri = data.documents?.find((d: { type: string; url: string }) => d.type === "REGLEMENT_INTERIEUR");
+          const cgv = data.documents?.find((d: { type: string; url: string }) => d.type === "CONDITIONS_GENERALES_VENTE");
+          setDocuments({
+            reglementInterieurUrl: ri?.url,
+            cgvUrl: cgv?.url,
+          });
+        }
+      } catch (error) {
+        console.error("Erreur chargement documents:", error);
+      }
+    };
+
+    loadDocuments();
+  }, [token]);
+
   // Organiser par niveau pour la pyramide
   const postesByLevel = organigramme.reduce((acc, poste) => {
     const level = poste.niveau || 0;
@@ -163,6 +208,27 @@ export default function AProposPage() {
   const levels = Object.keys(postesByLevel).map(Number).sort((a, b) => a - b);
 
   const LEVEL_LABELS = ["Direction", "Référents", "Équipe", "Support"];
+
+  // Correction 461: Formater l'adresse complète
+  const formatAdresseComplete = () => {
+    const parts = [];
+    if (organization?.adresse) parts.push(organization.adresse);
+    if (organization?.codePostal || organization?.ville) {
+      const localite = [organization.codePostal, organization.ville].filter(Boolean).join(" ");
+      if (localite) parts.push(localite);
+    }
+    return parts.join(", ");
+  };
+
+  // Correction 462: Formater l'URL du site web
+  const formatSiteWebUrl = (url: string | null | undefined): string => {
+    if (!url) return "";
+    // Ajouter https:// si l'URL ne commence pas par http:// ou https://
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      return `https://${url}`;
+    }
+    return url;
+  };
 
   return (
     <div className="space-y-6">
@@ -221,10 +287,11 @@ export default function AProposPage() {
                 Coordonnées
               </h3>
 
-              {organization?.adresse && (
+              {/* Correction 461: Adresse complète */}
+              {(organization?.adresse || organization?.codePostal || organization?.ville) && (
                 <div className="flex items-start gap-3 text-sm text-gray-600 dark:text-gray-300">
                   <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <span>{organization.adresse}</span>
+                  <span>{formatAdresseComplete()}</span>
                 </div>
               )}
 
@@ -248,9 +315,10 @@ export default function AProposPage() {
                 </a>
               )}
 
+              {/* Correction 462: Lien site web corrigé */}
               {organization?.siteWeb && (
                 <a
-                  href={organization.siteWeb}
+                  href={formatSiteWebUrl(organization.siteWeb)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 text-sm text-brand-600 dark:text-brand-400 hover:underline"
@@ -262,11 +330,11 @@ export default function AProposPage() {
               )}
             </div>
 
-            {/* Certifications */}
+            {/* Correction 463: Renommer "Certifications" en "Informations légales" */}
             <div className="space-y-4">
               <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Award className="w-5 h-5 text-brand-500" />
-                Certifications
+                <Scale className="w-5 h-5 text-brand-500" />
+                Informations légales
               </h3>
 
               {organization?.numeroFormateur && (
@@ -283,6 +351,26 @@ export default function AProposPage() {
                 </div>
               )}
 
+              {/* Correction 463: Bouton "Voir le certificat" */}
+              {organization?.certificatQualiopiUrl && (
+                <a
+                  href={organization.certificatQualiopiUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-500/10 rounded-lg hover:bg-green-100 dark:hover:bg-green-500/20 transition-colors"
+                >
+                  <Award className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <div className="flex-1">
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                      Certification Qualiopi
+                    </p>
+                    <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                      Voir le certificat
+                    </p>
+                  </div>
+                  <Download className="w-4 h-4 text-green-600 dark:text-green-400" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -315,14 +403,14 @@ export default function AProposPage() {
           transition={{ delay: 0.1 }}
           className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
         >
-          {/* Header */}
+          {/* Header - Correction 464: Nouveau sous-titre */}
           <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
             <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Users className="w-5 h-5 text-brand-500" />
               Notre équipe
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              L&apos;équipe à votre service pour votre réussite
+              Consultez les contacts et référents de votre organisme de formation.
             </p>
           </div>
 
@@ -386,68 +474,53 @@ export default function AProposPage() {
         </motion.div>
       )}
 
-      {/* Documents légaux */}
+      {/* Correction 467 & 468: Documents légaux - Seulement RI et CGV */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5 text-brand-500" />
           Documents légaux
         </h3>
         <div className="grid md:grid-cols-2 gap-3">
+          {/* Règlement intérieur - Correction 468: Nouveau sous-titre */}
           <a
-            href="#"
-            className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+            href={documents.reglementInterieurUrl || "#"}
+            target={documents.reglementInterieurUrl ? "_blank" : undefined}
+            rel={documents.reglementInterieurUrl ? "noopener noreferrer" : undefined}
+            className={`flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group ${!documents.reglementInterieurUrl ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 dark:text-white">
                 Règlement intérieur
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Consultez les règles de la formation
+                Consultez le règlement à respecter pendant la formation.
               </p>
             </div>
+            {documents.reglementInterieurUrl && (
+              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-brand-500" />
+            )}
           </a>
+
+          {/* CGV - Correction 467: Titre complet + Correction 468: Nouveau sous-titre */}
           <a
-            href="#"
-            className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+            href={documents.cgvUrl || "#"}
+            target={documents.cgvUrl ? "_blank" : undefined}
+            rel={documents.cgvUrl ? "noopener noreferrer" : undefined}
+            className={`flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group ${!documents.cgvUrl ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Conditions générales
+                Conditions générales de vente (CGV)
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                CGV et conditions de formation
+                Consultez les conditions générales de vente.
               </p>
             </div>
-          </a>
-          <a
-            href="#"
-            className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-          >
-            <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Politique de confidentialité
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Protection de vos données
-              </p>
-            </div>
-          </a>
-          <a
-            href="#"
-            className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-          >
-            <FileText className="w-5 h-5 text-gray-400 group-hover:text-brand-500" />
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Mentions légales
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Informations légales
-              </p>
-            </div>
+            {documents.cgvUrl && (
+              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-brand-500" />
+            )}
           </a>
         </div>
       </div>

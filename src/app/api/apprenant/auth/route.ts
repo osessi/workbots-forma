@@ -170,10 +170,15 @@ export async function GET(request: NextRequest) {
             nomCommercial: true,
             siret: true,
             adresse: true,
+            // Correction 461: Ajouter code postal et ville pour adresse complète
+            codePostal: true,
+            ville: true,
             email: true,
             telephone: true,
             siteWeb: true,
             numeroFormateur: true,
+            // Correction 463: URL du certificat Qualiopi
+            certificatQualiopiUrl: true,
           },
         },
         lmsInscriptions: {
@@ -390,10 +395,15 @@ export async function GET(request: NextRequest) {
         logoUrl: apprenant.organization.logo,
         siret: apprenant.organization.siret,
         adresse: apprenant.organization.adresse,
+        // Correction 461: Code postal et ville pour adresse complète
+        codePostal: apprenant.organization.codePostal,
+        ville: apprenant.organization.ville,
         email: apprenant.organization.email,
         telephone: apprenant.organization.telephone,
         siteWeb: apprenant.organization.siteWeb,
         numeroFormateur: apprenant.organization.numeroFormateur,
+        // Correction 463: URL certificat Qualiopi
+        certificatQualiopiUrl: apprenant.organization.certificatQualiopiUrl,
       },
       inscriptions: apprenant.lmsInscriptions.map(insc => ({
         id: insc.id,

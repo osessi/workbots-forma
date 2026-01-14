@@ -100,8 +100,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        // Résultats d'évaluation pour cet apprenant
-        evaluationResultats: true,
+        // Note: Les résultats d'évaluation sont récupérés séparément via prisma.evaluationResultat
       },
     });
 

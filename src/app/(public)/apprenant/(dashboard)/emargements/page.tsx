@@ -468,22 +468,18 @@ export default function EmargementsPage() {
   const handleSign = async (signature: string) => {
     if (!signingDemiJournee || !token || !data?.participantId) return;
 
-    // Vérifier qu'une feuille existe
-    if (!signingDemiJournee.feuilleId) {
-      setError("Impossible de signer : feuille d'émargement non créée pour cette journée.");
-      setSigningDemiJournee(null);
-      return;
-    }
-
     try {
       setSubmitting(true);
 
+      // Correction: Envoyer feuilleId si disponible, sinon journeeId pour création automatique
       const res = await fetch("/api/apprenant/emargements/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
-          feuilleId: signingDemiJournee.feuilleId,
+          ...(signingDemiJournee.feuilleId
+            ? { feuilleId: signingDemiJournee.feuilleId }
+            : { journeeId: signingDemiJournee.journeeId }),
           periode: signingDemiJournee.periode,
           signature,
         }),

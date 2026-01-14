@@ -111,8 +111,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Correction 441: Récupérer les feuilles d'émargement séparément pour la session
-    const feuillesEmargement = await prisma.feuilleEmargement.findMany({
+    // Correction 441: Récupérer les feuilles d'émargement du NOUVEAU système
+    // Les journées viennent de SessionJourneeNew, donc on utilise FeuilleEmargementNew
+    const feuillesEmargement = await prisma.feuilleEmargementNew.findMany({
       where: {
         journee: {
           sessionId: session.id,

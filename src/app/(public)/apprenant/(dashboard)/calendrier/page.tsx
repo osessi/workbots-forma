@@ -12,8 +12,15 @@ import {
   Loader2,
   AlertCircle,
   Calendar as CalendarIcon,
+  ClipboardCheck,
+  CheckCircle2,
+  ExternalLink,
+  Monitor,
+  Building,
+  Users,
 } from "lucide-react";
 
+// Correction 470: Types d'événements étendus
 interface CalendarEvent {
   id: string;
   date: string;
@@ -21,9 +28,15 @@ interface CalendarEvent {
   heureFin: string;
   sessionNom: string;
   sessionReference: string;
+  sessionId: string;
   lieu: string | null;
   formateur: string | null;
-  type: "formation" | "evaluation" | "autre";
+  modalite: string | null;
+  type: "formation" | "evaluation";
+  evaluationType?: "positionnement" | "finale" | "chaud" | "froid";
+  evaluationLabel?: string;
+  evaluationStatus?: "a_faire" | "en_cours" | "termine";
+  evaluationUrl?: string;
 }
 
 interface CalendarData {
@@ -63,8 +76,6 @@ function isSameDay(date1: Date, date2: Date) {
 
 function CalendarDay({
   day,
-  month,
-  year,
   events,
   isCurrentMonth,
   isToday,
@@ -72,15 +83,14 @@ function CalendarDay({
   onClick,
 }: {
   day: number;
-  month: number;
-  year: number;
   events: CalendarEvent[];
   isCurrentMonth: boolean;
   isToday: boolean;
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const hasEvents = events.length > 0;
+  const formationEvents = events.filter(e => e.type === "formation");
+  const evaluationEvents = events.filter(e => e.type === "evaluation");
 
   return (
     <button
@@ -90,7 +100,7 @@ function CalendarDay({
         ${isCurrentMonth ? "text-gray-900 dark:text-white" : "text-gray-400 dark:text-gray-600"}
         ${isToday ? "bg-brand-50 dark:bg-brand-500/10 font-bold" : ""}
         ${isSelected ? "ring-2 ring-brand-500" : ""}
-        ${hasEvents ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50" : ""}
+        ${events.length > 0 ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50" : ""}
       `}
     >
       <span
@@ -101,19 +111,18 @@ function CalendarDay({
         {day}
       </span>
 
-      {/* Indicateurs d'événements */}
-      {hasEvents && (
+      {/* Correction 471: Indicateurs d'événements multiples */}
+      {events.length > 0 && (
         <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-          {events.slice(0, 3).map((event, i) => (
+          {/* Indicateur formation (bleu) */}
+          {formationEvents.length > 0 && (
+            <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+          )}
+          {/* Indicateurs évaluations (ambre) - max 4 points */}
+          {evaluationEvents.slice(0, 4).map((_, i) => (
             <div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full ${
-                event.type === "formation"
-                  ? "bg-brand-500"
-                  : event.type === "evaluation"
-                  ? "bg-amber-500"
-                  : "bg-gray-400"
-              }`}
+              key={`eval-${i}`}
+              className="w-1.5 h-1.5 rounded-full bg-amber-500"
             />
           ))}
         </div>
@@ -123,10 +132,23 @@ function CalendarDay({
 }
 
 // =====================================
-// COMPOSANT ÉVÉNEMENT
+// Correction 472: COMPOSANT ÉVÉNEMENT FORMATION
 // =====================================
 
-function EventCard({ event }: { event: CalendarEvent }) {
+function FormationEventCard({ event }: { event: CalendarEvent }) {
+  const getModaliteIcon = () => {
+    switch (event.modalite?.toLowerCase()) {
+      case "presentiel":
+        return <Building className="w-4 h-4" />;
+      case "distanciel":
+        return <Monitor className="w-4 h-4" />;
+      case "mixte":
+        return <Users className="w-4 h-4" />;
+      default:
+        return <MapPin className="w-4 h-4" />;
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -135,39 +157,144 @@ function EventCard({ event }: { event: CalendarEvent }) {
     >
       <div className="flex items-start gap-3">
         {/* Badge type */}
-        <div
-          className={`w-2 h-full min-h-[60px] rounded-full flex-shrink-0 ${
-            event.type === "formation"
-              ? "bg-brand-500"
-              : event.type === "evaluation"
-              ? "bg-amber-500"
-              : "bg-gray-400"
-          }`}
-        />
+        <div className="w-1 h-full min-h-[80px] rounded-full flex-shrink-0 bg-brand-500" />
 
-        <div className="flex-1">
-          <h4 className="font-medium text-gray-900 dark:text-white">
+        <div className="flex-1 min-w-0">
+          {/* Nom de la formation */}
+          <h4 className="font-semibold text-gray-900 dark:text-white truncate">
             {event.sessionNom}
           </h4>
 
-          <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
-            <span className="flex items-center gap-1">
-              <Clock className="w-4 h-4" />
-              {event.heureDebut} - {event.heureFin}
-            </span>
-            {event.lieu && (
-              <span className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
-                {event.lieu}
-              </span>
+          {/* Référence session */}
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            Session : {event.sessionReference}
+          </p>
+
+          <div className="flex flex-col gap-2 mt-3 text-sm text-gray-600 dark:text-gray-300">
+            {/* Horaires */}
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span>{event.heureDebut} - {event.heureFin}</span>
+            </div>
+
+            {/* Modalité */}
+            {event.modalite && (
+              <div className="flex items-center gap-2">
+                {getModaliteIcon()}
+                <span className="capitalize">{event.modalite}</span>
+              </div>
             )}
+
+            {/* Lieu */}
+            {event.lieu && (
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-gray-400" />
+                <span>{event.lieu}</span>
+              </div>
+            )}
+
+            {/* Formateur */}
             {event.formateur && (
-              <span className="flex items-center gap-1">
-                <User className="w-4 h-4" />
-                {event.formateur}
-              </span>
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-gray-400" />
+                <span>{event.formateur}</span>
+              </div>
             )}
           </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// =====================================
+// Correction 472: COMPOSANT ÉVÉNEMENT ÉVALUATION
+// =====================================
+
+function EvaluationEventCard({ event }: { event: CalendarEvent }) {
+  const getStatusBadge = () => {
+    switch (event.evaluationStatus) {
+      case "termine":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">
+            <CheckCircle2 className="w-3 h-3" />
+            Terminé
+          </span>
+        );
+      case "en_cours":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
+            En cours
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+            À compléter
+          </span>
+        );
+    }
+  };
+
+  const getEvaluationDescription = () => {
+    switch (event.evaluationType) {
+      case "positionnement":
+        return "Évaluez vos connaissances avant la formation";
+      case "finale":
+        return "Évaluez vos acquis en fin de formation";
+      case "chaud":
+        return "Donnez votre avis sur la formation";
+      case "froid":
+        return "Évaluez l'impact de la formation";
+      default:
+        return "";
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4"
+    >
+      <div className="flex items-start gap-3">
+        {/* Badge type */}
+        <div className="w-1 h-full min-h-[60px] rounded-full flex-shrink-0 bg-amber-500" />
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              {/* Label évaluation */}
+              <h4 className="font-semibold text-gray-900 dark:text-white">
+                {event.evaluationLabel}
+              </h4>
+
+              {/* Formation associée */}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                {event.sessionNom}
+              </p>
+            </div>
+
+            {/* Status badge */}
+            {getStatusBadge()}
+          </div>
+
+          {/* Description */}
+          <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+            {getEvaluationDescription()}
+          </p>
+
+          {/* Bouton d'action */}
+          {event.evaluationStatus !== "termine" && event.evaluationUrl && (
+            <a
+              href={event.evaluationUrl}
+              className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium rounded-lg hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors text-sm"
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              Compléter l&apos;évaluation
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
         </div>
       </div>
     </motion.div>
@@ -179,7 +306,7 @@ function EventCard({ event }: { event: CalendarEvent }) {
 // =====================================
 
 export default function CalendrierPage() {
-  // Correction 430: Utiliser selectedSession pour filtrer par session
+  // Correction 469: Utiliser selectedSession pour filtrer par session
   const { token, selectedSession } = useApprenantPortal();
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -198,7 +325,7 @@ export default function CalendrierPage() {
       try {
         setLoading(true);
         const params = new URLSearchParams({ token });
-        // Correction 430: Filtrer par sessionId au lieu de inscriptionId
+        // Correction 469: Filtrer par sessionId
         if (selectedSession?.sessionId) {
           params.append("sessionId", selectedSession.sessionId);
         }
@@ -290,12 +417,15 @@ export default function CalendrierPage() {
     });
   }
 
-  // Filtrer les événements pour la date sélectionnée
+  // Correction 471 & 472: Filtrer et grouper les événements pour la date sélectionnée
   const selectedDateEvents = selectedDate
     ? data?.events.filter((event) =>
         isSameDay(new Date(event.date), selectedDate)
       ) || []
     : [];
+
+  const formationEvents = selectedDateEvents.filter(e => e.type === "formation");
+  const evaluationEvents = selectedDateEvents.filter(e => e.type === "evaluation");
 
   // Obtenir les événements pour un jour donné
   const getEventsForDay = (day: number, month: number, year: number) => {
@@ -333,8 +463,9 @@ export default function CalendrierPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Calendrier
           </h1>
+          {/* Correction 469: Nouveau sous-titre */}
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Vos prochains créneaux de formation
+            Consultez votre planning et vos évaluations à venir.
           </p>
         </div>
 
@@ -393,8 +524,6 @@ export default function CalendrierPage() {
                 <CalendarDay
                   key={index}
                   day={dayInfo.day}
-                  month={dayInfo.month}
-                  year={dayInfo.year}
                   events={events}
                   isCurrentMonth={dayInfo.isCurrentMonth}
                   isToday={isToday}
@@ -418,8 +547,8 @@ export default function CalendrierPage() {
           </div>
         </div>
 
-        {/* Événements du jour sélectionné */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
+        {/* Correction 472: Événements du jour sélectionné */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 max-h-[600px] overflow-y-auto">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {selectedDate
               ? selectedDate.toLocaleDateString("fr-FR", {
@@ -437,11 +566,37 @@ export default function CalendrierPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="space-y-3"
+                className="space-y-4"
               >
-                {selectedDateEvents.map((event) => (
-                  <EventCard key={event.id} event={event} />
-                ))}
+                {/* Section Formation */}
+                {formationEvents.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4" />
+                      Formation ({formationEvents.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {formationEvents.map((event) => (
+                        <FormationEventCard key={event.id} event={event} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section Évaluations */}
+                {evaluationEvents.length > 0 && (
+                  <div className={formationEvents.length > 0 ? "mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" : ""}>
+                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
+                      <ClipboardCheck className="w-4 h-4" />
+                      Évaluations ({evaluationEvents.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {evaluationEvents.map((event) => (
+                        <EvaluationEventCard key={event.id} event={event} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div

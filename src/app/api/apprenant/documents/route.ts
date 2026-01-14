@@ -49,7 +49,12 @@ const DOCUMENTS_ADMINISTRATIFS = [
   "CONVENTION", "CONTRAT_FORMATION", "CONVOCATION", "ATTESTATION_PRESENCE",
   "ATTESTATION_FIN", "CERTIFICAT", "FEUILLE_EMARGEMENT", "REGLEMENT_INTERIEUR",
   "CONDITIONS_GENERALES_VENTE", "FACTURE", "DEVIS", "EVALUATION_CHAUD",
-  "EVALUATION_FROID", "EVALUATION_INTERVENANT",
+  "EVALUATION_FROID",
+];
+
+// Correction: Types de documents exclus pour les apprenants (ne doivent pas voir)
+const EXCLUDED_DOCUMENT_TYPES = [
+  "EVALUATION_INTERVENANT", // Évaluation destinée aux intervenants, pas aux apprenants
 ];
 const SUPPORTS_FORMATION = [
   "FICHE_PEDAGOGIQUE", "PROGRAMME_FORMATION", "SLIDES",
@@ -306,6 +311,11 @@ export async function GET(request: NextRequest) {
         const sessionName = formatSessionName(session.reference, session.id, session.formation.titre);
 
         for (const doc of session.documentsGeneres) {
+          // Correction: Exclure les types de documents non destinés aux apprenants
+          if (EXCLUDED_DOCUMENT_TYPES.includes(doc.type)) {
+            continue;
+          }
+
           // Vérifier si ce document est pertinent pour cet apprenant
           let isRelevant = false;
           let isPersonalized = false;
@@ -503,6 +513,11 @@ export async function GET(request: NextRequest) {
         const sessionName = formatSessionName(null, session.id, session.formation?.titre || "Formation");
 
         for (const doc of session.documentsGeneres) {
+          // Correction: Exclure les types de documents non destinés aux apprenants
+          if (EXCLUDED_DOCUMENT_TYPES.includes(doc.type)) {
+            continue;
+          }
+
           // Correction 457: Même logique de filtrage améliorée
           let isRelevant = false;
           let isPersonalized = false;

@@ -14,10 +14,15 @@ interface Organization {
   logoUrl: string | null;
   siret: string | null;
   adresse: string | null;
+  // Correction 461: Code postal et ville pour adresse complète
+  codePostal: string | null;
+  ville: string | null;
   email: string | null;
   telephone: string | null;
   siteWeb: string | null;
   numeroFormateur: string | null;
+  // Correction 463: URL certificat Qualiopi
+  certificatQualiopiUrl: string | null;
 }
 
 interface Formation {

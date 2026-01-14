@@ -277,7 +277,7 @@ function LoginContent() {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="votre@email.com"
+                        placeholder="intervenant@gmail.com"
                         className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                         autoFocus
                         disabled={loading}
@@ -479,13 +479,8 @@ function LoginContent() {
         </div>
 
         {/* Powered by Workbots */}
-        <div className="flex items-center justify-center gap-2 mt-8 opacity-60">
-          <span className="text-xs text-gray-400 dark:text-gray-500">Propulsé par</span>
-          <img
-            src="/logo-workbots.svg"
-            alt="Workbots"
-            className="h-4 dark:invert dark:opacity-70"
-          />
+        <div className="flex items-center justify-center mt-8">
+          <span className="text-xs text-gray-400 dark:text-gray-500">Propulsé par Workbots Formations</span>
         </div>
       </motion.div>
     </div>

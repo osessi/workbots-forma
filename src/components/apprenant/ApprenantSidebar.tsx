@@ -153,7 +153,8 @@ export default function ApprenantSidebar({
       section: "secondary",
     },
     {
-      name: "Intervenants",
+      // Correction 473: Renommer "Intervenants" en "Intervenant(s)"
+      name: "Intervenant(s)",
       href: "/apprenant/intervenants",
       icon: UserCircle,
       section: "secondary",
@@ -354,7 +355,7 @@ export default function ApprenantSidebar({
             Besoin d&apos;aide ?
           </p>
           <p className="text-xs text-brand-700 dark:text-brand-300 mb-3">
-            Contactez votre formateur ou notre équipe support.
+            Contactez notre équipe support.
           </p>
           <button
             onClick={() => setShowContactModal(true)}

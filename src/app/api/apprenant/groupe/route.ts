@@ -84,19 +84,19 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Extraire tous les apprenants de la session
-      const apprenants: Array<{
+      // Extraire tous les apprenants de la session (avec déduplication)
+      const apprenantsMap = new Map<string, {
         id: string;
         nom: string;
         prenom: string;
         email: string;
         entreprise: string | null;
-      }> = [];
+      }>();
 
       for (const client of session.clients) {
         for (const participant of client.participants) {
-          if (participant.apprenant) {
-            apprenants.push({
+          if (participant.apprenant && !apprenantsMap.has(participant.apprenant.id)) {
+            apprenantsMap.set(participant.apprenant.id, {
               id: participant.apprenant.id,
               nom: participant.apprenant.nom,
               prenom: participant.apprenant.prenom,
@@ -106,6 +106,8 @@ export async function GET(request: NextRequest) {
           }
         }
       }
+
+      const apprenants = Array.from(apprenantsMap.values());
 
       // Trier pour mettre l'utilisateur actuel en premier
       apprenants.sort((a, b) => {

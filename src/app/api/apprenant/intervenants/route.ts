@@ -1,7 +1,8 @@
 // ===========================================
 // API INTERVENANTS APPRENANT - GET /api/apprenant/intervenants
 // ===========================================
-// Récupère les intervenants liés à la formation de l'apprenant
+// Récupère les intervenants liés à la session de formation de l'apprenant
+// Corrections 473-476: Affichage intervenants avec photo, spécialités et contact messagerie
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
@@ -31,11 +32,25 @@ function decodeApprenantToken(token: string): { apprenantId: string; organizatio
   }
 }
 
+// Type intervenant pour l'API
+interface IntervenantResponse {
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string | null;
+  telephone: string | null;
+  fonction: string | null;
+  specialites: string[];
+  structure: string | null;
+  photoUrl: string | null;
+  bio: string | null;
+  role: "formateur" | "tuteur" | "expert";
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Récupérer le token depuis les query params
     const token = request.nextUrl.searchParams.get("token");
-    // Correction 430: Utiliser sessionId au lieu de inscriptionId
     const sessionId = request.nextUrl.searchParams.get("sessionId");
 
     if (!token) {
@@ -56,13 +71,18 @@ export async function GET(request: NextRequest) {
 
     const { apprenantId } = decoded;
 
-    // Correction 430: Si sessionId fourni, récupérer les intervenants de la session spécifique
+    // Si sessionId fourni, récupérer les intervenants de la session spécifique
     if (sessionId) {
       const session = await prisma.session.findUnique({
         where: { id: sessionId },
         include: {
           formateur: true,
-          // Inclure aussi les co-formateurs s'ils existent
+          // Co-formateurs via table de jonction
+          coFormateurs: {
+            include: {
+              intervenant: true,
+            },
+          },
         },
       });
 
@@ -70,17 +90,75 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ intervenants: [] });
       }
 
-      const intervenants: Array<{
-        id: string;
-        nom: string;
-        prenom: string;
-        email: string | null;
-        telephone: string | null;
-        fonction: string | null;
-        specialites: string[];
-        structure: string | null;
-        role: "formateur" | "tuteur" | "expert";
-      }> = [];
+      const intervenants: IntervenantResponse[] = [];
+
+      // Formateur principal
+      if (session.formateur) {
+        intervenants.push({
+          id: session.formateur.id,
+          nom: session.formateur.nom,
+          prenom: session.formateur.prenom,
+          email: session.formateur.email,
+          telephone: session.formateur.telephone,
+          fonction: session.formateur.fonction,
+          specialites: session.formateur.specialites || [],
+          structure: session.formateur.structure,
+          photoUrl: session.formateur.photoUrl || null,
+          bio: session.formateur.bio || null,
+          role: "formateur",
+        });
+      }
+
+      // Co-formateurs (via table de jonction)
+      if (session.coFormateurs && session.coFormateurs.length > 0) {
+        for (const coFormateurRelation of session.coFormateurs) {
+          const coFormateur = coFormateurRelation.intervenant;
+          // Éviter les doublons
+          if (!intervenants.some(i => i.id === coFormateur.id)) {
+            intervenants.push({
+              id: coFormateur.id,
+              nom: coFormateur.nom,
+              prenom: coFormateur.prenom,
+              email: coFormateur.email,
+              telephone: coFormateur.telephone,
+              fonction: coFormateur.fonction,
+              specialites: coFormateur.specialites || [],
+              structure: coFormateur.structure,
+              photoUrl: coFormateur.photoUrl || null,
+              bio: coFormateur.bio || null,
+              role: "formateur",
+            });
+          }
+        }
+      }
+
+      return NextResponse.json({ intervenants });
+    }
+
+    // Fallback: comportement original si pas de sessionId
+    const participation = await prisma.sessionParticipantNew.findFirst({
+      where: { apprenantId },
+      include: {
+        client: {
+          include: {
+            session: {
+              include: {
+                formateur: true,
+                coFormateurs: {
+                  include: {
+                    intervenant: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (participation) {
+      const session = participation.client.session;
+      const intervenants: IntervenantResponse[] = [];
 
       if (session.formateur) {
         intervenants.push({
@@ -92,14 +170,37 @@ export async function GET(request: NextRequest) {
           fonction: session.formateur.fonction,
           specialites: session.formateur.specialites || [],
           structure: session.formateur.structure,
+          photoUrl: session.formateur.photoUrl || null,
+          bio: session.formateur.bio || null,
           role: "formateur",
         });
+      }
+
+      if (session.coFormateurs && session.coFormateurs.length > 0) {
+        for (const coFormateurRelation of session.coFormateurs) {
+          const coFormateur = coFormateurRelation.intervenant;
+          if (!intervenants.some(i => i.id === coFormateur.id)) {
+            intervenants.push({
+              id: coFormateur.id,
+              nom: coFormateur.nom,
+              prenom: coFormateur.prenom,
+              email: coFormateur.email,
+              telephone: coFormateur.telephone,
+              fonction: coFormateur.fonction,
+              specialites: coFormateur.specialites || [],
+              structure: coFormateur.structure,
+              photoUrl: coFormateur.photoUrl || null,
+              bio: coFormateur.bio || null,
+              role: "formateur",
+            });
+          }
+        }
       }
 
       return NextResponse.json({ intervenants });
     }
 
-    // Fallback: comportement original si pas de sessionId
+    // Fallback LMS
     const inscription = await prisma.lMSInscription.findFirst({
       where: { apprenantId },
     });
@@ -116,21 +217,16 @@ export async function GET(request: NextRequest) {
       },
       include: {
         formateur: true,
+        coFormateurs: {
+          include: {
+            intervenant: true,
+          },
+        },
       },
     });
 
     // Créer une map pour éviter les doublons
-    const intervenantsMap = new Map<string, {
-      id: string;
-      nom: string;
-      prenom: string;
-      email: string | null;
-      telephone: string | null;
-      fonction: string | null;
-      specialites: string[];
-      structure: string | null;
-      role: "formateur" | "tuteur" | "expert";
-    }>();
+    const intervenantsMap = new Map<string, IntervenantResponse>();
 
     for (const session of sessions) {
       if (session.formateur && !intervenantsMap.has(session.formateur.id)) {
@@ -143,8 +239,32 @@ export async function GET(request: NextRequest) {
           fonction: session.formateur.fonction,
           specialites: session.formateur.specialites || [],
           structure: session.formateur.structure,
+          photoUrl: session.formateur.photoUrl || null,
+          bio: session.formateur.bio || null,
           role: "formateur",
         });
+      }
+
+      // Ajouter les co-formateurs
+      if (session.coFormateurs) {
+        for (const coFormateurRelation of session.coFormateurs) {
+          const coFormateur = coFormateurRelation.intervenant;
+          if (!intervenantsMap.has(coFormateur.id)) {
+            intervenantsMap.set(coFormateur.id, {
+              id: coFormateur.id,
+              nom: coFormateur.nom,
+              prenom: coFormateur.prenom,
+              email: coFormateur.email,
+              telephone: coFormateur.telephone,
+              fonction: coFormateur.fonction,
+              specialites: coFormateur.specialites || [],
+              structure: coFormateur.structure,
+              photoUrl: coFormateur.photoUrl || null,
+              bio: coFormateur.bio || null,
+              role: "formateur",
+            });
+          }
+        }
       }
     }
 

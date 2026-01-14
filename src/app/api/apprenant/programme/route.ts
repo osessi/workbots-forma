@@ -116,21 +116,6 @@ export async function GET(request: NextRequest) {
                   formation: {
                     include: {
                       modules: { orderBy: { ordre: "asc" } },
-                      intervenants: {
-                        include: {
-                          intervenant: {
-                            select: {
-                              id: true,
-                              nom: true,
-                              prenom: true,
-                              fonction: true,
-                              specialites: true,
-                              bio: true,
-                              photoUrl: true,
-                            },
-                          },
-                        },
-                      },
                     },
                   },
                   formateur: {
@@ -142,6 +127,22 @@ export async function GET(request: NextRequest) {
                       specialites: true,
                       bio: true,
                       photoUrl: true,
+                    },
+                  },
+                  // Correction: Inclure les co-formateurs via la table de jonction
+                  coFormateurs: {
+                    include: {
+                      intervenant: {
+                        select: {
+                          id: true,
+                          nom: true,
+                          prenom: true,
+                          fonction: true,
+                          specialites: true,
+                          bio: true,
+                          photoUrl: true,
+                        },
+                      },
                     },
                   },
                 },
@@ -178,21 +179,6 @@ export async function GET(request: NextRequest) {
                   formation: {
                     include: {
                       modules: { orderBy: { ordre: "asc" } },
-                      intervenants: {
-                        include: {
-                          intervenant: {
-                            select: {
-                              id: true,
-                              nom: true,
-                              prenom: true,
-                              fonction: true,
-                              specialites: true,
-                              bio: true,
-                              photoUrl: true,
-                            },
-                          },
-                        },
-                      },
                     },
                   },
                   formateur: {
@@ -204,6 +190,22 @@ export async function GET(request: NextRequest) {
                       specialites: true,
                       bio: true,
                       photoUrl: true,
+                    },
+                  },
+                  // Correction: Inclure les co-formateurs via la table de jonction
+                  coFormateurs: {
+                    include: {
+                      intervenant: {
+                        select: {
+                          id: true,
+                          nom: true,
+                          prenom: true,
+                          fonction: true,
+                          specialites: true,
+                          bio: true,
+                          photoUrl: true,
+                        },
+                      },
                     },
                   },
                 },
@@ -310,20 +312,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Ajouter les autres intervenants de la formation
-    for (const fi of formation.intervenants) {
-      // Ne pas dupliquer le formateur principal
-      if (fi.intervenant.id !== session.formateur?.id) {
-        equipePedagogique.push({
-          id: fi.intervenant.id,
-          nom: fi.intervenant.nom,
-          prenom: fi.intervenant.prenom,
-          fonction: fi.intervenant.fonction,
-          specialites: fi.intervenant.specialites || [],
-          bio: fi.intervenant.bio,
-          photoUrl: fi.intervenant.photoUrl,
-          estFormateurPrincipal: false,
-        });
+    // Ajouter les co-formateurs de la session (via table de jonction)
+    if (session.coFormateurs && session.coFormateurs.length > 0) {
+      for (const coFormateurRelation of session.coFormateurs) {
+        const coFormateur = coFormateurRelation.intervenant;
+        // Ne pas dupliquer le formateur principal
+        if (coFormateur.id !== session.formateur?.id) {
+          equipePedagogique.push({
+            id: coFormateur.id,
+            nom: coFormateur.nom,
+            prenom: coFormateur.prenom,
+            fonction: coFormateur.fonction,
+            specialites: coFormateur.specialites || [],
+            bio: coFormateur.bio,
+            photoUrl: coFormateur.photoUrl,
+            estFormateurPrincipal: false,
+          });
+        }
       }
     }
 

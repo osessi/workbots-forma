@@ -1,39 +1,85 @@
 "use client";
 
-import React from "react";
+// ===========================================
+// CORRECTIONS 477-482: Page "Mes Certifications"
+// ===========================================
+// 477: Afficher 2 blocs : Attestation + Diplôme
+// 478: Nouveau titre et sous-titre
+// 479: Attestation disponible 1h avant fin de session
+// 480: Diplôme disponible si moyenne obtenue à l'évaluation finale
+// 481: Diplôme généré avec balises (nom, formation, date, organisme)
+// 482: Supprimer le bloc informatif Qualiopi
+
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
 import {
+  FileText,
   Award,
-  Calendar,
   Download,
-  Eye,
-  ExternalLink,
+  Clock,
+  CheckCircle2,
+  Lock,
   Loader2,
-  FileCheck,
-  BookOpen,
+  AlertCircle,
+  Trophy,
+  Calendar,
+  Building,
+  GraduationCap,
 } from "lucide-react";
 
 // =====================================
-// COMPOSANT CARTE CERTIFICATION
+// TYPES
 // =====================================
 
-function CertificationCard({
-  certification,
-  index,
-}: {
-  certification: {
-    id: string;
-    formationId: string;
-    formationTitre: string;
-    numeroFicheRS: string | null;
-    lienFranceCompetences: string | null;
+interface CertificationsData {
+  attestation: {
+    disponible: boolean;
+    dateDisponibilite: string | null;
+    sessionId: string;
     sessionReference: string;
-    dateCertification: string | null;
-    numeroCertificat: string | null;
-  };
-  index: number;
+    sessionNom: string | null;
+    formationTitre: string;
+    apprenant: {
+      nom: string;
+      prenom: string;
+    };
+    organisme: string | null;
+    periode: {
+      debut: string | null;
+      fin: string | null;
+    } | null;
+  } | null;
+  diplome: {
+    disponible: boolean;
+    score: number | null;
+    scoreMinimum: number;
+    sessionId: string;
+    sessionReference: string;
+    sessionNom: string | null;
+    formationTitre: string;
+    apprenant: {
+      nom: string;
+      prenom: string;
+    };
+    organisme: string | null;
+    dateObtention: string | null;
+  } | null;
+}
+
+// =====================================
+// COMPOSANT BLOC ATTESTATION
+// =====================================
+
+function AttestationCard({
+  attestation,
+  token,
+}: {
+  attestation: CertificationsData["attestation"];
+  token: string;
 }) {
+  if (!attestation) return null;
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -43,115 +89,269 @@ function CertificationCard({
     });
   };
 
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
+      transition={{ delay: 0.1 }}
       className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
     >
-      {/* Header avec badge */}
-      <div className="relative p-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-b border-amber-200 dark:border-amber-800">
-        <div className="flex items-start gap-4">
-          {/* Icône certification */}
-          <div className="flex-shrink-0">
-            <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/25">
-              <Award className="w-7 h-7 text-white" />
-            </div>
+      {/* Header */}
+      <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-blue-100 dark:border-blue-800">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+            <FileText className="w-7 h-7 text-white" />
           </div>
-
-          {/* Info formation */}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 line-clamp-2">
-              {certification.formationTitre}
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Attestation de fin de formation
             </h3>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full font-medium flex items-center gap-1.5">
-                <FileCheck className="w-3.5 h-3.5" />
-                Certifié
-              </span>
-              {certification.numeroFicheRS && (
-                <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full font-medium">
-                  RS {certification.numeroFicheRS}
-                </span>
-              )}
-            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Document officiel attestant de votre participation
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Détails */}
+      {/* Contenu */}
       <div className="p-6 space-y-4">
-        {/* Infos de certification */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Date d'obtention */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="w-4 h-4 text-gray-400" />
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Date d&apos;obtention
-              </span>
+        {/* Infos formation */}
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <GraduationCap className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Formation
+              </p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {attestation.formationTitre}
+              </p>
             </div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">
-              {formatDate(certification.dateCertification)}
-            </p>
           </div>
 
-          {/* Numéro de certificat */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <BookOpen className="w-4 h-4 text-gray-400" />
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                N° Certificat
-              </span>
+          {attestation.periode && (
+            <div className="flex items-start gap-3">
+              <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Période
+                </p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Du {formatDate(attestation.periode.debut)} au {formatDate(attestation.periode.fin)}
+                </p>
+              </div>
             </div>
-            <p className="text-sm font-mono font-semibold text-gray-900 dark:text-white">
-              {certification.numeroCertificat || "N/A"}
+          )}
+
+          {attestation.organisme && (
+            <div className="flex items-start gap-3">
+              <Building className="w-5 h-5 text-gray-400 mt-0.5" />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Organisme
+                </p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {attestation.organisme}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Statut et bouton */}
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          {attestation.disponible ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Disponible</span>
+              </div>
+              <a
+                href={`/api/apprenant/certifications/attestation?token=${token}&sessionId=${attestation.sessionId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                Télécharger l&apos;attestation
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <Clock className="w-5 h-5" />
+                <span className="text-sm font-medium">
+                  Disponible à partir du {formatDateTime(attestation.dateDisponibilite)}
+                </span>
+              </div>
+              <button
+                disabled
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium rounded-xl cursor-not-allowed"
+              >
+                <Lock className="w-5 h-5" />
+                Disponible en fin de session
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// =====================================
+// COMPOSANT BLOC DIPLÔME
+// =====================================
+
+function DiplomeCard({
+  diplome,
+  token,
+}: {
+  diplome: CertificationsData["diplome"];
+  token: string;
+}) {
+  if (!diplome) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+    >
+      {/* Header */}
+      <div className="p-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-b border-amber-100 dark:border-amber-800">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/25">
+            <Award className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Diplôme
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Certificat de réussite à la formation
             </p>
           </div>
         </div>
+      </div>
 
-        {/* Session de référence */}
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          Session : <span className="font-mono">{certification.sessionReference}</span>
+      {/* Contenu */}
+      <div className="p-6 space-y-4">
+        {/* Infos formation */}
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <GraduationCap className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Formation
+              </p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {diplome.formationTitre}
+              </p>
+            </div>
+          </div>
+
+          {/* Score requis */}
+          <div className="flex items-start gap-3">
+            <Trophy className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Condition d&apos;obtention
+              </p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                Score minimum requis : {diplome.scoreMinimum}% à l&apos;évaluation finale
+              </p>
+            </div>
+          </div>
+
+          {/* Score obtenu si disponible */}
+          {diplome.score !== null && (
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Votre score
+                </span>
+                <span
+                  className={`text-lg font-bold ${
+                    diplome.disponible
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {Math.round(diplome.score)}%
+                </span>
+              </div>
+              <div className="h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    diplome.disponible
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                  style={{ width: `${Math.min(100, diplome.score)}%` }}
+                />
+              </div>
+              <div className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>0%</span>
+                <span className="text-amber-600 dark:text-amber-400">
+                  Seuil : {diplome.scoreMinimum}%
+                </span>
+                <span>100%</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-          {/* Prévisualiser */}
-          <a
-            href={`/api/apprenant/certificate/${certification.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium rounded-xl hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors"
-          >
-            <Eye className="w-4 h-4" />
-            Prévisualiser
-          </a>
-
-          {/* Télécharger */}
-          <a
-            href={`/api/apprenant/certificate/${certification.id}`}
-            download={`certificat-${certification.numeroCertificat || certification.id}.html`}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Télécharger
-          </a>
+        {/* Statut et bouton */}
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          {diplome.disponible ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Félicitations ! Diplôme obtenu</span>
+              </div>
+              <a
+                href={`/api/apprenant/certifications/diplome?token=${token}&sessionId=${diplome.sessionId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-medium rounded-xl transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                Télécharger le diplôme
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                <Lock className="w-5 h-5" />
+                <span className="text-sm font-medium">
+                  {diplome.score === null
+                    ? "Passez l'évaluation finale pour débloquer"
+                    : `Score insuffisant (${Math.round(diplome.score)}% < ${diplome.scoreMinimum}%)`}
+                </span>
+              </div>
+              <button
+                disabled
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-medium rounded-xl cursor-not-allowed"
+              >
+                <Lock className="w-5 h-5" />
+                Disponible après réussite
+              </button>
+            </div>
+          )}
         </div>
-
-        {/* Lien France Compétences */}
-        {certification.lienFranceCompetences && (
-          <a
-            href={certification.lienFranceCompetences}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Voir sur France Compétences
-          </a>
-        )}
       </div>
     </motion.div>
   );
@@ -162,14 +362,66 @@ function CertificationCard({
 // =====================================
 
 export default function CertificationsPage() {
-  const { certifications, isLoading } = useApprenantPortal();
+  const { token, selectedSession } = useApprenantPortal();
+  const [data, setData] = useState<CertificationsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (isLoading) {
+  useEffect(() => {
+    const fetchCertifications = async () => {
+      if (!token) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const params = new URLSearchParams({ token });
+        if (selectedSession?.sessionId) {
+          params.append("sessionId", selectedSession.sessionId);
+        }
+
+        const res = await fetch(`/api/apprenant/certifications?${params.toString()}`);
+        if (!res.ok) {
+          throw new Error("Erreur lors du chargement des certifications");
+        }
+
+        const certificationsData = await res.json();
+        setData(certificationsData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erreur inconnue");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCertifications();
+  }, [token, selectedSession?.sessionId]);
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-brand-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Chargement des certifications...</p>
+          <p className="text-gray-600 dark:text-gray-400">
+            Chargement des certifications...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-900 dark:text-white font-medium mb-2">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+          >
+            Réessayer
+          </button>
         </div>
       </div>
     );
@@ -177,43 +429,45 @@ export default function CertificationsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header - Correction 478 */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Mes Certifications
+          Mes certifications
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Retrouvez toutes vos certifications obtenues
+          Retrouvez ici vos documents de fin de formation.
         </p>
       </div>
 
-      {/* Statistiques */}
-      {certifications && certifications.length > 0 && (
+      {/* Message si pas de session sélectionnée */}
+      {!selectedSession && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4"
         >
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-              <Award className="w-8 h-8" />
-            </div>
-            <div>
-              <p className="text-amber-100 text-sm">Total certifications</p>
-              <p className="text-4xl font-bold">{certifications.length}</p>
-            </div>
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Sélectionnez une session de formation pour accéder à vos documents.
+            </p>
           </div>
         </motion.div>
       )}
 
-      {/* Liste des certifications */}
-      {certifications && certifications.length > 0 ? (
+      {/* Blocs Attestation et Diplôme - Correction 477 */}
+      {data && token && (
         <div className="grid md:grid-cols-2 gap-6">
-          {certifications.map((cert, index) => (
-            <CertificationCard key={cert.id} certification={cert} index={index} />
-          ))}
+          {/* Bloc 1 : Attestation - Correction 479 */}
+          <AttestationCard attestation={data.attestation} token={token} />
+
+          {/* Bloc 2 : Diplôme - Correction 480 */}
+          <DiplomeCard diplome={data.diplome} token={token} />
         </div>
-      ) : (
+      )}
+
+      {/* État vide si pas de données */}
+      {(!data || (!data.attestation && !data.diplome)) && selectedSession && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -223,34 +477,15 @@ export default function CertificationsPage() {
             <Award className="w-10 h-10 text-gray-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Aucune certification
+            Aucun document disponible
           </h3>
           <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-            Vous n&apos;avez pas encore de certification. Continuez votre parcours de formation pour obtenir vos premières certifications !
+            Vos documents de fin de formation seront disponibles une fois la session terminée.
           </p>
         </motion.div>
       )}
 
-      {/* Info Qualiopi */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 flex items-start gap-3"
-      >
-        <div className="flex-shrink-0 p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-          <FileCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-            Certifications conformes Qualiopi
-          </p>
-          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-            Vos certifications sont délivrées conformément aux exigences de l&apos;indicateur 3 du référentiel Qualiopi.
-            Vous pouvez les télécharger et les présenter comme justificatif de vos compétences acquises.
-          </p>
-        </div>
-      </motion.div>
+      {/* Correction 482: Bloc Qualiopi supprimé */}
     </div>
   );
 }

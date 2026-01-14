@@ -2,6 +2,7 @@
 // API CALENDRIER APPRENANT - GET /api/apprenant/calendrier
 // ===========================================
 // Récupère les événements du calendrier pour l'apprenant
+// Correction 469-472: Ajout des 4 évaluations avec règles de dates
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
@@ -29,6 +30,57 @@ function decodeApprenantToken(token: string): { apprenantId: string; organizatio
   } catch {
     return null;
   }
+}
+
+// Types d'événements calendrier
+interface CalendarEvent {
+  id: string;
+  date: string;
+  heureDebut: string;
+  heureFin: string;
+  sessionNom: string;
+  sessionReference: string;
+  sessionId: string;
+  lieu: string | null;
+  formateur: string | null;
+  modalite: string | null;
+  type: "formation" | "evaluation";
+  // Correction 470: Champs spécifiques aux évaluations
+  evaluationType?: "positionnement" | "finale" | "chaud" | "froid";
+  evaluationLabel?: string;
+  evaluationStatus?: "a_faire" | "en_cours" | "termine";
+  evaluationUrl?: string;
+}
+
+// Correction 470: Calculer les dates des évaluations
+function calculateEvaluationDates(journees: Array<{ date: Date }>) {
+  if (journees.length === 0) return null;
+
+  const firstDay = new Date(journees[0].date);
+  const lastDay = new Date(journees[journees.length - 1].date);
+
+  // Test de positionnement : J-7 avant le 1er jour
+  const positionnement = new Date(firstDay);
+  positionnement.setDate(positionnement.getDate() - 7);
+
+  // Évaluation finale : le dernier jour de la session
+  const finale = new Date(lastDay);
+
+  // Évaluation à chaud : le dernier jour de la session
+  const chaud = new Date(lastDay);
+
+  // Évaluation à froid : J+3 mois après le dernier jour
+  const froid = new Date(lastDay);
+  froid.setMonth(froid.getMonth() + 3);
+
+  return {
+    positionnement,
+    finale,
+    chaud,
+    froid,
+    firstDay,
+    lastDay,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -77,6 +129,11 @@ export async function GET(request: NextRequest) {
                 },
                 formateur: true,
                 lieu: true,
+                formation: {
+                  select: {
+                    titre: true,
+                  },
+                },
               },
             },
           },
@@ -89,34 +146,112 @@ export async function GET(request: NextRequest) {
     }
 
     // Construire la liste des événements
-    const events: Array<{
-      id: string;
-      date: string;
-      heureDebut: string;
-      heureFin: string;
-      sessionNom: string;
-      sessionReference: string;
-      lieu: string | null;
-      formateur: string | null;
-      type: "formation" | "evaluation" | "autre";
-    }> = [];
+    const events: CalendarEvent[] = [];
 
     for (const participation of participations) {
       const session = participation.client.session;
+      const evalDates = calculateEvaluationDates(session.journees);
 
+      // Note: Le statut des évaluations est défini à "a_faire" par défaut
+      // car le modèle evaluationResponses n'existe pas encore dans le schéma
+
+      // Ajouter les journées de formation
       for (const journee of session.journees) {
         events.push({
           id: journee.id,
           date: journee.date.toISOString(),
           heureDebut: journee.heureDebutMatin || "09:00",
           heureFin: journee.heureFinAprem || "17:00",
-          sessionNom: session.nom || `Session ${session.reference}`,
+          sessionNom: session.nom || session.formation?.titre || `Session ${session.reference}`,
           sessionReference: session.reference,
+          sessionId: session.id,
           lieu: session.lieu?.nom || null,
           formateur: session.formateur
             ? `${session.formateur.prenom} ${session.formateur.nom}`
             : null,
+          modalite: session.modalite || null,
           type: "formation",
+        });
+      }
+
+      // Correction 470: Ajouter les 4 évaluations si on a des dates
+      if (evalDates) {
+        const sessionName = session.nom || session.formation?.titre || `Session ${session.reference}`;
+
+        // 1. Test de positionnement (J-7)
+        events.push({
+          id: `eval-positionnement-${session.id}`,
+          date: evalDates.positionnement.toISOString(),
+          heureDebut: "00:00",
+          heureFin: "23:59",
+          sessionNom: sessionName,
+          sessionReference: session.reference,
+          sessionId: session.id,
+          lieu: null,
+          formateur: null,
+          modalite: "En ligne",
+          type: "evaluation",
+          evaluationType: "positionnement",
+          evaluationLabel: "Test de positionnement",
+          evaluationStatus: "a_faire",
+          evaluationUrl: `/apprenant/evaluations?type=positionnement&sessionId=${session.id}`,
+        });
+
+        // 2. Évaluation finale (dernier jour)
+        events.push({
+          id: `eval-finale-${session.id}`,
+          date: evalDates.finale.toISOString(),
+          heureDebut: "00:00",
+          heureFin: "23:59",
+          sessionNom: sessionName,
+          sessionReference: session.reference,
+          sessionId: session.id,
+          lieu: null,
+          formateur: null,
+          modalite: "En ligne",
+          type: "evaluation",
+          evaluationType: "finale",
+          evaluationLabel: "Évaluation finale",
+          evaluationStatus: "a_faire",
+          evaluationUrl: `/apprenant/evaluations?type=finale&sessionId=${session.id}`,
+        });
+
+        // 3. Évaluation à chaud (dernier jour)
+        events.push({
+          id: `eval-chaud-${session.id}`,
+          date: evalDates.chaud.toISOString(),
+          heureDebut: "00:00",
+          heureFin: "23:59",
+          sessionNom: sessionName,
+          sessionReference: session.reference,
+          sessionId: session.id,
+          lieu: null,
+          formateur: null,
+          modalite: "En ligne",
+          type: "evaluation",
+          evaluationType: "chaud",
+          evaluationLabel: "Évaluation à chaud",
+          evaluationStatus: "a_faire",
+          evaluationUrl: `/apprenant/evaluations?type=chaud&sessionId=${session.id}`,
+        });
+
+        // 4. Évaluation à froid (J+3 mois)
+        events.push({
+          id: `eval-froid-${session.id}`,
+          date: evalDates.froid.toISOString(),
+          heureDebut: "00:00",
+          heureFin: "23:59",
+          sessionNom: sessionName,
+          sessionReference: session.reference,
+          sessionId: session.id,
+          lieu: null,
+          formateur: null,
+          modalite: "En ligne",
+          type: "evaluation",
+          evaluationType: "froid",
+          evaluationLabel: "Évaluation à froid",
+          evaluationStatus: "a_faire",
+          evaluationUrl: `/apprenant/evaluations?type=froid&sessionId=${session.id}`,
         });
       }
     }

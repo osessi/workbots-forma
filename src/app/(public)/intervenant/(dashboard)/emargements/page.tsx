@@ -304,6 +304,38 @@ export default function IntervenantEmargementsPage() {
     });
   };
 
+  // Correction 510: Compter les demi-journées réellement planifiées
+  const getPlannedHalfDays = (journee: Journee) => {
+    let count = 0;
+    // Matin planifié si heureDebutMatin ou heureFinMatin est défini
+    if (journee.heureDebutMatin || journee.heureFinMatin) {
+      count++;
+    }
+    // Après-midi planifié si heureDebutAprem ou heureFinAprem est défini
+    if (journee.heureDebutAprem || journee.heureFinAprem) {
+      count++;
+    }
+    // Si aucun horaire n'est défini, on suppose matin + après-midi par défaut
+    if (count === 0) {
+      count = 2;
+    }
+    return count;
+  };
+
+  // Correction 510: Vérifier si le matin est planifié
+  const hasMatinPlanned = (journee: Journee) => {
+    // Matin planifié si les heures sont définies, ou si rien n'est défini (par défaut = journée complète)
+    return !!(journee.heureDebutMatin || journee.heureFinMatin) ||
+           (!journee.heureDebutMatin && !journee.heureFinMatin && !journee.heureDebutAprem && !journee.heureFinAprem);
+  };
+
+  // Correction 510: Vérifier si l'après-midi est planifié
+  const hasApremPlanned = (journee: Journee) => {
+    // Après-midi planifié si les heures sont définies, ou si rien n'est défini (par défaut = journée complète)
+    return !!(journee.heureDebutAprem || journee.heureFinAprem) ||
+           (!journee.heureDebutMatin && !journee.heureFinMatin && !journee.heureDebutAprem && !journee.heureFinAprem);
+  };
+
   const getEmargementStatus = (journee: Journee) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -314,10 +346,21 @@ export default function IntervenantEmargementsPage() {
       return { status: "future", label: "À venir", color: "text-gray-400", bg: "bg-gray-100 dark:bg-gray-700" };
     }
 
-    const totalSignatures = journee.signaturesMatin + journee.signaturesAprem;
-    const expectedSignatures = journee.totalParticipants * 2;
+    // Correction 510: Calcul basé sur les demi-journées réellement planifiées
+    // Calculer les signatures attendues : participants * nombre de demi-journées planifiées
+    let totalSignatures = 0;
+    let expectedSignatures = 0;
 
-    if (totalSignatures === expectedSignatures) {
+    if (hasMatinPlanned(journee)) {
+      totalSignatures += journee.signaturesMatin;
+      expectedSignatures += journee.totalParticipants;
+    }
+    if (hasApremPlanned(journee)) {
+      totalSignatures += journee.signaturesAprem;
+      expectedSignatures += journee.totalParticipants;
+    }
+
+    if (totalSignatures === expectedSignatures && expectedSignatures > 0) {
       return { status: "complete", label: "Complet", color: "text-green-600", bg: "bg-green-100 dark:bg-green-500/20" };
     } else if (totalSignatures > 0) {
       return { status: "partial", label: "Partiel", color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-500/20" };
@@ -367,13 +410,43 @@ export default function IntervenantEmargementsPage() {
             {journees.filter(j => getEmargementStatus(j).status === "complete").length}
           </p>
         </div>
+        {/* Correction 510: Compteur basé sur les demi-journées non signées */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 text-amber-500 mb-1">
             <AlertCircle className="w-4 h-4" />
             <span className="text-xs">En attente</span>
           </div>
           <p className="text-2xl font-bold text-amber-600">
-            {journees.filter(j => getEmargementStatus(j).status === "partial" || getEmargementStatus(j).status === "missing").length}
+            {(() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+
+              let totalEnAttente = 0;
+
+              journees.forEach(journee => {
+                const journeeDate = new Date(journee.date);
+                journeeDate.setHours(0, 0, 0, 0);
+
+                // Ne pas compter les journées futures
+                if (journeeDate > today) return;
+
+                // Compter les demi-journées non complètes
+                if (hasMatinPlanned(journee)) {
+                  // Matin non complet si signatures < participants
+                  if (journee.signaturesMatin < journee.totalParticipants) {
+                    totalEnAttente++;
+                  }
+                }
+                if (hasApremPlanned(journee)) {
+                  // Après-midi non complet si signatures < participants
+                  if (journee.signaturesAprem < journee.totalParticipants) {
+                    totalEnAttente++;
+                  }
+                }
+              });
+
+              return totalEnAttente;
+            })()}
           </p>
         </div>
       </div>

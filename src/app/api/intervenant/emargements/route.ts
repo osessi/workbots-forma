@@ -90,6 +90,9 @@ export async function GET(request: NextRequest) {
                 id: true,
                 periode: true,
                 participantId: true,
+                formateurId: true,
+                typeSignataire: true,
+                signedAt: true,
               },
             },
           },
@@ -103,8 +106,17 @@ export async function GET(request: NextRequest) {
       const feuille = journee.feuillesEmargement[0];
       const signatures = feuille?.signatures || [];
 
-      const signaturesMatin = signatures.filter(s => s.periode === "matin").length;
-      const signaturesAprem = signatures.filter(s => s.periode === "aprem" || s.periode === "apres_midi").length;
+      // Signatures des participants (apprenants)
+      const participantSignatures = signatures.filter(s => s.typeSignataire === "apprenant" || s.participantId);
+      const signaturesMatin = participantSignatures.filter(s => s.periode === "matin").length;
+      const signaturesAprem = participantSignatures.filter(s => s.periode === "aprem" || s.periode === "apres_midi").length;
+
+      // Correction 505: Signatures de l'intervenant
+      const intervenantSignatures = signatures.filter(
+        s => s.typeSignataire === "formateur" || s.formateurId === intervenantId
+      );
+      const intervenantSignatureMatin = intervenantSignatures.find(s => s.periode === "matin");
+      const intervenantSignatureAprem = intervenantSignatures.find(s => s.periode === "aprem" || s.periode === "apres_midi");
 
       return {
         id: journee.id,
@@ -118,10 +130,19 @@ export async function GET(request: NextRequest) {
         signaturesMatin,
         signaturesAprem,
         totalParticipants,
+        // Correction 505: Émargement intervenant
+        intervenantSignatureMatin: intervenantSignatureMatin ? {
+          id: intervenantSignatureMatin.id,
+          signedAt: intervenantSignatureMatin.signedAt?.toISOString() || null,
+        } : null,
+        intervenantSignatureAprem: intervenantSignatureAprem ? {
+          id: intervenantSignatureAprem.id,
+          signedAt: intervenantSignatureAprem.signedAt?.toISOString() || null,
+        } : null,
       };
     });
 
-    return NextResponse.json({ journees: journeesData });
+    return NextResponse.json({ journees: journeesData, intervenantId });
   } catch (error) {
     console.error("Erreur API émargements intervenant:", error);
     return NextResponse.json(

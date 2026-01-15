@@ -211,3 +211,171 @@ export async function GET(
     );
   }
 }
+
+// Correction 505: POST - Signer l'émargement intervenant
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ journeeId: string }> }
+) {
+  try {
+    const { journeeId } = await params;
+    const body = await request.json();
+    const { token, periode, signatureData } = body;
+
+    if (!token) {
+      return NextResponse.json({ error: "Token manquant" }, { status: 401 });
+    }
+
+    const decoded = decodeIntervenantToken(token);
+    if (!decoded) {
+      return NextResponse.json({ error: "Token invalide ou expiré" }, { status: 401 });
+    }
+
+    const { intervenantId, organizationId } = decoded;
+
+    if (!periode || !["matin", "aprem"].includes(periode)) {
+      return NextResponse.json({ error: "Période invalide (matin ou aprem)" }, { status: 400 });
+    }
+
+    // Récupérer la journée avec la feuille d'émargement
+    const journee = await prisma.sessionJourneeNew.findUnique({
+      where: { id: journeeId },
+      include: {
+        session: {
+          select: {
+            id: true,
+            organizationId: true,
+            formateurId: true,
+          },
+        },
+        feuillesEmargement: {
+          where: { isActive: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!journee) {
+      return NextResponse.json({ error: "Journée non trouvée" }, { status: 404 });
+    }
+
+    // Vérifier que l'intervenant a accès à cette session
+    const session = journee.session;
+    const isFormateur = session.formateurId === intervenantId;
+
+    const isCoFormateur = await prisma.sessionCoFormateur.findFirst({
+      where: {
+        sessionId: session.id,
+        intervenantId,
+      },
+    });
+
+    if (!isFormateur && !isCoFormateur) {
+      return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+    }
+
+    if (session.organizationId !== organizationId) {
+      return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+    }
+
+    // Vérifier que la journée est bien aujourd'hui ou passée (pas future)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const journeeDate = new Date(journee.date);
+    journeeDate.setHours(0, 0, 0, 0);
+
+    if (journeeDate > today) {
+      return NextResponse.json(
+        { error: "Impossible de signer pour une journée future" },
+        { status: 400 }
+      );
+    }
+
+    // Vérifier l'heure pour le créneau (matin ou après-midi)
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+
+    // Si c'est aujourd'hui, vérifier que c'est le bon créneau
+    if (journeeDate.getTime() === today.getTime()) {
+      if (periode === "matin") {
+        const heureDebut = journee.heureDebutMatin || "09:00";
+        const [hDebut] = heureDebut.split(":").map(Number);
+        if (currentHour < hDebut) {
+          return NextResponse.json(
+            { error: `Le créneau matin n'est pas encore ouvert (à partir de ${heureDebut})` },
+            { status: 400 }
+          );
+        }
+      } else if (periode === "aprem") {
+        const heureDebut = journee.heureDebutAprem || "14:00";
+        const [hDebut] = heureDebut.split(":").map(Number);
+        if (currentHour < hDebut) {
+          return NextResponse.json(
+            { error: `Le créneau après-midi n'est pas encore ouvert (à partir de ${heureDebut})` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // Récupérer ou créer la feuille d'émargement
+    let feuille = journee.feuillesEmargement[0];
+
+    if (!feuille) {
+      const newToken = crypto.randomUUID();
+      feuille = await prisma.feuilleEmargementNew.create({
+        data: {
+          journeeId: journee.id,
+          token: newToken,
+          isActive: true,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    // Vérifier si l'intervenant a déjà signé pour cette période
+    const existingSignature = await prisma.signatureEmargementNew.findFirst({
+      where: {
+        feuilleId: feuille.id,
+        formateurId: intervenantId,
+        periode,
+      },
+    });
+
+    if (existingSignature) {
+      return NextResponse.json(
+        { error: "Vous avez déjà signé pour cette période" },
+        { status: 400 }
+      );
+    }
+
+    // Créer la signature
+    const signature = await prisma.signatureEmargementNew.create({
+      data: {
+        feuilleId: feuille.id,
+        formateurId: intervenantId,
+        typeSignataire: "formateur",
+        periode,
+        signatureData: signatureData || null,
+        signedAt: new Date(),
+        ipAddress: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      signature: {
+        id: signature.id,
+        periode: signature.periode,
+        signedAt: signature.signedAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Erreur API signature intervenant:", error);
+    return NextResponse.json(
+      { error: "Erreur lors de la signature" },
+      { status: 500 }
+    );
+  }
+}

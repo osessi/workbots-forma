@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import {
   PenLine,
@@ -10,14 +10,14 @@ import {
   CheckCircle,
   AlertCircle,
   ChevronRight,
-  Download,
   Eye,
   X,
   QrCode,
   ExternalLink,
   Loader2,
   Check,
-  Printer,
+  UserCheck,
+  Pen,
 } from "lucide-react";
 
 interface Journee {
@@ -32,6 +32,9 @@ interface Journee {
   signaturesMatin: number;
   signaturesAprem: number;
   totalParticipants: number;
+  // Correction 505: Signatures de l'intervenant
+  intervenantSignatureMatin?: { id: string; signedAt: string | null } | null;
+  intervenantSignatureAprem?: { id: string; signedAt: string | null } | null;
 }
 
 interface Participant {
@@ -84,14 +87,10 @@ export default function IntervenantEmargementsPage() {
   const [selectedJournee, setSelectedJournee] = useState<Journee | null>(null);
   const [feuilleDetail, setFeuilleDetail] = useState<FeuilleDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  // Correction 505: État pour la signature en cours
+  const [signingPeriode, setSigningPeriode] = useState<{ journeeId: string; periode: string } | null>(null);
 
-  useEffect(() => {
-    if (selectedSession && token) {
-      fetchJournees();
-    }
-  }, [selectedSession, token]);
-
-  const fetchJournees = async () => {
+  const fetchJournees = useCallback(async () => {
     if (!selectedSession || !token) return;
 
     setLoadingJournees(true);
@@ -106,7 +105,13 @@ export default function IntervenantEmargementsPage() {
     } finally {
       setLoadingJournees(false);
     }
-  };
+  }, [selectedSession, token]);
+
+  useEffect(() => {
+    if (selectedSession && token) {
+      fetchJournees();
+    }
+  }, [selectedSession, token, fetchJournees]);
 
   const openFeuilleDetail = async (journee: Journee) => {
     setSelectedJournee(journee);
@@ -131,6 +136,85 @@ export default function IntervenantEmargementsPage() {
     setFeuilleDetail(null);
     // Rafraîchir les journées après fermeture
     fetchJournees();
+  };
+
+  // Correction 505: Signer l'émargement intervenant
+  const signEmargement = async (journeeId: string, periode: string) => {
+    if (!token) return;
+
+    setSigningPeriode({ journeeId, periode });
+    try {
+      const res = await fetch(`/api/intervenant/emargements/${journeeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, periode }),
+      });
+
+      if (res.ok) {
+        // Rafraîchir les données
+        fetchJournees();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Erreur lors de la signature");
+      }
+    } catch (error) {
+      console.error("Erreur signature:", error);
+      alert("Erreur lors de la signature");
+    } finally {
+      setSigningPeriode(null);
+    }
+  };
+
+  // Correction 505: Déterminer le statut d'un créneau pour l'intervenant
+  const getIntervenantCreneauStatus = (journee: Journee, periode: "matin" | "aprem") => {
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const journeeDate = new Date(journee.date);
+    journeeDate.setHours(0, 0, 0, 0);
+
+    // Si déjà signé
+    const signature = periode === "matin" ? journee.intervenantSignatureMatin : journee.intervenantSignatureAprem;
+    if (signature) {
+      return { status: "signe", label: "Signé", canSign: false };
+    }
+
+    // Si journée future
+    if (journeeDate > today) {
+      return { status: "avenir", label: "À venir", canSign: false };
+    }
+
+    // Si journée passée (non signée)
+    if (journeeDate < today) {
+      return { status: "disponible", label: "Disponible", canSign: true };
+    }
+
+    // Journée d'aujourd'hui - vérifier l'heure
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTime = currentHour * 60 + currentMinutes;
+
+    if (periode === "matin") {
+      const heureDebut = journee.heureDebutMatin || "09:00";
+      const [hDebut, mDebut] = heureDebut.split(":").map(Number);
+      const startTime = hDebut * 60 + (mDebut || 0);
+
+      if (currentTime >= startTime) {
+        return { status: "disponible", label: "Disponible", canSign: true };
+      } else {
+        return { status: "avenir", label: `À partir de ${heureDebut}`, canSign: false };
+      }
+    } else {
+      const heureDebut = journee.heureDebutAprem || "14:00";
+      const [hDebut, mDebut] = heureDebut.split(":").map(Number);
+      const startTime = hDebut * 60 + (mDebut || 0);
+
+      if (currentTime >= startTime) {
+        return { status: "disponible", label: "Disponible", canSign: true };
+      } else {
+        return { status: "avenir", label: `À partir de ${heureDebut}`, canSign: false };
+      }
+    }
   };
 
   const openEmargementPage = (feuilleToken: string) => {
@@ -206,13 +290,13 @@ export default function IntervenantEmargementsPage() {
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* En-tête - Correction 504: Sous-titre reformulé */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Émargements
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          {selectedSession.formation.titre} - Gestion des feuilles de présence
+          Consultez les feuilles de présence et l&apos;avancement des signatures.
         </p>
       </div>
 
@@ -270,6 +354,12 @@ export default function IntervenantEmargementsPage() {
         </div>
       ) : (
         <div className="space-y-3">
+          {/* Section titre: Signatures apprenants */}
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <Users className="w-5 h-5 text-emerald-500" />
+            Signatures des apprenants
+          </h2>
+
           {journees.map((journee) => {
             const statusInfo = getEmargementStatus(journee);
             const isClickable = statusInfo.status !== "future";
@@ -351,6 +441,115 @@ export default function IntervenantEmargementsPage() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Correction 505: Bloc Émargement intervenant */}
+      {journees.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-indigo-500" />
+            Émargement intervenant
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 -mt-1">
+            Signez votre présence pour chaque demi-journée de formation.
+          </p>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {journees.map((journee) => {
+                const matinStatus = getIntervenantCreneauStatus(journee, "matin");
+                const apremStatus = getIntervenantCreneauStatus(journee, "aprem");
+
+                return (
+                  <div key={`intervenant-${journee.id}`} className="p-4">
+                    {/* En-tête de la journée */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white capitalize">
+                          {formatDate(journee.date)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Créneaux */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-13">
+                      {/* Créneau Matin */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white text-sm">Matin</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {journee.heureDebutMatin || "09:00"} – {journee.heureFinMatin || "12:30"}
+                          </p>
+                        </div>
+                        {matinStatus.status === "signe" ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-sm font-medium rounded-lg">
+                            <Check className="w-4 h-4" />
+                            Signé
+                          </span>
+                        ) : matinStatus.canSign ? (
+                          <button
+                            onClick={() => signEmargement(journee.id, "matin")}
+                            disabled={signingPeriode?.journeeId === journee.id && signingPeriode?.periode === "matin"}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {signingPeriode?.journeeId === journee.id && signingPeriode?.periode === "matin" ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Pen className="w-4 h-4" />
+                            )}
+                            Signer
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 text-sm rounded-lg">
+                            <Clock className="w-4 h-4" />
+                            {matinStatus.label}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Créneau Après-midi */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white text-sm">Après-midi</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {journee.heureDebutAprem || "14:00"} – {journee.heureFinAprem || "17:30"}
+                          </p>
+                        </div>
+                        {apremStatus.status === "signe" ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-sm font-medium rounded-lg">
+                            <Check className="w-4 h-4" />
+                            Signé
+                          </span>
+                        ) : apremStatus.canSign ? (
+                          <button
+                            onClick={() => signEmargement(journee.id, "aprem")}
+                            disabled={signingPeriode?.journeeId === journee.id && signingPeriode?.periode === "aprem"}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {signingPeriode?.journeeId === journee.id && signingPeriode?.periode === "aprem" ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Pen className="w-4 h-4" />
+                            )}
+                            Signer
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 text-sm rounded-lg">
+                            <Clock className="w-4 h-4" />
+                            {apremStatus.label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 

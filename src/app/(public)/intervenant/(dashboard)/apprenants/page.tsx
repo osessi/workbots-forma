@@ -1,19 +1,20 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import {
   Users,
   Search,
   Mail,
   Phone,
-  User,
   ChevronRight,
   Building2,
   X,
   CheckCircle,
   XCircle,
   Clock,
+  MessageCircle,
 } from "lucide-react";
 
 interface Apprenant {
@@ -29,6 +30,7 @@ interface Apprenant {
 
 export default function IntervenantApprenantsPage() {
   useRequireIntervenantAuth();
+  const router = useRouter();
   const { selectedSession, token, isLoading } = useIntervenantPortal();
   const [apprenants, setApprenants] = useState<Apprenant[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -256,32 +258,21 @@ export default function IntervenantApprenantsPage() {
                 )}
               </div>
 
-              {/* Progression */}
-              {selectedApprenant.progression !== undefined && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    Progression
-                  </h4>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-300">Avancement</span>
-                      <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        {selectedApprenant.progression}%
-                      </span>
-                    </div>
-                    <div className="h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all"
-                        style={{ width: `${selectedApprenant.progression}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            {/* Footer - Correction 503: Bouton Envoyer un message */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+              <button
+                onClick={() => {
+                  setSelectedApprenant(null);
+                  // Rediriger vers la messagerie avec l'ID de l'apprenant en paramètre
+                  router.push(`/intervenant/messages?apprenantId=${selectedApprenant.id}`);
+                }}
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2"
+              >
+                <MessageCircle className="w-5 h-5" />
+                Envoyer un message
+              </button>
               <button
                 onClick={() => setSelectedApprenant(null)}
                 className="w-full py-2.5 px-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg transition-colors"

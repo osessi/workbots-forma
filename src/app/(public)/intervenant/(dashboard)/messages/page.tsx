@@ -6,6 +6,7 @@
 // Permet à l'intervenant d'envoyer des messages aux apprenants de sa session
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -280,6 +281,7 @@ function MessageCard({
 
 export default function IntervenantMessagesPage() {
   useRequireIntervenantAuth();
+  const searchParams = useSearchParams();
   const { token, selectedSession, isLoading } = useIntervenantPortal();
 
   const [messages, setMessages] = useState<MessageEnvoye[]>([]);
@@ -298,7 +300,33 @@ export default function IntervenantMessagesPage() {
   const [sending, setSending] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
 
+  // Correction 503: Gérer le paramètre apprenantId pour pré-sélectionner un apprenant
+  const [initialApprenantId, setInitialApprenantId] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Correction 503: Récupérer l'apprenantId depuis l'URL au chargement
+  useEffect(() => {
+    const apprenantIdParam = searchParams.get("apprenantId");
+    if (apprenantIdParam) {
+      setInitialApprenantId(apprenantIdParam);
+    }
+  }, [searchParams]);
+
+  // Correction 503: Ouvrir le formulaire et pré-sélectionner l'apprenant quand les données sont chargées
+  useEffect(() => {
+    if (initialApprenantId && apprenants.length > 0 && !loading) {
+      // Vérifier que l'apprenant existe dans la liste
+      const apprenantExists = apprenants.some(a => a.id === initialApprenantId);
+      if (apprenantExists) {
+        setShowForm(true);
+        setEnvoyerATous(false);
+        setSelectedApprenants([initialApprenantId]);
+        // Réinitialiser pour ne pas rouvrir si on ferme le formulaire
+        setInitialApprenantId(null);
+      }
+    }
+  }, [initialApprenantId, apprenants, loading]);
 
   // Récupérer les messages
   const fetchMessages = useCallback(async () => {

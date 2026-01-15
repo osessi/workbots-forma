@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import {
   Users,
@@ -35,14 +35,12 @@ export default function IntervenantApprenantsPage() {
   const [selectedApprenant, setSelectedApprenant] = useState<Apprenant | null>(null);
   const [loadingApprenants, setLoadingApprenants] = useState(false);
 
-  useEffect(() => {
-    if (selectedSession && token) {
-      fetchApprenants();
+  // Correction 501: useCallback pour garantir la mise à jour automatique
+  const fetchApprenants = useCallback(async () => {
+    if (!selectedSession || !token) {
+      setApprenants([]);
+      return;
     }
-  }, [selectedSession, token]);
-
-  const fetchApprenants = async () => {
-    if (!selectedSession || !token) return;
 
     setLoadingApprenants(true);
     try {
@@ -50,13 +48,21 @@ export default function IntervenantApprenantsPage() {
       if (res.ok) {
         const data = await res.json();
         setApprenants(data.apprenants || []);
+      } else {
+        setApprenants([]);
       }
     } catch (error) {
       console.error("Erreur fetch apprenants:", error);
+      setApprenants([]);
     } finally {
       setLoadingApprenants(false);
     }
-  };
+  }, [selectedSession, token]);
+
+  // Correction 501: Recharger les apprenants quand la session change
+  useEffect(() => {
+    fetchApprenants();
+  }, [fetchApprenants]);
 
   if (isLoading) {
     return (
@@ -87,6 +93,7 @@ export default function IntervenantApprenantsPage() {
            apprenant.email.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  // Correction 502: Retourne null pour les statuts inconnus (pas de badge N/A)
   const getPresenceStatusInfo = (status?: string) => {
     switch (status) {
       case "present":
@@ -96,7 +103,7 @@ export default function IntervenantApprenantsPage() {
       case "partiel":
         return { icon: Clock, color: "text-amber-500", bg: "bg-amber-100 dark:bg-amber-500/20", label: "Partiel" };
       default:
-        return { icon: Clock, color: "text-gray-400", bg: "bg-gray-100 dark:bg-gray-700", label: "N/A" };
+        return null; // Pas de badge pour les statuts inconnus
     }
   };
 
@@ -143,7 +150,6 @@ export default function IntervenantApprenantsPage() {
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredApprenants.map((apprenant) => {
               const statusInfo = getPresenceStatusInfo(apprenant.presenceStatus);
-              const StatusIcon = statusInfo.icon;
 
               return (
                 <button
@@ -172,13 +178,15 @@ export default function IntervenantApprenantsPage() {
                     )}
                   </div>
 
-                  {/* Présence */}
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${statusInfo.bg}`}>
-                    <StatusIcon className={`w-4 h-4 ${statusInfo.color}`} />
-                    <span className={`text-xs font-medium ${statusInfo.color}`}>
-                      {statusInfo.label}
-                    </span>
-                  </div>
+                  {/* Correction 502: Afficher le badge uniquement si statut connu */}
+                  {statusInfo && (
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${statusInfo.bg}`}>
+                      <statusInfo.icon className={`w-4 h-4 ${statusInfo.color}`} />
+                      <span className={`text-xs font-medium ${statusInfo.color}`}>
+                        {statusInfo.label}
+                      </span>
+                    </div>
+                  )}
 
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </button>

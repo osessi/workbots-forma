@@ -229,6 +229,16 @@ export async function GET(request: NextRequest) {
         return journeeDate <= now && journeeDate >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       }).length || 0;
 
+      // Correction 500: Retourner toutes les journées avec leurs horaires complets
+      const journeesFormatees = session.journees?.map(j => ({
+        id: j.id,
+        date: j.date,
+        heureDebutMatin: j.heureDebutMatin,
+        heureFinMatin: j.heureFinMatin,
+        heureDebutAprem: j.heureDebutAprem,
+        heureFinAprem: j.heureFinAprem,
+      })) || [];
+
       return {
         id: session.id,
         reference: session.reference,
@@ -236,10 +246,12 @@ export async function GET(request: NextRequest) {
         dateDebut,
         dateFin,
         status: session.status,
+        modalite: session.modalite,
         formation: session.formation,
         lieu: session.lieu,
         nombreApprenants,
         nombreJournees: session.journees?.length || 0,
+        journees: journeesFormatees,
         prochaineJournee: prochaineJournee ? {
           id: prochaineJournee.id,
           date: prochaineJournee.date,

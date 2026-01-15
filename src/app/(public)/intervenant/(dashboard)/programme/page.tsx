@@ -1,5 +1,16 @@
 "use client";
 
+// ===========================================
+// CORRECTIONS 498-504: Page Programme intervenant
+// ===========================================
+// 498: Programme lié à la session sélectionnée
+// 499: Tuiles avec données de la SESSION uniquement
+// 500: Bloc Planning des journées ajouté
+// 501: Lieu de formation avec adresse complète
+// 502: "Programme détaillé" → "Contenu de la formation"
+// 503: "Suivi de l'exécution et évaluation" → "Suivi de l'exécution et évaluation des résultats"
+// 504: Snapshot figé - utiliser les données de la session et pas de la formation
+
 import React, { useEffect, Suspense } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -23,6 +34,9 @@ import {
   Timer,
   Accessibility,
   Info,
+  CalendarDays,
+  Sun,
+  Sunset,
 } from "lucide-react";
 
 function IntervenantProgrammePageContent() {
@@ -30,21 +44,22 @@ function IntervenantProgrammePageContent() {
   const { selectedSession, isLoading, selectSession, sessions } = useIntervenantPortal();
   const searchParams = useSearchParams();
 
-  // Sélectionner la session depuis l'URL si présente
+  // Correction 498: Sélectionner la session depuis l'URL si présente
   useEffect(() => {
     const sessionIdFromUrl = searchParams.get("session");
     if (sessionIdFromUrl && sessions.length > 0) {
-      // Vérifier que la session existe
       const sessionExists = sessions.some(s => s.id === sessionIdFromUrl);
       if (sessionExists) {
         selectSession(sessionIdFromUrl);
       }
     }
   }, [searchParams, sessions, selectSession]);
+
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
     description: true,
     objectifs: true,
     programme: true,
+    planning: true,
     public: false,
     prerequis: false,
     moyens: false,
@@ -76,13 +91,44 @@ function IntervenantProgrammePageContent() {
           Aucune session sélectionnée
         </h2>
         <p className="text-gray-500 dark:text-gray-400 max-w-md">
-          Veuillez sélectionner une session dans le menu déroulant en haut de page pour voir les détails du programme.
+          Veuillez sélectionner une session dans le menu pour voir les détails du programme.
         </p>
       </div>
     );
   }
 
+  // Correction 499 & 504: Utiliser les données de la SESSION et pas de la formation
   const formation = selectedSession.formation;
+  const sessionModalite = selectedSession.modalite || formation.modalite || "PRESENTIEL";
+  const nombreJournees = selectedSession.nombreJournees || 0;
+  const journees = selectedSession.journees || [];
+
+  // Calculer la durée totale en heures à partir des journées de la session
+  const calculerDureeSession = () => {
+    if (!journees || journees.length === 0) {
+      return formation.dureeHeures || 0;
+    }
+
+    let totalMinutes = 0;
+    for (const journee of journees) {
+      // Matin
+      if (journee.heureDebutMatin && journee.heureFinMatin) {
+        const [hDebutM, mDebutM] = journee.heureDebutMatin.split(":").map(Number);
+        const [hFinM, mFinM] = journee.heureFinMatin.split(":").map(Number);
+        totalMinutes += (hFinM * 60 + mFinM) - (hDebutM * 60 + mDebutM);
+      }
+      // Après-midi
+      if (journee.heureDebutAprem && journee.heureFinAprem) {
+        const [hDebutA, mDebutA] = journee.heureDebutAprem.split(":").map(Number);
+        const [hFinA, mFinA] = journee.heureFinAprem.split(":").map(Number);
+        totalMinutes += (hFinA * 60 + mFinA) - (hDebutA * 60 + mDebutA);
+      }
+    }
+
+    return Math.round(totalMinutes / 60);
+  };
+
+  const dureeSessionHeures = calculerDureeSession();
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return "Non défini";
@@ -94,8 +140,54 @@ function IntervenantProgrammePageContent() {
     });
   };
 
-  // Objectifs pédagogiques - déjà un tableau
+  const formatDateCourt = (date: Date | string | null) => {
+    if (!date) return "Non défini";
+    return new Date(date).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  const formatHeure = (heure: string | null) => {
+    if (!heure) return "-";
+    return heure;
+  };
+
+  // Correction 501: Construire l'adresse complète du lieu
+  const getAdresseComplete = () => {
+    if (!selectedSession.lieu) return null;
+    const lieu = selectedSession.lieu;
+
+    const parts: string[] = [];
+    if (lieu.lieuFormation) parts.push(lieu.lieuFormation);
+
+    // Construire code postal + ville
+    const cpVille: string[] = [];
+    if (lieu.codePostal) cpVille.push(lieu.codePostal);
+    if (lieu.ville) cpVille.push(lieu.ville);
+    if (cpVille.length > 0) parts.push(cpVille.join(" "));
+
+    return parts.join(", ") || lieu.nom;
+  };
+
+  // Objectifs pédagogiques
   const objectifsList = formation.objectifsPedagogiques || [];
+
+  // Formatter la modalité pour l'affichage
+  const getModaliteLabel = (modalite: string) => {
+    switch (modalite) {
+      case "PRESENTIEL":
+        return "Présentiel";
+      case "DISTANCIEL":
+        return "Distanciel";
+      case "MIXTE":
+        return "Mixte";
+      default:
+        return modalite;
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -118,7 +210,7 @@ function IntervenantProgrammePageContent() {
               </div>
               <div className="min-w-0">
                 <p className="text-emerald-100 text-sm mb-1">
-                  {formation.reference}
+                  {selectedSession.reference}
                 </p>
                 <h1 className="text-2xl font-bold truncate">
                   {formation.titre}
@@ -128,7 +220,7 @@ function IntervenantProgrammePageContent() {
           </div>
         </div>
 
-        {/* Infos clés */}
+        {/* Correction 499: Tuiles avec données de la SESSION uniquement */}
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
@@ -137,7 +229,7 @@ function IntervenantProgrammePageContent() {
                 <span className="text-xs uppercase tracking-wide">Durée</span>
               </div>
               <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                {formation.dureeHeures}h
+                {dureeSessionHeures}h
               </p>
             </div>
 
@@ -153,17 +245,17 @@ function IntervenantProgrammePageContent() {
 
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
-                {formation.modalite === "DISTANCIEL" ? (
+                {sessionModalite === "DISTANCIEL" ? (
                   <Video className="w-4 h-4" />
-                ) : formation.modalite === "MIXTE" ? (
+                ) : sessionModalite === "MIXTE" ? (
                   <Building2 className="w-4 h-4" />
                 ) : (
                   <MapPin className="w-4 h-4" />
                 )}
                 <span className="text-xs uppercase tracking-wide">Modalité</span>
               </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white capitalize">
-                {formation.modalite?.toLowerCase().replace("_", " ") || "Présentiel"}
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {getModaliteLabel(sessionModalite)}
               </p>
             </div>
 
@@ -173,7 +265,7 @@ function IntervenantProgrammePageContent() {
                 <span className="text-xs uppercase tracking-wide">Session</span>
               </div>
               <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                {selectedSession.nombreJournees ?? 0} jour{(selectedSession.nombreJournees ?? 0) > 1 ? "s" : ""}
+                {nombreJournees} jour{nombreJournees > 1 ? "s" : ""}
               </p>
             </div>
           </div>
@@ -201,6 +293,7 @@ function IntervenantProgrammePageContent() {
           </div>
         </div>
 
+        {/* Correction 501: Lieu avec adresse complète */}
         {selectedSession.lieu && (
           <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-2">
@@ -214,14 +307,89 @@ function IntervenantProgrammePageContent() {
             <p className="font-medium text-gray-900 dark:text-white">
               {selectedSession.lieu.nom}
             </p>
-            {selectedSession.lieu.lieuFormation && (
+            {getAdresseComplete() && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {selectedSession.lieu.lieuFormation}
+                {getAdresseComplete()}
               </p>
             )}
           </div>
         )}
       </div>
+
+      {/* Correction 500: Planning des journées */}
+      {journees.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <button
+            onClick={() => toggleSection("planning")}
+            className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <CalendarDays className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Planning des journées
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {journees.length} journée{journees.length > 1 ? "s" : ""} de formation
+                </p>
+              </div>
+            </div>
+            {expandedSections.planning ? (
+              <ChevronUp className="w-5 h-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            )}
+          </button>
+
+          {expandedSections.planning && (
+            <div className="px-6 pb-6">
+              <div className="space-y-3">
+                {journees
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map((journee, index) => (
+                    <div
+                      key={journee.id}
+                      className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="w-8 h-8 bg-blue-100 dark:bg-blue-500/20 rounded-full flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-400">
+                          {index + 1}
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatDateCourt(journee.date)}
+                        </span>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-3 ml-11">
+                        {/* Matin */}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Sun className="w-4 h-4 text-amber-500" />
+                          <span className="text-gray-500 dark:text-gray-400">Matin :</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {journee.heureDebutMatin && journee.heureFinMatin
+                              ? `${formatHeure(journee.heureDebutMatin)} - ${formatHeure(journee.heureFinMatin)}`
+                              : "Non défini"}
+                          </span>
+                        </div>
+                        {/* Après-midi */}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Sunset className="w-4 h-4 text-orange-500" />
+                          <span className="text-gray-500 dark:text-gray-400">Après-midi :</span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {journee.heureDebutAprem && journee.heureFinAprem
+                              ? `${formatHeure(journee.heureDebutAprem)} - ${formatHeure(journee.heureFinAprem)}`
+                              : "Non défini"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Description de la formation */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -392,7 +560,7 @@ function IntervenantProgrammePageContent() {
         )}
       </div>
 
-      {/* Programme détaillé */}
+      {/* Correction 502: "Contenu de la formation" (ex "Programme détaillé") */}
       {formation.modules && formation.modules.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <button
@@ -405,7 +573,7 @@ function IntervenantProgrammePageContent() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Programme détaillé
+                  Contenu de la formation
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {formation.modules.length} module{formation.modules.length > 1 ? "s" : ""}
@@ -507,7 +675,7 @@ function IntervenantProgrammePageContent() {
         )}
       </div>
 
-      {/* Suivi de l'exécution et évaluation des résultats */}
+      {/* Correction 503: "Suivi de l'exécution et évaluation des résultats" */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <button
           onClick={() => toggleSection("suivi")}
@@ -519,10 +687,10 @@ function IntervenantProgrammePageContent() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Suivi de l&apos;exécution et évaluation
+                Suivi de l&apos;exécution et évaluation des résultats
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Modalités de suivi et d&apos;évaluation des résultats
+                Modalités de suivi et d&apos;évaluation
               </p>
             </div>
           </div>

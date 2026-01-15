@@ -54,6 +54,7 @@ interface Lieu {
   typeLieu: string;
   lieuFormation?: string | null;
   adresse?: string | null;
+  codePostal?: string | null;
   ville?: string | null;
 }
 
@@ -72,6 +73,7 @@ interface Session {
   nom: string | null;
   status: string;
   statut?: string;
+  modalite?: string | null;
   formation: Formation;
   dateDebut: string | null;
   dateFin: string | null;

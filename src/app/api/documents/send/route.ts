@@ -189,12 +189,18 @@ export async function POST(request: NextRequest) {
       contentType: "application/pdf",
     }] : undefined;
 
-    await sendEmail({
+    // Correction 570: Envoyer l'email avec traçabilité complète
+    const emailResult = await sendEmail({
       to: email,
       subject: emailContent.subject,
       html: emailContent.html,
       text: emailContent.text,
       attachments,
+      // Options étendues pour traçabilité
+      type: "DOCUMENT" as const,
+      toName: body.toName || undefined,
+      sessionId: body.sessionId || undefined,
+      apprenantId: body.apprenantId || undefined,
     }, user.organizationId);
 
     // Mettre à jour le statut du document si c'est un SessionDocument
@@ -208,11 +214,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Correction 570: Retourner l'ID de l'email pour le suivi
     return NextResponse.json({
       success: true,
       message: `Document envoyé à ${email}`,
       documentId: documentInfo.id,
       documentTitre: documentInfo.titre,
+      sentEmailId: emailResult.sentEmailId || null,
+      sentAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error("Erreur envoi document:", error);

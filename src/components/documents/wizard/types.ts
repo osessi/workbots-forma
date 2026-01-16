@@ -152,6 +152,11 @@ export interface GeneratedDocument {
   jsonContent?: string;
   savedToDrive?: boolean;
   entrepriseId?: string;
+  // Correction 570: Suivi envoi email
+  sentEmailId?: string; // ID de l'email envoyé dans la table SentEmail
+  emailSentAt?: string; // Date d'envoi
+  emailOpenedAt?: string | null; // Date d'ouverture (null si pas ouvert)
+  emailStatus?: "SENT" | "DELIVERED" | "OPENED" | "BOUNCED" | "FAILED"; // Statut de l'email
 }
 
 // État complet du wizard

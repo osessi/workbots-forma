@@ -158,7 +158,7 @@ function mapDocumentType(wizardType: string): DocumentType | null {
     evaluation_financeur: "EVALUATION_FINANCEUR",
     evaluation_intervenant: "EVALUATION_INTERVENANT",
     // Nouveaux types
-    programme: "PROGRAMME_FORMATION",
+    programme: "FICHE_PEDAGOGIQUE", // Utilise le template PROGRAMME_DE_FORMATION qui a documentType: FICHE_PEDAGOGIQUE
     reglement_interieur: "REGLEMENT_INTERIEUR",
     cgv: "CONDITIONS_GENERALES_VENTE",
     contrat_sous_traitance: "CONTRAT_SOUS_TRAITANCE",

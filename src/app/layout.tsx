@@ -10,7 +10,10 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'Automate - Créez vos formations en quelques clics',
+  title: {
+    template: '%s | AutoMate Forma',
+    default: 'AutoMate Forma - Créez vos formations en quelques clics',
+  },
   description: 'Plateforme SaaS pour créer des formations professionnelles avec l\'IA',
   icons: {
     icon: '/images/logo/icone-automate.svg',

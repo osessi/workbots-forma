@@ -1,14 +1,18 @@
 // ===========================================
 // LAYOUT PUBLIC - Sans authentification
 // ===========================================
-// Layout pour les pages publiques (signature, etc.)
+// Layout pour les pages publiques (signature, évaluations, espaces apprenant/intervenant)
 // Note: Ce layout n'a pas de <html> ou <body> car ils sont définis dans le layout racine
+// Les titres spécifiques sont définis dans chaque page via generateMetadata ou metadata
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Signature Électronique | AutoMate Forma",
-  description: "Signez vos documents en ligne de manière sécurisée",
+  title: {
+    template: "%s | AutoMate Forma",
+    default: "AutoMate Forma",
+  },
+  description: "Plateforme de formation professionnelle",
 };
 
 export default function PublicLayout({

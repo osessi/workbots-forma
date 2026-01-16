@@ -35,6 +35,10 @@ import {
   Send,
   Copy,
   Link,
+  // Correction 571: Icônes pour nouveaux types de documents
+  ScrollText,
+  Handshake,
+  Building2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -89,11 +93,15 @@ type DocumentType =
   | "attestation"
   | "certificat_realisation"
   | "emargement"
-  | "facture";
+  | "facture"
+  // Correction 571: Nouveaux types de documents
+  | "cgv"
+  | "contrat_sous_traitance"
+  | "programme";
 
 // Types pour les évaluations en ligne (formulaires)
 type EvaluationSatisfactionType = "CHAUD" | "FROID";
-type EvaluationOtherType = "INTERVENANT" | "FINANCEUR";
+type EvaluationOtherType = "INTERVENANT" | "FINANCEUR" | "ENTREPRISE";
 type EvaluationType = EvaluationSatisfactionType | EvaluationOtherType;
 
 interface CreatedEvaluation {
@@ -105,6 +113,8 @@ interface CreatedEvaluation {
   intervenantName?: string;
   financeurId?: string;
   financeurName?: string;
+  entrepriseId?: string;
+  entrepriseName?: string;
   token: string;
   status: string;
 }
@@ -191,6 +201,39 @@ const documentsConfig: DocumentConfig[] = [
     color: "text-red-600 dark:text-red-400",
     bgColor: "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/30",
   },
+  // Correction 571: Nouveaux types de documents
+  {
+    id: "cgv",
+    label: "Conditions Générales de Vente (CGV)",
+    description: "Document légal présentant les conditions de vente",
+    icon: <ScrollText size={20} />,
+    perClient: true,
+    perApprenant: false,
+    color: "text-slate-600 dark:text-slate-400",
+    bgColor: "bg-slate-50 border-slate-200 dark:bg-slate-500/10 dark:border-slate-500/30",
+  },
+  {
+    id: "contrat_sous_traitance",
+    label: "Contrat de sous-traitance",
+    description: "Contrat entre l'organisme et un formateur externe",
+    icon: <Handshake size={20} />,
+    perClient: false,
+    perApprenant: false,
+    color: "text-indigo-600 dark:text-indigo-400",
+    bgColor: "bg-indigo-50 border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30",
+  },
+  {
+    id: "programme",
+    label: "Programme de formation",
+    description: "Programme détaillé de la formation à transmettre",
+    icon: <BookOpen size={20} />,
+    perClient: true,
+    perApprenant: false,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bgColor: "bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30",
+  },
+  // Note: evaluation_financeur et evaluation_entreprise sont maintenant dans evaluationsOtherConfig
+  // car ce sont des formulaires en ligne, pas des documents PDF
 ];
 
 // Configuration des évaluations en ligne (formulaires)
@@ -201,7 +244,7 @@ interface EvaluationConfig {
   icon: React.ReactNode;
   color: string;
   bgColor: string;
-  targetType: "apprenant" | "intervenant" | "financeur";
+  targetType: "apprenant" | "intervenant" | "financeur" | "entreprise";
 }
 
 // Évaluations de satisfaction (apprenants)
@@ -226,7 +269,7 @@ const evaluationsSatisfactionConfig: EvaluationConfig[] = [
   },
 ];
 
-// Évaluations autres (intervenants, financeurs)
+// Évaluations autres (intervenants, financeurs, entreprises)
 const evaluationsOtherConfig: EvaluationConfig[] = [
   {
     id: "INTERVENANT",
@@ -245,6 +288,15 @@ const evaluationsOtherConfig: EvaluationConfig[] = [
     color: "text-amber-600 dark:text-amber-400",
     bgColor: "bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30",
     targetType: "financeur",
+  },
+  {
+    id: "ENTREPRISE",
+    label: "Évaluation entreprise",
+    description: "Questionnaire de satisfaction pour l'entreprise cliente",
+    icon: <Building2 size={20} />,
+    color: "text-sky-600 dark:text-sky-400",
+    bgColor: "bg-sky-50 border-sky-200 dark:bg-sky-500/10 dark:border-sky-500/30",
+    targetType: "entreprise" as const,
   },
 ];
 
@@ -509,6 +561,52 @@ export default function StepDocuments({
     }
   }, [generatedDocs, onGeneratedDocsChange]);
 
+  // Correction 570: Rafraîchir le statut des emails envoyés (vérifier ouverture)
+  const refreshEmailStatuses = useCallback(async () => {
+    const docsWithEmail = generatedDocs.filter(d => d.sentEmailId);
+    if (docsWithEmail.length === 0) return;
+
+    for (const doc of docsWithEmail) {
+      if (!doc.sentEmailId) continue;
+
+      try {
+        const res = await fetch(`/api/emails/${doc.sentEmailId}/status`);
+        if (res.ok) {
+          const status = await res.json();
+          // Mettre à jour si le statut a changé
+          if (status.openedAt && !doc.emailOpenedAt) {
+            setGeneratedDocs((prev) =>
+              prev.map((d) =>
+                d.id === doc.id
+                  ? {
+                      ...d,
+                      emailOpenedAt: status.openedAt,
+                      emailStatus: "OPENED" as const,
+                    }
+                  : d
+              )
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Erreur refresh statut email:", err);
+      }
+    }
+  }, [generatedDocs]);
+
+  // Correction 570: Rafraîchir les statuts toutes les 30 secondes si des emails ont été envoyés
+  useEffect(() => {
+    const hasEmailsSent = generatedDocs.some(d => d.sentEmailId && !d.emailOpenedAt);
+    if (!hasEmailsSent) return;
+
+    // Rafraîchir immédiatement
+    refreshEmailStatuses();
+
+    // Puis toutes les 30 secondes
+    const interval = setInterval(refreshEmailStatuses, 30000);
+    return () => clearInterval(interval);
+  }, [generatedDocs, refreshEmailStatuses]);
+
   // Calculs pour le récap
   const totalApprenants = clients.reduce((acc, c) => acc + c.apprenants.length, 0);
   const totalTarif = tarifs.reduce((acc, t) => acc + (t.tarifHT || 0), 0);
@@ -720,6 +818,31 @@ export default function StepDocuments({
         }));
       case "emargement":
         return [{ id: "session", uniqueKey: "emargement-session", name: "Session complète", type: "session" as const }];
+      // Correction 571: Nouveaux types de documents
+      case "cgv":
+      case "programme":
+        // CGV et Programme pour tous les clients
+        return clients.map((c) => ({
+          id: c.id,
+          uniqueKey: `${docType}-${c.id}`,
+          name: c.type === "ENTREPRISE"
+            ? c.entreprise?.raisonSociale || "Entreprise"
+            : c.apprenant ? `${c.apprenant.prenom} ${c.apprenant.nom}` : "Client",
+          type: "client" as const,
+          clientType: c.type,
+        }));
+      case "contrat_sous_traitance":
+        // Contrat de sous-traitance pour les formateurs (si externes)
+        if (formateurs.formateurPrincipal) {
+          return [{
+            id: formateurs.formateurPrincipal.id,
+            uniqueKey: `contrat_sous_traitance-${formateurs.formateurPrincipal.id}`,
+            name: `${formateurs.formateurPrincipal.prenom} ${formateurs.formateurPrincipal.nom}`,
+            type: "formateur" as const,
+          }];
+        }
+        return [];
+      // Note: Les évaluations financeur et entreprise sont maintenant dans le bloc "Évaluations en ligne"
       default:
         return [];
     }
@@ -870,6 +993,54 @@ export default function StepDocuments({
     }
   };
 
+  // Créer une évaluation entreprise
+  const createEntrepriseEvaluation = async (entrepriseId: string, entrepriseName: string) => {
+    if (!formation.sessionId) {
+      setError("Aucune session associée. Veuillez d'abord planifier la session.");
+      return;
+    }
+
+    setCreatingEvalType(`ENTREPRISE-${entrepriseId}`);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/evaluation-entreprise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: formation.sessionId,
+          entrepriseId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la création de l'évaluation entreprise");
+      }
+
+      const result = await response.json();
+
+      // Ajouter à la liste des évaluations créées
+      setCreatedEvaluations((prev) => {
+        const exists = prev.find((e) => e.id === result.id);
+        if (exists) return prev;
+        return [...prev, {
+          id: result.id,
+          type: "ENTREPRISE" as EvaluationType,
+          entrepriseId,
+          entrepriseName,
+          token: result.token,
+          status: result.status,
+        }];
+      });
+    } catch (err) {
+      console.error("Erreur création évaluation entreprise:", err);
+      setError(err instanceof Error ? err.message : "Erreur lors de la création de l'évaluation");
+    } finally {
+      setCreatingEvalType(null);
+    }
+  };
+
   // Fonction générique pour créer une évaluation selon son type
   const createEvaluation = async (evalConfig: EvaluationConfig, targetId: string, targetName: string) => {
     if (evalConfig.targetType === "apprenant") {
@@ -878,6 +1049,8 @@ export default function StepDocuments({
       await createIntervenantEvaluation(targetId, targetName);
     } else if (evalConfig.targetType === "financeur") {
       await createFinanceurEvaluation(targetId, targetName);
+    } else if (evalConfig.targetType === "entreprise") {
+      await createEntrepriseEvaluation(targetId, targetName);
     }
   };
 
@@ -935,6 +1108,23 @@ export default function StepDocuments({
           await createFinanceurEvaluation(financeur.id, financeur.name);
         }
       }
+    } else if (evalConfig.targetType === "entreprise") {
+      // Créer pour toutes les entreprises clientes
+      const entreprises = clients
+        .filter((c) => c.type === "ENTREPRISE" && c.entreprise)
+        .map((c) => ({
+          id: c.entrepriseId || c.id,
+          name: c.entreprise?.raisonSociale || "Entreprise",
+        }));
+
+      for (const entreprise of entreprises) {
+        const alreadyCreated = createdEvaluations.find(
+          (e) => e.type === "ENTREPRISE" && e.entrepriseId === entreprise.id
+        );
+        if (!alreadyCreated) {
+          await createEntrepriseEvaluation(entreprise.id, entreprise.name);
+        }
+      }
     }
   };
 
@@ -946,6 +1136,8 @@ export default function StepDocuments({
       return createdEvaluations.some((e) => e.type === "INTERVENANT" && e.intervenantId === targetId);
     } else if (evalConfig.targetType === "financeur") {
       return createdEvaluations.some((e) => e.type === "FINANCEUR" && e.financeurId === targetId);
+    } else if (evalConfig.targetType === "entreprise") {
+      return createdEvaluations.some((e) => e.type === "ENTREPRISE" && e.entrepriseId === targetId);
     }
     return false;
   };
@@ -958,6 +1150,8 @@ export default function StepDocuments({
       return createdEvaluations.find((e) => e.type === "INTERVENANT" && e.intervenantId === targetId);
     } else if (evalConfig.targetType === "financeur") {
       return createdEvaluations.find((e) => e.type === "FINANCEUR" && e.financeurId === targetId);
+    } else if (evalConfig.targetType === "entreprise") {
+      return createdEvaluations.find((e) => e.type === "ENTREPRISE" && e.entrepriseId === targetId);
     }
     return undefined;
   };
@@ -985,6 +1179,15 @@ export default function StepDocuments({
       // Pour l'instant, les financeurs ne sont pas dans SessionTarif
       // Cette partie sera mise à jour quand les financeurs seront ajoutés
       return [];
+    } else if (evalConfig.targetType === "entreprise") {
+      // Retourner les entreprises clientes
+      return clients
+        .filter((c) => c.type === "ENTREPRISE" && c.entreprise)
+        .map((c) => ({
+          id: c.entrepriseId || c.id,
+          uniqueKey: `ENTREPRISE-${c.entrepriseId || c.id}`,
+          name: c.entreprise?.raisonSociale || "Entreprise",
+        }));
     }
     return [];
   };
@@ -1235,20 +1438,40 @@ export default function StepDocuments({
   };
 
   // Envoyer un document par email
+  // Correction 570: Stocker les informations d'envoi pour afficher les pastilles Envoyé/Ouvert
   const sendDocumentEmail = async () => {
     if (!emailDoc || !emailAddress) return;
 
     setIsSendingEmail(true);
     try {
+      // Récupérer le nom du destinataire
+      let toName = "";
+      if (emailDoc.apprenantId) {
+        const apprenant = clients
+          .flatMap(c => c.apprenants)
+          .find(a => a.id === emailDoc.apprenantId);
+        toName = apprenant ? `${apprenant.prenom} ${apprenant.nom}` : "";
+      } else if (emailDoc.clientId) {
+        const client = clients.find(c => c.id === emailDoc.clientId);
+        if (client?.type === "ENTREPRISE" && client?.entreprise) {
+          toName = client.entreprise.raisonSociale;
+        } else if (client?.apprenant) {
+          toName = `${client.apprenant.prenom} ${client.apprenant.nom}`;
+        }
+      }
+
       const response = await fetch("/api/documents/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documentId: emailDoc.id,
-          documentTitre: emailDoc.titre, // Envoyer le titre pour les documents non sauvegardés
+          documentTitre: emailDoc.titre,
           email: emailAddress,
           subject: emailSubject,
           message: emailMessage,
+          toName,
+          sessionId: formation.sessionId,
+          apprenantId: emailDoc.apprenantId,
         }),
       });
 
@@ -1257,7 +1480,23 @@ export default function StepDocuments({
         throw new Error(errorData.error || "Erreur lors de l'envoi");
       }
 
-      // Marquer comme envoyé
+      const result = await response.json();
+
+      // Correction 570: Mettre à jour le document avec les infos d'envoi
+      setGeneratedDocs((prev) =>
+        prev.map((d) =>
+          d.id === emailDoc.id
+            ? {
+                ...d,
+                sentEmailId: result.sentEmailId,
+                emailSentAt: result.sentAt,
+                emailStatus: "SENT" as const,
+              }
+            : d
+        )
+      );
+
+      // Marquer comme envoyé (legacy)
       setEmailSent(prev => new Set([...prev, emailDoc.id]));
       setShowEmailModal(false);
       setEmailDoc(null);
@@ -1339,6 +1578,7 @@ export default function StepDocuments({
       }
 
       // Mapper les types de documents locaux vers les types Prisma
+      // Correction 571: Ajouter les nouveaux types de documents au mapping
       const documentTypeMapping: Record<string, string> = {
         convention: "CONVENTION",
         contrat: "CONTRAT_FORMATION",
@@ -1347,6 +1587,11 @@ export default function StepDocuments({
         certificat_realisation: "CERTIFICAT",
         emargement: "FEUILLE_EMARGEMENT",
         facture: "FACTURE",
+        cgv: "CGV",
+        contrat_sous_traitance: "CONTRAT_SOUS_TRAITANCE",
+        programme: "PROGRAMME",
+        evaluation_financeur: "EVALUATION_FINANCEUR",
+        evaluation_entreprise: "EVALUATION_ENTREPRISE",
       };
       const mappedDocType = documentTypeMapping[signatureDoc.type || ""] || "AUTRE";
 
@@ -1851,6 +2096,33 @@ export default function StepDocuments({
                           <div className="flex items-center gap-2">
                             {isGenerated && generatedDoc ? (
                               <>
+                                {/* Correction 570: Pastille statut email */}
+                                {generatedDoc.emailSentAt && (
+                                  <span
+                                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg ${
+                                      generatedDoc.emailOpenedAt
+                                        ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                        : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400"
+                                    }`}
+                                    title={
+                                      generatedDoc.emailOpenedAt
+                                        ? `Ouvert le ${new Date(generatedDoc.emailOpenedAt).toLocaleDateString("fr-FR")} à ${new Date(generatedDoc.emailOpenedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                                        : `Envoyé le ${new Date(generatedDoc.emailSentAt).toLocaleDateString("fr-FR")} à ${new Date(generatedDoc.emailSentAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                                    }
+                                  >
+                                    {generatedDoc.emailOpenedAt ? (
+                                      <>
+                                        <Eye size={10} />
+                                        Ouvert
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Send size={10} />
+                                        Envoyé
+                                      </>
+                                    )}
+                                  </span>
+                                )}
                                 <button
                                   onClick={() => {
                                     setPreviewDoc(generatedDoc);
@@ -1867,6 +2139,19 @@ export default function StepDocuments({
                                 >
                                   <Download size={12} />
                                   PDF
+                                </button>
+                                {/* Correction 570: Bouton Envoyer par email */}
+                                <button
+                                  onClick={() => openEmailModal(generatedDoc)}
+                                  className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg ${
+                                    generatedDoc.emailSentAt
+                                      ? "text-green-600 bg-green-50 border border-green-200 hover:bg-green-100 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-400"
+                                      : "text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-400"
+                                  }`}
+                                  title={generatedDoc.emailSentAt ? "Renvoyer par email" : "Envoyer par email"}
+                                >
+                                  <Mail size={12} />
+                                  {generatedDoc.emailSentAt ? "Renvoyer" : "Email"}
                                 </button>
                                 <button
                                   onClick={() => openSignatureModal(generatedDoc)}
@@ -2000,7 +2285,9 @@ export default function StepDocuments({
                           ? `/evaluation-intervenant/${createdEval?.token}`
                           : evalConfig.targetType === "financeur"
                             ? `/evaluation-financeur/${createdEval?.token}`
-                            : `/evaluation/${createdEval?.token}`;
+                            : evalConfig.targetType === "entreprise"
+                              ? `/evaluation-entreprise/${createdEval?.token}`
+                              : `/evaluation/${createdEval?.token}`;
 
                         return (
                           <div
@@ -2100,14 +2387,19 @@ export default function StepDocuments({
               <CheckCircle2 size={16} />
               {generatedDocs.length} document{generatedDocs.length > 1 ? "s" : ""} généré{generatedDocs.length > 1 ? "s" : ""}
             </h3>
+            {/* Correction 570: Légende mise à jour avec statuts email */}
             <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                Complet
+                Ouvert
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                Envoyé
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-yellow-500" />
-                Partiel
+                Sauvegardé
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-gray-400" />
@@ -2119,7 +2411,9 @@ export default function StepDocuments({
           <div className="flex flex-wrap gap-2">
             {generatedDocs.map((doc) => {
               const isSaved = doc.savedToDrive;
-              const isSent = emailSent.has(doc.id);
+              // Correction 570: Utiliser les nouvelles propriétés d'email
+              const isSent = doc.emailSentAt || emailSent.has(doc.id);
+              const isOpened = !!doc.emailOpenedAt;
               return (
                 <div
                   key={doc.id}
@@ -2128,25 +2422,38 @@ export default function StepDocuments({
                   {/* Pastille de statut */}
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      isSaved && isSent
+                      isOpened
                         ? "bg-green-500"
-                        : isSaved || isSent
-                          ? "bg-yellow-500"
-                          : "bg-gray-400"
+                        : isSent
+                          ? "bg-blue-500"
+                          : isSaved
+                            ? "bg-yellow-500"
+                            : "bg-gray-400"
                     }`}
                     title={
-                      isSaved && isSent
-                        ? "Sauvegardé et envoyé"
-                        : isSaved
-                          ? "Sauvegardé (non envoyé)"
-                          : isSent
-                            ? "Envoyé (non sauvegardé)"
+                      isOpened
+                        ? `Ouvert le ${new Date(doc.emailOpenedAt!).toLocaleDateString("fr-FR")}`
+                        : isSent
+                          ? `Envoyé le ${doc.emailSentAt ? new Date(doc.emailSentAt).toLocaleDateString("fr-FR") : ""}`
+                          : isSaved
+                            ? "Sauvegardé (non envoyé)"
                             : "En attente"
                     }
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300 max-w-[180px] truncate">
                     {doc.titre}
                   </span>
+                  {/* Correction 570: Badge statut email */}
+                  {isOpened && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400 rounded">
+                      Ouvert
+                    </span>
+                  )}
+                  {isSent && !isOpened && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 rounded">
+                      Envoyé
+                    </span>
+                  )}
                   <button
                     onClick={() => {
                       setPreviewDoc(doc);
@@ -2167,13 +2474,15 @@ export default function StepDocuments({
                   <button
                     onClick={() => openEmailModal(doc)}
                     className={`p-1 transition-colors ${
-                      isSent
+                      isOpened
                         ? "text-green-500"
-                        : "text-blue-500 hover:text-blue-600"
+                        : isSent
+                          ? "text-blue-500"
+                          : "text-blue-500 hover:text-blue-600"
                     }`}
-                    title={isSent ? "Email envoyé" : "Envoyer par email"}
+                    title={isOpened ? "Email ouvert - Renvoyer" : isSent ? "Email envoyé - Renvoyer" : "Envoyer par email"}
                   >
-                    {isSent ? <CheckCircle2 size={14} /> : <Mail size={14} />}
+                    {isOpened ? <CheckCircle2 size={14} /> : isSent ? <Send size={14} /> : <Mail size={14} />}
                   </button>
                   <button
                     onClick={() => openSignatureModal(doc)}

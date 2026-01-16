@@ -196,6 +196,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Derniers emails
+    // Correction 569: Ajouter openedAt pour afficher la date d'ouverture
     const recentEmails = await prisma.sentEmail.findMany({
       where: { ...orgFilter },
       orderBy: { sentAt: "desc" },
@@ -208,6 +209,7 @@ export async function GET(request: NextRequest) {
         type: true,
         status: true,
         sentAt: true,
+        openedAt: true, // Correction 569
       },
     });
 

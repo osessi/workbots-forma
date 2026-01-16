@@ -31,6 +31,7 @@ interface DashboardStats {
     type: string;
     status: string;
     sentAt: string;
+    openedAt: string | null; // Correction 569
   }>;
 }
 
@@ -266,27 +267,31 @@ export default function EmailsPage() {
                       À : {email.toName || email.toEmail}
                     </p>
                   </div>
+                  {/* Correction 569: Afficher Ouvert avec date/heure si ouvert */}
                   <div className="text-right">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        email.status === "DELIVERED"
+                        email.status === "OPENED" || email.openedAt
                           ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : email.status === "OPENED"
-                          ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                          : email.status === "DELIVERED"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                           : email.status === "BOUNCED"
                           ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
                       }`}
                     >
-                      {email.status === "DELIVERED" && "Délivré"}
-                      {email.status === "OPENED" && "Ouvert"}
-                      {email.status === "SENT" && "Envoyé"}
+                      {(email.status === "OPENED" || email.openedAt) && "Ouvert"}
+                      {email.status === "DELIVERED" && !email.openedAt && "Délivré"}
+                      {email.status === "SENT" && !email.openedAt && "Envoyé"}
                       {email.status === "BOUNCED" && "Rebond"}
-                      {!["DELIVERED", "OPENED", "SENT", "BOUNCED"].includes(email.status) && email.status}
+                      {!["DELIVERED", "OPENED", "SENT", "BOUNCED"].includes(email.status) && !email.openedAt && email.status}
                     </span>
                     <p className="text-xs text-gray-400 mt-1 flex items-center justify-end gap-1">
                       <Clock className="w-3 h-3" />
-                      {formatDate(email.sentAt)}
+                      {email.openedAt
+                        ? `Ouvert le ${formatDate(email.openedAt)}`
+                        : `Envoyé le ${formatDate(email.sentAt)}`
+                      }
                     </p>
                   </div>
                 </div>

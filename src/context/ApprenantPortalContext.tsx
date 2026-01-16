@@ -64,6 +64,7 @@ interface DashboardStats {
   prochainsCréneaux: number;
   messagesNonLus?: number;
   messagesIntervenantNonLus?: number; // Correction 431 - Messages de l'intervenant non lus
+  messagesOrganismeNonLus?: number; // Messages de l'organisme non lus
 }
 
 // Qualiopi IND 3 - Certification obtenue par l'apprenant

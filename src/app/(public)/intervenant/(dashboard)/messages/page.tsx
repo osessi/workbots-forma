@@ -5,7 +5,7 @@
 // ===========================================
 // Permet à l'intervenant d'envoyer des messages aux apprenants de sa session
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -560,7 +560,7 @@ function MessageCard({
 // PAGE PRINCIPALE
 // =====================================
 
-export default function IntervenantMessagesPage() {
+function IntervenantMessagesPageContent() {
   useRequireIntervenantAuth();
   const searchParams = useSearchParams();
   const { token, selectedSession, isLoading } = useIntervenantPortal();
@@ -1060,5 +1060,18 @@ export default function IntervenantMessagesPage() {
         </motion.div>
       )}
     </div>
+  );
+}
+
+// Wrapper avec Suspense pour useSearchParams
+export default function IntervenantMessagesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+      </div>
+    }>
+      <IntervenantMessagesPageContent />
+    </Suspense>
   );
 }

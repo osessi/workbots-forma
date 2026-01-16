@@ -5,7 +5,7 @@
 // ===========================================
 // Qualiopi Indicateur 1 : Gestion des demandes de pré-inscription
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -172,7 +172,7 @@ const financementLabels: Record<string, string> = {
   AUTRE: "Autre",
 };
 
-export default function PreInscriptionsPage() {
+function PreInscriptionsPageContent() {
   // Correction 389: Récupérer le paramètre view pour ouvrir directement un dossier
   const searchParams = useSearchParams();
   const viewId = searchParams.get("view");
@@ -1059,6 +1059,19 @@ function PreInscriptionDetailModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrapper avec Suspense pour useSearchParams
+export default function PreInscriptionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+      </div>
+    }>
+      <PreInscriptionsPageContent />
+    </Suspense>
   );
 }
 

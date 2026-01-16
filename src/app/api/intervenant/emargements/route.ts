@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
                 formateurId: true,
                 typeSignataire: true,
                 signedAt: true,
+                signatureData: true, // Inclure les données de signature pour affichage miniature
               },
             },
           },
@@ -130,14 +131,16 @@ export async function GET(request: NextRequest) {
         signaturesMatin,
         signaturesAprem,
         totalParticipants,
-        // Correction 505: Émargement intervenant
+        // Correction 505: Émargement intervenant avec données de signature
         intervenantSignatureMatin: intervenantSignatureMatin ? {
           id: intervenantSignatureMatin.id,
           signedAt: intervenantSignatureMatin.signedAt?.toISOString() || null,
+          signatureData: intervenantSignatureMatin.signatureData || null,
         } : null,
         intervenantSignatureAprem: intervenantSignatureAprem ? {
           id: intervenantSignatureAprem.id,
           signedAt: intervenantSignatureAprem.signedAt?.toISOString() || null,
+          signatureData: intervenantSignatureAprem.signatureData || null,
         } : null,
       };
     });

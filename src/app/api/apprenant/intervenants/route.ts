@@ -33,6 +33,7 @@ function decodeApprenantToken(token: string): { apprenantId: string; organizatio
 }
 
 // Type intervenant pour l'API
+// Correction 537: Ajout du rôle "coformateur"
 interface IntervenantResponse {
   id: string;
   nom: string;
@@ -44,7 +45,7 @@ interface IntervenantResponse {
   structure: string | null;
   photoUrl: string | null;
   bio: string | null;
-  role: "formateur" | "tuteur" | "expert";
+  role: "formateur" | "coformateur" | "tuteur" | "expert";
 }
 
 export async function GET(request: NextRequest) {
@@ -126,7 +127,7 @@ export async function GET(request: NextRequest) {
               structure: coFormateur.structure,
               photoUrl: coFormateur.photoUrl || null,
               bio: coFormateur.biographie || null,
-              role: "formateur",
+              role: "coformateur",
             });
           }
         }
@@ -191,7 +192,7 @@ export async function GET(request: NextRequest) {
               structure: coFormateur.structure,
               photoUrl: coFormateur.photoUrl || null,
               bio: coFormateur.biographie || null,
-              role: "formateur",
+              role: "coformateur",
             });
           }
         }
@@ -261,7 +262,7 @@ export async function GET(request: NextRequest) {
               structure: coFormateur.structure,
               photoUrl: coFormateur.photoUrl || null,
               bio: coFormateur.biographie || null,
-              role: "formateur",
+              role: "coformateur",
             });
           }
         }

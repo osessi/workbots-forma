@@ -30,6 +30,8 @@ import {
   RefreshCw,
   Inbox,
   Plus,
+  Reply,
+  MessageCircle,
 } from "lucide-react";
 
 // =====================================
@@ -50,6 +52,34 @@ interface Apprenant {
   email: string;
 }
 
+interface ReponseMessage {
+  id: string;
+  contenu: string;
+  attachments: Attachment[];
+  createdAt: string;
+  typeAuteur: string; // "apprenant" ou "intervenant"
+  isReadByIntervenant: boolean;
+  isReadByApprenant: boolean;
+  // Auteur si c'est un apprenant
+  apprenant: {
+    id: string;
+    nom: string;
+    prenom: string;
+  } | null;
+  // Auteur si c'est l'intervenant
+  intervenant: {
+    id: string;
+    nom: string;
+    prenom: string;
+  } | null;
+  // Destinataire si réponse de l'intervenant
+  destinataireApprenant: {
+    id: string;
+    nom: string;
+    prenom: string;
+  } | null;
+}
+
 interface MessageEnvoye {
   id: string;
   sujet: string | null;
@@ -64,6 +94,9 @@ interface MessageEnvoye {
     apprenantId: string;
     readAt: string;
   }>;
+  // Réponses (apprenants ET intervenant)
+  reponses: ReponseMessage[];
+  nombreReponsesNonLues: number;
 }
 
 // =====================================
@@ -114,16 +147,79 @@ function getFileIcon(type?: string) {
 function MessageCard({
   message,
   apprenants,
+  token,
+  onReponseLue,
 }: {
   message: MessageEnvoye;
   apprenants: Apprenant[];
+  token: string;
+  onReponseLue: () => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [markingAsRead, setMarkingAsRead] = useState(false);
+  // État pour le formulaire de réponse
+  const [replyingTo, setReplyingTo] = useState<{ apprenantId: string; apprenantNom: string } | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
 
   // Calculer le statut de lecture
   const lecturesCount = message.nombreLectures;
   const totalDestinataires = message.nombreDestinataires;
   const allRead = lecturesCount >= totalDestinataires;
+  const hasUnreadReplies = message.nombreReponsesNonLues > 0;
+
+  // Envoyer une réponse à un apprenant
+  const handleSendReply = async () => {
+    if (!replyingTo || !replyContent.trim()) return;
+
+    setSendingReply(true);
+    try {
+      const res = await fetch(`/api/intervenant/messages/reponse?token=${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: message.id,
+          destinataireApprenantId: replyingTo.apprenantId,
+          contenu: replyContent.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        setReplyingTo(null);
+        setReplyContent("");
+        onReponseLue(); // Rafraîchir les messages
+      } else {
+        const data = await res.json();
+        alert(data.error || "Erreur lors de l'envoi");
+      }
+    } catch (err) {
+      console.error("Erreur envoi réponse:", err);
+      alert("Erreur lors de l'envoi de la réponse");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  // Marquer toutes les réponses comme lues
+  const markAllRepliesAsRead = async () => {
+    if (message.nombreReponsesNonLues === 0) return;
+
+    setMarkingAsRead(true);
+    try {
+      const res = await fetch(`/api/intervenant/messages?token=${encodeURIComponent(token)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: message.id }),
+      });
+      if (res.ok) {
+        onReponseLue();
+      }
+    } catch (err) {
+      console.error("Erreur marquage comme lu:", err);
+    } finally {
+      setMarkingAsRead(false);
+    }
+  };
 
   return (
     <motion.div
@@ -172,8 +268,28 @@ function MessageCard({
               {allRead ? <CheckCheck className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
               {lecturesCount}/{totalDestinataires} lu{lecturesCount > 1 ? "s" : ""}
             </span>
+            {message.reponses.length > 0 && (
+              <span className={`flex items-center gap-1 ${hasUnreadReplies ? "text-orange-600 dark:text-orange-400 font-medium" : "text-gray-500"}`}>
+                <Reply className="w-3.5 h-3.5" />
+                {message.reponses.length} réponse{message.reponses.length > 1 ? "s" : ""}
+                {hasUnreadReplies && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 text-[10px] font-bold rounded-full">
+                    {message.nombreReponsesNonLues} new
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Badge réponses non lues */}
+        {hasUnreadReplies && (
+          <div className="flex-shrink-0 mr-2">
+            <span className="flex items-center justify-center w-6 h-6 bg-orange-500 text-white text-xs font-bold rounded-full">
+              {message.nombreReponsesNonLues}
+            </span>
+          </div>
+        )}
 
         {/* Chevron */}
         <div className="flex-shrink-0">
@@ -232,6 +348,171 @@ function MessageCard({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Conversation (réponses des apprenants ET de l'intervenant) */}
+              {message.reponses.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4" />
+                      Conversation ({message.reponses.length} message{message.reponses.length > 1 ? "s" : ""})
+                    </p>
+                    {hasUnreadReplies && (
+                      <button
+                        onClick={markAllRepliesAsRead}
+                        disabled={markingAsRead}
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded transition-colors"
+                      >
+                        {markingAsRead ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Check className="w-3 h-3" />
+                        )}
+                        Tout marquer comme lu
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    {message.reponses.map((reponse) => {
+                      const isFromIntervenant = reponse.typeAuteur === "intervenant";
+                      const isUnread = !isFromIntervenant && !reponse.isReadByIntervenant;
+
+                      return (
+                        <div
+                          key={reponse.id}
+                          className={`p-3 rounded-lg border-l-4 ${
+                            isFromIntervenant
+                              ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-400 dark:border-emerald-500 ml-6"
+                              : isUnread
+                                ? "bg-orange-50 dark:bg-orange-500/10 border-orange-400 dark:border-orange-500"
+                                : "bg-gray-50 dark:bg-gray-700/30 border-gray-300 dark:border-gray-600"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              isFromIntervenant
+                                ? "bg-gradient-to-br from-emerald-400 to-emerald-600"
+                                : "bg-gradient-to-br from-blue-400 to-blue-600"
+                            }`}>
+                              {isFromIntervenant ? (
+                                <Send className="w-4 h-4 text-white" />
+                              ) : (
+                                <User className="w-4 h-4 text-white" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {isFromIntervenant ? (
+                                      <>Vous</>
+                                    ) : (
+                                      <>{reponse.apprenant?.prenom} {reponse.apprenant?.nom}</>
+                                    )}
+                                  </p>
+                                  {isFromIntervenant && reponse.destinataireApprenant && (
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      → {reponse.destinataireApprenant.prenom} {reponse.destinataireApprenant.nom}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {isUnread && (
+                                    <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300 text-[10px] font-bold rounded">
+                                      Nouveau
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {formatDate(reponse.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                {reponse.contenu}
+                              </p>
+                              {reponse.attachments.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {reponse.attachments.map((att, idx) => {
+                                    const FileIcon = getFileIcon(att.type);
+                                    return (
+                                      <a
+                                        key={idx}
+                                        href={att.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 rounded text-xs transition-colors"
+                                      >
+                                        <FileIcon className="w-3 h-3 text-emerald-500" />
+                                        <span className="text-gray-700 dark:text-gray-300 truncate max-w-[120px]">
+                                          {att.name}
+                                        </span>
+                                      </a>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {/* Bouton répondre (seulement pour les messages des apprenants) */}
+                              {!isFromIntervenant && reponse.apprenant && (
+                                <button
+                                  onClick={() => setReplyingTo({
+                                    apprenantId: reponse.apprenant!.id,
+                                    apprenantNom: `${reponse.apprenant!.prenom} ${reponse.apprenant!.nom}`,
+                                  })}
+                                  className="mt-2 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+                                >
+                                  <Reply className="w-3 h-3" />
+                                  Répondre
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Formulaire de réponse */}
+                  {replyingTo && (
+                    <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg border border-emerald-200 dark:border-emerald-700">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                          Répondre à {replyingTo.apprenantNom}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setReplyingTo(null);
+                            setReplyContent("");
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <textarea
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        placeholder="Votre réponse..."
+                        rows={3}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+                      />
+                      <div className="flex justify-end mt-2">
+                        <button
+                          onClick={handleSendReply}
+                          disabled={sendingReply || !replyContent.trim()}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          {sendingReply ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          Envoyer
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -748,6 +1029,8 @@ export default function IntervenantMessagesPage() {
               key={message.id}
               message={message}
               apprenants={apprenants}
+              token={token || ""}
+              onReponseLue={fetchMessages}
             />
           ))}
         </div>

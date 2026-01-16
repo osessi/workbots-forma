@@ -157,6 +157,22 @@ export default function HistoriqueEmailsPage() {
     });
   };
 
+  // Correction 556: Fonctions séparées pour date et heure
+  const formatDateOnly = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const formatTimeOnly = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const getTypeConfig = (type: string) => {
     return EMAIL_TYPES[type as keyof typeof EMAIL_TYPES] || EMAIL_TYPES.OTHER;
   };
@@ -191,8 +207,9 @@ export default function HistoriqueEmailsPage() {
               <Mail className="w-7 h-7 text-brand-600" />
               Historique des emails
             </h1>
+            {/* Correction 551: Sous-titre reformulé */}
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Traçabilité complète des emails envoyés - {stats.total} email{stats.total > 1 ? "s" : ""} au total
+              Retrouvez ici l&apos;historique et le suivi des emails envoyés depuis la plateforme.
             </p>
           </div>
           <button
@@ -219,9 +236,10 @@ export default function HistoriqueEmailsPage() {
             <div className="flex-1 min-w-[250px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                {/* Correction 552: Placeholder reformulé */}
                 <input
                   type="text"
-                  placeholder="Rechercher par email, nom ou sujet..."
+                  placeholder="Rechercher par destinataire, objet ou email…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
@@ -229,10 +247,11 @@ export default function HistoriqueEmailsPage() {
               </div>
             </div>
 
+            {/* Correction 553: Padding ajusté */}
             <select
               value={filterType || ""}
               onChange={(e) => setFilterType(e.target.value || null)}
-              className="px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500"
+              className="px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500"
             >
               <option value="">Tous les types</option>
               {Object.entries(EMAIL_TYPES).map(([key, config]) => (
@@ -240,10 +259,11 @@ export default function HistoriqueEmailsPage() {
               ))}
             </select>
 
+            {/* Correction 554: Padding ajusté */}
             <select
               value={filterStatus || ""}
               onChange={(e) => setFilterStatus(e.target.value || null)}
-              className="px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500"
+              className="px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500"
             >
               <option value="">Tous les statuts</option>
               {Object.entries(STATUS_CONFIG).map(([key, config]) => (
@@ -320,8 +340,9 @@ export default function HistoriqueEmailsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Destinataire
                   </th>
+                  {/* Correction 555: Libellé renommé */}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Sujet
+                    Objet
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Type
@@ -329,8 +350,12 @@ export default function HistoriqueEmailsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Statut
                   </th>
+                  {/* Correction 556: Date et Heure séparées */}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Heure
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
@@ -338,16 +363,17 @@ export default function HistoriqueEmailsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {/* Correction 556: colSpan ajusté à 7 colonnes */}
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center">
+                    <td colSpan={7} className="px-4 py-12 text-center">
                       <RefreshCw className="w-8 h-8 text-gray-400 mx-auto animate-spin" />
                       <p className="text-gray-500 mt-2">Chargement...</p>
                     </td>
                   </tr>
                 ) : emails.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center">
+                    <td colSpan={7} className="px-4 py-12 text-center">
                       <Mail className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                       <p className="text-gray-500 dark:text-gray-400">
                         {hasActiveFilters ? "Aucun email ne correspond aux filtres" : "Aucun email envoyé"}
@@ -404,10 +430,17 @@ export default function HistoriqueEmailsPage() {
                             {statusConfig.label}
                           </span>
                         </td>
+                        {/* Correction 556: Date et Heure séparées */}
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {formatDateOnly(email.sentAt)}
+                          </p>
+                        </td>
                         <td className="px-4 py-3">
                           <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {formatDate(email.sentAt)}
+                            {formatTimeOnly(email.sentAt)}
                           </p>
                         </td>
                         <td className="px-4 py-3 text-center">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import {
   FileText,
@@ -11,6 +11,10 @@ import {
   File,
   Video,
   Search,
+  PenLine,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
 
 interface Document {
@@ -21,6 +25,12 @@ interface Document {
   dateCreation: string;
   url?: string;
   categorie: string;
+  requiresSignature?: boolean;
+  isSigned?: boolean;
+  signedAt?: string | null;
+  signatureUrl?: string | null;
+  status?: string;
+  expiresAt?: string | null;
 }
 
 export default function IntervenantDocumentsPage() {
@@ -31,13 +41,7 @@ export default function IntervenantDocumentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategorie, setSelectedCategorie] = useState<string>("all");
 
-  useEffect(() => {
-    if (selectedSession && token) {
-      fetchDocuments();
-    }
-  }, [selectedSession, token]);
-
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     if (!selectedSession || !token) return;
 
     setLoadingDocuments(true);
@@ -52,7 +56,13 @@ export default function IntervenantDocumentsPage() {
     } finally {
       setLoadingDocuments(false);
     }
-  };
+  }, [selectedSession, token]);
+
+  useEffect(() => {
+    if (selectedSession && token) {
+      fetchDocuments();
+    }
+  }, [selectedSession, token, fetchDocuments]);
 
   if (isLoading) {
     return (
@@ -90,13 +100,16 @@ export default function IntervenantDocumentsPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + " Mo";
   };
 
-  // Catégories disponibles
+  // Catégories disponibles - Correction 520: catégories adaptées aux documents intervenant
   const categories = [
     { id: "all", label: "Tous" },
-    { id: "support", label: "Supports" },
-    { id: "administratif", label: "Administratif" },
-    { id: "ressource", label: "Ressources" },
+    { id: "contrat", label: "Contrats" },
+    { id: "pedagogique", label: "Pédagogique" },
+    { id: "emargement", label: "Émargement" },
   ];
+
+  // Compter les documents nécessitant une signature
+  const documentsASign = documents.filter(doc => doc.requiresSignature && !doc.isSigned).length;
 
   // Filtrer les documents
   const filteredDocuments = documents.filter(doc => {
@@ -107,14 +120,20 @@ export default function IntervenantDocumentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* En-tête - Correction 521: sous-titre reformulé */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Documents
         </h1>
         <p className="text-gray-500 dark:text-gray-400">
-          {selectedSession.formation.titre} - Supports et ressources
+          Retrouvez ici les documents de la session et signez ceux qui vous concernent.
         </p>
+        {documentsASign > 0 && (
+          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg text-sm">
+            <AlertCircle className="w-4 h-4" />
+            <span>{documentsASign} document{documentsASign > 1 ? "s" : ""} en attente de signature</span>
+          </div>
+        )}
       </div>
 
       {/* Filtres */}
@@ -169,61 +188,109 @@ export default function IntervenantDocumentsPage() {
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredDocuments.map((doc) => {
               const FileIcon = getFileIcon(doc.type);
+              const isContrat = doc.type === "CONTRAT_SOUS_TRAITANCE";
 
               return (
-                <a
+                <div
                   key={doc.id}
-                  href={doc.url || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer group"
+                  className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                 >
                   {/* Icône */}
-                  <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/20 transition-colors">
-                    <FileIcon className="w-6 h-6 text-gray-500 dark:text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                    isContrat && !doc.isSigned
+                      ? "bg-amber-100 dark:bg-amber-500/20"
+                      : "bg-gray-100 dark:bg-gray-700"
+                  }`}>
+                    <FileIcon className={`w-6 h-6 transition-colors ${
+                      isContrat && !doc.isSigned
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`} />
                   </div>
 
                   {/* Infos */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                      {doc.nom}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                        {doc.nom}
+                      </p>
+                      {/* Badge statut signature - Correction 522 */}
+                      {doc.requiresSignature && (
+                        doc.isSigned ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-medium">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Signé
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">
+                            <Clock className="w-3 h-3" />
+                            À signer
+                          </span>
+                        )
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                       <span>{formatFileSize(doc.taille)}</span>
                       <span>
                         {new Date(doc.dateCreation).toLocaleDateString("fr-FR")}
                       </span>
+                      {doc.isSigned && doc.signedAt && (
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          Signé le {new Date(doc.signedAt).toLocaleDateString("fr-FR")}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    <span
-                      className="p-2 text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors"
-                      title="Voir le document"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (doc.url) {
-                          const link = document.createElement("a");
-                          link.href = doc.url;
-                          link.download = doc.nom || "document";
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }
-                      }}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-                      title="Télécharger"
-                    >
-                      <Download className="w-5 h-5" />
-                    </button>
+                    {/* Bouton Signer - Correction 522 */}
+                    {doc.requiresSignature && !doc.isSigned && doc.signatureUrl && (
+                      <a
+                        href={doc.signatureUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <PenLine className="w-4 h-4" />
+                        Signer
+                      </a>
+                    )}
+                    {/* Bouton Voir pour les documents non-signature ou déjà signés */}
+                    {(!doc.requiresSignature || doc.isSigned) && doc.url && (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                        title="Voir le document"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </a>
+                    )}
+                    {/* Bouton Télécharger */}
+                    {doc.url && (!doc.requiresSignature || doc.isSigned) && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (doc.url) {
+                            const link = document.createElement("a");
+                            link.href = doc.url;
+                            link.download = doc.nom || "document";
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }
+                        }}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+                        title="Télécharger"
+                      >
+                        <Download className="w-5 h-5" />
+                      </button>
+                    )}
                   </div>
-                </a>
+                </div>
               );
             })}
           </div>

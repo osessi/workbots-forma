@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApprenantPortal } from "@/context/ApprenantPortalContext";
 import Link from "next/link";
@@ -28,6 +28,8 @@ import {
   Video,
   Building2,
   Info,
+  Mail,
+  BellOff,
 } from "lucide-react";
 
 // =====================================
@@ -44,10 +46,51 @@ export default function AccueilPage() {
     dashboardStats,
     certifications, // Qualiopi IND 3
     sessions, // Correction 427-428
+    token, // Correction 567: Token pour l'API
+    refreshData, // Correction 567: Pour rafraîchir les données après consentement
   } = useApprenantPortal();
 
   // Correction 428: État pour le popup de détails session
   const [selectedSessionForDetails, setSelectedSessionForDetails] = useState<typeof sessions[0] | null>(null);
+
+  // Correction 567: État pour le popup de consentement newsletter
+  const [showNewsletterConsent, setShowNewsletterConsent] = useState(false);
+  const [consentLoading, setConsentLoading] = useState(false);
+
+  // Correction 567: Afficher le popup si l'apprenant n'a pas encore donné son consentement
+  useEffect(() => {
+    if (apprenant && apprenant.newsletterConsent === null && !isLoading) {
+      // Petit délai pour laisser la page se charger
+      const timer = setTimeout(() => {
+        setShowNewsletterConsent(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [apprenant, isLoading]);
+
+  // Correction 567: Fonction pour enregistrer le consentement
+  const handleNewsletterConsent = async (consent: boolean) => {
+    if (!token) return;
+
+    setConsentLoading(true);
+    try {
+      const res = await fetch("/api/apprenant/newsletter-consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, consent }),
+      });
+
+      if (res.ok) {
+        setShowNewsletterConsent(false);
+        // Rafraîchir les données pour mettre à jour le contexte
+        await refreshData();
+      }
+    } catch (error) {
+      console.error("Erreur consentement newsletter:", error);
+    } finally {
+      setConsentLoading(false);
+    }
+  };
 
   // Correction 427: Calculs des compteurs orientés session
   const sessionStats = useMemo(() => {
@@ -637,6 +680,83 @@ export default function AccueilPage() {
           </div>
         </motion.div>
       )}
+
+      {/* Correction 567: Popup consentement newsletter */}
+      <AnimatePresence>
+        {showNewsletterConsent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
+            >
+              {/* Header avec icône */}
+              <div className="bg-gradient-to-r from-brand-500 to-brand-600 p-6 text-center">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Mail className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-white">
+                  Recevoir les actualités par email ?
+                </h2>
+              </div>
+
+              {/* Contenu */}
+              <div className="p-6">
+                <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
+                  Souhaitez-vous recevoir par email les actualités, nouveautés et informations de{" "}
+                  <strong className="text-gray-900 dark:text-white">
+                    {organization?.nomCommercial || organization?.name || "l'organisme"}
+                  </strong>
+                  {" "}? Vous pourrez modifier ce choix à tout moment dans votre profil.
+                </p>
+
+                {/* Boutons */}
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => handleNewsletterConsent(true)}
+                    disabled={consentLoading}
+                    className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {consentLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Mail className="w-5 h-5" />
+                        Oui, je m&apos;abonne
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleNewsletterConsent(false)}
+                    disabled={consentLoading}
+                    className="w-full py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {consentLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <BellOff className="w-5 h-5" />
+                        Non merci
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Note RGPD */}
+                <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-4">
+                  Conformément au RGPD, vous pouvez modifier votre choix à tout moment depuis la section &quot;Mon profil&quot;.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Correction 428: Popup détails session */}
       <AnimatePresence>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRequireIntervenantAuth, useIntervenantPortal } from "@/context/IntervenantPortalContext";
 import {
   PenLine,
@@ -18,7 +18,161 @@ import {
   Pen,
   Send,
   User,
+  Eraser,
 } from "lucide-react";
+
+// =====================================
+// COMPOSANT SIGNATURE PAD
+// =====================================
+function SignaturePadModal({
+  onSave,
+  onCancel,
+  periode,
+}: {
+  onSave: (data: string) => void;
+  onCancel: () => void;
+  periode: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Set canvas size
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    ctx.scale(2, 2);
+
+    // Set style
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+  }, []);
+
+  const getCoords = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+
+    if ("touches" in e) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top,
+      };
+    }
+
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) return;
+
+    const { x, y } = getCoords(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+    setHasDrawn(true);
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) return;
+
+    const { x, y } = getCoords(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx || !canvas) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasDrawn(false);
+  };
+
+  const save = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const data = canvas.toDataURL("image/png");
+    onSave(data);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-4">
+        <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
+          Signez votre présence
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Créneau : {periode === "matin" ? "Matin" : "Après-midi"}
+        </p>
+
+        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg mb-4 bg-white">
+          <canvas
+            ref={canvasRef}
+            className="w-full h-40 touch-none cursor-crosshair bg-white rounded-lg"
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={clear}
+            className="flex items-center justify-center gap-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Eraser className="w-4 h-4" />
+            Effacer
+          </button>
+          <button
+            onClick={save}
+            disabled={!hasDrawn}
+            className="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Valider
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Journee {
   id: string;
@@ -32,9 +186,9 @@ interface Journee {
   signaturesMatin: number;
   signaturesAprem: number;
   totalParticipants: number;
-  // Correction 505: Signatures de l'intervenant
-  intervenantSignatureMatin?: { id: string; signedAt: string | null } | null;
-  intervenantSignatureAprem?: { id: string; signedAt: string | null } | null;
+  // Correction 505: Signatures de l'intervenant avec données de signature
+  intervenantSignatureMatin?: { id: string; signedAt: string | null; signatureData?: string | null } | null;
+  intervenantSignatureAprem?: { id: string; signedAt: string | null; signatureData?: string | null } | null;
 }
 
 interface Participant {
@@ -96,6 +250,8 @@ export default function IntervenantEmargementsPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   // Correction 505: État pour la signature en cours
   const [signingPeriode, setSigningPeriode] = useState<{ journeeId: string; periode: string } | null>(null);
+  // État pour le modal de signature
+  const [showSignatureModal, setShowSignatureModal] = useState<{ journeeId: string; periode: string } | null>(null);
   // Correction 508: État pour l'envoi de relances
   const [sendingRelance, setSendingRelance] = useState(false);
 
@@ -147,16 +303,29 @@ export default function IntervenantEmargementsPage() {
     fetchJournees();
   };
 
-  // Correction 505: Signer l'émargement intervenant
-  const signEmargement = async (journeeId: string, periode: string) => {
-    if (!token) return;
+  // Ouvrir le modal de signature
+  const openSignatureModal = (journeeId: string, periode: string) => {
+    setShowSignatureModal({ journeeId, periode });
+  };
 
+  // Fermer le modal de signature
+  const closeSignatureModal = () => {
+    setShowSignatureModal(null);
+  };
+
+  // Correction 505: Signer l'émargement intervenant avec les données de signature
+  const signEmargement = async (signatureData: string) => {
+    if (!token || !showSignatureModal) return;
+
+    const { journeeId, periode } = showSignatureModal;
     setSigningPeriode({ journeeId, periode });
+    setShowSignatureModal(null);
+
     try {
       const res = await fetch(`/api/intervenant/emargements/${journeeId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, periode }),
+        body: JSON.stringify({ token, periode, signatureData }),
       });
 
       if (res.ok) {
@@ -597,13 +766,23 @@ export default function IntervenantEmargementsPage() {
                           </p>
                         </div>
                         {matinStatus.status === "signe" ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-sm font-medium rounded-lg">
-                            <Check className="w-4 h-4" />
-                            Signé
-                          </span>
+                          <div className="flex flex-col items-center">
+                            {journee.intervenantSignatureMatin?.signatureData ? (
+                              <img
+                                src={journee.intervenantSignatureMatin.signatureData}
+                                alt="Signature"
+                                className="max-h-8 max-w-20"
+                              />
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-sm font-medium rounded-lg">
+                                <Check className="w-4 h-4" />
+                                Signé
+                              </span>
+                            )}
+                          </div>
                         ) : matinStatus.canSign ? (
                           <button
-                            onClick={() => signEmargement(journee.id, "matin")}
+                            onClick={() => openSignatureModal(journee.id, "matin")}
                             disabled={signingPeriode?.journeeId === journee.id && signingPeriode?.periode === "matin"}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                           >
@@ -631,13 +810,23 @@ export default function IntervenantEmargementsPage() {
                           </p>
                         </div>
                         {apremStatus.status === "signe" ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-sm font-medium rounded-lg">
-                            <Check className="w-4 h-4" />
-                            Signé
-                          </span>
+                          <div className="flex flex-col items-center">
+                            {journee.intervenantSignatureAprem?.signatureData ? (
+                              <img
+                                src={journee.intervenantSignatureAprem.signatureData}
+                                alt="Signature"
+                                className="max-h-8 max-w-20"
+                              />
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 text-sm font-medium rounded-lg">
+                                <Check className="w-4 h-4" />
+                                Signé
+                              </span>
+                            )}
+                          </div>
                         ) : apremStatus.canSign ? (
                           <button
-                            onClick={() => signEmargement(journee.id, "aprem")}
+                            onClick={() => openSignatureModal(journee.id, "aprem")}
                             disabled={signingPeriode?.journeeId === journee.id && signingPeriode?.periode === "aprem"}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                           >
@@ -941,6 +1130,15 @@ export default function IntervenantEmargementsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de signature intervenant */}
+      {showSignatureModal && (
+        <SignaturePadModal
+          periode={showSignatureModal.periode}
+          onSave={signEmargement}
+          onCancel={closeSignatureModal}
+        />
       )}
     </div>
   );

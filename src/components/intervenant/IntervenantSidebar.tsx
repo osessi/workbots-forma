@@ -5,7 +5,7 @@
 // ===========================================
 // 495: Sélecteur de session ajouté en haut du menu gauche
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -54,6 +54,30 @@ export default function IntervenantSidebar({
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
   const [isSessionSelectorOpen, setIsSessionSelectorOpen] = useState(false);
+  // Badge messages non lus
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  // Récupérer le nombre de réponses non lues
+  const fetchUnreadMessagesCount = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      const res = await fetch(`/api/intervenant/messages/unread-count?token=${encodeURIComponent(token)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadMessagesCount(data.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error("Erreur récupération messages non lus:", error);
+    }
+  }, [token]);
+
+  // Récupérer le compteur au montage et toutes les 30 secondes
+  useEffect(() => {
+    fetchUnreadMessagesCount();
+    const interval = setInterval(fetchUnreadMessagesCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadMessagesCount]);
 
   // Correction 495: Fonction pour sélectionner une session
   const handleSelectSession = (sessionId: string) => {
@@ -132,11 +156,12 @@ export default function IntervenantSidebar({
       icon: FileText,
       section: "main",
     },
-    // Correction 431: Messagerie apprenants
+    // Correction 530: Messagerie (Organisme + Apprenants)
     {
-      name: "Messages apprenants",
-      href: "/intervenant/messages",
+      name: "Messagerie",
+      href: "/intervenant/messagerie",
       icon: MessageSquare,
+      badge: unreadMessagesCount,
       section: "main",
     },
     // Section secondaire
@@ -323,7 +348,7 @@ export default function IntervenantSidebar({
             Besoin d&apos;aide ?
           </p>
           <p className="text-xs text-emerald-700 dark:text-emerald-300 mb-3">
-            Contactez l&apos;équipe administrative ou le support technique.
+            Contactez le support technique.
           </p>
           <button
             onClick={() => setShowContactModal(true)}

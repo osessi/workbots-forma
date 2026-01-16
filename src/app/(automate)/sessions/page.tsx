@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image"; // Correction 538
 import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -23,6 +24,7 @@ interface Session {
   formation: {
     id: string;
     titre: string;
+    image: string | null; // Correction 538: Image de la formation
   };
   lieu: {
     id: string;
@@ -115,6 +117,14 @@ const MapPinIcon = () => (
 const TrashIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
     <path d="M2 4h12M5.33 4V2.67c0-.37.3-.67.67-.67h4c.37 0 .67.3.67.67V4M6.67 7.33v4M9.33 7.33v4M12.67 4v9.33c0 .37-.3.67-.67.67H4c-.37 0-.67-.3-.67-.67V4" />
+  </svg>
+);
+
+// Correction 538: Icône pour le fallback de la vignette
+const BookIcon = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
   </svg>
 );
 
@@ -583,57 +593,80 @@ function SessionsPageContent() {
             return (
               <div
                 key={session.id}
-                className="group relative block p-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
+                className="group relative block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl hover:border-brand-300 dark:hover:border-brand-700 transition-colors overflow-hidden"
               >
                 <Link
                   href={`/sessions/${session.id}`}
-                  className="block"
+                  className="flex"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-sm font-mono text-gray-500 dark:text-gray-400">{session.reference}</span>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
-                          {statusLabels[session.status]}
-                        </span>
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                          {modaliteLabels[session.modalite]}
-                        </span>
+                  {/* Correction 538: Vignette de la formation */}
+                  <div className="hidden sm:flex w-32 h-full flex-shrink-0">
+                    {session.formation.image ? (
+                      <div className="relative w-full h-full min-h-[140px]">
+                        <Image
+                          src={session.formation.image}
+                          alt={session.formation.titre}
+                          fill
+                          className="object-cover"
+                          sizes="128px"
+                        />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                        {session.formation.titre}
-                      </h3>
-                      {session.nom && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{session.nom}</p>
-                      )}
-                      {/* Correction 371: Affichage clients & participants */}
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        <span className="font-medium text-gray-600 dark:text-gray-300">Clients & participants :</span>{' '}
-                        <span className={getClientsParticipantsLabel(session) === "Aucun client/participant" ? "italic text-gray-400" : ""}>
-                          {getClientsParticipantsLabel(session)}
-                        </span>
-                      </p>
-                    </div>
+                    ) : (
+                      <div className="w-full h-full min-h-[140px] bg-gradient-to-br from-brand-50 to-brand-100 dark:from-brand-900/30 dark:to-brand-800/30 flex items-center justify-center">
+                        <div className="text-brand-400 dark:text-brand-500">
+                          <BookIcon />
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center gap-1.5">
-                        <CalendarIcon />
-                        <span>{getDateRange(session.journees)}</span>
-                        {session.journees.length > 1 && (
-                          <span className="text-xs">({session.journees.length} jours)</span>
+                  <div className="flex-1 p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-sm font-mono text-gray-500 dark:text-gray-400">{session.reference}</span>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
+                            {statusLabels[session.status]}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                            {modaliteLabels[session.modalite]}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                          {session.formation.titre}
+                        </h3>
+                        {session.nom && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{session.nom}</p>
+                        )}
+                        {/* Correction 371: Affichage clients & participants */}
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          <span className="font-medium text-gray-600 dark:text-gray-300">Clients & participants :</span>{' '}
+                          <span className={getClientsParticipantsLabel(session) === "Aucun client/participant" ? "italic text-gray-400" : ""}>
+                            {getClientsParticipantsLabel(session)}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1.5">
+                          <CalendarIcon />
+                          <span>{getDateRange(session.journees)}</span>
+                          {session.journees.length > 1 && (
+                            <span className="text-xs">({session.journees.length} jours)</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <UsersIcon />
+                          <span>{getParticipantCount(session)} participant{getParticipantCount(session) > 1 ? "s" : ""}</span>
+                        </div>
+                        {session.lieu && (
+                          <div className="flex items-center gap-1.5">
+                            <MapPinIcon />
+                            <span>{session.lieu.nom}</span>
+                          </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <UsersIcon />
-                        <span>{getParticipantCount(session)} participant{getParticipantCount(session) > 1 ? "s" : ""}</span>
-                      </div>
-                      {session.lieu && (
-                        <div className="flex items-center gap-1.5">
-                          <MapPinIcon />
-                          <span>{session.lieu.nom}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </Link>

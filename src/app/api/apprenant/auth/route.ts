@@ -387,6 +387,9 @@ export async function GET(request: NextRequest) {
         telephone: apprenant.telephone,
         adresse: apprenant.adresse,
         createdAt: apprenant.createdAt?.toISOString(),
+        // Correction 567: Consentement newsletter
+        newsletterConsent: apprenant.newsletterConsent,
+        newsletterConsentDate: apprenant.newsletterConsentDate?.toISOString() || null,
       },
       organization: {
         id: apprenant.organization.id,

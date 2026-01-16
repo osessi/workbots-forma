@@ -132,11 +132,12 @@ export default function ApprenantSidebar({
       badge: dashboardStats?.documentsDisponibles || 0,
       section: "main",
     },
+    // Correction 535: Messagerie avec 2 blocs (Organisme + Intervenants)
     {
       name: "Messagerie",
-      href: "/apprenant/messages",
+      href: "/apprenant/messagerie",
       icon: MessageSquare,
-      badge: dashboardStats?.messagesNonLus || 0,
+      badge: (dashboardStats?.messagesNonLus || 0) + (dashboardStats?.messagesOrganismeNonLus || 0),
       section: "main",
     },
     {

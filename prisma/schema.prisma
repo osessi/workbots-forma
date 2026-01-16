@@ -348,6 +348,9 @@ model Organization {
   // Correction 431: Messages intervenant → apprenants
   messagesIntervenant MessageIntervenant[]
 
+  // Réponses aux messages de l'intervenant
+  reponsesMessages MessageReponse[] @relation("MessageReponseOrganization")
+
   // Qualiopi IND 26 - Procédures qualité
   procedures Procedure[]
 
@@ -382,6 +385,12 @@ model Organization {
   videoIntegrations VideoIntegration[]
   videoMeetings     VideoMeeting[]
   videoRecordings   VideoRecording[]
+
+  // Correction 532: Messages avec les intervenants
+  messagesIntervenants MessageIntervenantOrganisme[] @relation("MessageIntervenantOrganismeOrg")
+
+  // Correction 535-536: Messages avec les apprenants
+  messagesApprenants MessageApprenantOrganisme[] @relation("MessageApprenantOrganismeOrg")
 
   @@index([slug])
   @@index([customDomain])
@@ -1453,6 +1462,20 @@ model Apprenant {
   // Correction 431: Lectures des messages intervenant
   lecturesMessagesIntervenant MessageIntervenantLecture[] @relation("MessageIntervenantLectureApprenant")
 
+  // Réponses aux messages de l'intervenant
+  reponsesMessages MessageReponse[] @relation("MessageReponseApprenant")
+
+  // Réponses reçues de l'intervenant (destinataire)
+  reponsesRecues MessageReponse[] @relation("MessageReponseDestinataire")
+
+  // Correction 535-536: Messages avec l'organisme
+  messagesOrganisme MessageApprenantOrganisme[] @relation("MessageApprenantOrganisme")
+
+  // Correction 567: Consentement newsletter
+  // null = non demandé, true = accepté, false = refusé
+  newsletterConsent       Boolean?
+  newsletterConsentDate   DateTime? // Date du choix
+
   @@index([organizationId])
   @@index([entrepriseId])
   @@index([statut])
@@ -1580,6 +1603,12 @@ model Intervenant {
 
   // Correction 431: Messages envoyés aux apprenants
   messagesEnvoyes MessageIntervenant[] @relation("MessageIntervenantSender")
+
+  // Réponses dans les conversations messages
+  reponsesMessages MessageReponse[] @relation("MessageReponseIntervenant")
+
+  // Correction 532: Messages avec l'organisme
+  messagesOrganisme MessageIntervenantOrganisme[] @relation("MessageIntervenantOrganisme")
 
   @@index([organizationId])
   @@index([nom])
@@ -6233,6 +6262,7 @@ model MessageIntervenant {
 
   // Relations
   lectures MessageIntervenantLecture[] // Suivi des lectures
+  reponses MessageReponse[]            @relation("MessageReponses") // Réponses des apprenants
 
   @@index([sessionId])
   @@index([intervenantId])
@@ -6258,4 +6288,142 @@ model MessageIntervenantLecture {
   @@unique([messageId, apprenantId]) // Un apprenant ne peut lire un message qu'une fois
   @@index([messageId])
   @@index([apprenantId])
+}
+
+// Réponses/échanges dans les conversations messages intervenant-apprenants
+model MessageReponse {
+  id String @id @default(cuid())
+
+  // Message parent (message de l'intervenant qui a initié la conversation)
+  messageId String
+  message   MessageIntervenant @relation("MessageReponses", fields: [messageId], references: [id], onDelete: Cascade)
+
+  // Type d'auteur de la réponse
+  typeAuteur String @default("apprenant") // "apprenant" ou "intervenant"
+
+  // Apprenant qui répond (si typeAuteur = "apprenant")
+  apprenantId String?
+  apprenant   Apprenant? @relation("MessageReponseApprenant", fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Intervenant qui répond (si typeAuteur = "intervenant")
+  intervenantId String?
+  intervenant   Intervenant? @relation("MessageReponseIntervenant", fields: [intervenantId], references: [id], onDelete: Cascade)
+
+  // Destinataire apprenant (pour les réponses de l'intervenant à un apprenant spécifique)
+  destinataireApprenantId String?
+  destinataireApprenant   Apprenant? @relation("MessageReponseDestinataire", fields: [destinataireApprenantId], references: [id], onDelete: SetNull)
+
+  // Contenu de la réponse
+  contenu String @db.Text
+
+  // Pièces jointes (stockées en JSON)
+  // Format: [{ name: string, url: string, size?: number, type?: string }]
+  attachments Json?
+
+  // Statut de lecture par l'intervenant (pour réponses des apprenants)
+  isReadByIntervenant Boolean   @default(false)
+  readByIntervenantAt DateTime?
+
+  // Statut de lecture par l'apprenant (pour réponses de l'intervenant)
+  isReadByApprenant Boolean   @default(false)
+  readByApprenantAt DateTime?
+
+  // Multi-tenant
+  organizationId String
+  organization   Organization @relation("MessageReponseOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([messageId])
+  @@index([apprenantId])
+  @@index([intervenantId])
+  @@index([destinataireApprenantId])
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+// ===========================================
+// MESSAGERIE INTERVENANT <-> ORGANISME (Correction 532)
+// ===========================================
+// Messages échangés entre un intervenant et l'organisme de formation
+
+model MessageIntervenantOrganisme {
+  id String @id @default(cuid())
+
+  // Intervenant
+  intervenantId String
+  intervenant   Intervenant @relation("MessageIntervenantOrganisme", fields: [intervenantId], references: [id], onDelete: Cascade)
+
+  // Organisation
+  organizationId String
+  organization   Organization @relation("MessageIntervenantOrganismeOrg", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Type d'auteur du message
+  typeAuteur String @default("intervenant") // "intervenant" ou "organisme"
+
+  // Contenu du message
+  sujet   String
+  contenu String @db.Text
+
+  // Pièces jointes (JSON)
+  // Format: [{ name: string, url: string, size?: number, type?: string }]
+  attachments Json?
+
+  // Statut de lecture
+  isReadByIntervenant Boolean   @default(false)
+  readByIntervenantAt DateTime?
+  isReadByOrganisme   Boolean   @default(false)
+  readByOrganismeAt   DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([intervenantId])
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+// ===========================================
+// Correction 535-536: MESSAGERIE APPRENANT ↔ ORGANISME
+// ===========================================
+// Conversations directes entre apprenant et organisme
+
+model MessageApprenantOrganisme {
+  id String @id @default(cuid())
+
+  // Apprenant
+  apprenantId String
+  apprenant   Apprenant @relation("MessageApprenantOrganisme", fields: [apprenantId], references: [id], onDelete: Cascade)
+
+  // Organisation
+  organizationId String
+  organization   Organization @relation("MessageApprenantOrganismeOrg", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Type d'auteur du message
+  typeAuteur String @default("apprenant") // "apprenant" ou "organisme"
+
+  // Contenu du message
+  sujet   String
+  contenu String @db.Text
+
+  // Pièces jointes (JSON)
+  // Format: [{ name: string, url: string, size?: number, type?: string }]
+  attachments Json?
+
+  // Statut de lecture
+  isReadByApprenant Boolean   @default(false)
+  readByApprenantAt DateTime?
+  isReadByOrganisme Boolean   @default(false)
+  readByOrganismeAt DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([apprenantId])
+  @@index([organizationId])
+  @@index([createdAt])
 }

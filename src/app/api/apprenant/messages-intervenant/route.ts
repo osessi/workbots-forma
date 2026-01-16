@@ -114,11 +114,39 @@ export async function GET(request: NextRequest) {
           where: { apprenantId },
           select: { readAt: true },
         },
+        // Inclure les réponses de la conversation
+        reponses: {
+          where: {
+            OR: [
+              // Réponses de cet apprenant
+              { apprenantId },
+              // Réponses de l'intervenant à cet apprenant
+              { destinataireApprenantId: apprenantId, typeAuteur: "intervenant" },
+            ],
+          },
+          include: {
+            apprenant: {
+              select: {
+                id: true,
+                nom: true,
+                prenom: true,
+              },
+            },
+            intervenant: {
+              select: {
+                id: true,
+                nom: true,
+                prenom: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    // Formater les messages
+    // Formater les messages avec les réponses
     const formattedMessages = messages.map((msg) => ({
       id: msg.id,
       sujet: msg.sujet,
@@ -139,13 +167,37 @@ export async function GET(request: NextRequest) {
         nom: msg.session.nom,
         formationTitre: msg.session.formation.titre,
       },
+      // Réponses de la conversation
+      reponses: msg.reponses.map((r) => ({
+        id: r.id,
+        contenu: r.contenu,
+        attachments: r.attachments as Array<{ name: string; url: string; size?: number; type?: string }> || [],
+        createdAt: r.createdAt,
+        typeAuteur: r.typeAuteur,
+        isReadByApprenant: r.isReadByApprenant,
+        apprenant: r.apprenant ? {
+          id: r.apprenant.id,
+          nom: r.apprenant.nom,
+          prenom: r.apprenant.prenom,
+        } : null,
+        intervenant: r.intervenant ? {
+          id: r.intervenant.id,
+          nom: r.intervenant.nom,
+          prenom: r.intervenant.prenom,
+        } : null,
+      })),
+      // Nombre de réponses de l'intervenant non lues par l'apprenant
+      nombreReponsesNonLues: msg.reponses.filter((r) => r.typeAuteur === "intervenant" && !r.isReadByApprenant).length,
     }));
 
     const unreadCount = formattedMessages.filter((m) => !m.isRead).length;
+    // Inclure aussi les réponses de l'intervenant non lues
+    const unreadRepliesCount = formattedMessages.reduce((acc, m) => acc + m.nombreReponsesNonLues, 0);
 
     return NextResponse.json({
       messages: formattedMessages,
       unreadCount,
+      unreadRepliesCount,
     });
   } catch (error) {
     console.error("[API] GET /api/apprenant/messages-intervenant error:", error);
@@ -153,7 +205,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH - Marquer un message comme lu
+// PATCH - Marquer un message comme lu + marquer les réponses de l'intervenant comme lues
 export async function PATCH(request: NextRequest) {
   try {
     const token = request.nextUrl.searchParams.get("token");
@@ -210,7 +262,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    // Créer ou mettre à jour la lecture (upsert)
+    // 1. Créer ou mettre à jour la lecture du message principal (upsert)
     await prisma.messageIntervenantLecture.upsert({
       where: {
         messageId_apprenantId: {
@@ -224,6 +276,21 @@ export async function PATCH(request: NextRequest) {
       },
       update: {
         readAt: new Date(),
+      },
+    });
+
+    // 2. Marquer toutes les réponses de l'intervenant destinées à cet apprenant comme lues
+    await prisma.messageReponse.updateMany({
+      where: {
+        messageId,
+        organizationId,
+        typeAuteur: "intervenant",
+        destinataireApprenantId: apprenantId,
+        isReadByApprenant: false,
+      },
+      data: {
+        isReadByApprenant: true,
+        readByApprenantAt: new Date(),
       },
     });
 

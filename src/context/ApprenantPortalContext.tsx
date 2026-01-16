@@ -52,6 +52,9 @@ interface Apprenant {
   entreprise: string | null;
   photoUrl?: string | null;
   createdAt?: string;
+  // Correction 567: Consentement newsletter
+  newsletterConsent: boolean | null;
+  newsletterConsentDate: string | null;
 }
 
 interface DashboardStats {

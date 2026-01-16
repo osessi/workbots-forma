@@ -4,12 +4,12 @@
 // PAGE NEWSLETTER - Gestion des newsletters
 // ===========================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Newspaper, Search, Users, Send, Eye,
   RefreshCw, X, Check, MoreVertical, TrendingUp, Mail,
-  UserPlus, Settings, BarChart3
+  Trash2, MousePointerClick
 } from "lucide-react";
 
 interface Newsletter {
@@ -43,10 +43,29 @@ export default function NewsletterPage() {
 
   // Menu dropdown
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Correction 566: Pop-up de détails
+  const [detailNewsletter, setDetailNewsletter] = useState<Newsletter | null>(null);
+  const [showFullContent, setShowFullContent] = useState(false);
 
   useEffect(() => {
     fetchNewsletters();
   }, []);
+
+  // Correction 564: Fermeture du menu au clic extérieur
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      setOpenMenuId(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (openMenuId) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [openMenuId, handleClickOutside]);
 
   const fetchNewsletters = async () => {
     try {
@@ -100,23 +119,6 @@ export default function NewsletterPage() {
     }
   };
 
-  const toggleActive = async (id: string, currentStatus: boolean) => {
-    try {
-      const res = await fetch(`/api/emailing/newsletters/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !currentStatus }),
-      });
-
-      if (res.ok) {
-        fetchNewsletters();
-      }
-    } catch (error) {
-      console.error("Erreur toggle:", error);
-    }
-    setOpenMenuId(null);
-  };
-
   const handleDelete = async (id: string) => {
     if (!confirm("Supprimer cette newsletter et tous ses abonnés ?")) return;
 
@@ -134,14 +136,22 @@ export default function NewsletterPage() {
     setOpenMenuId(null);
   };
 
+  // Correction 566: Ouvrir la pop-up de détails
+  const openDetails = (newsletter: Newsletter) => {
+    setDetailNewsletter(newsletter);
+    setShowFullContent(false);
+    setOpenMenuId(null);
+  };
+
   const filteredNewsletters = newsletters.filter((n) =>
     n.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalSubscribers = newsletters.reduce((acc, n) => acc + n.activeCount, 0);
   const totalSent = newsletters.reduce((acc, n) => acc + n.totalSent, 0);
+  // Correction 562: Éviter NaN en vérifiant les valeurs
   const avgOpenRate = newsletters.length > 0
-    ? Math.round(newsletters.reduce((acc, n) => acc + n.averageOpenRate, 0) / newsletters.length)
+    ? Math.round(newsletters.reduce((acc, n) => acc + (isNaN(n.averageOpenRate) ? 0 : n.averageOpenRate), 0) / newsletters.length) || 0
     : 0;
 
   return (
@@ -160,8 +170,9 @@ export default function NewsletterPage() {
               <Newspaper className="w-7 h-7 text-brand-600" />
               Newsletters
             </h1>
+            {/* Correction 560: Sous-titre reformulé */}
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Gérez vos listes de diffusion et envoyez des newsletters
+              Envoyez des newsletters à vos contacts et suivez les résultats.
             </p>
           </div>
           <button
@@ -261,8 +272,8 @@ export default function NewsletterPage() {
                 key={newsletter.id}
                 className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-all group relative"
               >
-                {/* Menu */}
-                <div className="absolute top-4 right-4">
+                {/* Correction 564-565: Menu simplifié avec fermeture au clic extérieur */}
+                <div className="absolute top-4 right-4" ref={openMenuId === newsletter.id ? menuRef : null}>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -274,41 +285,19 @@ export default function NewsletterPage() {
                   </button>
 
                   {openMenuId === newsletter.id && (
-                    <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
-                      <Link
-                        href={`/emails/newsletter/${newsletter.id}`}
+                    <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
+                      <button
+                        onClick={() => openDetails(newsletter)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       >
                         <Eye className="w-4 h-4" />
                         Voir les détails
-                      </Link>
-                      <Link
-                        href={`/emails/newsletter/${newsletter.id}/send`}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                      >
-                        <Send className="w-4 h-4" />
-                        Envoyer une édition
-                      </Link>
-                      <Link
-                        href={`/emails/newsletter/${newsletter.id}/subscribers`}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        Gérer les abonnés
-                      </Link>
-                      <button
-                        onClick={() => toggleActive(newsletter.id, newsletter.isActive)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                      >
-                        <Settings className="w-4 h-4" />
-                        {newsletter.isActive ? "Désactiver" : "Activer"}
                       </button>
-                      <hr className="my-1 border-gray-200 dark:border-gray-700" />
                       <button
                         onClick={() => handleDelete(newsletter.id)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                       >
-                        <X className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                         Supprimer
                       </button>
                     </div>
@@ -330,15 +319,18 @@ export default function NewsletterPage() {
                       }`} />
                     </div>
                     <div className="flex-1">
+                      {/* Correction 563: Badge de statut amélioré */}
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-gray-900 dark:text-white">
                           {newsletter.name}
                         </h3>
-                        {!newsletter.isActive && (
-                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 rounded">
-                            Inactive
-                          </span>
-                        )}
+                        <span className={`px-2 py-0.5 text-xs rounded ${
+                          newsletter.isActive
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                        }`}>
+                          {newsletter.isActive ? "Active" : "Inactive"}
+                        </span>
                       </div>
                       {newsletter.description && (
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
@@ -346,24 +338,27 @@ export default function NewsletterPage() {
                         </p>
                       )}
 
+                      {/* Correction 563: Infos orientées performance */}
                       <div className="grid grid-cols-3 gap-4 mt-4">
                         <div className="text-center">
                           <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {newsletter.activeCount}
+                            {newsletter.totalSent || 0}
                           </p>
-                          <p className="text-xs text-gray-500">Abonnés</p>
+                          <p className="text-xs text-gray-500">Emails envoyés</p>
                         </div>
                         <div className="text-center">
                           <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {newsletter._count?.issues || 0}
+                            {isNaN(newsletter.averageOpenRate) ? 0 : newsletter.averageOpenRate}%
                           </p>
-                          <p className="text-xs text-gray-500">Éditions</p>
+                          <p className="text-xs text-gray-500">Taux d&apos;ouverture</p>
                         </div>
                         <div className="text-center">
                           <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {newsletter.averageOpenRate}%
+                            {newsletter.totalSent > 0 && newsletter.totalOpened > 0
+                              ? Math.round((newsletter.totalOpened / newsletter.totalSent) * 100)
+                              : 0}%
                           </p>
-                          <p className="text-xs text-gray-500">Ouverture</p>
+                          <p className="text-xs text-gray-500">Taux de clic</p>
                         </div>
                       </div>
                     </div>
@@ -467,6 +462,125 @@ export default function NewsletterPage() {
                     Créer
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Correction 566: Pop-up de détails */}
+      {detailNewsletter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {detailNewsletter.name}
+                </h3>
+                <span className={`inline-flex px-2 py-0.5 text-xs rounded mt-1 ${
+                  detailNewsletter.isActive
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                }`}>
+                  {detailNewsletter.isActive ? "Active" : "Inactive"}
+                </span>
+              </div>
+              <button
+                onClick={() => setDetailNewsletter(null)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 space-y-4">
+              {/* Aperçu du contenu */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Aperçu du contenu
+                </h4>
+                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  {detailNewsletter.description ? (
+                    <>
+                      <p className={`text-sm text-gray-600 dark:text-gray-400 ${!showFullContent ? "line-clamp-3" : ""}`}>
+                        {detailNewsletter.description}
+                      </p>
+                      {detailNewsletter.description.length > 150 && (
+                        <button
+                          onClick={() => setShowFullContent(!showFullContent)}
+                          className="text-sm text-brand-600 dark:text-brand-400 hover:underline mt-2"
+                        >
+                          {showFullContent ? "Réduire" : "Voir le contenu complet"}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">Aucune description définie</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Statistiques */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Statistiques
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <Send className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-xs text-blue-600 dark:text-blue-400">Emails envoyés</span>
+                    </div>
+                    <p className="text-xl font-bold text-blue-700 dark:text-blue-300">
+                      {detailNewsletter.totalSent > 0 ? detailNewsletter.totalSent : "—"}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <Mail className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-xs text-green-600 dark:text-green-400">Livrés</span>
+                    </div>
+                    <p className="text-xl font-bold text-green-700 dark:text-green-300">
+                      {detailNewsletter.totalSent > 0 ? detailNewsletter.totalSent : "—"}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <Eye className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span className="text-xs text-purple-600 dark:text-purple-400">Ouvertures</span>
+                    </div>
+                    <p className="text-xl font-bold text-purple-700 dark:text-purple-300">
+                      {detailNewsletter.totalSent > 0 ? (detailNewsletter.totalOpened || 0) : "—"}
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <MousePointerClick className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <span className="text-xs text-amber-600 dark:text-amber-400">Clics</span>
+                    </div>
+                    <p className="text-xl font-bold text-amber-700 dark:text-amber-300">
+                      {detailNewsletter.totalSent > 0 ? "0" : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {detailNewsletter.totalSent === 0 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3 italic">
+                    Les statistiques seront disponibles après l&apos;envoi de la newsletter.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end p-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setDetailNewsletter(null)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Fermer
               </button>
             </div>
           </div>

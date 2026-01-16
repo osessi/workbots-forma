@@ -69,7 +69,7 @@ export default function EmailsPage() {
   const modules = [
     {
       title: "Composer un email",
-      description: "Envoyer un email personnalisé avec pièces jointes",
+      description: "Rédigez et envoyez un email en quelques clics", // Correction 541
       href: "/emails/compose",
       icon: Send,
       color: "bg-brand-500",
@@ -111,8 +111,9 @@ export default function EmailsPage() {
               <Mail className="w-7 h-7 text-brand-600" />
               Emailing
             </h1>
+            {/* Correction 539: Sous-titre reformulé */}
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Gérez vos communications email avec vos apprenants et partenaires
+              Envoyez et suivez vos emails depuis la plateforme, en toute simplicité.
             </p>
           </div>
           <Link
@@ -144,7 +145,8 @@ export default function EmailsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Taux de livraison</p>
+                {/* Correction 540: Libellé renommé */}
+                <p className="text-sm text-gray-500 dark:text-gray-400">Taux de délivrabilité</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
                   {loading ? "-" : `${stats?.overview?.deliveryRate || 0}%`}
                 </p>
@@ -229,8 +231,9 @@ export default function EmailsPage() {
         {/* Derniers emails */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+{/* Correction 542: Titre renommé */}
             <h2 className="font-semibold text-gray-900 dark:text-white">
-              Derniers emails envoyés
+              Historique des envois
             </h2>
             <Link
               href="/emails/historique"

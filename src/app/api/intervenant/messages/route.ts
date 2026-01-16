@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Récupérer les messages de cette session envoyés par cet intervenant
+    // Inclure les réponses des apprenants
     const messages = await prisma.messageIntervenant.findMany({
       where: {
         sessionId,
@@ -103,6 +104,33 @@ export async function GET(request: NextRequest) {
             readAt: true,
           },
         },
+        // Inclure toutes les réponses (apprenants ET intervenant)
+        reponses: {
+          include: {
+            apprenant: {
+              select: {
+                id: true,
+                nom: true,
+                prenom: true,
+              },
+            },
+            intervenant: {
+              select: {
+                id: true,
+                nom: true,
+                prenom: true,
+              },
+            },
+            destinataireApprenant: {
+              select: {
+                id: true,
+                nom: true,
+                prenom: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -112,7 +140,7 @@ export async function GET(request: NextRequest) {
       client.participants.map((p) => p.apprenant)
     );
 
-    // Formater les messages avec le statut de lecture
+    // Formater les messages avec le statut de lecture et les réponses
     const formattedMessages = messages.map((msg) => ({
       id: msg.id,
       sujet: msg.sujet,
@@ -128,11 +156,47 @@ export async function GET(request: NextRequest) {
         apprenantId: l.apprenantId,
         readAt: l.readAt,
       })),
+      // Réponses (apprenants ET intervenant)
+      reponses: msg.reponses.map((r) => ({
+        id: r.id,
+        contenu: r.contenu,
+        attachments: r.attachments as Array<{ name: string; url: string; size?: number; type?: string }> || [],
+        createdAt: r.createdAt,
+        typeAuteur: r.typeAuteur,
+        isReadByIntervenant: r.isReadByIntervenant,
+        isReadByApprenant: r.isReadByApprenant,
+        // Info auteur selon le type
+        apprenant: r.apprenant ? {
+          id: r.apprenant.id,
+          nom: r.apprenant.nom,
+          prenom: r.apprenant.prenom,
+        } : null,
+        intervenant: r.intervenant ? {
+          id: r.intervenant.id,
+          nom: r.intervenant.nom,
+          prenom: r.intervenant.prenom,
+        } : null,
+        // Destinataire pour les réponses de l'intervenant
+        destinataireApprenant: r.destinataireApprenant ? {
+          id: r.destinataireApprenant.id,
+          nom: r.destinataireApprenant.nom,
+          prenom: r.destinataireApprenant.prenom,
+        } : null,
+      })),
+      // Seules les réponses des apprenants non lues comptent
+      nombreReponsesNonLues: msg.reponses.filter((r) => r.typeAuteur === "apprenant" && !r.isReadByIntervenant).length,
     }));
+
+    // Calculer le total de réponses non lues
+    const totalReponsesNonLues = formattedMessages.reduce(
+      (acc, msg) => acc + msg.nombreReponsesNonLues,
+      0
+    );
 
     return NextResponse.json({
       messages: formattedMessages,
       apprenants,
+      totalReponsesNonLues,
     });
   } catch (error) {
     console.error("[API] GET /api/intervenant/messages error:", error);
@@ -306,16 +370,103 @@ export async function POST(request: NextRequest) {
         id: message.id,
         sujet: message.sujet,
         contenu: message.contenu,
-        attachments: message.attachments,
+        attachments: (message.attachments as Array<{ name: string; url: string; size?: number; type?: string }>) || [],
         envoyeATous: message.envoyeATous,
         destinatairesIds: message.destinatairesIds,
         createdAt: message.createdAt,
         nombreDestinataires: destinatairesFinals.length,
         nombreLectures: 0,
+        lectures: [],
+        reponses: [],
+        nombreReponsesNonLues: 0,
       },
     });
   } catch (error) {
     console.error("[API] POST /api/intervenant/messages error:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+// PATCH - Marquer une réponse comme lue
+export async function PATCH(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "") ||
+                  request.nextUrl.searchParams.get("token");
+
+    if (!token) {
+      return NextResponse.json({ error: "Token manquant" }, { status: 401 });
+    }
+
+    const decoded = decodeIntervenantToken(token);
+    if (!decoded) {
+      return NextResponse.json({ error: "Token invalide ou expiré" }, { status: 401 });
+    }
+
+    const { intervenantId, organizationId } = decoded;
+    const body = await request.json();
+    const { reponseId, messageId } = body;
+
+    // Marquer une seule réponse comme lue
+    if (reponseId) {
+      // Vérifier que la réponse existe et appartient à un message de l'intervenant
+      const reponse = await prisma.messageReponse.findFirst({
+        where: {
+          id: reponseId,
+          organizationId,
+          message: {
+            intervenantId,
+          },
+        },
+      });
+
+      if (!reponse) {
+        return NextResponse.json({ error: "Réponse non trouvée" }, { status: 404 });
+      }
+
+      await prisma.messageReponse.update({
+        where: { id: reponseId },
+        data: {
+          isReadByIntervenant: true,
+          readByIntervenantAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Marquer toutes les réponses d'un message comme lues
+    if (messageId) {
+      // Vérifier que le message appartient à l'intervenant
+      const message = await prisma.messageIntervenant.findFirst({
+        where: {
+          id: messageId,
+          intervenantId,
+          organizationId,
+        },
+      });
+
+      if (!message) {
+        return NextResponse.json({ error: "Message non trouvé" }, { status: 404 });
+      }
+
+      await prisma.messageReponse.updateMany({
+        where: {
+          messageId,
+          isReadByIntervenant: false,
+        },
+        data: {
+          isReadByIntervenant: true,
+          readByIntervenantAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "reponseId ou messageId requis" }, { status: 400 });
+  } catch (error) {
+    console.error("[API] PATCH /api/intervenant/messages error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

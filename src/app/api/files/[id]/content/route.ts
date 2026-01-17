@@ -61,14 +61,37 @@ export async function GET(
     const { id } = await params;
 
     // Extraire l'ID de base si c'est un ID composite (pour les documents dupliqués)
-    // Format: originalId-apprenantId (où les deux sont des UUIDs)
-    // Un UUID standard a 5 segments: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    // Un ID composite a plus de 5 segments car c'est UUID-UUID
-    const segments = id.split("-");
-    const isCompositeId = segments.length > 5 && !id.startsWith("emargement-");
-    const baseId = isCompositeId
-      ? segments.slice(0, 5).join("-") // Prendre les 5 premiers segments (le premier UUID)
-      : id;
+    // Format des IDs composites: {originalId}-{apprenantId}
+    // Les IDs peuvent être soit des UUIDs (5 segments avec tirets) soit des CUIDs (commence par 'c', ~25 chars)
+    //
+    // Exemples:
+    // - UUID simple: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (5 segments)
+    // - UUID composite: uuid1-uuid2 (10 segments)
+    // - CUID simple: cmkh4nzr00014wbaaxklgn0q6 (1 segment)
+    // - CUID composite: cmkh4nzr00014wbaaxklgn0q6-cmk7ehmf70000n30kt1ean3xb (2 segments)
+
+    let baseId = id;
+
+    // Cas spécial: emargement-{feuilleId}-{apprenantId}
+    if (!id.startsWith("emargement-")) {
+      const segments = id.split("-");
+
+      // Vérifier si c'est un ID composite CUID (2 segments, chacun commençant par 'c')
+      const isCuidComposite = segments.length === 2 &&
+        segments[0].startsWith("c") &&
+        segments[1].startsWith("c") &&
+        segments[0].length >= 20 &&
+        segments[1].length >= 20;
+
+      // Vérifier si c'est un ID composite UUID (plus de 5 segments)
+      const isUuidComposite = segments.length > 5;
+
+      if (isCuidComposite) {
+        baseId = segments[0]; // Premier CUID
+      } else if (isUuidComposite) {
+        baseId = segments.slice(0, 5).join("-"); // Premier UUID (5 segments)
+      }
+    }
 
     // D'abord chercher dans les fichiers (avec ID original ou baseId pour documents dupliqués)
     const file = await prisma.file.findFirst({

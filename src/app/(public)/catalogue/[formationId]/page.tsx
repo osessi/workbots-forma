@@ -298,8 +298,14 @@ function FormationDetailContent({ formationId }: { formationId: string }) {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur lors du chargement");
+        // Vérifier le content-type avant de parser en JSON
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Erreur lors du chargement");
+        } else {
+          throw new Error(`Erreur serveur (${response.status})`);
+        }
       }
 
       const data = await response.json();

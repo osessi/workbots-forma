@@ -174,8 +174,15 @@ function CatalogueContent() {
       const response = await fetch(`/api/public/catalogue?${params}`);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erreur lors du chargement");
+        // Vérifier le content-type avant de parser en JSON
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Erreur lors du chargement");
+        } else {
+          // La réponse n'est pas du JSON (probablement une page d'erreur HTML)
+          throw new Error(`Erreur serveur (${response.status})`);
+        }
       }
 
       const catalogueData = await response.json();

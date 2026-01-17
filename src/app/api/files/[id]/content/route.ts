@@ -61,9 +61,13 @@ export async function GET(
     const { id } = await params;
 
     // Extraire l'ID de base si c'est un ID composite (pour les documents dupliqués)
-    // Format: originalId-apprenantId
-    const baseId = id.includes("-") && !id.startsWith("emargement-")
-      ? id.split("-").slice(0, -1).join("-") || id.split("-")[0]
+    // Format: originalId-apprenantId (où les deux sont des UUIDs)
+    // Un UUID standard a 5 segments: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    // Un ID composite a plus de 5 segments car c'est UUID-UUID
+    const segments = id.split("-");
+    const isCompositeId = segments.length > 5 && !id.startsWith("emargement-");
+    const baseId = isCompositeId
+      ? segments.slice(0, 5).join("-") // Prendre les 5 premiers segments (le premier UUID)
       : id;
 
     // D'abord chercher dans les fichiers (avec ID original ou baseId pour documents dupliqués)

@@ -5,49 +5,11 @@
 // DELETE /api/files/[id] - Supprimer un fichier importé
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 
 const STORAGE_BUCKET = "worksbots-forma-stockage";
-
-// Helper pour authentifier l'utilisateur
-async function authenticateUser() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-  if (!supabaseUser) {
-    return null;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser.id },
-  });
-
-  return user;
-}
 
 // Client admin avec service role (bypass RLS)
 function getAdminClient() {

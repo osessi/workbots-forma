@@ -180,3 +180,49 @@ export async function getRealAdmin(): Promise<{ id: string; email: string } | nu
   const user = await getCurrentUser();
   return user?.impersonatedBy ?? null;
 }
+
+// ===========================================
+// AUTHENTIFICATION POUR LES APIs (avec support impersonation)
+// ===========================================
+// Cette fonction remplace les fonctions `authenticateUser` locales dans les APIs
+// Elle retourne l'utilisateur avec son organisation, en tenant compte de l'impersonation
+
+export interface AuthenticatedUser {
+  id: string;
+  supabaseId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  avatar: string | null;
+  role: string;
+  isSuperAdmin: boolean;
+  isActive: boolean;
+  organizationId: string | null;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    logo: string | null;
+    primaryColor: string | null;
+    [key: string]: unknown; // Permet d'autres champs de l'organisation
+  } | null;
+  // Contexte d'impersonation
+  isImpersonating: boolean;
+  impersonatedBy: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+}
+
+/**
+ * Authentifie l'utilisateur courant pour les APIs
+ * Gère automatiquement l'impersonation si un super admin est en mode impersonation
+ *
+ * @returns L'utilisateur authentifié ou null si non connecté
+ */
+export async function authenticateUser(): Promise<AuthenticatedUser | null> {
+  return getCurrentUser();
+}

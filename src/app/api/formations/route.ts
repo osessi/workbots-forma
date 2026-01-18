@@ -5,49 +5,20 @@
 // GET /api/formations - Lister les formations de l'utilisateur
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 
 // POST - Créer une nouvelle formation
 export async function POST(request: NextRequest) {
   try {
     // Authentification
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-      include: { organization: true },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Utilisateur ou organisation non trouvé" }, { status: 404 });
     }
 
@@ -102,13 +73,24 @@ export async function POST(request: NextRequest) {
       });
 
       // 2. Créer automatiquement un dossier Drive pour cette formation
-      await tx.folder.create({
+      const formationFolder = await tx.folder.create({
         data: {
           name: titre,
           color: "#4277FF", // Couleur par défaut
           organizationId: user.organizationId!,
           formationId: newFormation.id, // Lier le dossier à la formation
           folderType: "formation",
+        },
+      });
+
+      // 3. Créer le sous-dossier "Documents de formation" pour stocker fiche pédagogique, tests, etc.
+      await tx.folder.create({
+        data: {
+          name: "Documents de formation",
+          color: "#6366F1", // Indigo pour distinguer des dossiers apprenants
+          parentId: formationFolder.id,
+          folderType: "documents_formation",
+          organizationId: user.organizationId!,
         },
       });
 
@@ -165,40 +147,13 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get("dateTo");
 
     // Authentification
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
 

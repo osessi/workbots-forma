@@ -4,39 +4,13 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 import {
   getIndicateur,
   getCritere,
   analyserIndicateurSpecifique,
 } from "@/lib/services/qualiopi";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 export async function GET(
   request: NextRequest,
@@ -54,27 +28,19 @@ export async function GET(
     }
 
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
 
     // Récupérer les données de référence
     const indicateurRef = getIndicateur(numeroInt);
@@ -188,27 +154,19 @@ export async function PATCH(
     }
 
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
     const body = await request.json();
 
     const { status, notes, prochainControle } = body;

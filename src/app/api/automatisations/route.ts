@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 import { z } from "zod";
 import { WorkflowTriggerType, WorkflowCategory, WorkflowActionType, Prisma } from "@prisma/client";
 
@@ -61,23 +61,16 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -90,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     // Construire les filtres
     const where: any = {
-      organizationId: dbUser.organizationId,
+      organizationId: user.organizationId,
     };
 
     if (query.actif !== undefined) {
@@ -167,23 +160,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -197,7 +183,7 @@ export async function POST(request: NextRequest) {
     // Créer le workflow avec ses étapes
     const workflow = await prisma.workflow.create({
       data: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         nom: data.nom,
         description: data.description,
         icone: data.icone,

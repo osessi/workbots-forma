@@ -4,30 +4,19 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { prisma } from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 
 const SLIDES_API_URL = process.env.SLIDES_API_URL || "http://localhost:8000";
 
 export async function GET(request: NextRequest) {
   try {
     // Authenticate user
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Get user's organization
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }

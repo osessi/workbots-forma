@@ -6,33 +6,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // GET - Détail d'un template
 export async function GET(
@@ -41,29 +16,18 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, isSuperAdmin: true },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const template = await prisma.emailTemplate.findFirst({
       where: {
         id,
         OR: [
-          { organizationId: dbUser.organizationId },
+          { organizationId: user.organizationId },
           { isGlobal: true },
-          ...(dbUser.isSuperAdmin ? [{ organizationId: null }] : []),
+          ...(user.isSuperAdmin ? [{ organizationId: null }] : []),
         ],
       },
       include: {
@@ -112,20 +76,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, isSuperAdmin: true },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     // Vérifier l'accès au template
@@ -133,8 +86,8 @@ export async function PATCH(
       where: {
         id,
         OR: [
-          { organizationId: dbUser.organizationId },
-          ...(dbUser.isSuperAdmin ? [{ organizationId: null }, { isGlobal: true }] : []),
+          { organizationId: user.organizationId },
+          ...(user.isSuperAdmin ? [{ organizationId: null }, { isGlobal: true }] : []),
         ],
       },
     });
@@ -144,7 +97,7 @@ export async function PATCH(
     }
 
     // Un utilisateur normal ne peut pas modifier un template global
-    if (template.isGlobal && !dbUser.isSuperAdmin) {
+    if (template.isGlobal && !user.isSuperAdmin) {
       return NextResponse.json(
         { error: "Vous ne pouvez pas modifier un template global" },
         { status: 403 }
@@ -180,7 +133,7 @@ export async function PATCH(
           subject: template.subject,
           htmlContent: template.htmlContent,
           jsonContent: template.jsonContent as object | undefined,
-          createdById: dbUser.id,
+          createdById: user.id,
           changeNotes: changeNotes || "Modification du contenu",
         },
       });
@@ -199,7 +152,7 @@ export async function PATCH(
         ...(jsonContent !== undefined && { jsonContent }),
         ...(variables !== undefined && { variables }),
         ...(isActive !== undefined && { isActive }),
-        ...(isGlobal !== undefined && dbUser.isSuperAdmin && { isGlobal }),
+        ...(isGlobal !== undefined && user.isSuperAdmin && { isGlobal }),
         ...(contentChanged && { version: { increment: 1 } }),
       },
     });
@@ -218,20 +171,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, isSuperAdmin: true },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     // Vérifier l'accès
@@ -239,8 +181,8 @@ export async function DELETE(
       where: {
         id,
         OR: [
-          { organizationId: dbUser.organizationId },
-          ...(dbUser.isSuperAdmin ? [{ organizationId: null }] : []),
+          { organizationId: user.organizationId },
+          ...(user.isSuperAdmin ? [{ organizationId: null }] : []),
         ],
       },
     });
@@ -249,7 +191,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Template non trouvé" }, { status: 404 });
     }
 
-    if (template.isGlobal && !dbUser.isSuperAdmin) {
+    if (template.isGlobal && !user.isSuperAdmin) {
       return NextResponse.json(
         { error: "Vous ne pouvez pas supprimer un template global" },
         { status: 403 }

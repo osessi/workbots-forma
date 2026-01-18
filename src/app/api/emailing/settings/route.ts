@@ -5,35 +5,10 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // Extraire les statuts de vérification depuis dnsRecords
 function extractVerificationStatus(dnsRecords: unknown) {
@@ -59,25 +34,19 @@ function extractVerificationStatus(dnsRecords: unknown) {
 
 export async function GET() {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
     // Configuration SMTP personnalisée
     const smtpConfig = await prisma.emailSmtpConfig.findUnique({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       select: {
         id: true,
         provider: true,
@@ -94,7 +63,7 @@ export async function GET() {
 
     // Domaines configurés
     const domains = await prisma.emailDomain.findMany({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       select: {
         id: true,
         domain: true,
@@ -108,7 +77,7 @@ export async function GET() {
 
     // Organisation pour infos générales
     const organization = await prisma.organization.findUnique({
-      where: { id: dbUser.organizationId },
+      where: { id: user.organizationId },
       select: {
         id: true,
         name: true,
@@ -121,7 +90,7 @@ export async function GET() {
     const defaultTemplates = await prisma.emailTemplate.findMany({
       where: {
         OR: [
-          { organizationId: dbUser.organizationId },
+          { organizationId: user.organizationId },
           { isGlobal: true },
         ],
       },
@@ -171,24 +140,18 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
     // Vérifier les droits (admin ou owner)
-    if (!["ADMIN", "OWNER", "SUPER_ADMIN"].includes(dbUser.role)) {
+    if (!["ADMIN", "OWNER", "SUPER_ADMIN", "ORG_ADMIN"].includes(user.role)) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
@@ -197,7 +160,7 @@ export async function PATCH(request: NextRequest) {
 
     // Mettre à jour ou créer la config SMTP
     const smtpConfig = await prisma.emailSmtpConfig.upsert({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       update: {
         fromEmail: defaultFromEmail,
         fromName: defaultFromName,
@@ -205,7 +168,7 @@ export async function PATCH(request: NextRequest) {
         updatedAt: new Date(),
       },
       create: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         provider: "resend",
         fromEmail: defaultFromEmail || "",
         fromName: defaultFromName || "",

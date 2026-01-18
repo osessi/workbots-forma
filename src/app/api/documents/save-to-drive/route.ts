@@ -20,6 +20,7 @@ interface SaveDocumentRequest {
   clientId?: string;
   entrepriseId?: string;
   apprenantId?: string;
+  intervenantId?: string; // Pour les documents destinés au formateur (contrat sous-traitance, programme)
   saveAsPdf?: boolean; // Optionnel, défaut true
 }
 
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: SaveDocumentRequest = await request.json();
-    const { formationId, documentType, titre, content, entrepriseId, apprenantId, saveAsPdf = true } = body;
+    const { formationId, documentType, titre, content, entrepriseId, apprenantId, intervenantId, saveAsPdf = true } = body;
 
     if (!formationId || !documentType || !titre || !content) {
       return NextResponse.json(
@@ -196,6 +197,39 @@ export async function POST(request: NextRequest) {
         }
 
         targetFolderId = apprenantFolder.id;
+      }
+    } else if (intervenantId) {
+      // Intervenant/Formateur - créer/trouver le sous-dossier intervenant
+      const intervenant = await prisma.intervenant.findFirst({
+        where: {
+          id: intervenantId,
+          organizationId: user.organizationId,
+        },
+      });
+
+      if (intervenant) {
+        let intervenantFolder = await prisma.folder.findFirst({
+          where: {
+            parentId: formationFolder.id,
+            intervenantId: intervenant.id,
+            organizationId: user.organizationId,
+          },
+        });
+
+        if (!intervenantFolder) {
+          intervenantFolder = await prisma.folder.create({
+            data: {
+              name: `${intervenant.prenom} ${intervenant.nom}`,
+              color: "#8B5CF6", // Violet pour les formateurs
+              parentId: formationFolder.id,
+              intervenantId: intervenant.id,
+              folderType: "intervenant",
+              organizationId: user.organizationId,
+            },
+          });
+        }
+
+        targetFolderId = intervenantFolder.id;
       }
     }
 

@@ -1,9 +1,9 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import JSZip from "jszip";
+import { authenticateUser } from "@/lib/auth/getCurrentUser";
 
 // Types pour la génération SCORM
 interface ModuleContent {
@@ -26,6 +26,16 @@ interface FormationExport {
 // POST - Générer et exporter un package SCORM à partir d'une formation
 export async function POST(request: NextRequest) {
   try {
+    const user = await authenticateUser();
+    if (!user) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    if (!user.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    // Créer le client Supabase pour les opérations storage
     const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,20 +57,6 @@ export async function POST(request: NextRequest) {
         },
       }
     );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
-    if (!user || !user.organizationId) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
 
     const body = await request.json();
     const { formationId, version = "SCORM_1_2", options = {} } = body;

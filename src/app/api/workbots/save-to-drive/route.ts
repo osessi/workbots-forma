@@ -4,7 +4,7 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { uploadFileServer } from "@/lib/supabase/storage";
 
@@ -21,22 +21,12 @@ interface SaveToDriveRequest {
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Get user and organization
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -50,7 +40,7 @@ export async function POST(request: NextRequest) {
     const formation = await prisma.formation.findFirst({
       where: {
         id: formationId,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
       include: {
         folder: true,
@@ -70,7 +60,7 @@ export async function POST(request: NextRequest) {
       formationFolder = await prisma.folder.create({
         data: {
           name: formation.titre,
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           formationId: formation.id,
           folderType: "formation",
           color: "#3B82F6",
@@ -121,7 +111,7 @@ export async function POST(request: NextRequest) {
       finalFileName,
       contentType,
       {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         category: "SLIDES",
         formationId: formationId,
         fileName: finalFileName,
@@ -145,8 +135,8 @@ export async function POST(request: NextRequest) {
         category: "SLIDES",
         storagePath: uploadResult.path,
         publicUrl: uploadResult.publicUrl,
-        organizationId: dbUser.organizationId,
-        userId: dbUser.id,
+        organizationId: user.organizationId,
+        userId: user.id,
         formationId: formation.id,
         folderId: formationFolder.id,
       },

@@ -5,35 +5,9 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import { EvaluationSatisfactionType } from "@prisma/client";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
+import { authenticateUser } from "@/lib/auth/getCurrentUser";
 
 // ===========================================
 // GET - Liste des enquêtes
@@ -41,19 +15,12 @@ async function getSupabaseClient() {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -67,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Construire le filtre
     const where: Record<string, unknown> = {
-      organizationId: dbUser.organizationId,
+      organizationId: user.organizationId,
     };
 
     if (sessionId) where.sessionId = sessionId;
@@ -112,7 +79,7 @@ export async function GET(request: NextRequest) {
     // Statistiques globales
     const stats = await prisma.evaluationSatisfaction.groupBy({
       by: ["status", "type"],
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       _count: { id: true },
     });
 
@@ -120,7 +87,7 @@ export async function GET(request: NextRequest) {
     const reponses = await prisma.evaluationSatisfactionReponse.findMany({
       where: {
         evaluation: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
         },
         tauxSatisfaction: { not: null },
       },
@@ -158,19 +125,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -191,7 +151,7 @@ export async function POST(request: NextRequest) {
     const session = await prisma.documentSession.findFirst({
       where: {
         id: sessionId,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
     });
 
@@ -206,7 +166,7 @@ export async function POST(request: NextRequest) {
     const apprenant = await prisma.apprenant.findFirst({
       where: {
         id: apprenantId,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
     });
 
@@ -241,7 +201,7 @@ export async function POST(request: NextRequest) {
 
     const enquete = await prisma.evaluationSatisfaction.create({
       data: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         sessionId,
         apprenantId,
         type,

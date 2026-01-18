@@ -3,52 +3,39 @@
 // ===========================================
 // Gère la personnalisation visuelle de l'organisation (couleur primaire, logo)
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 
 // GET - Récupérer les paramètres de branding
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-      include: { organization: true },
+    if (!user.organizationId) {
+      return NextResponse.json(
+        { error: "Organisation non trouvée" },
+        { status: 404 }
+      );
+    }
+
+    // Récupérer l'organisation
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: {
+        primaryColor: true,
+        logo: true,
+      },
     });
 
-    if (!user || !user.organization) {
+    if (!organization) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -56,8 +43,8 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      primaryColor: user.organization.primaryColor || "#4277FF",
-      logo: user.organization.logo,
+      primaryColor: organization.primaryColor || "#4277FF",
+      logo: organization.logo,
     });
   } catch (error) {
     console.error("Error fetching branding:", error);
@@ -71,43 +58,16 @@ export async function GET() {
 // PATCH - Mettre à jour les paramètres de branding
 export async function PATCH(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur et vérifier les permissions
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }

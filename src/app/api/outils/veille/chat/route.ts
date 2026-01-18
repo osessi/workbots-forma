@@ -4,9 +4,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 import { VeilleType } from "@prisma/client";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -73,39 +72,12 @@ Sois sensible aux enjeux d'inclusion et donne des conseils pratiques et accessib
 // POST - Envoyer un message au chat
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -295,39 +267,12 @@ Règles importantes:
 // GET - Récupérer l'historique de conversation
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -397,40 +342,9 @@ export async function GET(request: NextRequest) {
 // DELETE - Supprimer une conversation
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -466,40 +380,9 @@ export async function DELETE(request: NextRequest) {
 // Correction 409: PATCH - Renommer ou épingler une conversation
 export async function PATCH(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const body = await request.json();

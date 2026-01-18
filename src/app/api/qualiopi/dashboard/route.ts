@@ -4,9 +4,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 import {
   analyserConformiteOrganisation,
   initialiserIndicateursOrganisation,
@@ -15,60 +14,28 @@ import {
 export async function GET(request: NextRequest) {
   try {
     // Authentification
-    const cookieStore = await cookies();
-    const allCookies = cookieStore.getAll();
-    console.log("[Qualiopi Dashboard] Cookies count:", allCookies.length);
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return allCookies;
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     console.log("[Qualiopi Dashboard] Auth result:", {
       hasUser: !!user,
       userId: user?.id,
-      authError: authError?.message
     });
 
     if (!user) {
       return NextResponse.json({
         error: "Non authentifié",
-        details: authError?.message || "No user session found"
+        details: "No user session found"
       }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
 
     console.log("[Qualiopi Dashboard] OrganizationId:", organizationId);
 

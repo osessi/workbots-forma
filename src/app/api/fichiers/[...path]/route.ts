@@ -4,9 +4,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { authenticateUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 
 // Bucket Supabase Storage
 const STORAGE_BUCKET = "worksbots-forma-stockage";
@@ -20,31 +19,6 @@ function getAdminClient() {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
-      },
-    }
-  );
-}
-
-// Helper pour créer le client Supabase (authentification)
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
       },
     }
   );
@@ -76,8 +50,7 @@ export async function GET(
 
     // Pour les fichiers non-publics, vérifier l'authentification
     if (!isPublicImage) {
-      const supabase = await getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await authenticateUser();
 
       if (!user) {
         return NextResponse.json({ error: "Non authentifié" }, { status: 401 });

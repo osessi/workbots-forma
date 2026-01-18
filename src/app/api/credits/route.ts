@@ -3,9 +3,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 import {
   getCreditsBalance,
   getCreditHistory,
@@ -14,49 +13,17 @@ import {
   hasUnlimitedCredits,
 } from "@/lib/services/credits.service";
 
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
-
 // GET - Récupérer le solde de crédits
 export async function GET(request: NextRequest) {
   try {
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -68,10 +35,10 @@ export async function GET(request: NextRequest) {
     const historyLimit = parseInt(searchParams.get("limit") || "20");
 
     // Vérifier si crédits illimités
-    const isUnlimited = await hasUnlimitedCredits(dbUser.organizationId);
+    const isUnlimited = await hasUnlimitedCredits(user.organizationId);
 
     // Récupérer le solde
-    const balance = await getCreditsBalance(dbUser.organizationId);
+    const balance = await getCreditsBalance(user.organizationId);
 
     // Formater pour l'affichage
     const response: {
@@ -102,7 +69,7 @@ export async function GET(request: NextRequest) {
     // Ajouter l'historique si demandé
     if (includeHistory) {
       const { transactions } = await getCreditHistory(
-        dbUser.organizationId,
+        user.organizationId,
         historyLimit
       );
       response.history = transactions;

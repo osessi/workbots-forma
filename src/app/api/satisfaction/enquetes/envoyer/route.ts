@@ -4,51 +4,18 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import { EvaluationSatisfactionType } from "@prisma/client";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
+import { authenticateUser } from "@/lib/auth/getCurrentUser";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -66,7 +33,7 @@ export async function POST(request: NextRequest) {
       enquetesToSend = await prisma.evaluationSatisfaction.findMany({
         where: {
           id: { in: enqueteIds },
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           status: "PENDING",
           sentAt: null,
         },
@@ -93,7 +60,7 @@ export async function POST(request: NextRequest) {
       // Toutes les enquêtes d'une session
       const whereClause: Record<string, unknown> = {
         sessionId,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         status: "PENDING",
         sentAt: null,
       };
@@ -138,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     // Récupérer les informations de l'organisation pour l'email
     const organization = await prisma.organization.findUnique({
-      where: { id: dbUser.organizationId },
+      where: { id: user.organizationId },
       select: {
         name: true,
         email: true,
@@ -162,7 +129,7 @@ export async function POST(request: NextRequest) {
         // Créer l'enregistrement d'email envoyé
         await prisma.sentEmail.create({
           data: {
-            organizationId: dbUser.organizationId,
+            organizationId: user.organizationId,
             toEmail: enquete.apprenant.email,
             toName: `${enquete.apprenant.prenom} ${enquete.apprenant.nom}`,
             subject: enquete.type === "CHAUD"
@@ -178,7 +145,7 @@ export async function POST(request: NextRequest) {
             type: "OTHER",
             sessionId: enquete.sessionId,
             apprenantId: enquete.apprenantId,
-            sentByUserId: dbUser.id,
+            sentByUserId: user.id,
           },
         });
 

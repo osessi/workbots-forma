@@ -32,6 +32,24 @@ export default function SignUpForm() {
       return;
     }
 
+    // Validation du mot de passe avec règles de complexité
+    if (password.length < 12) {
+      setError("Le mot de passe doit contenir au moins 12 caractères");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError("Le mot de passe doit contenir au moins 1 majuscule");
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError("Le mot de passe doit contenir au moins 1 chiffre");
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      setError("Le mot de passe doit contenir au moins 1 caractère spécial (!@#$%...)");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -139,13 +157,13 @@ export default function SignUpForm() {
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full overflow-y-auto no-scrollbar">
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
-        <Link
-          href="/"
+        <a
+          href="https://workbots.io"
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
           <ChevronLeftIcon />
           Retour
-        </Link>
+        </a>
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
@@ -292,12 +310,12 @@ export default function SignUpForm() {
                   </Label>
                   <div className="relative">
                     <Input
-                      placeholder="Minimum 6 caractères"
+                      placeholder="Minimum 12 caractères"
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      minLength={6}
+                      minLength={12}
                       disabled={isLoading}
                     />
                     <span
@@ -311,6 +329,25 @@ export default function SignUpForm() {
                       )}
                     </span>
                   </div>
+                  {/* Indicateur de complexité du mot de passe */}
+                  {password && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className={`px-2 py-0.5 rounded ${password.length >= 12 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          {password.length >= 12 ? '✓' : '○'} 12+ caractères
+                        </span>
+                        <span className={`px-2 py-0.5 rounded ${/[A-Z]/.test(password) ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          {/[A-Z]/.test(password) ? '✓' : '○'} Majuscule
+                        </span>
+                        <span className={`px-2 py-0.5 rounded ${/[0-9]/.test(password) ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          {/[0-9]/.test(password) ? '✓' : '○'} Chiffre
+                        </span>
+                        <span className={`px-2 py-0.5 rounded ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? '✓' : '○'} Spécial
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <Checkbox

@@ -5,58 +5,23 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // GET - Liste des newsletters
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, isSuperAdmin: true },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const global = searchParams.get("global") === "true" && dbUser.isSuperAdmin;
+    const global = searchParams.get("global") === "true" && user.isSuperAdmin;
 
     const newsletters = await prisma.newsletter.findMany({
-      where: global ? {} : { organizationId: dbUser.organizationId },
+      where: global ? {} : { organizationId: user.organizationId },
       orderBy: { updatedAt: "desc" },
       include: {
         _count: {
@@ -107,20 +72,10 @@ export async function GET(request: NextRequest) {
 // POST - Créer une newsletter
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, isSuperAdmin: true },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -146,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     const newsletter = await prisma.newsletter.create({
       data: {
-        organizationId: dbUser.isSuperAdmin && !dbUser.organizationId ? null : dbUser.organizationId,
+        organizationId: user.isSuperAdmin && !user.organizationId ? null : user.organizationId,
         name,
         description,
         fromName,
@@ -159,15 +114,15 @@ export async function POST(request: NextRequest) {
         formStyle,
         confirmationTitle: confirmationTitle || "Inscription confirmée !",
         confirmationMessage: confirmationMessage || "Merci pour votre inscription.",
-        createdById: dbUser.id,
+        createdById: user.id,
       },
     });
 
     // Importer les apprenants si demandé
-    if (importFromApprenants && dbUser.organizationId) {
+    if (importFromApprenants && user.organizationId) {
       const apprenants = await prisma.apprenant.findMany({
         where: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           isActive: true,
           email: { not: undefined, notIn: [""] },
         },

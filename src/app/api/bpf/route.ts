@@ -5,34 +5,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
+import { authenticateUser } from "@/lib/auth";
 
 // ===========================================
 // GET - Liste des BPF
@@ -40,19 +14,13 @@ async function getSupabaseClient() {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -61,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // Récupérer tous les BPF de l'organisation
     const bpfs = await prisma.bilanPedagogiqueFinancier.findMany({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       orderBy: { annee: "desc" },
     });
 
@@ -87,19 +55,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -120,7 +82,7 @@ export async function POST(request: NextRequest) {
     const existingBpf = await prisma.bilanPedagogiqueFinancier.findUnique({
       where: {
         organizationId_annee: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           annee,
         },
       },
@@ -136,7 +98,7 @@ export async function POST(request: NextRequest) {
     // Créer le BPF vide
     const bpf = await prisma.bilanPedagogiqueFinancier.create({
       data: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         annee,
         sectionA: {},
         repartitionPublic: {},

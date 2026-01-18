@@ -4,35 +4,15 @@
 // Synchronise l'utilisateur Supabase avec la base Prisma
 // Crée également l'organisation si les infos workspace sont présentes
 // Appelé après connexion email/password ou inscription
+// NOTE: Cette API utilise directement Supabase car elle a besoin des métadonnées
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
 
 export async function POST() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const supabase = await createSupabaseServerClient();
 
     // Récupérer l'utilisateur connecté
     const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
@@ -45,6 +25,10 @@ export async function POST() {
     }
 
     const metadata = supabaseUser.user_metadata || {};
+
+    console.log("[User Sync] User metadata:", JSON.stringify(metadata, null, 2));
+    console.log("[User Sync] workspace_name:", metadata.workspace_name);
+    console.log("[User Sync] workspace_slug:", metadata.workspace_slug);
 
     // Vérifier si c'est le premier utilisateur (sera Super Admin)
     const userCount = await prisma.user.count();
@@ -60,22 +44,41 @@ export async function POST() {
 
     // Créer l'organisation si workspace_name est fourni et l'utilisateur n'a pas d'org
     if (metadata.workspace_name && metadata.workspace_slug && !organizationId) {
+      console.log("[User Sync] Will create organization");
       // Vérifier si le slug n'existe pas déjà
       const existingOrg = await prisma.organization.findUnique({
         where: { slug: metadata.workspace_slug },
       });
 
       if (!existingOrg) {
+        console.log("[User Sync] Creating new organization with data:", {
+          name: metadata.workspace_name,
+          slug: metadata.workspace_slug,
+          siret: metadata.siret,
+          representantNom: metadata.representant_nom,
+        });
         const newOrg = await prisma.organization.create({
           data: {
+            // Identité de l'organisme
             name: metadata.workspace_name,
             slug: metadata.workspace_slug,
+            nomCommercial: metadata.nom_commercial || null,
+            // Informations légales
             siret: metadata.siret || null,
+            villeRcs: metadata.ville_rcs || null,
             numeroFormateur: metadata.numero_formateur || null,
+            prefectureRegion: metadata.prefecture_region || null,
+            // Représentant légal
+            representantNom: metadata.representant_nom || null,
+            representantPrenom: metadata.representant_prenom || null,
+            representantFonction: metadata.representant_fonction || null,
+            // Coordonnées
             adresse: metadata.adresse || null,
             codePostal: metadata.code_postal || null,
             ville: metadata.ville || null,
-            telephone: metadata.telephone || null,
+            email: metadata.email_organisme || null,
+            telephone: metadata.telephone_organisme || metadata.phone || null,
+            siteWeb: metadata.site_web || null,
           },
         });
         organizationId = newOrg.id;
@@ -133,13 +136,23 @@ export async function POST() {
           id: user.organization.id,
           name: user.organization.name,
           slug: user.organization.slug,
+          nomCommercial: user.organization.nomCommercial,
           siret: user.organization.siret,
+          villeRcs: user.organization.villeRcs,
           numeroFormateur: user.organization.numeroFormateur,
+          prefectureRegion: user.organization.prefectureRegion,
+          representantNom: user.organization.representantNom,
+          representantPrenom: user.organization.representantPrenom,
+          representantFonction: user.organization.representantFonction,
           adresse: user.organization.adresse,
           codePostal: user.organization.codePostal,
           ville: user.organization.ville,
+          email: user.organization.email,
           telephone: user.organization.telephone,
+          siteWeb: user.organization.siteWeb,
           logo: user.organization.logo,
+          signature: user.organization.signature,
+          cachet: user.organization.cachet,
         } : null,
       },
     });

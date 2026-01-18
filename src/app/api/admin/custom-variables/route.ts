@@ -4,32 +4,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 
 // GET - Liste des variables personnalisees de l'organisation
 export async function GET() {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
-
-    if (!dbUser.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ variables: [] });
     }
 
     const variables = await prisma.customVariable.findMany({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       orderBy: [{ category: "asc" }, { label: "asc" }],
     });
 
@@ -46,27 +37,18 @@ export async function GET() {
 // POST - Créer une variable personnalisee
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
-
     // Verifier les droits admin
-    if (!dbUser.isSuperAdmin && dbUser.role !== "ORG_ADMIN") {
+    if (!user.isSuperAdmin && user.role !== "ORG_ADMIN") {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
-    if (!dbUser.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Vous devez appartenir à une organisation" },
         { status: 400 }
@@ -91,7 +73,7 @@ export async function POST(req: NextRequest) {
     // Verifier que la variable n'existe pas deja
     const existing = await prisma.customVariable.findFirst({
       where: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         variableId: cleanVariableId,
       },
     });
@@ -111,7 +93,7 @@ export async function POST(req: NextRequest) {
         category: category || "organisation",
         defaultValue: defaultValue || null,
         dataType: dataType || "text",
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
     });
 

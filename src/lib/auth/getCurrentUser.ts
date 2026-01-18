@@ -22,6 +22,8 @@ export interface CurrentUser {
     slug: string;
     logo: string | null;
     primaryColor: string | null;
+    email: string | null;
+    telephone: string | null;
   } | null;
   // Informations d'impersonation
   isImpersonating: boolean;
@@ -97,6 +99,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
               slug: true,
               logo: true,
               primaryColor: true,
+              email: true,
+              telephone: true,
             },
           },
         },
@@ -138,6 +142,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
             slug: true,
             logo: true,
             primaryColor: true,
+            email: true,
+            telephone: true,
           },
         },
       },
@@ -205,7 +211,8 @@ export interface AuthenticatedUser {
     slug: string;
     logo: string | null;
     primaryColor: string | null;
-    [key: string]: unknown; // Permet d'autres champs de l'organisation
+    email: string | null;
+    telephone: string | null;
   } | null;
   // Contexte d'impersonation
   isImpersonating: boolean;

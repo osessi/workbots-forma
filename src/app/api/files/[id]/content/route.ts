@@ -134,9 +134,7 @@ export async function GET(
       where: {
         id: { in: [id, baseId] },
         session: {
-          organization: {
-            id: user.organizationId,
-          },
+          organizationId: user.organizationId,
         },
       },
     });

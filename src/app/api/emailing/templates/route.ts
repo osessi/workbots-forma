@@ -5,51 +5,15 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // GET - Liste des templates
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, isSuperAdmin: true },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -67,11 +31,11 @@ export async function GET(request: NextRequest) {
       isActive: true,
       OR: [
         // Templates de l'organisation
-        { organizationId: dbUser.organizationId },
+        { organizationId: user.organizationId },
         // Templates globaux (si demandé)
         ...(includeGlobal ? [{ isGlobal: true }] : []),
         // Si super admin, tous les templates
-        ...(dbUser.isSuperAdmin ? [{ organizationId: null }] : []),
+        ...(user.isSuperAdmin ? [{ organizationId: null }] : []),
       ],
     };
 
@@ -124,7 +88,7 @@ export async function GET(request: NextRequest) {
       by: ["category"],
       where: {
         OR: [
-          { organizationId: dbUser.organizationId },
+          { organizationId: user.organizationId },
           { isGlobal: true },
         ],
         isActive: true,
@@ -149,20 +113,9 @@ export async function GET(request: NextRequest) {
 // POST - Créer un template
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, isSuperAdmin: true },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -186,11 +139,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Seul un super admin peut créer des templates globaux
-    const makeGlobal = isGlobal && dbUser.isSuperAdmin;
+    const makeGlobal = isGlobal && user.isSuperAdmin;
 
     const template = await prisma.emailTemplate.create({
       data: {
-        organizationId: makeGlobal ? null : dbUser.organizationId,
+        organizationId: makeGlobal ? null : user.organizationId,
         name,
         description,
         subject,
@@ -200,7 +153,7 @@ export async function POST(request: NextRequest) {
         jsonContent,
         variables: variables || [],
         isGlobal: makeGlobal,
-        createdById: dbUser.id,
+        createdById: user.id,
       },
     });
 

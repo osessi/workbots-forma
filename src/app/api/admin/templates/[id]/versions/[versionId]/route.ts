@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 
 // GET - Recuperer une version specifique
 export async function GET(
@@ -13,19 +13,10 @@ export async function GET(
 ) {
   try {
     const { id, versionId } = await params;
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
 
     // Verifier que le template existe et est accessible
@@ -34,7 +25,7 @@ export async function GET(
         id,
         OR: [
           { isSystem: true },
-          ...(dbUser.organizationId ? [{ organizationId: dbUser.organizationId }] : []),
+          ...(user.organizationId ? [{ organizationId: user.organizationId }] : []),
         ],
       },
     });
@@ -78,23 +69,14 @@ export async function POST(
 ) {
   try {
     const { id, versionId } = await params;
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
-
     // Verifier les droits admin
-    if (!dbUser.isSuperAdmin && dbUser.role !== "ORG_ADMIN") {
+    if (!user.isSuperAdmin && user.role !== "ORG_ADMIN") {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
@@ -103,8 +85,8 @@ export async function POST(
       where: {
         id,
         OR: [
-          ...(dbUser.isSuperAdmin ? [{ isSystem: true }] : []),
-          ...(dbUser.organizationId ? [{ organizationId: dbUser.organizationId }] : []),
+          ...(user.isSuperAdmin ? [{ isSystem: true }] : []),
+          ...(user.organizationId ? [{ organizationId: user.organizationId }] : []),
         ],
       },
     });
@@ -138,7 +120,7 @@ export async function POST(
         headerContent: template.headerContent ?? undefined,
         footerContent: template.footerContent ?? undefined,
         changeNote: `Sauvegarde avant restauration vers v${version.version}`,
-        createdById: dbUser.id,
+        createdById: user.id,
       },
     });
 
@@ -162,7 +144,7 @@ export async function POST(
         headerContent: version.headerContent ?? undefined,
         footerContent: version.footerContent ?? undefined,
         changeNote: `Restauré depuis v${version.version}`,
-        createdById: dbUser.id,
+        createdById: user.id,
       },
     });
 
@@ -187,23 +169,14 @@ export async function DELETE(
 ) {
   try {
     const { id, versionId } = await params;
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
-
     // Verifier les droits admin
-    if (!dbUser.isSuperAdmin && dbUser.role !== "ORG_ADMIN") {
+    if (!user.isSuperAdmin && user.role !== "ORG_ADMIN") {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 

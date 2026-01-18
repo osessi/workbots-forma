@@ -5,46 +5,8 @@
 // GET /api/evaluations - Lister les évaluations d'une formation
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
-
-// Helper pour authentifier l'utilisateur
-async function authenticateUser() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-  if (!supabaseUser) {
-    return null;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser.id },
-  });
-
-  return user;
-}
 
 // Types valides pour EvaluationType
 const validTypes = ["POSITIONNEMENT", "FINALE", "QCM_MODULE", "ATELIER_MODULE"];

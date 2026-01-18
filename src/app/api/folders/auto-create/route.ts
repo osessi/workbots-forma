@@ -1,11 +1,13 @@
 // ===========================================
 // API AUTO-CREATE FOLDERS - Création automatique de sous-dossiers
 // ===========================================
-// POST /api/folders/auto-create - Créer les sous-dossiers entreprise/apprenant
+// POST /api/folders/auto-create - Créer les sous-dossiers entreprise/apprenant/intervenant
+// + Duplication des documents de formation vers les dossiers apprenants
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
 import { authenticateUser } from "@/lib/auth";
+import { duplicateDocumentsToApprenantFolders } from "@/lib/services/drive-service";
 
 // POST - Créer automatiquement les sous-dossiers pour une session documentaire
 export async function POST(request: NextRequest) {
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const createdFolders: { type: string; id: string; name: string }[] = [];
+    const apprenantFolderIds: string[] = []; // Pour la duplication des documents
 
     // Si une session est spécifiée, créer les sous-dossiers pour ses clients et participants
     if (sessionId) {
@@ -72,11 +75,41 @@ export async function POST(request: NextRequest) {
               },
             },
           },
+          formateur: true, // Inclure le formateur pour créer son dossier
         },
       });
 
       if (!session) {
         return NextResponse.json({ error: "Session non trouvée" }, { status: 404 });
+      }
+
+      // 1. Créer le dossier de l'intervenant/formateur
+      if (session.formateurId && session.formateur) {
+        const existingIntervenantFolder = await prisma.folder.findFirst({
+          where: {
+            parentId: formationFolder.id,
+            intervenantId: session.formateurId,
+            organizationId: user.organizationId,
+          },
+        });
+
+        if (!existingIntervenantFolder) {
+          const intervenantFolder = await prisma.folder.create({
+            data: {
+              name: `${session.formateur.prenom} ${session.formateur.nom}`,
+              color: "#8B5CF6", // Violet pour les formateurs
+              parentId: formationFolder.id,
+              intervenantId: session.formateurId,
+              folderType: "intervenant",
+              organizationId: user.organizationId,
+            },
+          });
+          createdFolders.push({
+            type: "intervenant",
+            id: intervenantFolder.id,
+            name: `${session.formateur.prenom} ${session.formateur.nom}`,
+          });
+        }
       }
 
       // Pour chaque client de la session
@@ -139,6 +172,10 @@ export async function POST(request: NextRequest) {
                 id: apprenantFolder.id,
                 name: `${apprenant.prenom} ${apprenant.nom}`,
               });
+              apprenantFolderIds.push(apprenantFolder.id);
+            } else {
+              // Le dossier existe déjà, on l'ajoute quand même pour la duplication
+              apprenantFolderIds.push(existingApprenantFolder.id);
             }
           }
         } else {
@@ -171,8 +208,30 @@ export async function POST(request: NextRequest) {
                 id: apprenantFolder.id,
                 name: `${apprenant.prenom} ${apprenant.nom}`,
               });
+              apprenantFolderIds.push(apprenantFolder.id);
+            } else {
+              // Le dossier existe déjà, on l'ajoute quand même pour la duplication
+              apprenantFolderIds.push(existingApprenantFolder.id);
             }
           }
+        }
+      }
+
+      // 2. Dupliquer les documents de formation vers chaque dossier apprenant
+      if (apprenantFolderIds.length > 0) {
+        const duplicateResult = await duplicateDocumentsToApprenantFolders(
+          formationFolder.id,
+          apprenantFolderIds,
+          user.organizationId,
+          user.id
+        );
+
+        if (duplicateResult.copiedCount > 0) {
+          console.log(`[auto-create] ${duplicateResult.copiedCount} document(s) dupliqué(s) vers les dossiers apprenants`);
+        }
+
+        if (duplicateResult.errors.length > 0) {
+          console.warn("[auto-create] Erreurs de duplication:", duplicateResult.errors);
         }
       }
     }

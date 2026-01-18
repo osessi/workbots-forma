@@ -1,52 +1,17 @@
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/db/prisma";
 import { VirtualRoomStatus } from "@prisma/client";
-
-// Helper pour créer le client Supabase côté serveur
-async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore en Server Components
-          }
-        },
-      },
-    }
-  );
-}
+import { authenticateUser } from "@/lib/auth/getCurrentUser";
 
 // GET - Liste des salles virtuelles
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -55,7 +20,7 @@ export async function GET(request: NextRequest) {
     const upcoming = searchParams.get("upcoming") === "true";
 
     const where: Record<string, unknown> = {
-      organizationId: dbUser.organizationId,
+      organizationId: user.organizationId,
     };
 
     if (status) {
@@ -75,7 +40,7 @@ export async function GET(request: NextRequest) {
     // Compter par statut
     const stats = await prisma.virtualRoom.groupBy({
       by: ["status"],
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       _count: true,
     });
 
@@ -102,19 +67,12 @@ export async function GET(request: NextRequest) {
 // POST - Créer une nouvelle salle
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -125,8 +83,8 @@ export async function POST(request: NextRequest) {
         titre: body.titre,
         description: body.description || null,
         sessionId: body.sessionId || null,
-        hosteNom: body.hosteNom || `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim(),
-        hosteEmail: body.hosteEmail || dbUser.email,
+        hosteNom: body.hosteNom || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        hosteEmail: body.hosteEmail || user.email,
         password: body.password || null,
         dateDebut: new Date(body.dateDebut),
         dateFin: body.dateFin ? new Date(body.dateFin) : null,
@@ -135,8 +93,8 @@ export async function POST(request: NextRequest) {
         enregistrement: body.enregistrement || false,
         chatActif: body.chatActif !== false,
         ecranPartageActif: body.ecranPartageActif !== false,
-        organizationId: dbUser.organizationId,
-        userId: dbUser.id,
+        organizationId: user.organizationId,
+        userId: user.id,
       },
     });
 
@@ -150,18 +108,12 @@ export async function POST(request: NextRequest) {
 // PATCH - Mettre à jour une salle
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -174,7 +126,7 @@ export async function PATCH(request: NextRequest) {
 
     // Vérifier que la salle appartient à l'organisation
     const existingRoom = await prisma.virtualRoom.findFirst({
-      where: { id, organizationId: dbUser.organizationId },
+      where: { id, organizationId: user.organizationId },
     });
 
     if (!existingRoom) {
@@ -204,18 +156,12 @@ export async function PATCH(request: NextRequest) {
 // DELETE - Supprimer une salle
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -228,7 +174,7 @@ export async function DELETE(request: NextRequest) {
 
     // Vérifier que la salle appartient à l'organisation
     const room = await prisma.virtualRoom.findFirst({
-      where: { id, organizationId: dbUser.organizationId },
+      where: { id, organizationId: user.organizationId },
     });
 
     if (!room) {

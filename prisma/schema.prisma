@@ -99,6 +99,7 @@ enum FileCategory {
   SUPPORT_STAGIAIRE
   IMAGE
   AUTRE
+  EVALUATION_LINK // Liens vers évaluations en ligne (QR codes)
 }
 
 enum SlideGenerationStatus {
@@ -803,8 +804,13 @@ model Folder {
   apprenantId String?
   apprenant   Apprenant? @relation(fields: [apprenantId], references: [id], onDelete: SetNull)
 
+  // Lien avec intervenant (sous-dossier formateur)
+  intervenantId String?
+  intervenant   Intervenant? @relation("IntervenantFolder", fields: [intervenantId], references: [id], onDelete: SetNull)
+
   // Type de dossier pour faciliter le filtrage
-  folderType String @default("general") // formation, entreprise, apprenant, general
+  // Values: formation, documents_formation, entreprise, apprenant, intervenant, general
+  folderType String @default("general")
 
   // Multi-tenant
   organizationId String
@@ -821,6 +827,7 @@ model Folder {
   @@index([formationId])
   @@index([entrepriseId])
   @@index([apprenantId])
+  @@index([intervenantId])
   @@index([folderType])
 }
 
@@ -1609,6 +1616,9 @@ model Intervenant {
 
   // Correction 532: Messages avec l'organisme
   messagesOrganisme MessageIntervenantOrganisme[] @relation("MessageIntervenantOrganisme")
+
+  // Dossiers de l'intervenant (pour le Drive)
+  folders Folder[] @relation("IntervenantFolder")
 
   @@index([organizationId])
   @@index([nom])

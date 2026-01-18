@@ -41,6 +41,14 @@ export async function GET() {
             email: true,
           },
         },
+        intervenant: {
+          select: {
+            id: true,
+            nom: true,
+            prenom: true,
+            email: true,
+          },
+        },
         files: {
           include: {
             fileContent: true,
@@ -51,6 +59,7 @@ export async function GET() {
           include: {
             entreprise: true,
             apprenant: true,
+            intervenant: true,
             files: {
               include: {
                 fileContent: true,
@@ -59,6 +68,7 @@ export async function GET() {
             children: {
               include: {
                 apprenant: true,
+                intervenant: true,
                 files: {
                   include: {
                     fileContent: true,
@@ -235,6 +245,52 @@ export async function GET() {
       },
     });
 
+    // Récupérer les évaluations de satisfaction (QR codes pour apprenants)
+    const evaluationsSatisfaction = await prisma.evaluationSatisfaction.findMany({
+      where: { organizationId: user.organizationId },
+      select: {
+        id: true,
+        token: true,
+        type: true,
+        status: true,
+        sessionId: true,
+        apprenantId: true,
+        createdAt: true,
+        completedAt: true,
+        session: {
+          select: {
+            formationId: true,
+          },
+        },
+      },
+    });
+
+    // Récupérer les évaluations intervenant (QR codes pour formateurs)
+    const evaluationsIntervenant = await prisma.evaluationIntervenant.findMany({
+      where: { organizationId: user.organizationId },
+      select: {
+        id: true,
+        token: true,
+        status: true,
+        sessionId: true,
+        intervenantId: true,
+        createdAt: true,
+        completedAt: true,
+        session: {
+          select: {
+            formationId: true,
+          },
+        },
+        intervenant: {
+          select: {
+            id: true,
+            nom: true,
+            prenom: true,
+          },
+        },
+      },
+    });
+
     // Dossiers racine (formations)
     const formationFolders = folders.filter((f) => f.formationId && !f.parentId);
 
@@ -249,13 +305,14 @@ export async function GET() {
       // Fichiers orphelins liés à cette formation
       const formationOrphanFiles = orphanFiles.filter((f) => f.formationId === formation.id);
 
-      // Construire la liste des sous-dossiers (entreprises ou apprenants)
+      // Construire la liste des sous-dossiers (entreprises, apprenants ou intervenants)
       type SubfolderType = {
         id: string;
         name: string;
-        type: "entreprise" | "apprenant";
+        type: "entreprise" | "apprenant" | "intervenant";
         entrepriseId?: string;
         apprenantId?: string;
+        intervenantId?: string;
         email?: string;
         files: Prisma.FileGetPayload<{ include: { fileContent: true } }>[];
         children: {
@@ -332,7 +389,18 @@ export async function GET() {
               files: child.files || [],
               children: [],
             });
-          } else if (!child.entrepriseId && !child.apprenantId) {
+          } else if (child.intervenantId && child.intervenant) {
+            // Dossier intervenant/formateur
+            subfolders.push({
+              id: child.id,
+              name: `${child.intervenant.prenom} ${child.intervenant.nom}`,
+              type: "intervenant",
+              intervenantId: child.intervenantId,
+              email: child.intervenant.email || undefined,
+              files: child.files || [],
+              children: [],
+            });
+          } else if (!child.entrepriseId && !child.apprenantId && !child.intervenantId) {
             // Sous-dossier créé par l'utilisateur (sans entreprise ni apprenant)
             const formatFiles = (files: typeof child.files) => files.map((f) => ({
               id: f.id,
@@ -646,9 +714,12 @@ export async function GET() {
             subfolder.files.forEach((file) => {
               // Éviter les doublons par ID
               if (!apprenant.documents.some(d => d.id === file.id)) {
+                // Nettoyer le titre (supprimer .html si présent)
+                let titre = file.originalName || file.name;
+                titre = titre.replace(/\.html$/i, "");
                 apprenant.documents.push({
                   id: file.id,
-                  titre: file.originalName || file.name,
+                  titre,
                   type: file.category || "DOCUMENT",
                   status: "SAVED",
                   isSigned: false,
@@ -668,9 +739,12 @@ export async function GET() {
                 child.files.forEach((file) => {
                   // Éviter les doublons par ID
                   if (!apprenant.documents.some(d => d.id === file.id)) {
+                    // Nettoyer le titre (supprimer .html si présent)
+                    let titre = file.originalName || file.name;
+                    titre = titre.replace(/\.html$/i, "");
                     apprenant.documents.push({
                       id: file.id,
-                      titre: file.originalName || file.name,
+                      titre,
                       type: file.category || "DOCUMENT",
                       status: "SAVED",
                       isSigned: false,
@@ -684,6 +758,37 @@ export async function GET() {
               }
             }
           });
+        }
+      });
+
+      // Ajouter les évaluations de satisfaction (QR codes) aux apprenants
+      evaluationsSatisfaction.forEach((evaluation) => {
+        // Vérifier que l'évaluation appartient à une session de cette formation
+        if (evaluation.session?.formationId !== formation.id) return;
+
+        if (evaluation.apprenantId) {
+          const apprenant = apprenantMap.get(evaluation.apprenantId);
+          if (apprenant) {
+            // Générer le titre basé sur le type
+            const typeLabel = evaluation.type === "CHAUD" ? "Évaluation à chaud" : "Évaluation à froid";
+            const statusLabel = evaluation.status === "COMPLETED" ? "Complétée" : "En attente";
+
+            // Générer l'URL du QR code
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.formalearning.fr";
+            const evaluationUrl = `${baseUrl}/evaluation/${evaluation.token}`;
+
+            apprenant.documents.push({
+              id: `eval-${evaluation.id}`,
+              titre: typeLabel,
+              type: `EVALUATION_${evaluation.type}`,
+              status: evaluation.status === "COMPLETED" ? "COMPLETED" : "PENDING",
+              isSigned: evaluation.status === "COMPLETED",
+              signedAt: evaluation.completedAt?.toISOString() || null,
+              createdAt: evaluation.createdAt.toISOString(),
+              fileUrl: evaluationUrl,
+              mimeType: "application/qrcode", // Type spécial pour indiquer un QR code
+            });
+          }
         }
       });
 

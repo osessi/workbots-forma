@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 import { z } from "zod";
 import { triggerWorkflow } from "@/lib/queue/workflow-execution.queue";
 
@@ -32,23 +32,16 @@ export async function POST(
     const { id } = await params;
 
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -59,7 +52,7 @@ export async function POST(
     const workflow = await prisma.workflow.findFirst({
       where: {
         id,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
     });
 
@@ -86,10 +79,10 @@ export async function POST(
     const executionId = await triggerWorkflow(
       id,
       data.declencheurType || "MANUEL",
-      data.declencheurId || dbUser.id,
+      data.declencheurId || user.id,
       {
         ...data.declencheurData,
-        triggeredBy: dbUser.id,
+        triggeredBy: user.id,
         triggeredAt: new Date().toISOString(),
       }
     );

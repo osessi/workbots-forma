@@ -4,61 +4,34 @@
 // POST /api/documents/send - Envoyer un document par email
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import { sendEmail, generateDocumentSendEmail } from "@/lib/services/email";
+import { authenticateUser } from "@/lib/auth";
 
 // POST - Envoyer un document par email
 export async function POST(request: NextRequest) {
   try {
-    // Authentification
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    // Authentification (avec support impersonation)
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-      include: {
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            nomCommercial: true,
-            logo: true,
-            primaryColor: true,
-          },
-        },
+    if (!user.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    // Récupérer les infos de l'organisation pour l'email
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: {
+        id: true,
+        name: true,
+        nomCommercial: true,
+        logo: true,
+        primaryColor: true,
       },
     });
-
-    if (!user || !user.organizationId) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
-    }
 
     const body = await request.json();
     const { documentId, email, subject, message, content } = body;
@@ -170,7 +143,7 @@ export async function POST(request: NextRequest) {
     console.log(`[DOCUMENT] Message: ${message || "(aucun message personnalisé)"}`);
     console.log(`[DOCUMENT] Document: ${documentInfo.titre} (${documentInfo.type})`);
 
-    const orgName = user.organization?.nomCommercial || user.organization?.name || "Organisme de formation";
+    const orgName = organization?.nomCommercial || organization?.name || "Organisme de formation";
 
     const emailContent = generateDocumentSendEmail({
       documentTitre: documentInfo.titre,
@@ -178,8 +151,8 @@ export async function POST(request: NextRequest) {
       customSubject: subject,
       customMessage: message,
       organizationName: orgName,
-      organizationLogo: user.organization?.logo,
-      primaryColor: user.organization?.primaryColor || undefined,
+      organizationLogo: organization?.logo,
+      primaryColor: organization?.primaryColor || undefined,
     });
 
     // Préparer les pièces jointes si contenu fourni

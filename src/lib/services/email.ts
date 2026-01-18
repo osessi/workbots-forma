@@ -1080,6 +1080,158 @@ ${data.organizationName}
 }
 
 // ===========================================
+// EMAIL NOTIFICATION SIGNATURE REÇUE (pour le centre de formation)
+// ===========================================
+
+interface SignatureReceivedNotificationData {
+  signataireName: string;
+  signataireEmail: string;
+  documentTitre: string;
+  documentType: string;
+  signedAt: Date;
+  certificateUrl: string;
+  formationTitre?: string;
+  organizationName: string;
+  organizationLogo?: string | null;
+  primaryColor?: string;
+}
+
+export function generateSignatureReceivedNotificationEmail(data: SignatureReceivedNotificationData) {
+  const color = data.primaryColor || "#10B981"; // Vert pour succès
+
+  const subject = `✅ Document signé : ${data.documentTitre}`;
+
+  const signedAtFormatted = data.signedAt.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document signé</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="background-color: ${color}; padding: 30px 40px; text-align: center;">
+              ${data.organizationLogo
+                ? `<img src="${data.organizationLogo}" alt="${data.organizationName}" style="max-height: 50px; max-width: 180px;">`
+                : `<h1 style="color: white; margin: 0; font-size: 22px;">${data.organizationName}</h1>`
+              }
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <div style="display: inline-block; background-color: #D1FAE5; border-radius: 50%; padding: 20px;">
+                  <span style="font-size: 40px;">✅</span>
+                </div>
+              </div>
+
+              <h2 style="margin: 0 0 25px; color: #1a1a1a; font-size: 24px; text-align: center;">
+                Document signé avec succès
+              </h2>
+
+              <p style="margin: 0 0 25px; color: #4a4a4a; font-size: 16px; line-height: 1.6; text-align: center;">
+                Le document suivant vient d'être signé électroniquement :
+              </p>
+
+              <!-- Document Info Box -->
+              <div style="background-color: #F0FDF4; border: 1px solid #10B981; border-radius: 8px; padding: 25px; margin-bottom: 25px;">
+                <h3 style="margin: 0 0 15px; color: #065F46; font-size: 18px;">
+                  📄 ${data.documentTitre}
+                </h3>
+                <table style="width: 100%; font-size: 14px; color: #4a4a4a;">
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Type :</strong></td>
+                    <td style="padding: 5px 0;">${data.documentType}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Signataire :</strong></td>
+                    <td style="padding: 5px 0;">${data.signataireName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Email :</strong></td>
+                    <td style="padding: 5px 0;">${data.signataireEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Date de signature :</strong></td>
+                    <td style="padding: 5px 0;">${signedAtFormatted}</td>
+                  </tr>
+                  ${data.formationTitre ? `
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Formation :</strong></td>
+                    <td style="padding: 5px 0;">${data.formationTitre}</td>
+                  </tr>
+                  ` : ""}
+                </table>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${data.certificateUrl}" style="display: inline-block; background-color: ${color}; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-size: 15px; font-weight: 600;">
+                  Voir le certificat de signature
+                </a>
+              </div>
+
+              <div style="background-color: #F3F4F6; border-radius: 8px; padding: 15px; margin-top: 20px;">
+                <p style="margin: 0; color: #6B7280; font-size: 13px; text-align: center;">
+                  🔒 La signature électronique est conforme au règlement eIDAS et à l'article 1367 du Code civil.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f8f9fa; border-top: 1px solid #e9ecef; text-align: center;">
+              <p style="margin: 0; color: #6c757d; font-size: 13px;">
+                Notification automatique de ${data.organizationName}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const text = `
+✅ DOCUMENT SIGNÉ
+
+Le document suivant vient d'être signé électroniquement :
+
+📄 ${data.documentTitre}
+Type : ${data.documentType}
+Signataire : ${data.signataireName} (${data.signataireEmail})
+Date de signature : ${signedAtFormatted}
+${data.formationTitre ? `Formation : ${data.formationTitre}` : ""}
+
+🔗 Certificat de signature : ${data.certificateUrl}
+
+---
+${data.organizationName}
+`;
+
+  return { subject, html, text };
+}
+
+// ===========================================
 // EMAIL ENVOI DOCUMENT GÉNÉRIQUE
 // ===========================================
 

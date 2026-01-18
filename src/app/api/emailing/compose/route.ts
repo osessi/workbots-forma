@@ -4,33 +4,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // Récupérer la config email de l'organisation
 async function getEmailConfig(organizationId: string) {
@@ -104,27 +79,26 @@ function replaceVariables(content: string, variables: Record<string, string>): s
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
+    if (!user.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    // Récupérer les infos supplémentaires de l'utilisateur
     const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
+      where: { id: user.id },
       select: {
         id: true,
-        organizationId: true,
         firstName: true,
         lastName: true,
         email: true,
       },
     });
-
-    if (!dbUser?.organizationId) {
-      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
-    }
 
     const body = await request.json();
     const {
@@ -164,7 +138,7 @@ export async function POST(request: NextRequest) {
         where: {
           id: templateId,
           OR: [
-            { organizationId: dbUser.organizationId },
+            { organizationId: user.organizationId },
             { isGlobal: true },
           ],
         },
@@ -182,10 +156,10 @@ export async function POST(request: NextRequest) {
     const allVariables = {
       ...variables,
       organisation_nom: (await prisma.organization.findUnique({
-        where: { id: dbUser.organizationId },
+        where: { id: user.organizationId },
         select: { name: true },
       }))?.name || "",
-      expediteur_nom: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim(),
+      expediteur_nom: `${dbUser?.firstName || ""} ${dbUser?.lastName || ""}`.trim(),
       date_envoi: new Date().toLocaleDateString("fr-FR"),
     };
 
@@ -198,7 +172,7 @@ export async function POST(request: NextRequest) {
       const files = await prisma.file.findMany({
         where: {
           id: { in: attachmentIds },
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
         },
         select: {
           id: true,
@@ -230,7 +204,7 @@ export async function POST(request: NextRequest) {
       // Créer une campagne programmée pour un seul destinataire
       const campaign = await prisma.emailCampaign.create({
         data: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           name: `Email à ${recipients[0]}`,
           type: "ONE_TIME",
           status: "SCHEDULED",
@@ -238,7 +212,7 @@ export async function POST(request: NextRequest) {
           htmlContent: finalHtml,
           scheduledAt: new Date(scheduledAt),
           totalRecipients: recipients.length,
-          createdById: dbUser.id,
+          createdById: user.id,
         },
       });
 
@@ -262,7 +236,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Envoi immédiat
-    const config = await getEmailConfig(dbUser.organizationId);
+    const config = await getEmailConfig(user.organizationId);
     const results: Array<{ email: string; success: boolean; id?: string; error?: string }> = [];
 
     for (const recipientEmail of recipients) {
@@ -272,7 +246,7 @@ export async function POST(request: NextRequest) {
           subject: finalSubject,
           html: finalHtml,
           from: `${config.fromName} <${config.fromEmail}>`,
-          replyTo: replyTo || dbUser.email,
+          replyTo: replyTo || dbUser?.email,
           attachments: attachments.length > 0 ? attachments : undefined,
           apiKey: config.apiKey,
         });
@@ -280,7 +254,7 @@ export async function POST(request: NextRequest) {
         // Stocker l'email envoyé
         await prisma.sentEmail.create({
           data: {
-            organizationId: dbUser.organizationId,
+            organizationId: user.organizationId,
             toEmail: recipientEmail,
             toName: toName || undefined,
             subject: finalSubject,
@@ -289,7 +263,7 @@ export async function POST(request: NextRequest) {
             type,
             status: "SENT",
             resendId,
-            sentByUserId: dbUser.id,
+            sentByUserId: user.id,
             sentBySystem: false,
             apprenantId,
             sessionId,
@@ -307,7 +281,7 @@ export async function POST(request: NextRequest) {
         // Stocker l'échec
         await prisma.sentEmail.create({
           data: {
-            organizationId: dbUser.organizationId,
+            organizationId: user.organizationId,
             toEmail: recipientEmail,
             toName: toName || undefined,
             subject: finalSubject,
@@ -315,7 +289,7 @@ export async function POST(request: NextRequest) {
             type,
             status: "FAILED",
             errorMessage: error instanceof Error ? error.message : "Erreur inconnue",
-            sentByUserId: dbUser.id,
+            sentByUserId: user.id,
             sentBySystem: false,
           },
         });

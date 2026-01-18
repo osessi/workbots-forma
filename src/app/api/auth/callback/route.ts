@@ -48,6 +48,10 @@ export async function GET(request: NextRequest) {
       if (supabaseUser) {
         const metadata = supabaseUser.user_metadata || {};
 
+        console.log("[Auth Callback] User metadata:", JSON.stringify(metadata, null, 2));
+        console.log("[Auth Callback] workspace_name:", metadata.workspace_name);
+        console.log("[Auth Callback] workspace_slug:", metadata.workspace_slug);
+
         // Vérifier si c'est le premier utilisateur (sera Super Admin)
         const userCount = await prisma.user.count();
         const isFirstUser = userCount === 0;
@@ -68,6 +72,12 @@ export async function GET(request: NextRequest) {
           });
 
           if (!existingOrg) {
+            console.log("[Auth Callback] Creating new organization with data:", {
+              name: metadata.workspace_name,
+              slug: metadata.workspace_slug,
+              siret: metadata.siret,
+              representantNom: metadata.representant_nom,
+            });
             const newOrg = await prisma.organization.create({
               data: {
                 // Identité de l'organisme
@@ -93,9 +103,13 @@ export async function GET(request: NextRequest) {
               },
             });
             organizationId = newOrg.id;
+            console.log("[Auth Callback] Organization created:", newOrg.id);
           } else {
             organizationId = existingOrg.id;
+            console.log("[Auth Callback] Using existing organization:", existingOrg.id);
           }
+        } else {
+          console.log("[Auth Callback] No workspace_name or workspace_slug in metadata, skipping org creation");
         }
 
         // Créer ou mettre à jour l'utilisateur dans Prisma
@@ -128,6 +142,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Rediriger vers la page demandée ou / par défaut
+      // Note: Le sync se fait aussi côté client au premier chargement via useAutomateContext
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
   }

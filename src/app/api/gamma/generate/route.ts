@@ -3,8 +3,7 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import { createGammaClient, FormationSlidesConfig, ModuleSlideConfig } from "@/lib/gamma";
 
@@ -12,40 +11,12 @@ import { createGammaClient, FormationSlidesConfig, ModuleSlideConfig } from "@/l
 export async function POST(request: NextRequest) {
   try {
     // Vérifier l'authentification
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-      include: { organization: true },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -73,8 +44,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Récupérer la clé API Gamma de l'organisation
-    const gammaApiKey = user.organization?.gammaApiKey || process.env.GAMMA_API_KEY;
+    // Récupérer la clé API Gamma depuis l'organisation
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { gammaApiKey: true },
+    });
+    const gammaApiKey = organization?.gammaApiKey || process.env.GAMMA_API_KEY;
 
     if (!gammaApiKey) {
       return NextResponse.json(

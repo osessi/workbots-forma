@@ -4,39 +4,13 @@
 // ===========================================
 
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import dns from "dns";
 import { promisify } from "util";
 
 const resolveCname = promisify(dns.resolveCname);
 const resolveTxt = promisify(dns.resolveTxt);
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // Configuration
 const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") || "app.automate-forma.com";
@@ -60,29 +34,31 @@ interface DnsVerificationResult {
 // POST - Vérifier les enregistrements DNS
 export async function POST(): Promise<NextResponse> {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
-    });
-
-    if (!dbUser?.organization) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
     // Vérifier le rôle (admin requis)
-    if (dbUser.role !== "ORG_ADMIN" && dbUser.role !== "SUPER_ADMIN") {
+    if (user.role !== "ORG_ADMIN" && !user.isSuperAdmin) {
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
 
-    const customDomain = dbUser.organization.customDomain;
+    // Récupérer l'organisation pour le domaine et le slug
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { id: true, customDomain: true, slug: true },
+    });
+
+    if (!organization) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    const customDomain = organization.customDomain;
 
     if (!customDomain) {
       return NextResponse.json(
@@ -91,7 +67,7 @@ export async function POST(): Promise<NextResponse> {
       );
     }
 
-    const orgSlug = dbUser.organization.slug;
+    const orgSlug = organization.slug;
     const expectedTxtValue = `automate-forma-verify=${orgSlug}`;
 
     const result: DnsVerificationResult = {
@@ -152,7 +128,7 @@ export async function POST(): Promise<NextResponse> {
     // Mettre à jour le statut de vérification dans la base de données
     if (result.allVerified) {
       await prisma.organization.update({
-        where: { id: dbUser.organization.id },
+        where: { id: organization.id },
         data: {
           customDomainVerified: true,
         },

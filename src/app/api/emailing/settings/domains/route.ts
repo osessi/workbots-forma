@@ -5,36 +5,11 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import { Resend } from "resend";
 
 export const dynamic = "force-dynamic";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // ===========================================
 // GET - Liste des domaines
@@ -42,24 +17,18 @@ async function getSupabaseClient() {
 
 export async function GET() {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
     const domains = await prisma.emailDomain.findMany({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -104,23 +73,17 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
-    if (!["ADMIN", "OWNER", "SUPER_ADMIN"].includes(dbUser.role)) {
+    if (!["ADMIN", "OWNER", "SUPER_ADMIN", "ORG_ADMIN"].includes(user.role)) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
@@ -141,7 +104,7 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.emailDomain.findFirst({
       where: {
         domain: domain.toLowerCase(),
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
     });
 
@@ -169,7 +132,7 @@ export async function POST(request: NextRequest) {
     // Créer le domaine en base
     const emailDomain = await prisma.emailDomain.create({
       data: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         domain: domain.toLowerCase(),
         resendDomainId: resendDomain?.id || null,
         status: "PENDING",

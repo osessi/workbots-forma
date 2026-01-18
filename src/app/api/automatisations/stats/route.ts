@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 import { WorkflowDashboardData, WorkflowStats } from "@/types/workflow";
 
 // ===========================================
@@ -15,30 +15,23 @@ import { WorkflowDashboardData, WorkflowStats } from "@/types/workflow";
 export async function GET(request: NextRequest) {
   try {
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
 
     // Stats globales des workflows
     const [

@@ -1,49 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
-
-// Vérifier que l'utilisateur est super admin
-async function checkSuperAdmin() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-  if (!supabaseUser) return null;
-
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser.id },
-  });
-
-  if (!user?.isSuperAdmin) return null;
-  return user;
-}
+import { authenticateUser } from "@/lib/auth";
 
 // POST - Tester une connexion d'intégration
 export async function POST(request: NextRequest) {
   try {
-    const user = await checkSuperAdmin();
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    if (!user.isSuperAdmin) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     const { integrationId, config } = await request.json();
@@ -134,7 +102,7 @@ async function testYousign(config: Record<string, string>): Promise<{ success: b
     } else {
       return { success: false, message: `Erreur Yousign: ${res.status}` };
     }
-  } catch (error) {
+  } catch {
     return { success: false, message: "Impossible de contacter Yousign" };
   }
 }
@@ -158,7 +126,7 @@ async function testZoom(config: Record<string, string>): Promise<{ success: bool
     } else {
       return { success: false, message: `Erreur Zoom OAuth: ${tokenRes.status}` };
     }
-  } catch (error) {
+  } catch {
     return { success: false, message: "Impossible de contacter Zoom" };
   }
 }
@@ -177,7 +145,7 @@ async function testStripe(config: Record<string, string>): Promise<{ success: bo
     } else {
       return { success: false, message: `Erreur Stripe: ${res.status}` };
     }
-  } catch (error) {
+  } catch {
     return { success: false, message: "Impossible de contacter Stripe" };
   }
 }
@@ -196,7 +164,7 @@ async function testResend(config: Record<string, string>): Promise<{ success: bo
     } else {
       return { success: false, message: `Erreur Resend: ${res.status}` };
     }
-  } catch (error) {
+  } catch {
     return { success: false, message: "Impossible de contacter Resend" };
   }
 }
@@ -215,7 +183,7 @@ async function testSendGrid(config: Record<string, string>): Promise<{ success: 
     } else {
       return { success: false, message: `Erreur SendGrid: ${res.status}` };
     }
-  } catch (error) {
+  } catch {
     return { success: false, message: "Impossible de contacter SendGrid" };
   }
 }
@@ -237,7 +205,7 @@ async function testXAPI(config: Record<string, string>): Promise<{ success: bool
     } else {
       return { success: false, message: `Erreur LRS: ${res.status}` };
     }
-  } catch (error) {
+  } catch {
     return { success: false, message: "Impossible de contacter le LRS" };
   }
 }

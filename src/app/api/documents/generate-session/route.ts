@@ -5,14 +5,13 @@
 // Génère tous les documents sélectionnés pour une session de formation
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import { renderTemplate } from "@/lib/templates";
 import { DocumentType, FileCategory } from "@prisma/client";
 import { generatePDFFromHtml } from "@/lib/services/pdf-generator";
 import { createClient } from "@supabase/supabase-js";
 import { DEFAULT_TEMPLATES } from "@/lib/templates/default-templates";
+import { authenticateUser } from "@/lib/auth";
 
 // Client Supabase admin pour le stockage
 function getSupabaseAdmin() {
@@ -190,7 +189,7 @@ function mapToFileCategory(docType: string): FileCategory {
   return mapping[docType] || "DOCUMENT";
 }
 
-// Sauvegarder un document dans le Drive avec structure Formation > Entreprise > Apprenant
+// Sauvegarder un document dans le Drive avec structure Formation > Entreprise > Apprenant (ou Intervenant)
 // Si copyToAllApprenants est true, le document sera copié dans tous les dossiers des apprenants concernés
 async function saveDocumentToDrive(params: {
   organizationId: string;
@@ -202,12 +201,14 @@ async function saveDocumentToDrive(params: {
   content: string;
   entrepriseId?: string;
   apprenantId?: string;
+  // Nouveau paramètre pour les intervenants/formateurs
+  intervenantId?: string;
   // Nouveaux paramètres pour la duplication
   copyToAllApprenants?: boolean; // Copier dans tous les dossiers des apprenants de l'entreprise
   allApprenantIds?: string[]; // Liste des IDs des apprenants pour la duplication (pour documents session-wide)
 }): Promise<{ success: boolean; fileId?: string; folderId?: string; fileIds?: string[] }> {
   try {
-    const { organizationId, userId, formationId, formationTitre, documentType, titre, content, entrepriseId, apprenantId, copyToAllApprenants, allApprenantIds } = params;
+    const { organizationId, userId, formationId, formationTitre, documentType, titre, content, entrepriseId, apprenantId, intervenantId, copyToAllApprenants, allApprenantIds } = params;
 
     // S'assurer qu'un dossier racine existe pour la formation
     let formationFolder = await prisma.folder.findFirst({
@@ -323,6 +324,36 @@ async function saveDocumentToDrive(params: {
         }
 
         targetFolderId = apprenantFolder.id;
+      }
+    } else if (intervenantId) {
+      // Document pour un intervenant/formateur (ex: contrat de sous-traitance)
+      const intervenant = await prisma.intervenant.findFirst({
+        where: { id: intervenantId, organizationId },
+      });
+
+      if (intervenant) {
+        let intervenantFolder = await prisma.folder.findFirst({
+          where: {
+            parentId: formationFolder.id,
+            intervenantId: intervenant.id,
+            organizationId,
+          },
+        });
+
+        if (!intervenantFolder) {
+          intervenantFolder = await prisma.folder.create({
+            data: {
+              name: `${intervenant.prenom} ${intervenant.nom}`,
+              color: "#8B5CF6", // Violet pour les formateurs
+              parentId: formationFolder.id,
+              intervenantId: intervenant.id,
+              folderType: "intervenant",
+              organizationId,
+            },
+          });
+        }
+
+        targetFolderId = intervenantFolder.id;
       }
     }
 
@@ -520,42 +551,23 @@ async function saveDocumentToDrive(params: {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentification
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    // Authentification (avec support impersonation)
+    const authUser = await authenticateUser();
+    if (!authUser) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur et son organisation
+    if (!authUser.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    // Récupérer l'utilisateur complet avec l'organisation pour la génération des documents
     const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
+      where: { id: authUser.id },
       include: { organization: true },
     });
 
-    if (!user || !user.organizationId) {
+    if (!user) {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
 
@@ -1751,6 +1763,7 @@ export async function POST(request: NextRequest) {
 
         case "programme":
           // Programme de formation = un document global par session
+          // Sauvegardé dans les dossiers de CHAQUE apprenant ET dans le dossier du formateur
           {
             const programmeDoc = await generateDocument(
               template,
@@ -1768,17 +1781,43 @@ export async function POST(request: NextRequest) {
             };
 
             if (autoSaveToDrive && formation.id) {
-              const saveResult = await saveDocumentToDrive({
-                organizationId: user.organizationId!,
-                userId: user.id,
-                formationId: formation.id,
-                formationTitre: formation.titre,
-                documentType: "programme",
-                titre: programmeEntry.titre,
-                content: programmeDoc,
-              });
-              programmeEntry.savedToDrive = saveResult.success;
-              programmeEntry.fileId = saveResult.fileId;
+              // 1. Collecter tous les IDs d'apprenants de la session
+              const allApprenantIds = clients.flatMap(c => c.apprenants.map(a => a.id));
+
+              // 2. Sauvegarder dans le dossier de CHAQUE apprenant
+              if (allApprenantIds.length > 0) {
+                const saveResult = await saveDocumentToDrive({
+                  organizationId: user.organizationId!,
+                  userId: user.id,
+                  formationId: formation.id,
+                  formationTitre: formation.titre,
+                  documentType: "programme",
+                  titre: programmeEntry.titre,
+                  content: programmeDoc,
+                  allApprenantIds, // Copier dans tous les dossiers des apprenants
+                });
+                programmeEntry.savedToDrive = saveResult.success;
+                programmeEntry.fileId = saveResult.fileIds?.[0];
+              }
+
+              // 3. Sauvegarder aussi dans le dossier de chaque formateur/intervenant
+              const allIntervenants = [
+                ...(formateurs.formateurPrincipal ? [formateurs.formateurPrincipal] : []),
+                ...(formateurs.coformateurs || []),
+              ];
+
+              for (const intervenant of allIntervenants) {
+                await saveDocumentToDrive({
+                  organizationId: user.organizationId!,
+                  userId: user.id,
+                  formationId: formation.id,
+                  formationTitre: formation.titre,
+                  documentType: "programme",
+                  titre: programmeEntry.titre,
+                  content: programmeDoc,
+                  intervenantId: intervenant.id, // Sauvegarder dans le dossier du formateur
+                });
+              }
             }
 
             generatedDocuments.push(programmeEntry);
@@ -1823,6 +1862,7 @@ export async function POST(request: NextRequest) {
 
         case "cgv":
           // CGV = un document global par session
+          // Sauvegardé dans les dossiers de CHAQUE apprenant
           {
             const cgvDoc = await generateDocument(
               template,
@@ -1840,17 +1880,23 @@ export async function POST(request: NextRequest) {
             };
 
             if (autoSaveToDrive && formation.id) {
-              const saveResult = await saveDocumentToDrive({
-                organizationId: user.organizationId!,
-                userId: user.id,
-                formationId: formation.id,
-                formationTitre: formation.titre,
-                documentType: "cgv",
-                titre: cgvEntry.titre,
-                content: cgvDoc,
-              });
-              cgvEntry.savedToDrive = saveResult.success;
-              cgvEntry.fileId = saveResult.fileId;
+              // Collecter tous les IDs d'apprenants de la session
+              const allApprenantIds = clients.flatMap(c => c.apprenants.map(a => a.id));
+
+              if (allApprenantIds.length > 0) {
+                const saveResult = await saveDocumentToDrive({
+                  organizationId: user.organizationId!,
+                  userId: user.id,
+                  formationId: formation.id,
+                  formationTitre: formation.titre,
+                  documentType: "cgv",
+                  titre: cgvEntry.titre,
+                  content: cgvDoc,
+                  allApprenantIds, // Copier dans tous les dossiers des apprenants
+                });
+                cgvEntry.savedToDrive = saveResult.success;
+                cgvEntry.fileId = saveResult.fileIds?.[0];
+              }
             }
 
             generatedDocuments.push(cgvEntry);
@@ -1913,6 +1959,7 @@ export async function POST(request: NextRequest) {
                   documentType: "contrat_sous_traitance",
                   titre: contratEntry.titre,
                   content: contratDoc,
+                  intervenantId: intervenant.id, // Sauvegarder dans le dossier du formateur
                 });
                 contratEntry.savedToDrive = saveResult.success;
                 contratEntry.fileId = saveResult.fileId;

@@ -243,12 +243,25 @@ export default function SignUpWizard() {
         setError("Email invalide");
         return false;
       }
-      if (data.password.length < 6) {
-        setError("Le mot de passe doit contenir au moins 6 caractères");
+      // Validation du mot de passe avec règles de complexité
+      if (data.password.length < 12) {
+        setError("Le mot de passe doit contenir au moins 12 caractères");
+        return false;
+      }
+      if (!/[A-Z]/.test(data.password)) {
+        setError("Le mot de passe doit contenir au moins 1 majuscule");
+        return false;
+      }
+      if (!/[0-9]/.test(data.password)) {
+        setError("Le mot de passe doit contenir au moins 1 chiffre");
+        return false;
+      }
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(data.password)) {
+        setError("Le mot de passe doit contenir au moins 1 caractère spécial (!@#$%...)");
         return false;
       }
       if (!isChecked) {
-        setError("Vous devez accepter les conditions d'utilisation");
+        setError("Vous devez accepter les conditions d'utilisation et la politique de confidentialité");
         return false;
       }
     }
@@ -457,13 +470,13 @@ export default function SignUpWizard() {
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full overflow-y-auto no-scrollbar">
       <div className="w-full max-w-md sm:pt-6 mx-auto mb-5 px-4">
-        <Link
-          href="/"
+        <a
+          href="https://workbots.io"
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
           <ChevronLeftIcon />
           Retour
-        </Link>
+        </a>
       </div>
 
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4">
@@ -532,7 +545,7 @@ export default function SignUpWizard() {
           <div className="space-y-5">
             <div className="mb-4">
               <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-                Créer votre compte
+                Créez votre compte
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Commencez par vos informations personnelles
@@ -668,11 +681,11 @@ export default function SignUpWizard() {
               <div className="relative">
                 <Input
                   type={showPassword ? "text" : "password"}
-                  placeholder="Minimum 6 caractères"
+                  placeholder="Minimum 12 caractères"
                   value={data.password}
                   onChange={(e) => updateData({ password: e.target.value })}
                   required
-                  minLength={6}
+                  minLength={12}
                 />
                 <span
                   onClick={() => setShowPassword(!showPassword)}
@@ -685,6 +698,25 @@ export default function SignUpWizard() {
                   )}
                 </span>
               </div>
+              {/* Indicateur de complexité du mot de passe */}
+              {data.password && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className={`px-2 py-0.5 rounded ${data.password.length >= 12 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                      {data.password.length >= 12 ? '✓' : '○'} 12+ caractères
+                    </span>
+                    <span className={`px-2 py-0.5 rounded ${/[A-Z]/.test(data.password) ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                      {/[A-Z]/.test(data.password) ? '✓' : '○'} Majuscule
+                    </span>
+                    <span className={`px-2 py-0.5 rounded ${/[0-9]/.test(data.password) ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                      {/[0-9]/.test(data.password) ? '✓' : '○'} Chiffre
+                    </span>
+                    <span className={`px-2 py-0.5 rounded ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(data.password) ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                      {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(data.password) ? '✓' : '○'} Spécial
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-start gap-3">
@@ -751,7 +783,7 @@ export default function SignUpWizard() {
                 </span>
                 <Input
                   type="text"
-                  placeholder="ma-formation"
+                  placeholder="mon-organisme-de-formation"
                   value={data.workspaceSlug}
                   onChange={(e) => updateData({ workspaceSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
                   className="rounded-l-none"
@@ -818,7 +850,7 @@ export default function SignUpWizard() {
             {/* NDA et Région */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>N° de déclaration d&apos;activité (NDA)</Label>
+                <Label>N° de déclaration d&apos;activité</Label>
                 <Input
                   type="text"
                   placeholder="11 75 12345 67"

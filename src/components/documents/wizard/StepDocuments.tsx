@@ -550,6 +550,62 @@ export default function StepDocuments({
     }
   }, [initialGeneratedDocs]);
 
+  // Auto-créer les dossiers apprenants/formateurs à l'arrivée sur cette étape
+  // Cela déclenche aussi la duplication des documents de formation
+  const [foldersCreated, setFoldersCreated] = useState(false);
+  useEffect(() => {
+    if (foldersCreated) return; // Ne faire qu'une seule fois
+    if (!formation.id) return; // Pas d'ID formation
+
+    const autoCreateFolders = async () => {
+      try {
+        // Chercher d'abord si une DocumentSession existe pour cette formation
+        const sessionRes = await fetch(`/api/document-sessions?formationId=${formation.id}`);
+        let sessionId: string | null = null;
+
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData.session?.id) {
+            sessionId = sessionData.session.id;
+          }
+        }
+
+        if (!sessionId && formation.sessionId) {
+          sessionId = formation.sessionId;
+        }
+
+        if (!sessionId) {
+          console.log("[StepDocuments] Pas de session trouvée, création des dossiers ignorée");
+          setFoldersCreated(true);
+          return;
+        }
+
+        // Appeler l'API auto-create folders
+        const res = await fetch("/api/folders/auto-create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            formationId: formation.id,
+            sessionId,
+          }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          console.log("[StepDocuments] Dossiers créés:", result.message);
+        } else {
+          console.warn("[StepDocuments] Erreur création dossiers:", await res.text());
+        }
+      } catch (err) {
+        console.error("[StepDocuments] Erreur auto-création dossiers:", err);
+      } finally {
+        setFoldersCreated(true);
+      }
+    };
+
+    autoCreateFolders();
+  }, [formation.id, formation.sessionId, foldersCreated]);
+
   // Notifier le parent quand les documents changent (pour persistence)
   // On utilise un effet qui surveille generatedDocs et notifie le parent
   const prevDocsLengthRef = useRef(initialGeneratedDocs.length);

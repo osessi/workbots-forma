@@ -6,35 +6,9 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import { ProcedureType } from "@prisma/client";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // ===========================================
 // GET - Détails d'une procédure
@@ -47,19 +21,13 @@ export async function GET(
   try {
     const { type } = await params;
 
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -69,7 +37,7 @@ export async function GET(
     const procedure = await prisma.procedure.findUnique({
       where: {
         organizationId_type: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           type: type as ProcedureType,
         },
       },
@@ -113,30 +81,30 @@ export async function PATCH(
   try {
     const { type } = await params;
 
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, firstName: true, lastName: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
+    // Récupérer les infos de l'utilisateur pour le nom
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { id: true, firstName: true, lastName: true },
+    });
+
     // Vérifier que la procédure existe
     const existingProcedure = await prisma.procedure.findUnique({
       where: {
         organizationId_type: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           type: type as ProcedureType,
         },
       },
@@ -164,8 +132,8 @@ export async function PATCH(
             procedureId: existingProcedure.id,
             content: existingProcedure.content || {},
             version: existingProcedure.version,
-            modifiedById: dbUser.id,
-            modifiedByName: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim() || "Utilisateur",
+            modifiedById: user.id,
+            modifiedByName: `${dbUser?.firstName || ""} ${dbUser?.lastName || ""}`.trim() || "Utilisateur",
             changeNotes: body.changeNotes || "Modification du contenu",
           },
         });
@@ -175,7 +143,7 @@ export async function PATCH(
       const procedure = await tx.procedure.update({
         where: {
           organizationId_type: {
-            organizationId: dbUser.organizationId!,
+            organizationId: user.organizationId!,
             type: type as ProcedureType,
           },
         },
@@ -189,7 +157,7 @@ export async function PATCH(
             publishedAt: isPublished ? new Date() : null,
           }),
           ...(contentChanged && { version: { increment: 1 } }),
-          lastModifiedBy: dbUser.id,
+          lastModifiedBy: user.id,
         },
         include: {
           versions: {
@@ -220,19 +188,13 @@ export async function DELETE(
   try {
     const { type } = await params;
 
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -243,7 +205,7 @@ export async function DELETE(
     const procedure = await prisma.procedure.findUnique({
       where: {
         organizationId_type: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           type: type as ProcedureType,
         },
       },
@@ -260,7 +222,7 @@ export async function DELETE(
     await prisma.procedure.delete({
       where: {
         organizationId_type: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           type: type as ProcedureType,
         },
       },

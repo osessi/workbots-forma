@@ -50,14 +50,17 @@ interface WorkflowJobResult {
 const QUEUE_NAME = "workflow-execution";
 
 // Singleton de la queue
-let workflowQueue: Queue<WorkflowJobData, WorkflowJobResult> | null = null;
-let workflowWorker: Worker<WorkflowJobData, WorkflowJobResult> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let workflowQueue: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let workflowWorker: any = null;
 let workflowQueueEvents: QueueEvents | null = null;
 
 /**
  * Obtenir ou créer la queue des workflows
  */
-export async function getWorkflowQueue(): Promise<Queue<WorkflowJobData, WorkflowJobResult> | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getWorkflowQueue(): Promise<any> {
   // Vérifier si Redis est disponible
   const redisAvailable = await isRedisAvailable();
   if (!redisAvailable) {
@@ -67,8 +70,9 @@ export async function getWorkflowQueue(): Promise<Queue<WorkflowJobData, Workflo
 
   if (!workflowQueue) {
     const connection = getRedisConnection();
-    workflowQueue = new Queue<WorkflowJobData, WorkflowJobResult>(QUEUE_NAME, {
-      connection,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    workflowQueue = new Queue(QUEUE_NAME, {
+      connection: connection as any,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -100,7 +104,8 @@ export async function getWorkflowQueueEvents(): Promise<QueueEvents | null> {
 
   if (!workflowQueueEvents) {
     const connection = getRedisConnection();
-    workflowQueueEvents = new QueueEvents(QUEUE_NAME, { connection });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    workflowQueueEvents = new QueueEvents(QUEUE_NAME, { connection: connection as any });
   }
 
   return workflowQueueEvents;
@@ -123,13 +128,14 @@ export async function startWorkflowWorker(): Promise<Worker<WorkflowJobData, Wor
   if (!workflowWorker) {
     const connection = getRedisConnection();
 
-    workflowWorker = new Worker<WorkflowJobData, WorkflowJobResult>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    workflowWorker = new Worker(
       QUEUE_NAME,
       async (job: Job<WorkflowJobData>) => {
         return await processWorkflowJob(job);
       },
       {
-        connection,
+        connection: connection as any,
         concurrency: 5, // 5 workflows en parallèle max
         limiter: {
           max: 100,
@@ -139,12 +145,12 @@ export async function startWorkflowWorker(): Promise<Worker<WorkflowJobData, Wor
     );
 
     // Gestion des événements du worker
-    workflowWorker.on("completed", async (job, result) => {
+    workflowWorker.on("completed", async (job: Job<WorkflowJobData>, result: WorkflowJobResult) => {
       console.log(`[WorkflowWorker] Job ${job.id} completed:`, result);
       await updateWorkflowStats(job.data.workflowId, true);
     });
 
-    workflowWorker.on("failed", async (job, error) => {
+    workflowWorker.on("failed", async (job: Job<WorkflowJobData> | undefined, error: Error) => {
       console.error(`[WorkflowWorker] Job ${job?.id} failed:`, error.message);
       if (job) {
         await updateWorkflowStats(job.data.workflowId, false);
@@ -152,7 +158,7 @@ export async function startWorkflowWorker(): Promise<Worker<WorkflowJobData, Wor
       }
     });
 
-    workflowWorker.on("error", (error) => {
+    workflowWorker.on("error", (error: Error) => {
       console.error("[WorkflowWorker] Worker error:", error);
     });
 

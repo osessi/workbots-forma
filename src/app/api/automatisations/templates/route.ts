@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { WorkflowTemplate } from "@/types/workflow";
@@ -94,13 +94,6 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             <p>Votre formation <strong>{{formation.titre}}</strong> débute dans 7 jours.</p>
             <p><strong>Date :</strong> {{session.dateDebut}}</p>
             <p><strong>Lieu :</strong> {{session.lieu}}</p>
-            <p>Nous vous invitons à consulter votre espace apprenant pour :</p>
-            <ul>
-              <li>Consulter le programme de formation</li>
-              <li>Lire le règlement intérieur</li>
-              <li>Prendre connaissance des CGV</li>
-            </ul>
-            <p>À très bientôt !</p>
           `,
         },
         ordre: 0,
@@ -156,268 +149,15 @@ const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           contenu: `
             <h2>Bonjour {{apprenant.prenom}},</h2>
             <p>Votre formation <strong>{{formation.titre}}</strong> vient de se terminer.</p>
-            <p>Votre avis est très important pour nous. Merci de prendre quelques minutes pour répondre à notre questionnaire de satisfaction.</p>
-            <p><a href="{{lienEspaceApprenant}}/evaluations">Accéder au questionnaire</a></p>
-            <p>Merci pour votre participation !</p>
+            <p>Votre avis est très important pour nous.</p>
           `,
         },
         ordre: 1,
         positionX: 250,
         positionY: 200,
-      },
-      {
-        type: "DELAI",
-        nom: "Attendre 30 jours",
-        description: "Délai avant envoi évaluation à froid",
-        config: {
-          duree: 30,
-          unite: "jours",
-        },
-        ordre: 2,
-        positionX: 250,
-        positionY: 300,
-      },
-      {
-        type: "ENVOYER_EMAIL",
-        nom: "Email éval à froid",
-        description: "Envoi du questionnaire d'évaluation à froid",
-        config: {
-          destinataire: "apprenant",
-          sujet: "Évaluation à froid - {{formation.titre}}",
-          contenu: `
-            <h2>Bonjour {{apprenant.prenom}},</h2>
-            <p>Il y a 30 jours, vous avez suivi la formation <strong>{{formation.titre}}</strong>.</p>
-            <p>Nous souhaitons savoir si cette formation vous a été utile dans votre quotidien professionnel.</p>
-            <p><a href="{{lienEspaceApprenant}}/evaluations">Répondre à l'évaluation à froid</a></p>
-            <p>Merci pour votre retour !</p>
-          `,
-        },
-        ordre: 3,
-        positionX: 250,
-        positionY: 400,
       },
     ],
     tags: ["evaluation", "satisfaction", "qualiopi"],
-    isPopular: true,
-  },
-
-  // Template 4: Relances signatures
-  {
-    id: "relances-signatures",
-    nom: "Relances signatures",
-    description: "Relances automatiques pour les documents non signés après 3 jours.",
-    categorie: "DOCUMENT",
-    icone: "FileX",
-    triggerType: "DOCUMENT_NON_SIGNE",
-    triggerConfig: {
-      delaiJours: 3,
-    },
-    etapes: [
-      {
-        type: "ENVOYER_EMAIL",
-        nom: "Relance 1",
-        description: "Première relance par email",
-        config: {
-          destinataire: "apprenant",
-          sujet: "Rappel : Document en attente de signature",
-          contenu: `
-            <h2>Bonjour {{apprenant.prenom}},</h2>
-            <p>Un document relatif à votre formation <strong>{{formation.titre}}</strong> est en attente de votre signature.</p>
-            <p>Merci de vous connecter à votre espace apprenant pour le signer.</p>
-            <p><a href="{{lienEspaceApprenant}}/documents">Accéder aux documents</a></p>
-          `,
-        },
-        ordre: 0,
-        positionX: 250,
-        positionY: 100,
-      },
-      {
-        type: "DELAI",
-        nom: "Attendre 3 jours",
-        description: "Attente avant seconde relance",
-        config: {
-          duree: 3,
-          unite: "jours",
-        },
-        ordre: 1,
-        positionX: 250,
-        positionY: 200,
-      },
-      {
-        type: "ENVOYER_EMAIL",
-        nom: "Relance 2",
-        description: "Seconde relance par email",
-        config: {
-          destinataire: "apprenant",
-          sujet: "URGENT : Document en attente de signature",
-          contenu: `
-            <h2>Bonjour {{apprenant.prenom}},</h2>
-            <p><strong>Rappel urgent :</strong> Un document relatif à votre formation est toujours en attente de signature.</p>
-            <p>Sans votre signature, nous ne pourrons pas finaliser votre inscription.</p>
-            <p><a href="{{lienEspaceApprenant}}/documents">Signer le document maintenant</a></p>
-          `,
-        },
-        ordre: 2,
-        positionX: 250,
-        positionY: 300,
-      },
-      {
-        type: "NOTIFIER_EQUIPE",
-        nom: "Alerter l'équipe",
-        description: "Notification si toujours pas signé",
-        config: {
-          titre: "Document non signé",
-          message: "{{apprenant.prenom}} {{apprenant.nom}} n'a toujours pas signé le document après 2 relances",
-          priorite: "haute",
-        },
-        ordre: 3,
-        positionX: 250,
-        positionY: 400,
-      },
-    ],
-    tags: ["signature", "relance", "document"],
-    isPopular: true,
-  },
-
-  // Template 5: Adaptabilité (score faible)
-  {
-    id: "adaptabilite",
-    nom: "Adaptabilité parcours",
-    description: "Déclenchement automatique lors d'un score de positionnement faible (<20%) pour proposer un accompagnement adapté.",
-    categorie: "EVALUATION",
-    icone: "AlertTriangle",
-    triggerType: "SCORE_INFERIEUR_SEUIL",
-    triggerConfig: {
-      seuil: 20,
-      typeEvaluation: "POSITIONNEMENT",
-    },
-    etapes: [
-      {
-        type: "GENERER_DOCUMENT",
-        nom: "Générer fiche adaptabilité",
-        description: "Génération de la fiche d'adaptabilité personnalisée",
-        config: {
-          typeDocument: "AUTRE",
-          envoyerParEmail: false,
-        },
-        ordre: 0,
-        positionX: 250,
-        positionY: 100,
-      },
-      {
-        type: "ENVOYER_EMAIL",
-        nom: "Email apprenant",
-        description: "Information à l'apprenant sur l'accompagnement proposé",
-        config: {
-          destinataire: "apprenant",
-          sujet: "Accompagnement personnalisé - {{formation.titre}}",
-          contenu: `
-            <h2>Bonjour {{apprenant.prenom}},</h2>
-            <p>Suite à votre test de positionnement, nous avons identifié que certains prérequis nécessitent un renforcement.</p>
-            <p>Ne vous inquiétez pas ! Nous vous proposons un accompagnement personnalisé avec un module préparatoire adapté à votre niveau.</p>
-            <p>Notre équipe vous contactera prochainement pour en discuter.</p>
-            <p>Cordialement,<br/>L'équipe {{organisation.nom}}</p>
-          `,
-        },
-        ordre: 1,
-        positionX: 250,
-        positionY: 200,
-      },
-      {
-        type: "NOTIFIER_EQUIPE",
-        nom: "Alerter l'équipe pédagogique",
-        description: "Notification pour mise en place du module 0",
-        config: {
-          titre: "Score de positionnement faible",
-          message: "{{apprenant.prenom}} {{apprenant.nom}} a obtenu un score faible au positionnement ({{evaluation.score}}%). Adaptabilité requise.",
-          priorite: "haute",
-          roles: ["ORG_ADMIN", "FORMATEUR"],
-        },
-        ordre: 2,
-        positionX: 250,
-        positionY: 300,
-      },
-      {
-        type: "CREER_AMELIORATION",
-        nom: "Créer action amélioration",
-        description: "Traçabilité pour Qualiopi IND 10",
-        config: {
-          entite: "amelioration",
-          donnees: {
-            titre: "Mise en place parcours adapté",
-            description: "Suite au positionnement de {{apprenant.prenom}} {{apprenant.nom}}, mise en place d'un accompagnement personnalisé.",
-            origine: "EVALUATION",
-            priorite: "HAUTE",
-          },
-        },
-        ordre: 3,
-        positionX: 250,
-        positionY: 400,
-      },
-    ],
-    tags: ["adaptabilite", "qualiopi", "positionnement"],
-    isPopular: true,
-  },
-
-  // Template 6: Traitement réclamation
-  {
-    id: "traitement-reclamation",
-    nom: "Traitement réclamation",
-    description: "Workflow automatique lors de la réception d'une réclamation : accusé réception, notification équipe.",
-    categorie: "QUALITE",
-    icone: "MessageSquareWarning",
-    triggerType: "RECLAMATION_RECUE",
-    etapes: [
-      {
-        type: "ENVOYER_EMAIL",
-        nom: "Accusé de réception",
-        description: "Email d'accusé de réception au réclamant",
-        config: {
-          destinataire: "apprenant",
-          sujet: "Accusé de réception de votre réclamation",
-          contenu: `
-            <h2>Bonjour,</h2>
-            <p>Nous avons bien reçu votre réclamation et nous vous remercions de nous avoir fait part de votre insatisfaction.</p>
-            <p>Votre demande a été enregistrée et sera traitée dans les plus brefs délais par notre équipe qualité.</p>
-            <p>Nous nous engageons à vous apporter une réponse sous 5 jours ouvrés.</p>
-            <p>Cordialement,<br/>L'équipe {{organisation.nom}}</p>
-          `,
-        },
-        ordre: 0,
-        positionX: 250,
-        positionY: 100,
-      },
-      {
-        type: "NOTIFIER_EQUIPE",
-        nom: "Alerter l'équipe qualité",
-        description: "Notification urgente à l'équipe",
-        config: {
-          titre: "Nouvelle réclamation",
-          message: "Une nouvelle réclamation a été reçue. Merci de la traiter sous 5 jours.",
-          priorite: "urgente",
-          roles: ["ORG_ADMIN"],
-        },
-        ordre: 1,
-        positionX: 250,
-        positionY: 200,
-      },
-      {
-        type: "CREER_TACHE",
-        nom: "Créer tâche de suivi",
-        description: "Création d'une tâche de suivi",
-        config: {
-          entite: "tache",
-          donnees: {
-            titre: "Traiter réclamation",
-            description: "Réclamation à traiter sous 5 jours ouvrés",
-          },
-        },
-        ordre: 2,
-        positionX: 250,
-        positionY: 300,
-      },
-    ],
-    tags: ["reclamation", "qualiopi", "qualite"],
     isPopular: true,
   },
 ];
@@ -439,12 +179,11 @@ const createFromTemplateSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
@@ -490,23 +229,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Authentification
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -530,7 +262,7 @@ export async function POST(request: NextRequest) {
     // Créer le workflow depuis le template
     const workflow = await prisma.workflow.create({
       data: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         nom: data.nom || template.nom,
         description: template.description,
         icone: template.icone,

@@ -1,52 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
-
-// Verifier si l'utilisateur est super admin
-async function checkSuperAdmin() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-  if (!supabaseUser) {
-    return null;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser.id },
-    select: { isSuperAdmin: true },
-  });
-
-  return user?.isSuperAdmin ? supabaseUser : null;
-}
+import { authenticateUser } from "@/lib/auth";
 
 // POST - Synchroniser les utilisateurs Supabase avec Prisma
 export async function POST() {
-  const adminUser = await checkSuperAdmin();
+  const user = await authenticateUser();
 
-  if (!adminUser) {
+  if (!user) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
+
+  if (!user.isSuperAdmin) {
     return NextResponse.json(
       { error: "Non autorise - Super Admin requis" },
       { status: 403 }
@@ -167,9 +132,13 @@ export async function POST() {
 
 // GET - Comparer les utilisateurs Supabase et Prisma
 export async function GET() {
-  const adminUser = await checkSuperAdmin();
+  const user = await authenticateUser();
 
-  if (!adminUser) {
+  if (!user) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
+
+  if (!user.isSuperAdmin) {
     return NextResponse.json(
       { error: "Non autorise - Super Admin requis" },
       { status: 403 }

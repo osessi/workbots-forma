@@ -5,35 +5,9 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import { OrganigrammePosteType } from "@prisma/client";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // ===========================================
 // GET - Liste des postes de l'organigramme
@@ -41,19 +15,13 @@ async function getSupabaseClient() {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -64,7 +32,7 @@ export async function GET(request: NextRequest) {
     const visibleOnly = searchParams.get("visible") === "true";
 
     const whereClause: Record<string, unknown> = {
-      organizationId: dbUser.organizationId,
+      organizationId: user.organizationId,
     };
 
     if (visibleOnly) {
@@ -137,19 +105,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -186,7 +148,7 @@ export async function POST(request: NextRequest) {
       const parent = await prisma.organigrammePoste.findFirst({
         where: {
           id: parentId,
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
         },
       });
 
@@ -203,7 +165,7 @@ export async function POST(request: NextRequest) {
       const intervenant = await prisma.intervenant.findFirst({
         where: {
           id: intervenantId,
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
         },
       });
 
@@ -230,7 +192,7 @@ export async function POST(request: NextRequest) {
     if (ordre === undefined) {
       const maxOrdre = await prisma.organigrammePoste.aggregate({
         where: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           niveau: niveauFinal,
           parentId: parentId || null,
         },
@@ -241,7 +203,7 @@ export async function POST(request: NextRequest) {
 
     const poste = await prisma.organigrammePoste.create({
       data: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         type: type as OrganigrammePosteType || "AUTRE",
         titre,
         nom,

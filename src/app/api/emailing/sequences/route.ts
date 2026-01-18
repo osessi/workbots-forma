@@ -5,36 +5,11 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import { EmailTriggerType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // ===========================================
 // GET - Liste des séquences
@@ -42,19 +17,12 @@ async function getSupabaseClient() {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
@@ -67,7 +35,7 @@ export async function GET(request: NextRequest) {
       isActive?: boolean;
       triggerType?: EmailTriggerType;
     } = {
-      organizationId: dbUser.organizationId,
+      organizationId: user.organizationId,
     };
 
     if (isActive !== null) {
@@ -149,23 +117,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
-    if (!["ADMIN", "OWNER", "SUPER_ADMIN"].includes(dbUser.role)) {
+    if (!["ADMIN", "OWNER", "SUPER_ADMIN"].includes(user.role)) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
@@ -185,13 +146,13 @@ export async function POST(request: NextRequest) {
     // Créer la séquence avec ses étapes
     const sequence = await prisma.emailSequence.create({
       data: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         name,
         description,
         triggerType: triggerType as EmailTriggerType,
         triggerConfig: triggerConfig || {},
         isActive: false,
-        createdById: dbUser.id,
+        createdById: user.id,
         steps: {
           create: steps.map((step: {
             subject: string;

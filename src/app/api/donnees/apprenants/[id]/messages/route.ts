@@ -5,34 +5,8 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
+import { authenticateUser } from "@/lib/auth";
 
 // GET - Récupérer les messages d'un apprenant
 export async function GET(
@@ -43,20 +17,12 @@ export async function GET(
     const { id: apprenantId } = await params;
 
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -67,7 +33,7 @@ export async function GET(
     const apprenant = await prisma.apprenant.findFirst({
       where: {
         id: apprenantId,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
       select: { id: true, nom: true, prenom: true, email: true },
     });
@@ -84,7 +50,7 @@ export async function GET(
     // avec resourceType = "apprenant" et resourceId = apprenantId
     const notifications = await prisma.notification.findMany({
       where: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         resourceType: "apprenant",
         resourceId: apprenantId,
       },
@@ -154,26 +120,12 @@ export async function POST(
     const { id: apprenantId } = await params;
 
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: {
-        id: true,
-        organizationId: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-      },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -184,7 +136,7 @@ export async function POST(
     const apprenant = await prisma.apprenant.findFirst({
       where: {
         id: apprenantId,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
       select: { id: true, nom: true, prenom: true, email: true },
     });
@@ -217,7 +169,7 @@ export async function POST(
 
     // Récupérer l'organisation pour l'envoi d'email
     const organization = await prisma.organization.findUnique({
-      where: { id: dbUser.organizationId },
+      where: { id: user.organizationId },
       select: {
         id: true,
         name: true,
@@ -232,7 +184,7 @@ export async function POST(
       const notification = await prisma.notification.findFirst({
         where: {
           id: messageId,
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
         },
       });
 
@@ -251,8 +203,8 @@ export async function POST(
       const newReply = {
         id: `reply_${Date.now()}`,
         content: content.trim(),
-        senderName: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim() || dbUser.email,
-        senderEmail: dbUser.email,
+        senderName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
+        senderEmail: user.email,
         createdAt: new Date().toISOString(),
         attachments: validAttachments,
       };
@@ -316,7 +268,7 @@ export async function POST(
       // Correction 422: actionUrl vers l'onglet Messages avec messageId
       const notification = await prisma.notification.create({
         data: {
-          organizationId: dbUser.organizationId,
+          organizationId: user.organizationId,
           type: "SYSTEME",
           titre: subject || "Message de l'organisme",
           message: content.trim(),
@@ -329,8 +281,8 @@ export async function POST(
             direction: "outgoing",
             subject: subject || "Message de l'organisme",
             messageOriginal: content.trim(),
-            senderName: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim() || dbUser.email,
-            senderEmail: dbUser.email,
+            senderName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
+            senderEmail: user.email,
             sentAt: new Date().toISOString(),
             attachments: validAttachments, // Correction 421
             replies: [],
@@ -383,8 +335,8 @@ export async function POST(
           type: "outgoing",
           subject: subject || "Message de l'organisme",
           content: content.trim(),
-          senderName: `${dbUser.firstName || ""} ${dbUser.lastName || ""}`.trim() || dbUser.email,
-          senderEmail: dbUser.email,
+          senderName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
+          senderEmail: user.email,
           isRead: true,
           createdAt: notification.createdAt,
           attachments: validAttachments,

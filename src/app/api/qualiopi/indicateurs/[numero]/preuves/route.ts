@@ -7,12 +7,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 
 // Bucket Supabase Storage
 const STORAGE_BUCKET = "worksbots-forma-stockage";
 
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
+// Helper pour créer le client Supabase (pour storage uniquement)
+async function getSupabaseStorageClient() {
   const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,27 +53,19 @@ export async function POST(
     }
 
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
 
     // Récupérer le FormData
     const formData = await request.formData();
@@ -131,6 +124,7 @@ export async function POST(
         console.log(`[Upload] Tentative d'upload: ${fileName}, taille: ${buffer.length} bytes, type: ${file.type}`);
 
         // Upload vers Supabase Storage
+        const supabase = await getSupabaseStorageClient();
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from(STORAGE_BUCKET)
           .upload(fileName, buffer, {
@@ -202,27 +196,19 @@ export async function GET(
     }
 
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
 
     // Récupérer les preuves
     const indicateur = await prisma.indicateurConformite.findUnique({
@@ -266,27 +252,19 @@ export async function DELETE(
     }
 
     // Authentification
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
 
     // Récupérer l'ID de la preuve depuis le body
     const body = await request.json();
@@ -325,6 +303,7 @@ export async function DELETE(
 
         console.log("[Delete] Suppression du fichier:", decodedPath);
 
+        const supabase = await getSupabaseStorageClient();
         const { error: deleteError } = await supabase.storage
           .from(STORAGE_BUCKET)
           .remove([decodedPath]);

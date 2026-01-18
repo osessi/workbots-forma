@@ -1,49 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
-
-// Vérifier que l'utilisateur est super admin
-async function checkSuperAdmin() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-  if (!supabaseUser) return null;
-
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser.id },
-  });
-
-  if (!user?.isSuperAdmin) return null;
-  return user;
-}
+import { authenticateUser } from "@/lib/auth";
 
 // GET - Récupérer toutes les configurations d'intégration
 export async function GET() {
   try {
-    const user = await checkSuperAdmin();
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    if (!user.isSuperAdmin) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     // Récupérer les configurations depuis GlobalConfig
@@ -77,9 +45,13 @@ export async function GET() {
 // PUT - Sauvegarder une configuration d'intégration
 export async function PUT(request: NextRequest) {
   try {
-    const user = await checkSuperAdmin();
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    if (!user.isSuperAdmin) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     const { integrationId, config } = await request.json();
@@ -130,9 +102,13 @@ export async function PUT(request: NextRequest) {
 // DELETE - Supprimer une configuration d'intégration
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await checkSuperAdmin();
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    if (!user.isSuperAdmin) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

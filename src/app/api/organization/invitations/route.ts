@@ -3,9 +3,8 @@
 // ===========================================
 // Gère les invitations des membres d'une organisation
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import crypto from "crypto";
 
@@ -17,46 +16,18 @@ function generateToken(): string {
 // GET - Liste des invitations de l'organisation
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-      include: { organization: true },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
-        { error: "Utilisateur ou organisation non trouvée" },
+        { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
@@ -90,46 +61,18 @@ export async function GET() {
 // POST - Créer une nouvelle invitation
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-      include: { organization: true },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
-        { error: "Utilisateur ou organisation non trouvée" },
+        { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
@@ -191,6 +134,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Récupérer l'organisation pour vérifier les limites
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { maxFormateurs: true },
+    });
+
     // Vérifier les limites du plan
     const membersCount = await prisma.user.count({
       where: { organizationId: user.organizationId },
@@ -203,7 +152,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const maxFormateurs = user.organization?.maxFormateurs || 1;
+    const maxFormateurs = organization?.maxFormateurs || 1;
     if (maxFormateurs !== -1 && membersCount + pendingInvitationsCount >= maxFormateurs) {
       return NextResponse.json(
         { error: "Limite de membres atteinte pour votre plan" },
@@ -254,45 +203,18 @@ export async function POST(request: NextRequest) {
 // DELETE - Annuler une invitation
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-    });
-
-    if (!user || !user.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
-        { error: "Utilisateur ou organisation non trouvée" },
+        { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }

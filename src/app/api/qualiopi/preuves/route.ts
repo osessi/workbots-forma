@@ -7,13 +7,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import prisma from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth";
 import {
   genererPreuvesIndicateur,
   genererDossierAuditComplet,
 } from "@/lib/services/qualiopi";
 
-// Helper pour créer le client Supabase
+// Helper pour créer le client Supabase (pour session/cookies uniquement)
 async function getSupabaseClient() {
   const cookieStore = await cookies();
   return createServerClient(
@@ -41,30 +41,23 @@ async function getSupabaseClient() {
 export async function POST(request: NextRequest) {
   try {
     // Authentification
-    const cookieStore = await cookies();
-    const allCookies = cookieStore.getAll();
-
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur avec son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
       );
     }
 
-    const organizationId = dbUser.organizationId;
+    const organizationId = user.organizationId;
+
+    // Récupérer les cookies pour l'auth puppeteer
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
     const body = await request.json();
     const { indicateur, full } = body;
 
@@ -72,6 +65,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = request.headers.get("origin") || "http://localhost:4000";
 
     // Récupérer la session Supabase complète pour avoir le token d'accès
+    const supabase = await getSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
 
     // Construire les cookies d'auth - inclure le token de session si disponible

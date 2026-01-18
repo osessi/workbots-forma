@@ -5,62 +5,38 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
-
-// Helper pour créer le client Supabase
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // POST - Enregistrer un domaine personnalisé
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
+    if (!user.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
+    }
+
+    // Récupérer l'organisation pour vérifier le plan
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { id: true, plan: true },
     });
 
-    if (!dbUser?.organization) {
+    if (!organization) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
     // Vérifier le rôle (admin requis)
-    if (dbUser.role !== "ORG_ADMIN" && dbUser.role !== "SUPER_ADMIN") {
+    if (user.role !== "ORG_ADMIN" && !user.isSuperAdmin) {
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
 
     // Vérifier le plan (Pro ou Enterprise requis)
-    if (dbUser.organization.plan !== "PRO" && dbUser.organization.plan !== "ENTERPRISE") {
+    if (organization.plan !== "PRO" && organization.plan !== "ENTERPRISE") {
       return NextResponse.json(
         { error: "Le plan Pro ou Enterprise est requis pour cette fonctionnalité" },
         { status: 403 }
@@ -86,7 +62,7 @@ export async function POST(request: NextRequest) {
     const existingOrg = await prisma.organization.findFirst({
       where: {
         customDomain: domain.toLowerCase(),
-        id: { not: dbUser.organization.id },
+        id: { not: organization.id },
       },
     });
 
@@ -99,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Mettre à jour l'organisation
     const updatedOrg = await prisma.organization.update({
-      where: { id: dbUser.organization.id },
+      where: { id: organization.id },
       data: {
         customDomain: domain.toLowerCase(),
       },
@@ -118,31 +94,23 @@ export async function POST(request: NextRequest) {
 // DELETE - Supprimer le domaine personnalisé
 export async function DELETE() {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer l'utilisateur et son organisation
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
-    });
-
-    if (!dbUser?.organization) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
     // Vérifier le rôle (admin requis)
-    if (dbUser.role !== "ORG_ADMIN" && dbUser.role !== "SUPER_ADMIN") {
+    if (user.role !== "ORG_ADMIN" && !user.isSuperAdmin) {
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
 
     // Supprimer le domaine
     await prisma.organization.update({
-      where: { id: dbUser.organization.id },
+      where: { id: user.organizationId },
       data: {
         customDomain: null,
       },

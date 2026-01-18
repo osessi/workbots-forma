@@ -3,6 +3,15 @@
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
+// Icônes Phosphor - style duotone pour un look moderne
+import {
+  GraduationCap,
+  Files,
+  CalendarCheck,
+  ChartLineUp,
+  Buildings,
+  UsersThree,
+} from "@phosphor-icons/react";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -39,64 +48,6 @@ interface DashboardData {
     formations: number;
   }>;
 }
-
-// Icons - Modern & Clean Design
-const FormationIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 3L2 8.5L12 14L22 8.5L12 3Z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-    <path d="M4 10V16L12 20L20 16V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M12 14V20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-
-const DocumentIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-    <path d="M14 2V8H20" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-    <path d="M8 13H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <path d="M8 17H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-
-const CalendarIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="3" y="4" width="18" height="18" rx="2" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M3 9H21" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M8 2V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <path d="M16 2V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <rect x="7" y="13" width="3" height="3" rx="0.5" fill="currentColor"/>
-    <rect x="14" y="13" width="3" height="3" rx="0.5" fill="currentColor" fillOpacity="0.5"/>
-  </svg>
-);
-
-const TrendingIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3 17L9 11L13 15L21 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M15 7H21V13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M3 17L9 11L13 15L21 7V17C21 18 20 19 19 19H5C4 19 3 18 3 17Z" fill="currentColor" fillOpacity="0.1"/>
-  </svg>
-);
-
-const BuildingIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3 21H21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <path d="M5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
-    <rect x="9" y="7" width="2" height="2" rx="0.5" fill="currentColor"/>
-    <rect x="13" y="7" width="2" height="2" rx="0.5" fill="currentColor"/>
-    <rect x="9" y="12" width="2" height="2" rx="0.5" fill="currentColor"/>
-    <rect x="13" y="12" width="2" height="2" rx="0.5" fill="currentColor"/>
-    <path d="M10 21V17H14V21" stroke="currentColor" strokeWidth="1.5"/>
-  </svg>
-);
-
-const UsersIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="9" cy="7" r="4" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M3 21V19C3 17.9391 3.42143 16.9217 4.17157 16.1716C4.92172 15.4214 5.93913 15 7 15H11C12.0609 15 13.0783 15.4214 13.8284 16.1716C14.5786 16.9217 15 17.9391 15 19V21" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <circle cx="17" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M21 21V19.5C21 18.5 20.5 17.6 19.8 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("fr-FR", {
@@ -167,6 +118,14 @@ export default function DashboardStats() {
     loadStats();
   }, []);
 
+  // Calculer le max dynamique pour l'axe Y
+  const maxFormations = data?.chartData
+    ? Math.max(...data.chartData.map((d) => d.formations), 1)
+    : 5;
+  // Arrondir au multiple de 5 supérieur pour un affichage propre
+  const yAxisMax = Math.ceil(maxFormations / 5) * 5 || 5;
+  const tickAmount = Math.min(yAxisMax, 10); // Max 10 graduations
+
   // Options du graphique formations
   const chartOptions: ApexOptions = {
     chart: {
@@ -195,11 +154,11 @@ export default function DashboardStats() {
         style: { colors: "#9CA3AF", fontSize: "12px" },
         formatter: (val) => Math.floor(val).toString(),
       },
-      tickAmount: 5,
+      tickAmount: tickAmount,
       min: 0,
-      forceNiceScale: false,
+      max: yAxisMax,
+      forceNiceScale: true,
       decimalsInFloat: 0,
-      stepSize: 1,
     },
     grid: {
       borderColor: "#E5E7EB",
@@ -269,39 +228,39 @@ export default function DashboardStats() {
       {/* Cartes de stats principales */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
-          icon={<FormationIcon />}
+          icon={<GraduationCap size={26} weight="duotone" />}
           label="Formations"
           value={data.formations.total}
           subValue={`sur ${data.formations.max}`}
           color="bg-blue-50 text-blue-600 dark:bg-blue-900/30"
         />
         <StatCard
-          icon={<DocumentIcon />}
+          icon={<Files size={26} weight="duotone" />}
           label="Documents"
           value={data.documents.total}
           color="bg-purple-50 text-purple-600 dark:bg-purple-900/30"
         />
         <StatCard
-          icon={<CalendarIcon />}
+          icon={<CalendarCheck size={26} weight="duotone" />}
           label="Sessions"
           value={data.sessions.total}
           color="bg-green-50 text-green-600 dark:bg-green-900/30"
         />
         <StatCard
-          icon={<TrendingIcon />}
+          icon={<ChartLineUp size={26} weight="duotone" />}
           label="Opportunités CRM"
           value={data.crm.opportunites}
           subValue={formatCurrency(data.crm.montantTotal)}
           color="bg-orange-50 text-orange-600 dark:bg-orange-900/30"
         />
         <StatCard
-          icon={<BuildingIcon />}
+          icon={<Buildings size={26} weight="duotone" />}
           label="Entreprises"
           value={data.clients.entreprises}
           color="bg-pink-50 text-pink-600 dark:bg-pink-900/30"
         />
         <StatCard
-          icon={<UsersIcon />}
+          icon={<UsersThree size={26} weight="duotone" />}
           label="Apprenants"
           value={data.clients.apprenants}
           color="bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30"

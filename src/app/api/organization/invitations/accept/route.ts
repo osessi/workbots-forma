@@ -3,40 +3,17 @@
 // ===========================================
 // Accepte une invitation et ajoute l'utilisateur à l'organisation
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore errors in Server Components
-            }
-          },
-        },
-      }
-    );
+    const user = await authenticateUser();
 
-    const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !supabaseUser) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Non authentifié" },
+        { error: "Non autorisé" },
         { status: 401 }
       );
     }
@@ -83,42 +60,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Récupérer l'email de l'utilisateur
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { email: true },
+    });
+
     // Vérifier que l'email correspond
-    if (invitation.email.toLowerCase() !== supabaseUser.email?.toLowerCase()) {
+    if (invitation.email.toLowerCase() !== dbUser?.email?.toLowerCase()) {
       return NextResponse.json(
         { error: "Cette invitation est pour une autre adresse email" },
         { status: 403 }
       );
     }
 
-    // Récupérer ou créer l'utilisateur Prisma
-    let user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
+    // Mettre à jour l'utilisateur avec l'organisation
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        organizationId: invitation.organizationId,
+        role: invitation.role,
+      },
     });
-
-    if (user) {
-      // Utilisateur existe - mettre à jour l'organisation
-      user = await prisma.user.update({
-        where: { supabaseId: supabaseUser.id },
-        data: {
-          organizationId: invitation.organizationId,
-          role: invitation.role,
-        },
-      });
-    } else {
-      // Créer l'utilisateur
-      const metadata = supabaseUser.user_metadata || {};
-      user = await prisma.user.create({
-        data: {
-          supabaseId: supabaseUser.id,
-          email: supabaseUser.email!,
-          firstName: metadata.first_name || null,
-          lastName: metadata.last_name || null,
-          organizationId: invitation.organizationId,
-          role: invitation.role,
-        },
-      });
-    }
 
     // Marquer l'invitation comme acceptée
     await prisma.invitation.update({

@@ -4,7 +4,7 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 
 const SLIDES_API_URL = process.env.SLIDES_API_URL || "http://localhost:8000";
@@ -35,22 +35,12 @@ interface GenerateRequestBody {
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Get user and organization
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      include: { organization: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json(
         { error: "Organisation non trouvée" },
         { status: 404 }
@@ -76,7 +66,7 @@ export async function POST(request: NextRequest) {
     const formation = await prisma.formation.findFirst({
       where: {
         id: formationId,
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
       },
     });
 
@@ -99,7 +89,7 @@ export async function POST(request: NextRequest) {
         themeName: templateId,
         tone,
         cardsPerModule,
-        userId: dbUser.id,
+        userId: user.id,
         moduleResults: [],
       },
     });
@@ -120,7 +110,7 @@ export async function POST(request: NextRequest) {
         includeConclusion,
         exportAs,
       },
-      dbUser.organizationId
+      user.organizationId
     ).catch((error) => {
       console.error("Background generation error:", error);
     });

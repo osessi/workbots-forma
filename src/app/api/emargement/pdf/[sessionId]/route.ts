@@ -5,9 +5,8 @@
 // Génère un document HTML avec les signatures réelles des participants et formateurs
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
+import { authenticateUser } from "@/lib/auth/getCurrentUser";
 
 // Types
 interface SignatureData {
@@ -47,43 +46,19 @@ export async function GET(
   try {
     const { sessionId } = await params;
 
-    // Authentification
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // Ignore
-            }
-          },
-        },
-      }
-    );
-
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-    if (!supabaseUser) {
+    const user = await authenticateUser();
+    if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { supabaseId: supabaseUser.id },
-      include: { organization: true },
-    });
-
-    if (!user || !user.organizationId) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
+    if (!user.organizationId) {
+      return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
+
+    // Récupérer l'organisation complète pour le PDF
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+    });
 
     // Récupérer la session avec toutes ses données
     const session = await prisma.documentSession.findUnique({
@@ -185,7 +160,7 @@ export async function GET(
 
     // Générer le HTML du document
     const html = generateEmargementHTML({
-      organization: user.organization!,
+      organization: organization!,
       formation: {
         titre: session.formation.titre,
         dureeHeures,

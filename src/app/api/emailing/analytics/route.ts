@@ -4,57 +4,25 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 
 export const dynamic = "force-dynamic";
 
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await authenticateUser();
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30d";
-    const global = searchParams.get("global") === "true" && dbUser.role === "SUPER_ADMIN";
+    const global = searchParams.get("global") === "true" && user.role === "SUPER_ADMIN";
 
     // Calculer les dates de période
     const now = new Date();
@@ -77,7 +45,7 @@ export async function GET(request: NextRequest) {
         startDate.setDate(now.getDate() - 30);
     }
 
-    const whereOrg = global ? {} : { organizationId: dbUser.organizationId };
+    const whereOrg = global ? {} : { organizationId: user.organizationId };
 
     // ===========================================
     // KPIs globaux
@@ -197,7 +165,7 @@ export async function GET(request: NextRequest) {
     // Performance des templates
     // ===========================================
     const templatePerformance = await prisma.emailTemplate.findMany({
-      where: global ? {} : { organizationId: dbUser.organizationId },
+      where: global ? {} : { organizationId: user.organizationId },
       select: {
         id: true,
         name: true,
@@ -217,7 +185,7 @@ export async function GET(request: NextRequest) {
     // Audiences et engagement
     // ===========================================
     const audiences = await prisma.emailAudience.findMany({
-      where: global ? {} : { organizationId: dbUser.organizationId },
+      where: global ? {} : { organizationId: user.organizationId },
       select: {
         id: true,
         name: true,
@@ -237,7 +205,7 @@ export async function GET(request: NextRequest) {
     // Newsletters performance
     // ===========================================
     const newsletters = await prisma.newsletter.findMany({
-      where: global ? {} : { organizationId: dbUser.organizationId },
+      where: global ? {} : { organizationId: user.organizationId },
       select: {
         id: true,
         name: true,

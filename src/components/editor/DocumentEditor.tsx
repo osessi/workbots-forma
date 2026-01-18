@@ -20,6 +20,7 @@ import { Color } from "@tiptap/extension-color";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Typography } from "@tiptap/extension-typography";
+import CharacterCount from "@tiptap/extension-character-count";
 import { useCallback, useEffect, useRef, useState } from "react";
 import mammoth from "mammoth";
 
@@ -133,6 +134,7 @@ export default function DocumentEditor({
         placeholder,
       }),
       Typography,
+      CharacterCount,
       TemplateVariable,
       PageBreak,
       ConditionalBlock,
@@ -316,18 +318,41 @@ export default function DocumentEditor({
 // ===========================================
 
 /**
- * Parser le contenu initial
+ * Parser le contenu initial - gère JSON TipTap, HTML, ou texte brut
  */
 function parseContent(content: string): Record<string, unknown> | string {
   if (!content) {
     return "";
   }
 
-  // Si c'est du JSON TipTap
-  if (content.startsWith("{")) {
+  // Si c'est du JSON (commence par { ou [)
+  if (content.startsWith("{") || content.startsWith("[")) {
     try {
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+
+      // Vérifier si c'est du JSON TipTap valide (doit avoir type: "doc")
+      if (parsed && typeof parsed === "object" && parsed.type === "doc" && Array.isArray(parsed.content)) {
+        return parsed;
+      }
+
+      // Si c'est un objet {raw: "..."} (format legacy), extraire le contenu
+      if (parsed && typeof parsed === "object" && typeof parsed.raw === "string") {
+        return parsed.raw;
+      }
+
+      // Si c'est un objet mais pas du JSON TipTap, le convertir en texte
+      if (parsed && typeof parsed === "object") {
+        // Peut-être un objet Prisma ou autre format - essayer d'extraire le contenu
+        if (parsed.content && typeof parsed.content === "string") {
+          return parsed.content;
+        }
+        // Sinon retourner la string originale comme HTML
+        return content;
+      }
+
+      return parsed;
     } catch {
+      // JSON invalide - traiter comme HTML ou texte brut
       return content;
     }
   }

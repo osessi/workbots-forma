@@ -52,21 +52,24 @@ interface EnrichedModule {
 }
 
 // Queue singleton
-let slideQueue: Queue<SlideGenerationJobData> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let slideQueue: any = null;
 
 /**
  * Obtenir la queue de génération de slides
  * Retourne null si Redis n'est pas configuré
  */
-export function getSlideGenerationQueue(): Queue<SlideGenerationJobData> | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getSlideGenerationQueue(): any {
   if (!process.env.REDIS_URL) {
     return null;
   }
 
   if (!slideQueue) {
     try {
-      slideQueue = new Queue<SlideGenerationJobData>(QUEUE_NAME, {
-        connection: getRedisConnection(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      slideQueue = new Queue(QUEUE_NAME, {
+        connection: getRedisConnection() as any,
         defaultJobOptions: {
           removeOnComplete: { count: 100 }, // Garder les 100 derniers jobs complétés
           removeOnFail: { count: 50 }, // Garder les 50 derniers échecs
@@ -375,8 +378,9 @@ export function startSlideGenerationWorker(): Worker<SlideGenerationJobData> | n
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     slideWorker = new Worker<SlideGenerationJobData>(QUEUE_NAME, processSlideGenerationJob, {
-      connection: getRedisConnection(),
+      connection: getRedisConnection() as any,
       concurrency: 2, // 2 jobs en parallèle max
       limiter: {
         max: 5, // Max 5 jobs

@@ -6,36 +6,11 @@
 // ===========================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { authenticateUser } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import { Resend } from "resend";
 
 export const dynamic = "force-dynamic";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-}
 
 // ===========================================
 // POST - Configurer ou tester SMTP
@@ -43,23 +18,17 @@ async function getSupabaseClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
-    if (!["ADMIN", "OWNER", "SUPER_ADMIN"].includes(dbUser.role)) {
+    if (!["ADMIN", "OWNER", "SUPER_ADMIN", "ORG_ADMIN"].includes(user.role)) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
@@ -72,13 +41,19 @@ export async function POST(request: NextRequest) {
     if (action === "test") {
       const { provider, apiKey, fromEmail, testEmail } = body;
 
+      // Récupérer l'email de l'utilisateur pour le test
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { email: true },
+      });
+
       if (provider === "RESEND") {
         try {
           const resend = new Resend(apiKey || process.env.RESEND_API_KEY);
 
           await resend.emails.send({
             from: fromEmail || "test@workbots.fr",
-            to: testEmail || user.email || "",
+            to: testEmail || dbUser?.email || "",
             subject: "Test de configuration SMTP - WORKBOTS",
             html: `
               <h2>Configuration SMTP réussie</h2>
@@ -89,13 +64,13 @@ export async function POST(request: NextRequest) {
 
           // Mettre à jour la date de test
           await prisma.emailSmtpConfig.updateMany({
-            where: { organizationId: dbUser.organizationId },
+            where: { organizationId: user.organizationId },
             data: { lastTestedAt: new Date() },
           });
 
           return NextResponse.json({
             success: true,
-            message: `Email de test envoyé à ${testEmail || user.email}`,
+            message: `Email de test envoyé à ${testEmail || dbUser?.email}`,
           });
         } catch (error) {
           console.error("SMTP test error:", error);
@@ -134,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     // Créer ou mettre à jour la config
     const smtpConfig = await prisma.emailSmtpConfig.upsert({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
       update: {
         provider,
         apiKey: apiKey || undefined,
@@ -150,7 +125,7 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       },
       create: {
-        organizationId: dbUser.organizationId,
+        organizationId: user.organizationId,
         provider,
         apiKey: apiKey || undefined,
         host: host || undefined,
@@ -189,28 +164,22 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, organizationId: true, role: true },
-    });
-
-    if (!dbUser?.organizationId) {
+    if (!user.organizationId) {
       return NextResponse.json({ error: "Organisation non trouvée" }, { status: 404 });
     }
 
-    if (!["ADMIN", "OWNER", "SUPER_ADMIN"].includes(dbUser.role)) {
+    if (!["ADMIN", "OWNER", "SUPER_ADMIN", "ORG_ADMIN"].includes(user.role)) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     await prisma.emailSmtpConfig.deleteMany({
-      where: { organizationId: dbUser.organizationId },
+      where: { organizationId: user.organizationId },
     });
 
     return NextResponse.json({

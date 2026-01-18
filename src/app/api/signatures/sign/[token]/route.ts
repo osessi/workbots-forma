@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
 import crypto from "crypto";
 import { FileCategory } from "@prisma/client";
+import { sendEmail, generateSignatureReceivedNotificationEmail } from "@/lib/services/email";
 
 // Générer un hash SHA-256
 function generateHash(content: string): string {
@@ -572,6 +573,47 @@ export async function POST(
       if (saveResult.success) {
         savedFileId = saveResult.fileId;
         console.log(`[SIGNATURE] Document signé sauvegardé dans le Drive: ${savedFileId}`);
+      }
+
+      // Envoyer une notification email au centre de formation
+      try {
+        // Récupérer l'organisation avec son email
+        const organization = await prisma.organization.findUnique({
+          where: { id: document.organizationId },
+          select: {
+            name: true,
+            email: true,
+            logo: true,
+            primaryColor: true,
+          },
+        });
+
+        if (organization?.email) {
+          const notificationEmail = generateSignatureReceivedNotificationEmail({
+            signataireName: document.destinataireNom,
+            signataireEmail: document.destinataireEmail,
+            documentTitre: document.titre,
+            documentType: document.documentType,
+            signedAt: signatureRecord.signedAt,
+            certificateUrl,
+            formationTitre: document.session?.formation?.titre || undefined,
+            organizationName: organization.name,
+            organizationLogo: organization.logo,
+            primaryColor: organization.primaryColor || undefined,
+          });
+
+          await sendEmail({
+            to: organization.email,
+            subject: notificationEmail.subject,
+            html: notificationEmail.html,
+            text: notificationEmail.text,
+          });
+
+          console.log(`[SIGNATURE] Notification de signature envoyée à ${organization.email}`);
+        }
+      } catch (emailError) {
+        // Log l'erreur mais ne pas faire échouer la signature
+        console.error("[SIGNATURE] Erreur envoi notification email:", emailError);
       }
     }
 

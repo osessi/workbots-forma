@@ -5,53 +5,15 @@
 // GET /api/adaptation-parcours - Récupérer les adaptations d'une formation
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import prisma from "@/lib/db/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_PROMPTS, injectVariablesInPrompt } from "@/lib/ai/dynamic-prompts";
+import { authenticateUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // Seuil de score pour déclencher l'adaptation (en pourcentage, équivalent 2/20)
 const SEUIL_ADAPTATION = 10;
-
-// Helper pour authentifier l'utilisateur
-async function authenticateUser() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore
-          }
-        },
-      },
-    }
-  );
-
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-  if (!supabaseUser) {
-    return null;
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { supabaseId: supabaseUser.id },
-  });
-
-  return user;
-}
 
 // GET - Récupérer les adaptations existantes pour une formation
 export async function GET(request: NextRequest) {

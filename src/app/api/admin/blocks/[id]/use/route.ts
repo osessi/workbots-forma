@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authenticateUser } from "@/lib/auth";
 
 // POST - Incrementer le compteur d'utilisation
 export async function POST(
@@ -14,19 +14,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await authenticateUser();
 
     if (!user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-    });
-
-    if (!dbUser) {
-      return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
 
     // Verifier que le bloc existe et est accessible
@@ -36,7 +27,7 @@ export async function POST(
         isActive: true,
         OR: [
           { isSystem: true },
-          ...(dbUser.organizationId ? [{ organizationId: dbUser.organizationId }] : []),
+          ...(user.organizationId ? [{ organizationId: user.organizationId }] : []),
         ],
       },
     });

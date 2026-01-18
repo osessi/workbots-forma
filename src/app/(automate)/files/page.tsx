@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import FilePreviewModal from "@/components/files/FilePreviewModal";
+import { QRCodeSVG } from "qrcode.react";
 
 // Import dynamique de l'éditeur TipTap
 const DocumentEditor = dynamic(
@@ -134,6 +135,8 @@ const DOCTYPE_CONFIG: Record<string, { label: string; color: string; icon: strin
   REGLEMENT_INTERIEUR: { label: "Règlement intérieur", color: "orange", icon: "📖" },
   EVALUATION_CHAUD: { label: "Évaluation à chaud", color: "red", icon: "🔥" },
   EVALUATION_FROID: { label: "Évaluation à froid", color: "blue", icon: "❄️" },
+  // Liens vers évaluations en ligne (cartes QR code)
+  EVALUATION_LINK: { label: "Lien évaluation", color: "violet", icon: "🔗" },
   // Aliases et types génériques (couleur non grise)
   DOCUMENT: { label: "Document", color: "blue", icon: "📄" },
   AUTRE: { label: "Document", color: "indigo", icon: "📄" },
@@ -465,6 +468,11 @@ export default function FileManagerPage() {
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+
+  // Modal QR Code pour liens d'évaluation
+  const [showQRCodeModal, setShowQRCodeModal] = useState(false);
+  const [qrCodeFile, setQrCodeFile] = useState<FileNode | null>(null);
+  const [qrCodeCopied, setQrCodeCopied] = useState(false);
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
 
   // Sélection de dossier pour import
@@ -1691,6 +1699,53 @@ export default function FileManagerPage() {
                   // Nettoyer le nom de fichier (supprimer .html)
                   let displayName = file.originalName || file.name;
                   displayName = displayName.replace(/\.html$/i, "");
+
+                  // Carte spéciale pour les liens d'évaluation (QR codes)
+                  if (file.category === "EVALUATION_LINK") {
+                    return (
+                      <motion.div
+                        key={file.id}
+                        variants={itemVariants}
+                        onClick={() => {
+                          setQrCodeFile(file);
+                          setQrCodeCopied(false);
+                          setShowQRCodeModal(true);
+                        }}
+                        className="group relative flex flex-col items-center p-4 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white hover:border-violet-400 hover:shadow-lg dark:border-violet-800 dark:from-violet-900/20 dark:to-gray-900 dark:hover:border-violet-600 transition-all duration-200 cursor-pointer"
+                      >
+                        {/* QR Code miniature */}
+                        <div className="mb-3 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm transform group-hover:scale-105 transition-transform">
+                          {file.publicUrl && (
+                            <QRCodeSVG
+                              value={file.publicUrl}
+                              size={48}
+                              level="M"
+                              bgColor="transparent"
+                              fgColor="#7C3AED"
+                            />
+                          )}
+                        </div>
+                        <h3 className="font-medium text-violet-900 dark:text-violet-200 text-sm text-center line-clamp-2 mb-1">
+                          {displayName}
+                        </h3>
+                        <span className="text-xs text-violet-600 dark:text-violet-400 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                          Lien d&apos;évaluation
+                        </span>
+                        <span className="text-xs text-gray-400 mt-1">
+                          {new Date(file.createdAt).toLocaleDateString('fr-FR')}
+                        </span>
+                        {/* Badge "QR Code" */}
+                        <div className="absolute top-2 right-2 px-2 py-0.5 bg-violet-100 dark:bg-violet-900/50 rounded-full">
+                          <span className="text-[10px] font-medium text-violet-700 dark:text-violet-300">QR</span>
+                        </div>
+                      </motion.div>
+                    );
+                  }
+
+                  // Carte normale pour les autres fichiers
                   return (
                     <motion.div
                       key={file.id}
@@ -1866,18 +1921,24 @@ export default function FileManagerPage() {
                           // Nettoyer le nom de fichier (supprimer .html)
                           let displayName = file.originalName || file.name;
                           displayName = displayName.replace(/\.html$/i, "");
+                          const isEvaluationLink = file.category === "EVALUATION_LINK";
                           return (
                             <motion.tr
                               key={file.id}
                               variants={itemVariants}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                              className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${isEvaluationLink ? "bg-violet-50/50 dark:bg-violet-900/10" : ""}`}
                             >
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
                                   <span className="text-xl">{config.icon}</span>
-                                  <span className="font-medium text-gray-900 dark:text-white">
+                                  <span className={`font-medium ${isEvaluationLink ? "text-violet-900 dark:text-violet-200" : "text-gray-900 dark:text-white"}`}>
                                     {displayName}
                                   </span>
+                                  {isEvaluationLink && (
+                                    <span className="px-2 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300 rounded-full">
+                                      QR
+                                    </span>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{config.label}</td>
@@ -1886,32 +1947,83 @@ export default function FileManagerPage() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => {
-                                      setPreviewFile(file);
-                                      setShowPreviewModal(true);
-                                    }}
-                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
-                                    title="Voir"
-                                  >
-                                    <EyeIcon />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (file.publicUrl) {
-                                        window.open(file.publicUrl, "_blank");
-                                      }
-                                    }}
-                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
-                                    title="Télécharger"
-                                  >
-                                    <DownloadIcon />
-                                  </button>
+                                  {isEvaluationLink ? (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setQrCodeFile(file);
+                                          setQrCodeCopied(false);
+                                          setShowQRCodeModal(true);
+                                        }}
+                                        className="p-1.5 text-violet-500 hover:text-violet-700 hover:bg-violet-100 rounded transition-colors dark:hover:bg-violet-900/30"
+                                        title="Voir le QR code"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                        </svg>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (file.publicUrl) {
+                                            window.open(file.publicUrl, "_blank");
+                                          }
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                        title="Ouvrir le lien"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (file.publicUrl) {
+                                            navigator.clipboard.writeText(file.publicUrl);
+                                          }
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                        title="Copier le lien"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setPreviewFile(file);
+                                          setShowPreviewModal(true);
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                        title="Voir"
+                                      >
+                                        <EyeIcon />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (file.publicUrl) {
+                                            window.open(file.publicUrl, "_blank");
+                                          }
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                        title="Télécharger"
+                                      >
+                                        <DownloadIcon />
+                                      </button>
+                                    </>
+                                  )}
                                   <button
                                     onClick={() => {
                                       setSendEmail("");
-                                      setSendSubject(`Document: ${displayName}`);
-                                      setSendMessage(`Bonjour,\n\nVeuillez trouver ci-joint le document "${displayName}".\n\nCordialement`);
+                                      if (isEvaluationLink) {
+                                        setSendSubject(`Lien d'évaluation: ${displayName}`);
+                                        setSendMessage(`Bonjour,\n\nVeuillez trouver ci-dessous le lien pour accéder à l'évaluation :\n\n${file.publicUrl}\n\nCordialement`);
+                                      } else {
+                                        setSendSubject(`Document: ${displayName}`);
+                                        setSendMessage(`Bonjour,\n\nVeuillez trouver ci-joint le document "${displayName}".\n\nCordialement`);
+                                      }
                                       setSendSuccess(false);
                                       setShowSendModal(true);
                                     }}
@@ -2136,6 +2248,91 @@ export default function FileManagerPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {selectedApprenant.documents.map((doc) => {
                   const config = DOCTYPE_CONFIG[doc.type] || DOCTYPE_CONFIG.AUTRE;
+
+                  // Carte spéciale pour les évaluations avec QR code
+                  if (doc.mimeType === "application/qrcode" && doc.fileUrl) {
+                    const isCompleted = doc.status === "COMPLETED" || doc.isSigned;
+                    return (
+                      <motion.div
+                        key={doc.id}
+                        variants={itemVariants}
+                        onClick={() => {
+                          // Ouvrir le modal QR code
+                          setQrCodeFile({
+                            id: doc.id,
+                            name: doc.titre,
+                            originalName: doc.titre,
+                            mimeType: "application/qrcode",
+                            size: 0,
+                            storagePath: "",
+                            publicUrl: doc.fileUrl || null,
+                            category: doc.type,
+                            createdAt: doc.createdAt,
+                            formationId: null,
+                          });
+                          setQrCodeCopied(false);
+                          setShowQRCodeModal(true);
+                        }}
+                        className={`group relative flex flex-col items-center p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
+                          isCompleted
+                            ? "border-green-200 bg-gradient-to-br from-green-50 to-white hover:border-green-400 hover:shadow-lg dark:border-green-800 dark:from-green-900/20 dark:to-gray-900 dark:hover:border-green-600"
+                            : "border-violet-200 bg-gradient-to-br from-violet-50 to-white hover:border-violet-400 hover:shadow-lg dark:border-violet-800 dark:from-violet-900/20 dark:to-gray-900 dark:hover:border-violet-600"
+                        }`}
+                      >
+                        {/* Status badge */}
+                        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          isCompleted
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                            : "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300"
+                        }`}>
+                          {isCompleted ? "Complété" : "QR"}
+                        </div>
+
+                        {/* QR Code miniature */}
+                        <div className="mb-3 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm transform group-hover:scale-105 transition-transform">
+                          <QRCodeSVG
+                            value={doc.fileUrl}
+                            size={48}
+                            level="M"
+                            bgColor="transparent"
+                            fgColor={isCompleted ? "#22C55E" : "#7C3AED"}
+                          />
+                        </div>
+
+                        <h3 className={`font-medium text-sm text-center line-clamp-2 mb-1 ${
+                          isCompleted
+                            ? "text-green-900 dark:text-green-200"
+                            : "text-violet-900 dark:text-violet-200"
+                        }`}>
+                          {doc.titre}
+                        </h3>
+                        <span className={`text-xs flex items-center gap-1 ${
+                          isCompleted
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-violet-600 dark:text-violet-400"
+                        }`}>
+                          {isCompleted ? (
+                            <>
+                              <CheckCircleIcon />
+                              Évaluation complétée
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                              </svg>
+                              Lien d&apos;évaluation
+                            </>
+                          )}
+                        </span>
+                        <span className="text-xs text-gray-400 mt-1">
+                          {formatDate(doc.createdAt)}
+                        </span>
+                      </motion.div>
+                    );
+                  }
+
+                  // Carte normale pour les autres documents
                   return (
                     <motion.div
                       key={doc.id}
@@ -2209,22 +2406,57 @@ export default function FileManagerPage() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                     {selectedApprenant.documents.map((doc) => {
                       const config = DOCTYPE_CONFIG[doc.type] || DOCTYPE_CONFIG.AUTRE;
+                      const isQrCode = doc.mimeType === "application/qrcode" && doc.fileUrl;
+                      const isCompleted = doc.status === "COMPLETED" || doc.isSigned;
+
                       return (
                         <motion.tr
                           key={doc.id}
                           variants={itemVariants}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                          className={`transition-colors ${
+                            isQrCode
+                              ? isCompleted
+                                ? "bg-green-50/50 hover:bg-green-50 dark:bg-green-900/10 dark:hover:bg-green-900/20"
+                                : "bg-violet-50/50 hover:bg-violet-50 dark:bg-violet-900/10 dark:hover:bg-violet-900/20"
+                              : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                          }`}
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <span className="text-lg">{config.icon}</span>
-                              <span className="font-medium text-gray-900 dark:text-white">{doc.titre}</span>
+                              {isQrCode ? (
+                                <div className="p-1 bg-white dark:bg-gray-800 rounded shadow-sm">
+                                  <QRCodeSVG
+                                    value={doc.fileUrl || ""}
+                                    size={24}
+                                    level="M"
+                                    bgColor="transparent"
+                                    fgColor={isCompleted ? "#22C55E" : "#7C3AED"}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="text-lg">{config.icon}</span>
+                              )}
+                              <span className={`font-medium ${
+                                isQrCode
+                                  ? isCompleted
+                                    ? "text-green-700 dark:text-green-300"
+                                    : "text-violet-700 dark:text-violet-300"
+                                  : "text-gray-900 dark:text-white"
+                              }`}>{doc.titre}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{config.label}</td>
                           <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{formatDate(doc.createdAt)}</td>
                           <td className="px-4 py-3">
-                            {(() => {
+                            {isQrCode ? (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                isCompleted
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                                  : "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300"
+                              }`}>
+                                {isCompleted ? <><CheckCircleIcon /> Complété</> : "En attente"}
+                              </span>
+                            ) : (() => {
                               const statusDisplay = getDocStatusDisplay(doc);
                               return (
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusDisplay.bgClass} ${statusDisplay.textClass}`}>
@@ -2237,30 +2469,72 @@ export default function FileManagerPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => openDocumentPreview(doc)}
-                                className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
-                                title="Voir"
-                              >
-                                <EyeIcon />
-                              </button>
-                              <button
-                                onClick={() => downloadDocWithLoad(doc)}
-                                className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
-                                title="Télécharger"
-                              >
-                                <DownloadIcon />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setPreviewDoc(doc);
-                                  openSendModal(doc);
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
-                                title="Partager par email"
-                              >
-                                <SendIcon />
-                              </button>
+                              {isQrCode ? (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setQrCodeFile({
+                                        id: doc.id,
+                                        name: doc.titre,
+                                        originalName: doc.titre,
+                                        mimeType: "application/qrcode",
+                                        size: 0,
+                                        storagePath: "",
+                                        publicUrl: doc.fileUrl || null,
+                                        category: doc.type,
+                                        createdAt: doc.createdAt,
+                                        formationId: null,
+                                      });
+                                      setQrCodeCopied(false);
+                                      setShowQRCodeModal(true);
+                                    }}
+                                    className="p-1.5 text-violet-500 hover:text-violet-700 rounded transition-colors"
+                                    title="Voir le QR Code"
+                                  >
+                                    <EyeIcon />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (doc.fileUrl) {
+                                        navigator.clipboard.writeText(doc.fileUrl);
+                                      }
+                                    }}
+                                    className="p-1.5 text-violet-500 hover:text-violet-700 rounded transition-colors"
+                                    title="Copier le lien"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => openDocumentPreview(doc)}
+                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                    title="Voir"
+                                  >
+                                    <EyeIcon />
+                                  </button>
+                                  <button
+                                    onClick={() => downloadDocWithLoad(doc)}
+                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                    title="Télécharger"
+                                  >
+                                    <DownloadIcon />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setPreviewDoc(doc);
+                                      openSendModal(doc);
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded transition-colors"
+                                    title="Partager par email"
+                                  >
+                                    <SendIcon />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </motion.tr>
@@ -2331,6 +2605,133 @@ export default function FileManagerPage() {
           }}
         />
       )}
+
+      {/* Modal QR Code pour liens d'évaluation */}
+      <AnimatePresence>
+        {showQRCodeModal && qrCodeFile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowQRCodeModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-violet-50 to-white dark:from-violet-900/20 dark:to-gray-900">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
+                    <svg className="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      QR Code d&apos;évaluation
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                      {qrCodeFile.originalName || qrCodeFile.name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowQRCodeModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* QR Code */}
+              <div className="p-8 flex flex-col items-center">
+                <div className="p-6 bg-white rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+                  {qrCodeFile.publicUrl && (
+                    <QRCodeSVG
+                      value={qrCodeFile.publicUrl}
+                      size={200}
+                      level="H"
+                      includeMargin={true}
+                      bgColor="#FFFFFF"
+                      fgColor="#1F2937"
+                    />
+                  )}
+                </div>
+                <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
+                  Scannez ce QR code pour accéder à l&apos;évaluation
+                </p>
+              </div>
+
+              {/* URL et actions */}
+              <div className="px-6 pb-6 space-y-4">
+                {/* URL copiable */}
+                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <span className="text-sm text-gray-600 dark:text-gray-300 truncate flex-1">
+                    {qrCodeFile.publicUrl}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (qrCodeFile.publicUrl) {
+                        navigator.clipboard.writeText(qrCodeFile.publicUrl);
+                        setQrCodeCopied(true);
+                        setTimeout(() => setQrCodeCopied(false), 2000);
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                      qrCodeCopied
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50"
+                    }`}
+                  >
+                    {qrCodeCopied ? "Copié !" : "Copier"}
+                  </button>
+                </div>
+
+                {/* Boutons d'action */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (qrCodeFile.publicUrl) {
+                        window.open(qrCodeFile.publicUrl, "_blank");
+                      }
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-700 bg-violet-100 rounded-lg hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Ouvrir le lien
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSendEmail("");
+                      setSendSubject(`Lien d'évaluation: ${qrCodeFile.originalName || qrCodeFile.name}`);
+                      setSendMessage(`Bonjour,\n\nVeuillez trouver ci-dessous le lien pour accéder à l'évaluation :\n\n${qrCodeFile.publicUrl}\n\nCordialement`);
+                      setSendSuccess(false);
+                      setShowQRCodeModal(false);
+                      setShowSendModal(true);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
+                  >
+                    <SendIcon />
+                    Partager par email
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modal de preview pour documents d'apprenants avec TipTap */}
       <AnimatePresence>

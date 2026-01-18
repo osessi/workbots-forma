@@ -771,7 +771,6 @@ export async function GET() {
           if (apprenant) {
             // Générer le titre basé sur le type
             const typeLabel = evaluation.type === "CHAUD" ? "Évaluation à chaud" : "Évaluation à froid";
-            const statusLabel = evaluation.status === "COMPLETED" ? "Complétée" : "En attente";
 
             // Générer l'URL du QR code
             const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.formalearning.fr";
